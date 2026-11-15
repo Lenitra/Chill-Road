@@ -1,0 +1,3623 @@
+{
+ "items": [
+  {
+   "id": "chalet_a",
+   "file": "Chalet_A",
+   "category": "chalet",
+   "tags": [
+    "habitat"
+   ],
+   "sx": 12.68,
+   "sy": 8.88,
+   "sz": 12.52,
+   "fw": 10.0,
+   "fd": 9.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "chalet_b",
+   "file": "Chalet_B",
+   "category": "chalet",
+   "tags": [
+    "habitat"
+   ],
+   "sx": 10.68,
+   "sy": 8.31,
+   "sz": 12.12,
+   "fw": 8.0,
+   "fd": 9.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "chalet_c",
+   "file": "Chalet_C",
+   "category": "chalet",
+   "tags": [
+    "habitat"
+   ],
+   "sx": 16.08,
+   "sy": 11.13,
+   "sz": 15.12,
+   "fw": 13.0,
+   "fd": 11.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "chalet_d",
+   "file": "Chalet_D",
+   "category": "chalet",
+   "tags": [
+    "habitat"
+   ],
+   "sx": 16.35,
+   "sy": 9.35,
+   "sz": 13.52,
+   "fw": 11.0,
+   "fd": 10.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "chalet_e",
+   "file": "Chalet_E",
+   "category": "chalet",
+   "tags": [
+    "habitat",
+    "large"
+   ],
+   "sx": 17.28,
+   "sy": 12.25,
+   "sz": 16.52,
+   "fw": 14.0,
+   "fd": 12.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "chalet_f",
+   "file": "Chalet_F",
+   "category": "chalet",
+   "tags": [
+    "habitat",
+    "alpage",
+    "small"
+   ],
+   "sx": 8.58,
+   "sy": 5.89,
+   "sz": 8.72,
+   "fw": 6.5,
+   "fd": 6.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "chalet_g",
+   "file": "Chalet_G",
+   "category": "chalet",
+   "tags": [
+    "habitat"
+   ],
+   "sx": 13.95,
+   "sy": 8.68,
+   "sz": 13.52,
+   "fw": 9.0,
+   "fd": 10.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "chalet_h",
+   "file": "Chalet_H",
+   "category": "chalet",
+   "tags": [
+    "habitat"
+   ],
+   "sx": 14.68,
+   "sy": 9.49,
+   "sz": 13.22,
+   "fw": 12.0,
+   "fd": 9.5,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "townhouse_a",
+   "file": "TownHouse_A",
+   "category": "townhouse",
+   "tags": [
+    "row",
+    "shop",
+    "bakery"
+   ],
+   "sx": 8.0,
+   "sy": 14.7,
+   "sz": 11.97,
+   "fw": 8.0,
+   "fd": 10.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "townhouse_b",
+   "file": "TownHouse_B",
+   "category": "townhouse",
+   "tags": [
+    "row"
+   ],
+   "sx": 6.0,
+   "sy": 17.18,
+   "sz": 10.32,
+   "fw": 6.0,
+   "fd": 9.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "townhouse_c",
+   "file": "TownHouse_C",
+   "category": "townhouse",
+   "tags": [
+    "row",
+    "shop",
+    "cafe"
+   ],
+   "sx": 10.0,
+   "sy": 15.12,
+   "sz": 12.97,
+   "fw": 10.0,
+   "fd": 11.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "townhouse_d",
+   "file": "TownHouse_D",
+   "category": "townhouse",
+   "tags": [
+    "row"
+   ],
+   "sx": 7.0,
+   "sy": 14.7,
+   "sz": 11.32,
+   "fw": 7.0,
+   "fd": 10.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "townhouse_e",
+   "file": "TownHouse_E",
+   "category": "townhouse",
+   "tags": [
+    "row",
+    "shop",
+    "pharmacy"
+   ],
+   "sx": 9.0,
+   "sy": 17.6,
+   "sz": 11.75,
+   "fw": 9.0,
+   "fd": 10.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "townhouse_f",
+   "file": "TownHouse_F",
+   "category": "townhouse",
+   "tags": [
+    "row"
+   ],
+   "sx": 11.0,
+   "sy": 15.12,
+   "sz": 12.8,
+   "fw": 11.0,
+   "fd": 11.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "townhouse_g",
+   "file": "TownHouse_G",
+   "category": "townhouse",
+   "tags": [
+    "row",
+    "shop",
+    "ski"
+   ],
+   "sx": 9.0,
+   "sy": 14.7,
+   "sz": 11.97,
+   "fw": 9.0,
+   "fd": 10.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "townhouse_h",
+   "file": "TownHouse_H",
+   "category": "townhouse",
+   "tags": [
+    "row",
+    "shop",
+    "grocery"
+   ],
+   "sx": 7.0,
+   "sy": 14.28,
+   "sz": 10.97,
+   "fw": 7.0,
+   "fd": 9.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "townhouse_i",
+   "file": "TownHouse_I",
+   "category": "townhouse",
+   "tags": [
+    "row",
+    "shop",
+    "restaurant"
+   ],
+   "sx": 10.0,
+   "sy": 13.33,
+   "sz": 12.93,
+   "fw": 10.0,
+   "fd": 11.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "townhouse_j",
+   "file": "TownHouse_J",
+   "category": "townhouse",
+   "tags": [
+    "row"
+   ],
+   "sx": 7.5,
+   "sy": 16.07,
+   "sz": 11.24,
+   "fw": 7.5,
+   "fd": 10.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "townhouse_k",
+   "file": "TownHouse_K",
+   "category": "townhouse",
+   "tags": [
+    "row",
+    "shop",
+    "souvenir"
+   ],
+   "sx": 8.5,
+   "sy": 14.7,
+   "sz": 11.97,
+   "fw": 8.5,
+   "fd": 10.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "church",
+   "file": "Church",
+   "category": "landmark",
+   "tags": [
+    "church"
+   ],
+   "sx": 15.86,
+   "sy": 36.3,
+   "sz": 30.55,
+   "fw": 10.5,
+   "fd": 28.8,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "townhall",
+   "file": "TownHall",
+   "category": "landmark",
+   "tags": [
+    "townhall"
+   ],
+   "sx": 19.52,
+   "sy": 21.69,
+   "sz": 16.18,
+   "fw": 18.0,
+   "fd": 12.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "hotel_grand",
+   "file": "Hotel_Grand",
+   "category": "landmark",
+   "tags": [
+    "hotel"
+   ],
+   "sx": 30.88,
+   "sy": 26.82,
+   "sz": 18.86,
+   "fw": 30.0,
+   "fd": 15.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "hotel_chalet",
+   "file": "Hotel_Chalet",
+   "category": "landmark",
+   "tags": [
+    "hotel",
+    "station"
+   ],
+   "sx": 27.48,
+   "sy": 16.28,
+   "sz": 19.81,
+   "fw": 24.0,
+   "fd": 14.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "apartment_ski",
+   "file": "Apartment_Ski",
+   "category": "ski",
+   "tags": [
+    "residence",
+    "habitat"
+   ],
+   "sx": 27.94,
+   "sy": 20.12,
+   "sz": 16.52,
+   "fw": 26.0,
+   "fd": 14.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "chapel",
+   "file": "Chapel",
+   "category": "landmark",
+   "tags": [
+    "chapel"
+   ],
+   "sx": 6.82,
+   "sy": 12.44,
+   "sz": 11.85,
+   "fw": 5.6,
+   "fd": 10.8,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "school",
+   "file": "School",
+   "category": "landmark",
+   "tags": [
+    "school"
+   ],
+   "sx": 27.96,
+   "sy": 11.12,
+   "sz": 13.6,
+   "fw": 20.0,
+   "fd": 10.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "firestation",
+   "file": "FireStation",
+   "category": "landmark",
+   "tags": [
+    "service"
+   ],
+   "sx": 17.93,
+   "sy": 19.5,
+   "sz": 16.46,
+   "fw": 16.0,
+   "fd": 11.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "gasstation",
+   "file": "GasStation",
+   "category": "landmark",
+   "tags": [
+    "service",
+    "fuel"
+   ],
+   "sx": 16.81,
+   "sy": 6.53,
+   "sz": 14.86,
+   "fw": 18.0,
+   "fd": 16.0,
+   "collider": "mesh",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [
+    3.5,
+    4.9,
+    2.5,
+    -3.5,
+    4.9,
+    2.5
+   ],
+   "material": ""
+  },
+  {
+   "id": "supermarket",
+   "file": "Supermarket",
+   "category": "landmark",
+   "tags": [
+    "service",
+    "shop"
+   ],
+   "sx": 24.44,
+   "sy": 7.22,
+   "sz": 21.4,
+   "fw": 24.0,
+   "fd": 16.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "garage",
+   "file": "Garage",
+   "category": "landmark",
+   "tags": [
+    "service"
+   ],
+   "sx": 15.96,
+   "sy": 6.41,
+   "sz": 11.3,
+   "fw": 14.0,
+   "fd": 10.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sawmill",
+   "file": "Sawmill",
+   "category": "landmark",
+   "tags": [
+    "industry",
+    "wood"
+   ],
+   "sx": 25.82,
+   "sy": 6.3,
+   "sz": 9.92,
+   "fw": 26.0,
+   "fd": 9.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "dairy",
+   "file": "Dairy",
+   "category": "landmark",
+   "tags": [
+    "shop",
+    "farm"
+   ],
+   "sx": 14.68,
+   "sy": 9.12,
+   "sz": 13.87,
+   "fw": 12.0,
+   "fd": 10.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "restaurant_altitude",
+   "file": "Restaurant_Altitude",
+   "category": "landmark",
+   "tags": [
+    "restaurant",
+    "summit"
+   ],
+   "sx": 16.68,
+   "sy": 9.15,
+   "sz": 17.88,
+   "fw": 16.0,
+   "fd": 16.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "refuge",
+   "file": "Refuge",
+   "category": "landmark",
+   "tags": [
+    "refuge",
+    "summit"
+   ],
+   "sx": 13.02,
+   "sy": 8.29,
+   "sz": 8.81,
+   "fw": 9.0,
+   "fd": 7.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "tower_ruin",
+   "file": "Tower_Ruin",
+   "category": "landmark",
+   "tags": [
+    "ruin",
+    "viewpoint"
+   ],
+   "sx": 20.53,
+   "sy": 15.5,
+   "sz": 14.38,
+   "fw": 18.0,
+   "fd": 9.0,
+   "collider": "capsule",
+   "radius": 4.3,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "monument",
+   "file": "Monument",
+   "category": "landmark",
+   "tags": [
+    "plaza"
+   ],
+   "sx": 6.48,
+   "sy": 9.02,
+   "sz": 6.48,
+   "fw": 5.0,
+   "fd": 5.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.6,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "fountain_plaza",
+   "file": "Fountain_Plaza",
+   "category": "landmark",
+   "tags": [
+    "plaza",
+    "fountain"
+   ],
+   "sx": 7.12,
+   "sy": 4.08,
+   "sz": 7.08,
+   "fw": 5.8,
+   "fd": 5.8,
+   "collider": "capsule",
+   "radius": 2.7,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "bandstand",
+   "file": "Bandstand",
+   "category": "landmark",
+   "tags": [
+    "plaza"
+   ],
+   "sx": 8.45,
+   "sy": 7.2,
+   "sz": 8.97,
+   "fw": 7.6,
+   "fd": 7.6,
+   "collider": "mesh",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "watermill",
+   "file": "WaterMill",
+   "category": "landmark",
+   "tags": [
+    "mill",
+    "river"
+   ],
+   "sx": 12.11,
+   "sy": 8.53,
+   "sz": 13.28,
+   "fw": 11.0,
+   "fd": 6.5,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "radio_tower",
+   "file": "Radio_Tower",
+   "category": "landmark",
+   "tags": [
+    "tower",
+    "summit"
+   ],
+   "sx": 10.47,
+   "sy": 43.0,
+   "sz": 8.48,
+   "fw": 7.6,
+   "fd": 5.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -1.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "summit_cross",
+   "file": "Summit_Cross",
+   "category": "landmark",
+   "tags": [
+    "summit"
+   ],
+   "sx": 5.22,
+   "sy": 5.73,
+   "sz": 2.86,
+   "fw": 3.0,
+   "fd": 3.0,
+   "collider": "capsule",
+   "radius": 1.0,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "lamp_alpine",
+   "file": "Lamp_Alpine",
+   "category": "street",
+   "tags": [
+    "lamp"
+   ],
+   "sx": 1.21,
+   "sy": 4.8,
+   "sz": 0.58,
+   "fw": 1.21,
+   "fd": 0.58,
+   "collider": "capsule",
+   "radius": 0.16,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [
+    0.0,
+    4.05,
+    0.0
+   ],
+   "material": ""
+  },
+  {
+   "id": "lamp_road",
+   "file": "Lamp_Road",
+   "category": "street",
+   "tags": [
+    "lamp"
+   ],
+   "sx": 0.48,
+   "sy": 8.17,
+   "sz": 2.66,
+   "fw": 0.48,
+   "fd": 2.66,
+   "collider": "capsule",
+   "radius": 0.12,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [
+    0.0,
+    7.95,
+    1.95
+   ],
+   "material": ""
+  },
+  {
+   "id": "barn_alpine",
+   "file": "Barn_Alpine",
+   "category": "farm",
+   "tags": [
+    "barn"
+   ],
+   "sx": 18.91,
+   "sy": 9.15,
+   "sz": 18.62,
+   "fw": 14.0,
+   "fd": 10.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "cowshed",
+   "file": "Cowshed",
+   "category": "farm",
+   "tags": [
+    "barn",
+    "long"
+   ],
+   "sx": 25.1,
+   "sy": 5.66,
+   "sz": 10.12,
+   "fw": 18.0,
+   "fd": 8.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "mazot",
+   "file": "Mazot",
+   "category": "farm",
+   "tags": [
+    "granary",
+    "small"
+   ],
+   "sx": 5.92,
+   "sy": 4.24,
+   "sz": 6.54,
+   "fw": 4.2,
+   "fd": 4.6,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "alpage_hut",
+   "file": "Alpage_Hut",
+   "category": "farm",
+   "tags": [
+    "alpage",
+    "small"
+   ],
+   "sx": 7.8,
+   "sy": 4.02,
+   "sz": 6.5,
+   "fw": 7.0,
+   "fd": 5.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "hayloft",
+   "file": "Hayloft",
+   "category": "farm",
+   "tags": [
+    "barn",
+    "small"
+   ],
+   "sx": 6.0,
+   "sy": 4.02,
+   "sz": 5.76,
+   "fw": 5.0,
+   "fd": 4.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "chicken_coop",
+   "file": "Chicken_Coop",
+   "category": "rural",
+   "tags": [
+    "farm"
+   ],
+   "sx": 3.29,
+   "sy": 2.01,
+   "sz": 4.03,
+   "fw": 3.4,
+   "fd": 4.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "beehives",
+   "file": "Beehives",
+   "category": "rural",
+   "tags": [
+    "farm"
+   ],
+   "sx": 4.2,
+   "sy": 2.21,
+   "sz": 1.42,
+   "fw": 4.0,
+   "fd": 1.4,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.6,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "trough",
+   "file": "Trough",
+   "category": "rural",
+   "tags": [
+    "fountain"
+   ],
+   "sx": 3.38,
+   "sy": 1.5,
+   "sz": 1.02,
+   "fw": 3.0,
+   "fd": 1.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "haybale_round",
+   "file": "HayBale_Round",
+   "category": "rural",
+   "tags": [
+    "hay"
+   ],
+   "sx": 1.24,
+   "sy": 1.4,
+   "sz": 1.44,
+   "fw": 1.24,
+   "fd": 1.44,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.04,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "haybale_stack",
+   "file": "HayBale_Stack",
+   "category": "rural",
+   "tags": [
+    "hay"
+   ],
+   "sx": 2.13,
+   "sy": 1.6,
+   "sz": 1.72,
+   "fw": 2.13,
+   "fd": 1.72,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "woodpile",
+   "file": "WoodPile",
+   "category": "rural",
+   "tags": [
+    "wood"
+   ],
+   "sx": 3.54,
+   "sy": 1.84,
+   "sz": 0.96,
+   "fw": 3.2,
+   "fd": 0.7,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "hay_cart",
+   "file": "Hay_Cart",
+   "category": "rural",
+   "tags": [
+    "hay",
+    "farm"
+   ],
+   "sx": 1.83,
+   "sy": 2.55,
+   "sz": 5.27,
+   "fw": 1.8,
+   "fd": 3.4,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "scarecrow",
+   "file": "Scarecrow",
+   "category": "rural",
+   "tags": [
+    "farm"
+   ],
+   "sx": 2.03,
+   "sy": 2.2,
+   "sz": 0.84,
+   "fw": 2.03,
+   "fd": 0.84,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "wood_fence",
+   "file": "Wood_Fence",
+   "category": "rural",
+   "tags": [
+    "fence",
+    "linear"
+   ],
+   "sx": 3.08,
+   "sy": 1.33,
+   "sz": 0.28,
+   "fw": 3.0,
+   "fd": 0.15,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 3.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "stone_wall",
+   "file": "Stone_Wall",
+   "category": "rural",
+   "tags": [
+    "wall",
+    "linear"
+   ],
+   "sx": 4.18,
+   "sy": 1.1,
+   "sz": 0.74,
+   "fw": 4.0,
+   "fd": 0.6,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 4.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "gate_wood",
+   "file": "Gate_Wood",
+   "category": "rural",
+   "tags": [
+    "fence"
+   ],
+   "sx": 3.2,
+   "sy": 1.62,
+   "sz": 0.23,
+   "fw": 3.2,
+   "fd": 0.2,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "picnic_table",
+   "file": "Picnic_Table",
+   "category": "rural",
+   "tags": [
+    "leisure"
+   ],
+   "sx": 1.81,
+   "sy": 0.78,
+   "sz": 1.75,
+   "fw": 1.8,
+   "fd": 1.8,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.02,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "tent",
+   "file": "Tent",
+   "category": "rural",
+   "tags": [
+    "camping",
+    "leisure"
+   ],
+   "sx": 3.26,
+   "sy": 1.42,
+   "sz": 3.91,
+   "fw": 2.2,
+   "fd": 2.4,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.1,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "caravan",
+   "file": "Caravan",
+   "category": "rural",
+   "tags": [
+    "camping",
+    "leisure"
+   ],
+   "sx": 2.3,
+   "sy": 2.51,
+   "sz": 5.93,
+   "fw": 2.3,
+   "fd": 6.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.05,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "bench",
+   "file": "Bench",
+   "category": "street",
+   "tags": [
+    "seat"
+   ],
+   "sx": 1.84,
+   "sy": 0.94,
+   "sz": 0.66,
+   "fw": 1.8,
+   "fd": 0.6,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "bin",
+   "file": "Bin",
+   "category": "street",
+   "tags": [
+    "small"
+   ],
+   "sx": 0.68,
+   "sy": 1.08,
+   "sz": 0.75,
+   "fw": 0.68,
+   "fd": 0.75,
+   "collider": "capsule",
+   "radius": 0.3,
+   "module": 0.0,
+   "ymin": -0.3,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "planter",
+   "file": "Planter",
+   "category": "street",
+   "tags": [
+    "flowers"
+   ],
+   "sx": 1.69,
+   "sy": 1.01,
+   "sz": 0.69,
+   "fw": 1.6,
+   "fd": 0.6,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.02,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "flower_pot",
+   "file": "Flower_Pot",
+   "category": "street",
+   "tags": [
+    "flowers",
+    "small"
+   ],
+   "sx": 1.03,
+   "sy": 0.87,
+   "sz": 0.99,
+   "fw": 1.03,
+   "fd": 0.99,
+   "collider": "capsule",
+   "radius": 0.4,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "bollard",
+   "file": "Bollard",
+   "category": "street",
+   "tags": [
+    "small"
+   ],
+   "sx": 0.23,
+   "sy": 1.1,
+   "sz": 0.23,
+   "fw": 0.23,
+   "fd": 0.23,
+   "collider": "capsule",
+   "radius": 0.1,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "busstop",
+   "file": "BusStop",
+   "category": "street",
+   "tags": [
+    "shelter"
+   ],
+   "sx": 5.05,
+   "sy": 2.7,
+   "sz": 2.02,
+   "fw": 4.2,
+   "fd": 2.0,
+   "collider": "mesh",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [
+    0.0,
+    2.4,
+    -0.6
+   ],
+   "material": ""
+  },
+  {
+   "id": "mailbox",
+   "file": "Mailbox",
+   "category": "street",
+   "tags": [
+    "small"
+   ],
+   "sx": 0.5,
+   "sy": 1.53,
+   "sz": 0.37,
+   "fw": 0.5,
+   "fd": 0.37,
+   "collider": "capsule",
+   "radius": 0.25,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "hydrant",
+   "file": "Hydrant",
+   "category": "street",
+   "tags": [
+    "small"
+   ],
+   "sx": 0.47,
+   "sy": 0.8,
+   "sz": 0.42,
+   "fw": 0.47,
+   "fd": 0.42,
+   "collider": "capsule",
+   "radius": 0.15,
+   "module": 0.0,
+   "ymin": -0.3,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "bicycle",
+   "file": "Bicycle",
+   "category": "street",
+   "tags": [
+    "small"
+   ],
+   "sx": 0.58,
+   "sy": 1.04,
+   "sz": 1.75,
+   "fw": 0.6,
+   "fd": 1.8,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.02,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "bike_rack",
+   "file": "Bike_Rack",
+   "category": "street",
+   "tags": [
+    "bikes"
+   ],
+   "sx": 1.92,
+   "sy": 1.04,
+   "sz": 1.75,
+   "fw": 2.2,
+   "fd": 1.8,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "cafe_table",
+   "file": "Cafe_Table",
+   "category": "street",
+   "tags": [
+    "terrace"
+   ],
+   "sx": 1.95,
+   "sy": 0.92,
+   "sz": 1.71,
+   "fw": 2.0,
+   "fd": 2.0,
+   "collider": "capsule",
+   "radius": 0.5,
+   "module": 0.0,
+   "ymin": -0.01,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "parasol_table",
+   "file": "Parasol_Table",
+   "category": "street",
+   "tags": [
+    "terrace"
+   ],
+   "sx": 3.0,
+   "sy": 2.54,
+   "sz": 3.0,
+   "fw": 3.0,
+   "fd": 3.0,
+   "collider": "capsule",
+   "radius": 0.5,
+   "module": 0.0,
+   "ymin": -0.01,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "market_stall_a",
+   "file": "Market_Stall_A",
+   "category": "street",
+   "tags": [
+    "market"
+   ],
+   "sx": 3.62,
+   "sy": 2.8,
+   "sz": 2.41,
+   "fw": 3.2,
+   "fd": 2.2,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "market_stall_b",
+   "file": "Market_Stall_B",
+   "category": "street",
+   "tags": [
+    "market"
+   ],
+   "sx": 3.62,
+   "sy": 2.8,
+   "sz": 2.41,
+   "fw": 3.2,
+   "fd": 2.2,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "flagpole_red",
+   "file": "Flagpole_Red",
+   "category": "street",
+   "tags": [
+    "flag"
+   ],
+   "sx": 1.83,
+   "sy": 9.17,
+   "sz": 0.34,
+   "fw": 1.83,
+   "fd": 0.34,
+   "collider": "capsule",
+   "radius": 0.1,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "flagpole_blue",
+   "file": "Flagpole_Blue",
+   "category": "street",
+   "tags": [
+    "flag"
+   ],
+   "sx": 1.83,
+   "sy": 9.17,
+   "sz": 0.34,
+   "fw": 1.83,
+   "fd": 0.34,
+   "collider": "capsule",
+   "radius": 0.1,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "clock_post",
+   "file": "Clock_Post",
+   "category": "street",
+   "tags": [
+    "plaza"
+   ],
+   "sx": 1.0,
+   "sy": 4.79,
+   "sz": 0.55,
+   "fw": 1.0,
+   "fd": 0.55,
+   "collider": "capsule",
+   "radius": 0.14,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "info_board",
+   "file": "Info_Board",
+   "category": "street",
+   "tags": [
+    "tourism"
+   ],
+   "sx": 2.3,
+   "sy": 2.37,
+   "sz": 0.86,
+   "fw": 2.0,
+   "fd": 0.3,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "billboard",
+   "file": "Billboard",
+   "category": "street",
+   "tags": [
+    "advert"
+   ],
+   "sx": 6.2,
+   "sy": 5.97,
+   "sz": 2.73,
+   "fw": 6.0,
+   "fd": 0.4,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.48,
+   "lights": [
+    0.0,
+    5.8,
+    0.5
+   ],
+   "material": ""
+  },
+  {
+   "id": "recycling_bins",
+   "file": "Recycling_Bins",
+   "category": "street",
+   "tags": [
+    "service"
+   ],
+   "sx": 4.39,
+   "sy": 1.99,
+   "sz": 1.31,
+   "fw": 4.4,
+   "fd": 1.2,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "utility_pole",
+   "file": "Utility_Pole",
+   "category": "street",
+   "tags": [
+    "pole",
+    "lamp"
+   ],
+   "sx": 2.2,
+   "sy": 8.5,
+   "sz": 1.45,
+   "fw": 2.2,
+   "fd": 1.45,
+   "collider": "capsule",
+   "radius": 0.15,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [
+    0.0,
+    6.42,
+    1.05
+   ],
+   "material": ""
+  },
+  {
+   "id": "transformer",
+   "file": "Transformer",
+   "category": "street",
+   "tags": [
+    "service"
+   ],
+   "sx": 3.3,
+   "sy": 3.94,
+   "sz": 2.91,
+   "fw": 2.6,
+   "fd": 2.2,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "phone_booth",
+   "file": "Phone_Booth",
+   "category": "street",
+   "tags": [
+    "service"
+   ],
+   "sx": 1.11,
+   "sy": 2.62,
+   "sz": 1.12,
+   "fw": 1.05,
+   "fd": 1.05,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.4,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_speed30",
+   "file": "Sign_Speed30",
+   "category": "sign",
+   "tags": [
+    "speed"
+   ],
+   "sx": 0.72,
+   "sy": 2.68,
+   "sz": 0.22,
+   "fw": 0.72,
+   "fd": 0.22,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_speed50",
+   "file": "Sign_Speed50",
+   "category": "sign",
+   "tags": [
+    "speed"
+   ],
+   "sx": 0.72,
+   "sy": 2.68,
+   "sz": 0.22,
+   "fw": 0.72,
+   "fd": 0.22,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_speed80",
+   "file": "Sign_Speed80",
+   "category": "sign",
+   "tags": [
+    "speed"
+   ],
+   "sx": 0.72,
+   "sy": 2.68,
+   "sz": 0.22,
+   "fw": 0.72,
+   "fd": 0.22,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_hairpin",
+   "file": "Sign_Hairpin",
+   "category": "sign",
+   "tags": [
+    "warning",
+    "curve"
+   ],
+   "sx": 0.79,
+   "sy": 2.7,
+   "sz": 0.22,
+   "fw": 0.79,
+   "fd": 0.22,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_curve_l",
+   "file": "Sign_Curve_L",
+   "category": "sign",
+   "tags": [
+    "warning",
+    "curve"
+   ],
+   "sx": 0.79,
+   "sy": 2.7,
+   "sz": 0.22,
+   "fw": 0.79,
+   "fd": 0.22,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_curve_r",
+   "file": "Sign_Curve_R",
+   "category": "sign",
+   "tags": [
+    "warning",
+    "curve"
+   ],
+   "sx": 0.79,
+   "sy": 2.7,
+   "sz": 0.22,
+   "fw": 0.79,
+   "fd": 0.22,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_steep",
+   "file": "Sign_Steep",
+   "category": "sign",
+   "tags": [
+    "warning"
+   ],
+   "sx": 0.79,
+   "sy": 2.7,
+   "sz": 0.22,
+   "fw": 0.79,
+   "fd": 0.22,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_rockfall",
+   "file": "Sign_Rockfall",
+   "category": "sign",
+   "tags": [
+    "warning"
+   ],
+   "sx": 0.79,
+   "sy": 2.7,
+   "sz": 0.22,
+   "fw": 0.79,
+   "fd": 0.22,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_cattle",
+   "file": "Sign_Cattle",
+   "category": "sign",
+   "tags": [
+    "warning"
+   ],
+   "sx": 0.79,
+   "sy": 2.7,
+   "sz": 0.22,
+   "fw": 0.79,
+   "fd": 0.22,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_yield",
+   "file": "Sign_Yield",
+   "category": "sign",
+   "tags": [
+    "priority"
+   ],
+   "sx": 0.79,
+   "sy": 2.62,
+   "sz": 0.22,
+   "fw": 0.79,
+   "fd": 0.22,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_stop",
+   "file": "Sign_Stop",
+   "category": "sign",
+   "tags": [
+    "priority"
+   ],
+   "sx": 0.74,
+   "sy": 2.67,
+   "sz": 0.22,
+   "fw": 0.74,
+   "fd": 0.22,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_noentry",
+   "file": "Sign_NoEntry",
+   "category": "sign",
+   "tags": [
+    "priority"
+   ],
+   "sx": 0.72,
+   "sy": 2.68,
+   "sz": 0.22,
+   "fw": 0.72,
+   "fd": 0.22,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_parking",
+   "file": "Sign_Parking",
+   "category": "sign",
+   "tags": [
+    "info"
+   ],
+   "sx": 0.7,
+   "sy": 2.72,
+   "sz": 0.22,
+   "fw": 0.7,
+   "fd": 0.22,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_town",
+   "file": "Sign_Town",
+   "category": "sign",
+   "tags": [
+    "info",
+    "town"
+   ],
+   "sx": 2.0,
+   "sy": 2.32,
+   "sz": 0.22,
+   "fw": 2.0,
+   "fd": 0.2,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_direction",
+   "file": "Sign_Direction",
+   "category": "sign",
+   "tags": [
+    "info"
+   ],
+   "sx": 2.6,
+   "sy": 3.22,
+   "sz": 0.29,
+   "fw": 2.6,
+   "fd": 0.2,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_hiking",
+   "file": "Sign_Hiking",
+   "category": "sign",
+   "tags": [
+    "info",
+    "hiking"
+   ],
+   "sx": 1.7,
+   "sy": 2.62,
+   "sz": 0.26,
+   "fw": 1.8,
+   "fd": 0.2,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "chevron",
+   "file": "Chevron",
+   "category": "sign",
+   "tags": [
+    "curve",
+    "small"
+   ],
+   "sx": 0.62,
+   "sy": 1.52,
+   "sz": 0.22,
+   "fw": 0.62,
+   "fd": 0.22,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "delineator",
+   "file": "Delineator",
+   "category": "sign",
+   "tags": [
+    "roadside",
+    "small"
+   ],
+   "sx": 0.12,
+   "sy": 1.12,
+   "sz": 0.12,
+   "fw": 0.12,
+   "fd": 0.12,
+   "collider": "none",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "snow_pole",
+   "file": "Snow_Pole",
+   "category": "sign",
+   "tags": [
+    "roadside",
+    "small"
+   ],
+   "sx": 0.07,
+   "sy": 2.5,
+   "sz": 0.07,
+   "fw": 0.07,
+   "fd": 0.07,
+   "collider": "none",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "milestone",
+   "file": "Milestone",
+   "category": "sign",
+   "tags": [
+    "roadside",
+    "small"
+   ],
+   "sx": 0.42,
+   "sy": 0.7,
+   "sz": 0.29,
+   "fw": 0.42,
+   "fd": 0.29,
+   "collider": "none",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.4,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "pass_sign",
+   "file": "Pass_Sign",
+   "category": "sign",
+   "tags": [
+    "info",
+    "summit"
+   ],
+   "sx": 3.32,
+   "sy": 2.9,
+   "sz": 1.55,
+   "fw": 2.8,
+   "fd": 1.0,
+   "collider": "box",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.31,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "road_barrier_closed",
+   "file": "Road_Barrier_Closed",
+   "category": "sign",
+   "tags": [
+    "closed"
+   ],
+   "sx": 4.0,
+   "sy": 1.8,
+   "sz": 0.98,
+   "fw": 4.0,
+   "fd": 0.8,
+   "collider": "box",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.01,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_exit",
+   "file": "Sign_Exit",
+   "category": "sign",
+   "tags": [
+    "motorway",
+    "info"
+   ],
+   "sx": 2.7,
+   "sy": 3.47,
+   "sz": 0.32,
+   "fw": 2.7,
+   "fd": 0.2,
+   "collider": "capsule",
+   "radius": 0.08,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_gore",
+   "file": "Sign_Gore",
+   "category": "sign",
+   "tags": [
+    "motorway",
+    "info"
+   ],
+   "sx": 1.3,
+   "sy": 2.27,
+   "sz": 0.29,
+   "fw": 1.3,
+   "fd": 0.2,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sign_motorway",
+   "file": "Sign_Motorway",
+   "category": "sign",
+   "tags": [
+    "motorway",
+    "info"
+   ],
+   "sx": 0.92,
+   "sy": 2.87,
+   "sz": 0.29,
+   "fw": 0.92,
+   "fd": 0.29,
+   "collider": "capsule",
+   "radius": 0.06,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "cablecar_station_low",
+   "file": "CableCar_Station_Low",
+   "category": "ski",
+   "tags": [
+    "cablecar",
+    "station"
+   ],
+   "sx": 15.65,
+   "sy": 12.95,
+   "sz": 22.51,
+   "fw": 14.0,
+   "fd": 18.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "cablecar_station_high",
+   "file": "CableCar_Station_High",
+   "category": "ski",
+   "tags": [
+    "cablecar",
+    "station",
+    "summit"
+   ],
+   "sx": 16.04,
+   "sy": 15.5,
+   "sz": 21.0,
+   "fw": 12.0,
+   "fd": 14.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "cablecar_pylon",
+   "file": "CableCar_Pylon",
+   "category": "ski",
+   "tags": [
+    "cablecar",
+    "pylon"
+   ],
+   "sx": 8.0,
+   "sy": 26.65,
+   "sz": 5.57,
+   "fw": 5.2,
+   "fd": 5.2,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.51,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "cablecar_cabin",
+   "file": "CableCar_Cabin",
+   "category": "ski",
+   "tags": [
+    "cablecar",
+    "hanging"
+   ],
+   "sx": 2.76,
+   "sy": 0.24,
+   "sz": 3.82,
+   "fw": 2.6,
+   "fd": 3.6,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -6.01,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "chairlift_pylon",
+   "file": "Chairlift_Pylon",
+   "category": "ski",
+   "tags": [
+    "chairlift",
+    "pylon"
+   ],
+   "sx": 5.2,
+   "sy": 12.73,
+   "sz": 2.6,
+   "fw": 1.4,
+   "fd": 1.4,
+   "collider": "capsule",
+   "radius": 0.45,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "chairlift_chair",
+   "file": "Chairlift_Chair",
+   "category": "ski",
+   "tags": [
+    "chairlift",
+    "hanging"
+   ],
+   "sx": 2.45,
+   "sy": 0.1,
+   "sz": 0.92,
+   "fw": 2.4,
+   "fd": 1.0,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.52,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "chairlift_station",
+   "file": "Chairlift_Station",
+   "category": "ski",
+   "tags": [
+    "chairlift",
+    "station"
+   ],
+   "sx": 12.0,
+   "sy": 6.5,
+   "sz": 9.2,
+   "fw": 10.0,
+   "fd": 9.0,
+   "collider": "mesh",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -1.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "snow_cannon",
+   "file": "Snow_Cannon",
+   "category": "ski",
+   "tags": [
+    "piste"
+   ],
+   "sx": 1.89,
+   "sy": 3.36,
+   "sz": 2.1,
+   "fw": 1.89,
+   "fd": 2.1,
+   "collider": "capsule",
+   "radius": 0.8,
+   "module": 0.0,
+   "ymin": -0.44,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "ski_rack",
+   "file": "Ski_Rack",
+   "category": "ski",
+   "tags": [
+    "piste",
+    "prop"
+   ],
+   "sx": 3.0,
+   "sy": 1.92,
+   "sz": 0.5,
+   "fw": 3.0,
+   "fd": 0.5,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "piste_marker",
+   "file": "Piste_Marker",
+   "category": "ski",
+   "tags": [
+    "piste",
+    "prop"
+   ],
+   "sx": 0.44,
+   "sy": 2.1,
+   "sz": 0.19,
+   "fw": 0.44,
+   "fd": 0.19,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "boathouse",
+   "file": "Boathouse",
+   "category": "lake",
+   "tags": [
+    "building"
+   ],
+   "sx": 8.88,
+   "sy": 5.54,
+   "sz": 11.67,
+   "fw": 8.2,
+   "fd": 11.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -4.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "pier",
+   "file": "Pier",
+   "category": "lake",
+   "tags": [
+    "linear"
+   ],
+   "sx": 6.0,
+   "sy": 0.83,
+   "sz": 2.22,
+   "fw": 6.0,
+   "fd": 2.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 6.0,
+   "ymin": -4.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "rowboat",
+   "file": "Rowboat",
+   "category": "lake",
+   "tags": [
+    "boat"
+   ],
+   "sx": 5.12,
+   "sy": 0.65,
+   "sz": 4.72,
+   "fw": 1.5,
+   "fd": 4.2,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.09,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sailboat",
+   "file": "Sailboat",
+   "category": "lake",
+   "tags": [
+    "boat"
+   ],
+   "sx": 1.96,
+   "sy": 7.3,
+   "sz": 5.62,
+   "fw": 1.9,
+   "fd": 5.6,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.07,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "pedalo",
+   "file": "Pedalo",
+   "category": "lake",
+   "tags": [
+    "boat"
+   ],
+   "sx": 2.08,
+   "sy": 1.24,
+   "sz": 4.02,
+   "fw": 2.0,
+   "fd": 3.4,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.22,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "buoy",
+   "file": "Buoy",
+   "category": "lake",
+   "tags": [
+    "prop"
+   ],
+   "sx": 1.1,
+   "sy": 1.78,
+   "sz": 1.1,
+   "fw": 1.1,
+   "fd": 1.1,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "tunnel_portal",
+   "file": "Tunnel_Portal",
+   "category": "infra",
+   "tags": [
+    "tunnel"
+   ],
+   "sx": 25.51,
+   "sy": 11.03,
+   "sz": 15.67,
+   "fw": 18.0,
+   "fd": 1.6,
+   "collider": "mesh",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "gallery_module",
+   "file": "Gallery_Module",
+   "category": "infra",
+   "tags": [
+    "gallery",
+    "linear"
+   ],
+   "sx": 12.7,
+   "sy": 7.71,
+   "sz": 8.11,
+   "fw": 12.6,
+   "fd": 8.0,
+   "collider": "mesh",
+   "radius": 0.0,
+   "module": 8.0,
+   "ymin": -3.0,
+   "lights": [
+    1.0,
+    6.2,
+    3.0,
+    1.0,
+    6.2,
+    -1.0
+   ],
+   "material": ""
+  },
+  {
+   "id": "power_pylon",
+   "file": "Power_Pylon",
+   "category": "infra",
+   "tags": [
+    "pylon",
+    "power"
+   ],
+   "sx": 13.0,
+   "sy": 32.0,
+   "sz": 6.34,
+   "fw": 6.0,
+   "fd": 6.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.51,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "antenna_mast",
+   "file": "Antenna_Mast",
+   "category": "infra",
+   "tags": [
+    "tower"
+   ],
+   "sx": 10.53,
+   "sy": 22.3,
+   "sz": 12.15,
+   "fw": 1.2,
+   "fd": 1.2,
+   "collider": "capsule",
+   "radius": 0.4,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "avalanche_barrier",
+   "file": "Avalanche_Barrier",
+   "category": "infra",
+   "tags": [
+    "linear",
+    "slope"
+   ],
+   "sx": 4.0,
+   "sy": 3.04,
+   "sz": 2.82,
+   "fw": 4.0,
+   "fd": 2.6,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 4.0,
+   "ymin": -0.52,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "bridge_pier",
+   "file": "Bridge_Pier",
+   "category": "infra",
+   "tags": [
+    "bridge"
+   ],
+   "sx": 5.2,
+   "sy": 0.0,
+   "sz": 4.8,
+   "fw": 4.0,
+   "fd": 2.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -13.2,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "dam_tower",
+   "file": "Dam_Tower",
+   "category": "infra",
+   "tags": [
+    "dam",
+    "lake"
+   ],
+   "sx": 6.8,
+   "sy": 14.6,
+   "sz": 18.9,
+   "fw": 6.4,
+   "fd": 6.4,
+   "collider": "capsule",
+   "radius": 3.2,
+   "module": 0.0,
+   "ymin": -12.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "reservoir_hut",
+   "file": "Reservoir_Hut",
+   "category": "infra",
+   "tags": [
+    "dam",
+    "building"
+   ],
+   "sx": 6.85,
+   "sy": 3.04,
+   "sz": 3.81,
+   "fw": 4.0,
+   "fd": 3.2,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -3.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "spruce_a",
+   "file": "Spruce_A",
+   "category": "nature",
+   "tags": [
+    "tree",
+    "conifer"
+   ],
+   "sx": 6.11,
+   "sy": 14.0,
+   "sz": 6.19,
+   "fw": 6.11,
+   "fd": 6.19,
+   "collider": "capsule",
+   "radius": 0.32,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "spruce_b",
+   "file": "Spruce_B",
+   "category": "nature",
+   "tags": [
+    "tree",
+    "conifer"
+   ],
+   "sx": 7.2,
+   "sy": 18.0,
+   "sz": 6.61,
+   "fw": 7.2,
+   "fd": 6.61,
+   "collider": "capsule",
+   "radius": 0.36,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "spruce_c",
+   "file": "Spruce_C",
+   "category": "nature",
+   "tags": [
+    "tree",
+    "conifer"
+   ],
+   "sx": 8.47,
+   "sy": 22.0,
+   "sz": 9.09,
+   "fw": 8.47,
+   "fd": 9.09,
+   "collider": "capsule",
+   "radius": 0.42,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "larch_a",
+   "file": "Larch_A",
+   "category": "nature",
+   "tags": [
+    "tree",
+    "conifer"
+   ],
+   "sx": 6.89,
+   "sy": 15.0,
+   "sz": 6.69,
+   "fw": 6.89,
+   "fd": 6.69,
+   "collider": "capsule",
+   "radius": 0.3,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "larch_b",
+   "file": "Larch_B",
+   "category": "nature",
+   "tags": [
+    "tree",
+    "conifer"
+   ],
+   "sx": 7.62,
+   "sy": 19.0,
+   "sz": 7.63,
+   "fw": 7.62,
+   "fd": 7.63,
+   "collider": "capsule",
+   "radius": 0.34,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "boulder_a",
+   "file": "Boulder_A",
+   "category": "nature",
+   "tags": [
+    "rock"
+   ],
+   "sx": 3.83,
+   "sy": 1.29,
+   "sz": 2.54,
+   "fw": 3.83,
+   "fd": 2.54,
+   "collider": "capsule",
+   "radius": 1.0,
+   "module": 0.0,
+   "ymin": -1.13,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "boulder_b",
+   "file": "Boulder_B",
+   "category": "nature",
+   "tags": [
+    "rock"
+   ],
+   "sx": 5.32,
+   "sy": 1.96,
+   "sz": 5.27,
+   "fw": 5.32,
+   "fd": 5.27,
+   "collider": "capsule",
+   "radius": 1.7,
+   "module": 0.0,
+   "ymin": -1.59,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "boulder_c",
+   "file": "Boulder_C",
+   "category": "nature",
+   "tags": [
+    "rock"
+   ],
+   "sx": 8.38,
+   "sy": 3.7,
+   "sz": 6.38,
+   "fw": 8.38,
+   "fd": 6.38,
+   "collider": "capsule",
+   "radius": 2.4,
+   "module": 0.0,
+   "ymin": -2.23,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "spruce_young",
+   "file": "Spruce_Young",
+   "category": "nature",
+   "tags": [
+    "tree",
+    "conifer",
+    "small"
+   ],
+   "sx": 4.02,
+   "sy": 5.5,
+   "sz": 3.43,
+   "fw": 4.02,
+   "fd": 3.43,
+   "collider": "capsule",
+   "radius": 0.15,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "dead_spruce",
+   "file": "Dead_Spruce",
+   "category": "nature",
+   "tags": [
+    "tree",
+    "dead"
+   ],
+   "sx": 4.85,
+   "sy": 14.0,
+   "sz": 4.36,
+   "fw": 4.85,
+   "fd": 4.36,
+   "collider": "capsule",
+   "radius": 0.3,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "swisspine_a",
+   "file": "SwissPine_A",
+   "category": "nature",
+   "tags": [
+    "tree",
+    "conifer"
+   ],
+   "sx": 5.89,
+   "sy": 8.96,
+   "sz": 6.8,
+   "fw": 5.89,
+   "fd": 6.8,
+   "collider": "capsule",
+   "radius": 0.34,
+   "module": 0.0,
+   "ymin": -0.55,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "swisspine_b",
+   "file": "SwissPine_B",
+   "category": "nature",
+   "tags": [
+    "tree",
+    "conifer"
+   ],
+   "sx": 7.05,
+   "sy": 11.93,
+   "sz": 7.76,
+   "fw": 7.05,
+   "fd": 7.76,
+   "collider": "capsule",
+   "radius": 0.4,
+   "module": 0.0,
+   "ymin": -0.56,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "deciduous_a",
+   "file": "Deciduous_A",
+   "category": "nature",
+   "tags": [
+    "tree",
+    "broadleaf"
+   ],
+   "sx": 8.69,
+   "sy": 10.41,
+   "sz": 8.22,
+   "fw": 8.69,
+   "fd": 8.22,
+   "collider": "capsule",
+   "radius": 0.3,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "deciduous_b",
+   "file": "Deciduous_B",
+   "category": "nature",
+   "tags": [
+    "tree",
+    "broadleaf"
+   ],
+   "sx": 7.99,
+   "sy": 14.52,
+   "sz": 8.01,
+   "fw": 7.99,
+   "fd": 8.01,
+   "collider": "capsule",
+   "radius": 0.38,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "deciduous_c",
+   "file": "Deciduous_C",
+   "category": "nature",
+   "tags": [
+    "tree",
+    "broadleaf"
+   ],
+   "sx": 9.23,
+   "sy": 8.36,
+   "sz": 8.76,
+   "fw": 9.23,
+   "fd": 8.76,
+   "collider": "capsule",
+   "radius": 0.3,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "birch_a",
+   "file": "Birch_A",
+   "category": "nature",
+   "tags": [
+    "tree",
+    "broadleaf"
+   ],
+   "sx": 4.09,
+   "sy": 9.32,
+   "sz": 3.97,
+   "fw": 4.09,
+   "fd": 3.97,
+   "collider": "capsule",
+   "radius": 0.15,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "birch_b",
+   "file": "Birch_B",
+   "category": "nature",
+   "tags": [
+    "tree",
+    "broadleaf"
+   ],
+   "sx": 4.85,
+   "sy": 12.21,
+   "sz": 4.99,
+   "fw": 4.85,
+   "fd": 4.99,
+   "collider": "capsule",
+   "radius": 0.18,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "poplar",
+   "file": "Poplar",
+   "category": "nature",
+   "tags": [
+    "tree",
+    "broadleaf",
+    "tall"
+   ],
+   "sx": 4.2,
+   "sy": 18.03,
+   "sz": 4.31,
+   "fw": 4.2,
+   "fd": 4.31,
+   "collider": "capsule",
+   "radius": 0.3,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "willow",
+   "file": "Willow",
+   "category": "nature",
+   "tags": [
+    "tree",
+    "broadleaf",
+    "water"
+   ],
+   "sx": 8.53,
+   "sy": 7.41,
+   "sz": 8.08,
+   "fw": 8.53,
+   "fd": 8.08,
+   "collider": "capsule",
+   "radius": 0.4,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "rock_slab",
+   "file": "Rock_Slab",
+   "category": "nature",
+   "tags": [
+    "rock"
+   ],
+   "sx": 4.2,
+   "sy": 0.84,
+   "sz": 2.89,
+   "fw": 4.2,
+   "fd": 2.89,
+   "collider": "capsule",
+   "radius": 1.3,
+   "module": 0.0,
+   "ymin": -0.67,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "cliff_a",
+   "file": "Cliff_A",
+   "category": "nature",
+   "tags": [
+    "rock",
+    "cliff"
+   ],
+   "sx": 12.73,
+   "sy": 7.89,
+   "sz": 8.3,
+   "fw": 12.73,
+   "fd": 8.3,
+   "collider": "capsule",
+   "radius": 4.0,
+   "module": 0.0,
+   "ymin": -5.05,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "cliff_b",
+   "file": "Cliff_B",
+   "category": "nature",
+   "tags": [
+    "rock",
+    "cliff",
+    "large"
+   ],
+   "sx": 19.79,
+   "sy": 12.03,
+   "sz": 9.51,
+   "fw": 19.79,
+   "fd": 9.51,
+   "collider": "capsule",
+   "radius": 6.0,
+   "module": 0.0,
+   "ymin": -4.6,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "cliff_c",
+   "file": "Cliff_C",
+   "category": "nature",
+   "tags": [
+    "rock",
+    "cliff",
+    "pinnacle"
+   ],
+   "sx": 10.96,
+   "sy": 16.73,
+   "sz": 7.51,
+   "fw": 10.96,
+   "fd": 7.51,
+   "collider": "capsule",
+   "radius": 3.4,
+   "module": 0.0,
+   "ymin": -4.18,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "scree",
+   "file": "Scree",
+   "category": "nature",
+   "tags": [
+    "rock",
+    "scatter"
+   ],
+   "sx": 4.87,
+   "sy": 0.44,
+   "sz": 5.68,
+   "fw": 4.87,
+   "fd": 5.68,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.23,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "snow_patch",
+   "file": "Snow_Patch",
+   "category": "nature",
+   "tags": [
+    "snow"
+   ],
+   "sx": 8.93,
+   "sy": 0.28,
+   "sz": 5.6,
+   "fw": 8.93,
+   "fd": 5.6,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.12,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "cow_a",
+   "file": "Cow_A",
+   "category": "animal",
+   "tags": [
+    "cow"
+   ],
+   "sx": 0.74,
+   "sy": 1.74,
+   "sz": 2.79,
+   "fw": 0.8,
+   "fd": 2.6,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.03,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "cow_b",
+   "file": "Cow_B",
+   "category": "animal",
+   "tags": [
+    "cow"
+   ],
+   "sx": 0.74,
+   "sy": 1.43,
+   "sz": 2.64,
+   "fw": 0.8,
+   "fd": 2.6,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.03,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "cow_lying",
+   "file": "Cow_Lying",
+   "category": "animal",
+   "tags": [
+    "cow"
+   ],
+   "sx": 0.83,
+   "sy": 1.06,
+   "sz": 2.96,
+   "fw": 0.9,
+   "fd": 2.6,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.03,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "sheep",
+   "file": "Sheep",
+   "category": "animal",
+   "tags": [
+    "sheep"
+   ],
+   "sx": 0.76,
+   "sy": 0.8,
+   "sz": 1.45,
+   "fw": 0.6,
+   "fd": 1.3,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.03,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "goat",
+   "file": "Goat",
+   "category": "animal",
+   "tags": [
+    "goat"
+   ],
+   "sx": 0.36,
+   "sy": 1.08,
+   "sz": 1.46,
+   "fw": 0.5,
+   "fd": 1.3,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.03,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "ibex",
+   "file": "Ibex",
+   "category": "animal",
+   "tags": [
+    "ibex",
+    "summit"
+   ],
+   "sx": 0.46,
+   "sy": 1.43,
+   "sz": 1.82,
+   "fw": 0.6,
+   "fd": 1.7,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.03,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "marmot",
+   "file": "Marmot",
+   "category": "animal",
+   "tags": [
+    "marmot",
+    "small"
+   ],
+   "sx": 0.42,
+   "sy": 0.56,
+   "sz": 0.65,
+   "fw": 0.42,
+   "fd": 0.65,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "dog",
+   "file": "Dog",
+   "category": "animal",
+   "tags": [
+    "dog"
+   ],
+   "sx": 0.34,
+   "sy": 0.7,
+   "sz": 1.5,
+   "fw": 0.4,
+   "fd": 1.3,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.03,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "reeds",
+   "file": "Reeds",
+   "category": "lake",
+   "tags": [
+    "plant"
+   ],
+   "sx": 2.77,
+   "sy": 2.07,
+   "sz": 2.3,
+   "fw": 2.77,
+   "fd": 2.3,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.6,
+   "lights": [],
+   "material": "AP_Flora"
+  },
+  {
+   "id": "lily_pads",
+   "file": "Lily_Pads",
+   "category": "lake",
+   "tags": [
+    "plant"
+   ],
+   "sx": 1.65,
+   "sy": 0.14,
+   "sz": 2.82,
+   "fw": 1.65,
+   "fd": 2.82,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.01,
+   "lights": [],
+   "material": "AP_Flora"
+  },
+  {
+   "id": "bush_rhodo",
+   "file": "Bush_Rhodo",
+   "category": "nature",
+   "tags": [
+    "bush",
+    "flowers"
+   ],
+   "sx": 2.33,
+   "sy": 1.02,
+   "sz": 2.21,
+   "fw": 2.33,
+   "fd": 2.21,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.01,
+   "lights": [],
+   "material": "AP_Flora"
+  },
+  {
+   "id": "juniper",
+   "file": "Juniper",
+   "category": "nature",
+   "tags": [
+    "bush"
+   ],
+   "sx": 2.85,
+   "sy": 0.62,
+   "sz": 2.58,
+   "fw": 2.85,
+   "fd": 2.58,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.09,
+   "lights": [],
+   "material": "AP_Flora"
+  },
+  {
+   "id": "fern",
+   "file": "Fern",
+   "category": "nature",
+   "tags": [
+    "plant",
+    "detail"
+   ],
+   "sx": 1.09,
+   "sy": 0.68,
+   "sz": 1.26,
+   "fw": 1.09,
+   "fd": 1.26,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": "AP_Flora"
+  },
+  {
+   "id": "grass_tall",
+   "file": "Grass_Tall",
+   "category": "nature",
+   "tags": [
+    "plant",
+    "detail"
+   ],
+   "sx": 0.97,
+   "sy": 0.97,
+   "sz": 0.97,
+   "fw": 0.97,
+   "fd": 0.97,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.02,
+   "lights": [],
+   "material": "AP_Flora"
+  },
+  {
+   "id": "flowers_gentian",
+   "file": "Flowers_Gentian",
+   "category": "nature",
+   "tags": [
+    "flowers",
+    "detail"
+   ],
+   "sx": 0.43,
+   "sy": 0.13,
+   "sz": 0.41,
+   "fw": 0.43,
+   "fd": 0.41,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.02,
+   "lights": [],
+   "material": "AP_Flora"
+  },
+  {
+   "id": "flowers_edelweiss",
+   "file": "Flowers_Edelweiss",
+   "category": "nature",
+   "tags": [
+    "flowers",
+    "detail"
+   ],
+   "sx": 0.28,
+   "sy": 0.14,
+   "sz": 0.29,
+   "fw": 0.28,
+   "fd": 0.29,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.02,
+   "lights": [],
+   "material": "AP_Flora"
+  },
+  {
+   "id": "flowers_meadow",
+   "file": "Flowers_Meadow",
+   "category": "nature",
+   "tags": [
+    "flowers",
+    "detail"
+   ],
+   "sx": 0.45,
+   "sy": 0.5,
+   "sz": 0.54,
+   "fw": 0.45,
+   "fd": 0.54,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.02,
+   "lights": [],
+   "material": "AP_Flora"
+  },
+  {
+   "id": "grass_short",
+   "file": "Grass_Short",
+   "category": "nature",
+   "tags": [
+    "plant",
+    "detail"
+   ],
+   "sx": 0.67,
+   "sy": 0.28,
+   "sz": 0.56,
+   "fw": 0.67,
+   "fd": 0.56,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.02,
+   "lights": [],
+   "material": "AP_Flora"
+  },
+  {
+   "id": "grass_dry",
+   "file": "Grass_Dry",
+   "category": "nature",
+   "tags": [
+    "plant",
+    "detail"
+   ],
+   "sx": 0.82,
+   "sy": 0.6,
+   "sz": 0.74,
+   "fw": 0.82,
+   "fd": 0.74,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.02,
+   "lights": [],
+   "material": "AP_Flora"
+  },
+  {
+   "id": "flowers_daisy",
+   "file": "Flowers_Daisy",
+   "category": "nature",
+   "tags": [
+    "flowers",
+    "detail"
+   ],
+   "sx": 0.53,
+   "sy": 0.54,
+   "sz": 0.47,
+   "fw": 0.53,
+   "fd": 0.47,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.02,
+   "lights": [],
+   "material": "AP_Flora"
+  },
+  {
+   "id": "flowers_lupin",
+   "file": "Flowers_Lupin",
+   "category": "nature",
+   "tags": [
+    "flowers",
+    "detail"
+   ],
+   "sx": 0.5,
+   "sy": 0.8,
+   "sz": 0.48,
+   "fw": 0.5,
+   "fd": 0.48,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.01,
+   "lights": [],
+   "material": "AP_Flora"
+  },
+  {
+   "id": "clover",
+   "file": "Clover",
+   "category": "nature",
+   "tags": [
+    "flowers",
+    "detail"
+   ],
+   "sx": 0.64,
+   "sy": 0.18,
+   "sz": 0.56,
+   "fw": 0.64,
+   "fd": 0.56,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.01,
+   "lights": [],
+   "material": "AP_Flora"
+  },
+  {
+   "id": "fern_young",
+   "file": "Fern_Young",
+   "category": "nature",
+   "tags": [
+    "plant",
+    "detail"
+   ],
+   "sx": 0.38,
+   "sy": 0.44,
+   "sz": 0.35,
+   "fw": 0.38,
+   "fd": 0.35,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": "AP_Flora"
+  },
+  {
+   "id": "blueberry",
+   "file": "Blueberry",
+   "category": "nature",
+   "tags": [
+    "bush",
+    "detail"
+   ],
+   "sx": 0.62,
+   "sy": 0.38,
+   "sz": 0.55,
+   "fw": 0.62,
+   "fd": 0.55,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.01,
+   "lights": [],
+   "material": "AP_Flora"
+  }
+ ]
+}

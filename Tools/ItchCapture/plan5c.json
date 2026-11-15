@@ -1,0 +1,53 @@
+{
+ "seed": 7373,
+ "shots": [
+  {
+   "name": "c_police_dmc",
+   "road": "Highway",
+   "car": 6,
+   "hour": 18.8,
+   "traffic": 1.0,
+   "drive": "weave",
+   "kmh": 140,
+   "cam": "rel",
+   "camOffset": {
+    "x": 3.4,
+    "y": 1.5,
+    "z": 9.0
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0.5,
+    "z": -14.0
+   },
+   "fov": 32,
+   "fx": false,
+   "ui": true,
+   "police": true,
+   "trigger": "police",
+   "triggerDist": 32,
+   "count": 6,
+   "interval": 1.2,
+   "warmup": 3,
+   "timeout": 90,
+   "hero": true
+  },
+  {
+   "name": "c_oncoming_ae86",
+   "road": "Country",
+   "car": 5,
+   "hour": 17.6,
+   "traffic": 1.5,
+   "drive": "oncoming",
+   "kmh": 160,
+   "cam": "chase",
+   "ui": true,
+   "trigger": "nearmiss",
+   "minKmh": 120,
+   "count": 5,
+   "interval": 1.5,
+   "warmup": 8,
+   "timeout": 80
+  }
+ ]
+}

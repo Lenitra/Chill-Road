@@ -1,0 +1,96 @@
+{
+ "seed": 9595,
+ "split": true,
+ "shots": [
+  {
+   "name": "sp_duo_rear",
+   "road": "Highway",
+   "car": 7,
+   "car2": 8,
+   "hour": 17.4,
+   "traffic": 0.8,
+   "drive": "cruise",
+   "drive2": "pair",
+   "kmh": 170,
+   "cam": "rel",
+   "camOffset": {
+    "x": 1.9,
+    "y": 2.4,
+    "z": -12.0
+   },
+   "lookOffset": {
+    "x": 1.9,
+    "y": 0.6,
+    "z": 4.0
+   },
+   "fov": 42,
+   "fx": false,
+   "trigger": "time",
+   "count": 5,
+   "interval": 2.5,
+   "warmup": 10,
+   "timeout": 40,
+   "hero": true
+  },
+  {
+   "name": "sp_duo_front",
+   "road": "Highway",
+   "car": 1,
+   "car2": 3,
+   "hour": 17.6,
+   "traffic": 0.8,
+   "drive": "cruise",
+   "drive2": "pair",
+   "kmh": 160,
+   "cam": "rel",
+   "camOffset": {
+    "x": 1.4,
+    "y": 1.3,
+    "z": 11.0
+   },
+   "lookOffset": {
+    "x": 1.9,
+    "y": 0.5,
+    "z": -3.5
+   },
+   "fov": 44,
+   "fx": false,
+   "trigger": "time",
+   "count": 5,
+   "interval": 2.5,
+   "warmup": 10,
+   "timeout": 40,
+   "hero": true
+  },
+  {
+   "name": "sp_duo_drone_hw",
+   "road": "Highway",
+   "car": 6,
+   "car2": 5,
+   "hour": 16.8,
+   "traffic": 1.0,
+   "drive": "cruise",
+   "drive2": "pair",
+   "kmh": 160,
+   "cam": "rel",
+   "camOffset": {
+    "x": 1.9,
+    "y": 13.0,
+    "z": -18.0
+   },
+   "lookOffset": {
+    "x": 1.9,
+    "y": 0.0,
+    "z": 10.0
+   },
+   "fov": 46,
+   "fx": false,
+   "trigger": "time",
+   "count": 4,
+   "interval": 3.0,
+   "warmup": 10,
+   "timeout": 40,
+   "hero": true
+  }
+ ]
+}

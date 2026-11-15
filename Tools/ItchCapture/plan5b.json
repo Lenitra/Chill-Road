@@ -1,0 +1,481 @@
+{
+ "seed": 6262,
+ "shots": [
+  {
+   "name": "p_0_vision74",
+   "road": "Highway",
+   "car": 0,
+   "hour": 17.4,
+   "traffic": 0.6,
+   "drive": "cruise",
+   "kmh": 150,
+   "cam": "rel",
+   "sunLit": true,
+   "camOffset": {
+    "x": -2.7,
+    "y": 1.2,
+    "z": 6.4
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0.45,
+    "z": -0.6
+   },
+   "fov": 36,
+   "fx": false,
+   "trigger": "time",
+   "count": 2,
+   "interval": 2.0,
+   "warmup": 5,
+   "timeout": 30,
+   "hero": true
+  },
+  {
+   "name": "p_1_supra",
+   "road": "Highway",
+   "car": 1,
+   "hour": 17.4,
+   "traffic": 0.6,
+   "drive": "cruise",
+   "kmh": 150,
+   "cam": "rel",
+   "sunLit": true,
+   "camOffset": {
+    "x": -2.7,
+    "y": 1.2,
+    "z": 6.4
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0.45,
+    "z": -0.6
+   },
+   "fov": 36,
+   "fx": false,
+   "trigger": "time",
+   "count": 2,
+   "interval": 2.0,
+   "warmup": 5,
+   "timeout": 30,
+   "hero": true
+  },
+  {
+   "name": "p_2_mx5",
+   "road": "Highway",
+   "car": 2,
+   "hour": 17.4,
+   "traffic": 0.6,
+   "drive": "cruise",
+   "kmh": 150,
+   "cam": "rel",
+   "sunLit": true,
+   "camOffset": {
+    "x": -2.7,
+    "y": 1.2,
+    "z": 6.4
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0.45,
+    "z": -0.6
+   },
+   "fov": 36,
+   "fx": false,
+   "trigger": "time",
+   "count": 2,
+   "interval": 2.0,
+   "warmup": 5,
+   "timeout": 30,
+   "hero": true
+  },
+  {
+   "name": "p_3_mustang",
+   "road": "Highway",
+   "car": 3,
+   "hour": 17.4,
+   "traffic": 0.6,
+   "drive": "cruise",
+   "kmh": 150,
+   "cam": "rel",
+   "sunLit": true,
+   "camOffset": {
+    "x": -2.7,
+    "y": 1.2,
+    "z": 6.4
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0.45,
+    "z": -0.6
+   },
+   "fov": 36,
+   "fx": false,
+   "trigger": "time",
+   "count": 2,
+   "interval": 2.0,
+   "warmup": 5,
+   "timeout": 30,
+   "hero": true
+  },
+  {
+   "name": "p_4_p50",
+   "road": "Highway",
+   "car": 4,
+   "hour": 17.4,
+   "traffic": 0.6,
+   "drive": "cruise",
+   "kmh": 60,
+   "cam": "rel",
+   "sunLit": true,
+   "camOffset": {
+    "x": -1.7,
+    "y": 0.9,
+    "z": 4.0
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0.45,
+    "z": -0.6
+   },
+   "fov": 36,
+   "fx": false,
+   "trigger": "time",
+   "count": 2,
+   "interval": 2.0,
+   "warmup": 5,
+   "timeout": 30,
+   "hero": true
+  },
+  {
+   "name": "p_5_ae86",
+   "road": "Highway",
+   "car": 5,
+   "hour": 17.4,
+   "traffic": 0.6,
+   "drive": "cruise",
+   "kmh": 150,
+   "cam": "rel",
+   "sunLit": true,
+   "camOffset": {
+    "x": -2.7,
+    "y": 1.2,
+    "z": 6.4
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0.45,
+    "z": -0.6
+   },
+   "fov": 36,
+   "fx": false,
+   "trigger": "time",
+   "count": 2,
+   "interval": 2.0,
+   "warmup": 5,
+   "timeout": 30,
+   "hero": true
+  },
+  {
+   "name": "p_6_delorean",
+   "road": "Highway",
+   "car": 6,
+   "hour": 17.4,
+   "traffic": 0.6,
+   "drive": "cruise",
+   "kmh": 150,
+   "cam": "rel",
+   "sunLit": true,
+   "camOffset": {
+    "x": -2.7,
+    "y": 1.2,
+    "z": 6.4
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0.45,
+    "z": -0.6
+   },
+   "fov": 36,
+   "fx": false,
+   "trigger": "time",
+   "count": 2,
+   "interval": 2.0,
+   "warmup": 5,
+   "timeout": 30,
+   "hero": true
+  },
+  {
+   "name": "p_7_jesko",
+   "road": "Highway",
+   "car": 7,
+   "hour": 17.4,
+   "traffic": 0.6,
+   "drive": "cruise",
+   "kmh": 150,
+   "cam": "rel",
+   "sunLit": true,
+   "camOffset": {
+    "x": -2.7,
+    "y": 1.2,
+    "z": 6.4
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0.45,
+    "z": -0.6
+   },
+   "fov": 36,
+   "fx": false,
+   "trigger": "time",
+   "count": 2,
+   "interval": 2.0,
+   "warmup": 5,
+   "timeout": 30,
+   "hero": true
+  },
+  {
+   "name": "p_8_valkyrie",
+   "road": "Highway",
+   "car": 8,
+   "hour": 17.4,
+   "traffic": 0.6,
+   "drive": "cruise",
+   "kmh": 150,
+   "cam": "rel",
+   "sunLit": true,
+   "camOffset": {
+    "x": -2.7,
+    "y": 1.2,
+    "z": 6.4
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0.45,
+    "z": -0.6
+   },
+   "fov": 36,
+   "fx": false,
+   "trigger": "time",
+   "count": 2,
+   "interval": 2.0,
+   "warmup": 5,
+   "timeout": 30,
+   "hero": true
+  },
+  {
+   "name": "s_lineup",
+   "road": "Highway",
+   "car": 0,
+   "hour": 17.9,
+   "traffic": 0,
+   "drive": "none",
+   "cam": "lineup",
+   "camOffset": {
+    "x": -9.0,
+    "y": 2.4,
+    "z": 17.0
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0.3,
+    "z": -1.5
+   },
+   "fov": 40,
+   "fx": false,
+   "count": 3,
+   "hero": true
+  },
+  {
+   "name": "s_roundabout",
+   "road": "Roundabout",
+   "car": 2,
+   "hour": 16.5,
+   "traffic": 1.4,
+   "drive": "cruise",
+   "kmh": 110,
+   "cam": "aerial",
+   "camOffset": {
+    "x": -40,
+    "y": 48,
+    "z": -50
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "fov": 45,
+   "fx": false,
+   "trigger": "feature",
+   "triggerDist": 50,
+   "count": 3,
+   "interval": 1.2,
+   "warmup": 2,
+   "timeout": 40,
+   "hero": true
+  },
+  {
+   "name": "s_overpass",
+   "road": "Overpass",
+   "car": 7,
+   "hour": 16.2,
+   "traffic": 1.5,
+   "drive": "weave",
+   "kmh": 200,
+   "cam": "aerial",
+   "camOffset": {
+    "x": -45,
+    "y": 40,
+    "z": -55
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "fov": 45,
+   "fx": false,
+   "trigger": "feature",
+   "triggerDist": 60,
+   "count": 3,
+   "interval": 1.0,
+   "warmup": 2,
+   "timeout": 40,
+   "hero": true
+  },
+  {
+   "name": "s_drone",
+   "road": "Country",
+   "car": 3,
+   "hour": 16.8,
+   "traffic": 1.4,
+   "drive": "cruise",
+   "kmh": 140,
+   "cam": "rel",
+   "camOffset": {
+    "x": -6,
+    "y": 16,
+    "z": -20
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0,
+    "z": 22
+   },
+   "fov": 50,
+   "fx": false,
+   "trigger": "time",
+   "count": 3,
+   "interval": 3,
+   "warmup": 6,
+   "timeout": 40,
+   "hero": true
+  },
+  {
+   "name": "s_cover_valkyrie",
+   "road": "Highway",
+   "car": 8,
+   "hour": 17.4,
+   "traffic": 1.5,
+   "drive": "weave",
+   "kmh": 220,
+   "cam": "rel",
+   "sunLit": true,
+   "camOffset": {
+    "x": -2.6,
+    "y": 1.25,
+    "z": 6.6
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0.5,
+    "z": -1.0
+   },
+   "fov": 36,
+   "fx": false,
+   "trigger": "approach",
+   "minKmh": 150,
+   "count": 5,
+   "interval": 1.5,
+   "warmup": 8,
+   "timeout": 50,
+   "hero": true
+  },
+  {
+   "name": "s_cover_jesko",
+   "road": "Highway",
+   "car": 7,
+   "hour": 17.4,
+   "traffic": 1.5,
+   "drive": "weave",
+   "kmh": 220,
+   "cam": "rel",
+   "sunLit": true,
+   "camOffset": {
+    "x": -2.6,
+    "y": 1.25,
+    "z": 6.6
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0.5,
+    "z": -1.0
+   },
+   "fov": 36,
+   "fx": false,
+   "trigger": "approach",
+   "minKmh": 150,
+   "count": 5,
+   "interval": 1.5,
+   "warmup": 8,
+   "timeout": 50,
+   "hero": true
+  },
+  {
+   "name": "g_jesko_weave2",
+   "road": "Highway",
+   "car": 7,
+   "hour": 15.3,
+   "traffic": 1.6,
+   "drive": "weave",
+   "kmh": 260,
+   "cam": "chase",
+   "ui": true,
+   "trigger": "nearmiss",
+   "minKmh": 160,
+   "count": 5,
+   "interval": 1.8,
+   "warmup": 10,
+   "timeout": 70
+  },
+  {
+   "name": "g_p50_trucks2",
+   "road": "Highway",
+   "car": 4,
+   "hour": 16.8,
+   "traffic": 1.8,
+   "drive": "cruise",
+   "kmh": 60,
+   "cam": "rel",
+   "camOffset": {
+    "x": 2.4,
+    "y": 1.3,
+    "z": -5.2
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0.4,
+    "z": 4.0
+   },
+   "fov": 46,
+   "fx": false,
+   "ui": true,
+   "trigger": "time",
+   "count": 6,
+   "interval": 3.0,
+   "warmup": 6,
+   "timeout": 40,
+   "hero": true
+  }
+ ]
+}

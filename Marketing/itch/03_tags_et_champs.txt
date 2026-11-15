@@ -1,0 +1,35 @@
+TAGS (itch.io en accepte 10 au maximum)
+=======================================
+
+driving, arcade, cars, low-poly, procedural-generation, endless, score-attack, local-multiplayer, split-screen, synthwave
+
+Pas besoin de mettre « ai-generated » : itch.io l'ajoute automatiquement quand on répond « Oui » dans la section
+« AI generation disclosure » (voir plus bas). Remplaçants possibles : singleplayer, 3d, police, rain, drifting, day-night-cycle, high-score.
+
+
+AUTRES CHAMPS DE LA PAGE
+========================
+
+Kind of project ............ Downloadable
+Release status ............. In development (ou Prototype)
+Classification ............. Games
+Genre ...................... Racing
+Made with .................. Unity, Blender
+Platforms .................. Windows (cocher sur l'upload du .zip)
+Inputs ..................... Keyboard, Mouse, Xbox controller, Gamepad (any)  (2 joueurs : 2 manettes, ou clavier + manette)
+Languages .................. English, French
+Average session ............ A few minutes
+Multiplayer ................ Local multiplayer (écran partagé)
+Player count ............... 1 - 2
+
+AI generation disclosure ... « Yes, this project contains the output of generative AI »
+                             Cocher : Graphics, Sound, Text & Dialog, Code
+                             (le projet est assumé 100 % IA ; itch ajoute alors le tag « AI Generated »)
+
+Cover image ................ cover_1260x1000.png (capture pure, même ratio que 630x500 mais plus nette)
+                             ou cover_1260x1000_titre.png (avec le titre « CHILL ROAD » incrusté)
+                             Variante : cover_alt_* (la mégacar blanche dans la forêt au lieu de la Supra)
+Screenshots ................ dossier screenshots/, dans l'ordre des numéros (les 3-5 premiers sont les plus vus) ;
+                             screenshots/2_joueurs/ = 6 captures de l'écran partagé (02 et 06 sont déjà dans la liste principale)
+                             screenshots/extras/ = captures de réserve, extras/voitures/ = un portrait par voiture
+                             (_ancienne_version/ = la série précédente, avec l'ancien HUD)

@@ -1,0 +1,50 @@
+{
+ "seed": 1234,
+ "shots": [
+  {
+   "name": "hw_weave",
+   "road": "Highway",
+   "car": 0,
+   "hour": 15.5,
+   "traffic": 1.5,
+   "drive": "weave",
+   "kmh": 225,
+   "cam": "chase",
+   "ui": true,
+   "trigger": "approach",
+   "count": 2,
+   "interval": 2.0,
+   "warmup": 10,
+   "timeout": 40
+  },
+  {
+   "name": "cover_rel",
+   "road": "Highway",
+   "car": 1,
+   "hour": 18.6,
+   "traffic": 1.6,
+   "drive": "weave",
+   "kmh": 210,
+   "cam": "rel",
+   "camOffset": {
+    "x": -2.7,
+    "y": 0.8,
+    "z": 6.2
+   },
+   "lookOffset": {
+    "x": 0,
+    "y": 0.6,
+    "z": -1.0
+   },
+   "fov": 42,
+   "fx": false,
+   "ui": false,
+   "trigger": "approach",
+   "count": 2,
+   "interval": 1.5,
+   "warmup": 10,
+   "timeout": 40,
+   "hero": true
+  }
+ ]
+}

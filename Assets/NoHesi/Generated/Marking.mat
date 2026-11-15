@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Marking
+  m_Shader: {fileID: 4800000, guid: e3f6692f3e9fc1247a5c0345429a18d8, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - _SURFACE_MARKING
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _Noise:
+        m_Texture: {fileID: 2800000, guid: 44a10852b1fbe4a4a9f759fbaad130aa, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Age: 0.8
+    - _DepthOffset: -1.5
+    - _DirtLane: 1.1
+    - _NoiseScale: 32
+    - _Smoothness: 0.16
+    - _Surface: 3
+    - _TrackShade: 0.07
+    m_Colors:
+    - _BareColor: {r: 0.56999993, g: 0.49, b: 0.35999998, a: 1}
+    - _CountryColor: {r: 0.32999998, g: 0.32999998, b: 0.33499998, a: 1}
+    - _CrackColor: {r: 0.19999996, g: 0.19999996, b: 0.20999995, a: 1}
+    - _EarthColor: {r: 0.6, g: 0.52, b: 0.39999998, a: 1}
+    - _GrassColor: {r: 0.26999995, g: 0.5, b: 0.23999995, a: 1}
+    - _GrassDark: {r: 0.20999995, g: 0.41999996, b: 0.19999996, a: 1}
+    - _GravelColor: {r: 0.6, g: 0.56999993, b: 0.5, a: 1}
+    - _HighwayColor: {r: 0.19999996, g: 0.20499995, b: 0.21499997, a: 1}
+    - _Lanes: {r: 3.5, g: 2.4, b: 12.9, a: 3.6}
+    - _PaintColor: {r: 0.93, g: 0.93, b: 0.9, a: 1}
+    - _PatchColor: {r: 0.24999997, g: 0.25199997, b: 0.25999996, a: 1}
+    - _RutColor: {r: 0.4699999, g: 0.38999996, b: 0.29999998, a: 1}
+    - _ShoulderColor: {r: 0.25999996, g: 0.26199996, b: 0.26999995, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
+--- !u!114 &5549311693903250861
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Editor::UnityEditor.Rendering.Universal.AssetVersion
+  version: 10

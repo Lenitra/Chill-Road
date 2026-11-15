@@ -1,0 +1,66 @@
+# ---- Unity : dossiers générés ----
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Scène de récupération auto (crash éditeur)
+/Assets/_Recovery/
+/Assets/_Recovery.meta
+
+# Fichiers d'IDE régénérés par Unity
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+/.vs/
+/.vscode/
+/.idea/
+
+# Crash reports / builds
+sysinfo.txt
+crashlytics-buildid.txt
+*.apk
+*.aab
+*.unitypackage
+*_BurstDebugInformation_DoNotShip/
+
+# ---- Projet ----
+# Sauvegardes manuelles (remplacées par l'historique git)
+/Backups/
+
+# Rendus Blender et sorties du baker de carte (régénérables, lourds)
+/Tools/Blender/Rendus/
+/Tools/Map/out/
+
+# Blender : sauvegardes auto
+*.blend1
+*.blend2
+_autosave*.blend
+
+# Ancienne version de la page itch
+/Marketing/itch/_ancienne_version/
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

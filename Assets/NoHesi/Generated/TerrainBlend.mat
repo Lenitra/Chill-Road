@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: TerrainBlend
+  m_Shader: {fileID: 4800000, guid: 2fcae57da8acf36469079ad42f8ef0ba, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _Noise:
+        m_Texture: {fileID: 2800000, guid: 44a10852b1fbe4a4a9f759fbaad130aa, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Facets: 1
+    - _NoiseScale: 32
+    - _RockSlope: 0.3
+    - _Smoothness: 0.04
+    m_Colors:
+    - _Dirt: {r: 0.56999993, g: 0.49, b: 0.35999998, a: 1}
+    - _Forest: {r: 0.19, g: 0.31, b: 0.16, a: 1}
+    - _Grass: {r: 0.32999998, g: 0.56, b: 0.21999997, a: 1}
+    - _GrassDry: {r: 0.62, g: 0.62, b: 0.29999998, a: 1}
+    - _GrassLush: {r: 0.24999997, g: 0.47999996, b: 0.18999997, a: 1}
+    - _Paved: {r: 0.55, g: 0.54, b: 0.52, a: 1}
+    - _Rock: {r: 0.5, g: 0.5, b: 0.49, a: 1}
+    - _RockDark: {r: 0.39999998, g: 0.39999998, b: 0.39999998, a: 1}
+    - _Snow: {r: 0.93, g: 0.95, b: 0.98, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
