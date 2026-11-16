@@ -286,7 +286,7 @@ namespace NoHesi.EditorTools
             m.SetFloat("_Smoothness", 0.55f);
             m.enableInstancing = true;
             EditorUtility.SetDirty(m);
-            return m;
+            return ToonStyle.Use(m);
         }
     }
 }

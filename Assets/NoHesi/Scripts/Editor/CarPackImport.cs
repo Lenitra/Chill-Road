@@ -150,7 +150,7 @@ namespace NoHesi.EditorTools
             m.SetFloat("_Smoothness", smoothness);
             m.enableInstancing = true;
             EditorUtility.SetDirty(m);
-            return m;
+            return ToonStyle.Use(m);
         }
 
         static Material Emissive(string name, Color linear, float intensity)
@@ -165,7 +165,7 @@ namespace NoHesi.EditorTools
             m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
             m.enableInstancing = true;
             EditorUtility.SetDirty(m);
-            return m;
+            return name.StartsWith("PK_Siren") ? m : ToonStyle.Use(m);
         }
     }
 }

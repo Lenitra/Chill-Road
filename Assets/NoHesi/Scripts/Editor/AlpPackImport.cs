@@ -179,6 +179,8 @@ namespace NoHesi.EditorTools
             m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
             m.enableInstancing = true;
             EditorUtility.SetDirty(m);
+            ToonStyle.Use(m);
+            ToonStyle.UseDetail(m, ToonStyle.AlpDetailMap);
             AssetDatabase.SaveAssets();
             return m;
         }

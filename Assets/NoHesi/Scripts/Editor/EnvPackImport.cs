@@ -131,6 +131,7 @@ namespace NoHesi.EditorTools
             m.SetFloat("_Smoothness", 0.12f);
             m.enableInstancing = true;                          // la végétation est rendue en GPU instancing
             EditorUtility.SetDirty(m);
+            ToonStyle.Use(m);
             AssetDatabase.SaveAssets();
             return m;
         }

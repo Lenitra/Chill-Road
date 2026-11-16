@@ -102,6 +102,7 @@ namespace NoHesi.EditorTools
             body.SetFloat("_Metallic", 0f);
             body.SetFloat("_Smoothness", 0.3f);        // mat comme les assets Polytope
             EditorUtility.SetDirty(body);
+            ToonStyle.Use(body);
 
             var d = new Dictionary<string, Material>
             {
@@ -139,7 +140,7 @@ namespace NoHesi.EditorTools
             // Émission temps réel : avec None, la validation d'URP retire _EMISSION (optiques éteintes)
             m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive;
             EditorUtility.SetDirty(m);
-            return m;
+            return ToonStyle.Use(m);
         }
     }
 }
