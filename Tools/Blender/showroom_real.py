@@ -3,7 +3,7 @@ Scène « ShowroomReal » de CarPack.blend, construite par build() :
 - halle de 48 x 32 m, façades vitrées au sud (rue) et à l'est, mur de lattes de bois au fond, plafond blanc à
   réglettes LED et rails de spots, poteaux ronds ; carrelage poli à joints, plâtre, bois, alu (matériaux procéduraux,
   aucun téléchargement) ;
-- zone premium côté vitrine : les 9 voitures jouables sur plaques tournantes (la Vision 74 au centre, cordons), un
+- zone premium côté vitrine : les 10 voitures jouables sur plaques tournantes (la Vision 74 au centre, cordons), un
   spot par voiture, bornes d'information (écrans vierges) ;
 - zone d'exposition au fond : voitures du trafic en épi (sans taxi ni police) ;
 - accueil, coin salon, plantes ; dehors : place dallée, rue, trottoir, immeubles, lampadaires ; ciel physique.
@@ -24,8 +24,10 @@ HALL_X, HALL_Y, HALL_H = 24.0, 32.0, 6.5          # demi-largeur, profondeur, ha
 # (id, x, y, cap) : cap = direction de l'avant en degrés (0 = +X), vers la vitrine et l'angle sud-est
 PREMIUM = [("supra", -18.0, 6.2, -40.0), ("jesko", -9.0, 5.2, -45.0), ("vision74", 0.0, 8.5, -50.0),
            ("valkyrie", 9.0, 5.2, -45.0), ("p50", 18.0, 6.2, -40.0),
-           ("miata", -13.5, 13.8, -45.0), ("ae86", -4.5, 14.8, -45.0), ("dmc12", 4.5, 14.8, -45.0),
-           ("mustang", 13.5, 13.8, -45.0)]
+           ("miata", -13.5, 14.0, -45.0), ("ae86", -6.75, 14.6, -45.0), ("twingo", 0.0, 15.3, -45.0),
+           ("dmc12", 6.75, 14.6, -45.0), ("mustang", 13.5, 14.0, -45.0)]
+COLUMN_Y = 18.7                  # poteaux entre la zone premium et l'exposition (pas de poteau central : Twingo)
+COLUMN_X = (-13.0, 13.0)
 STOCK_A = ["fiat500", "civic", "golf", "corolla", "model3"]
 STOCK_B = ["rav4", "kangoo", "f150", "transit"]
 
@@ -399,8 +401,8 @@ def build_hall(M, target):
     obj(bm, "RL_Mullions", target, M["mullion"])
     # poteaux ronds entre les deux zones
     bm = bmesh.new()
-    for xx in (-12.0, 0.0, 12.0):
-        cylinder(bm, (xx, 17.2), 0.32, Hh, n=32)
+    for xx in COLUMN_X:
+        cylinder(bm, (xx, COLUMN_Y), 0.32, Hh, n=32)
     obj(bm, "RL_Columns", target, M["plaster"])
     # volume du bâtiment vu de dehors : acrotère en panneaux sombres au-dessus des façades
     bm = bmesh.new()
@@ -538,7 +540,7 @@ def build_props(M, target):
     obj(bm, "RL_TableLegs", target, M["fixture"])
     # plantes en pot
     pot, leaf, trunk = bmesh.new(), bmesh.new(), bmesh.new()
-    for px, py in ((-22.8, 1.3), (22.8, 1.3), (-22.8, 30.6), (22.8, 30.6), (-12.9, 17.2), (12.9, 17.2),
+    for px, py in ((-22.8, 1.3), (22.8, 1.3), (-22.8, 30.6), (22.8, 30.6), (-13.9, COLUMN_Y), (13.9, COLUMN_Y),
                    (-20.4, 24.6), (22.6, 20.6), (22.6, 27.8)):
         plant(pot, leaf, trunk, px, py, rnd)
     obj(pot, "RL_Pots", target, M["pot"])

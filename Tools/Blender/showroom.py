@@ -1,6 +1,6 @@
 """Showroom : tous les véhicules du jeu exposés dans une halle low poly (même DA à plat que les voitures), pour des
 rendus de présentation. Scène « Showroom » de CarPack.blend, construite par build() :
-- premier rang : les 9 voitures jouables (Vision 74 comprise, liée depuis Vision74.blend) sur des podiums octogonaux
+- premier rang : les 10 voitures jouables (Vision 74 comprise, liée depuis Vision74.blend) sur des podiums octogonaux
   sombres cerclés d'or (l'or de l'interface du jeu) ;
 - deuxième rang : les voitures du trafic en épi sur une estrade, les deux-roues au bout ;
 - troisième rang : utilitaires et camions en épi ;
@@ -19,7 +19,7 @@ SCENE = "Showroom"
 V74_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Vision74.blend")
 V74_COL = "V74_Low"
 
-HERO = ["p50", "miata", "ae86", "supra", "jesko", "vision74", "valkyrie", "mustang", "dmc12"]
+HERO = ["p50", "twingo", "miata", "ae86", "supra", "jesko", "vision74", "valkyrie", "mustang", "dmc12"]
 CARS = ["fiat500", "civic", "golf", "corolla", "model3", "taxi", "police", "rav4", "kangoo", "f150", "transit"]
 BIKES = ["moto", "scooter"]
 TRUCKS = ["tractor", "boxvan", "ambulance", "towtruck", "firetruck", "boxtruck", "mixer", "garbage"]
@@ -270,7 +270,7 @@ def build():
     # premier rang : podiums en arc léger, voitures en 3/4 vers la caméra
     pods = []
     for i, cid in enumerate(HERO):
-        x = -30.0 + 7.5 * i
+        x = 7.5 * (i - (len(HERO) - 1) / 2)
         y = 0.0035 * x * x
         pods.append((x, y))
         place(cid, x, y, -50.0, PODIUM_H, veh)
