@@ -264,11 +264,24 @@ def _cn(g):
     return lay if lay is not None else g.bm.loops.layers.float_vector.new("cn")
 
 
-def leaf(g, p, d, out, length, width, color, nrm, fold=0.14, part=0):
+def _wd(g):
+    """Vent (2026-11-16) : par coin de face, (frémissement en m à la pointe, phase 0-1, 1). Converti en UV1/UV2 par
+    alp_lib.finish pour les fiches marquées `wind` ; le shader NoHesi/Toon déplace ces sommets."""
+    lay = g.bm.loops.layers.float_vector.get("wd")
+    return lay if lay is not None else g.bm.loops.layers.float_vector.new("wd")
+
+
+def leaf(g, p, d, out, length, width, color, nrm, fold=0.14, part=0, flut=None, phase=None):
     """Feuille en losange pliée sur sa nervure, visible des deux côtés (4 triangles). p : attache, d : direction,
-    out : côté vers lequel la feuille présente sa face, nrm : normale d'ombrage imposée."""
+    out : côté vers lequel la feuille présente sa face, nrm : normale d'ombrage imposée.
+    flut : (frémissement à l'attache, à la pointe) en m (défaut : pied fixe, pointe 12 % de la longueur) ;
+    phase : 0-1, propre à la feuille par défaut."""
     bm = g.bm
     cn = _cn(g)
+    wd = _wd(g)
+    f0, f1 = flut if flut is not None else (0.0, 0.12 * length)
+    ph = g.h(round(p.x, 2), round(p.y, 2), round(p.z, 2), 77) if phase is None else phase
+    wv = (Vector((f0, ph, 1.0)), Vector(((f0 + f1) * 0.5, ph, 1.0)), Vector((f1, ph, 1.0)), Vector(((f0 + f1) * 0.5, ph, 1.0)))
     side = d.cross(out)
     if side.length < 1e-4:
         side = d.orthogonal()
@@ -279,13 +292,15 @@ def leaf(g, p, d, out, length, width, color, nrm, fold=0.14, part=0):
     ci = A.CI[color]
     for sgn in (1, -1):
         o = up * (-0.004 if sgn < 0 else 0.0)
-        vb, vl, vt, vr = [bm.verts.new(q + o) for q in pts]
+        vs = [bm.verts.new(q + o) for q in pts]
+        vb, vl, vt, vr = vs
         for tri in (((vb, vl, vt), (vb, vt, vr)) if sgn > 0 else ((vb, vt, vl), (vb, vr, vt))):
             f = bm.faces.new(tri)
             f[g.col] = ci
             f[g.part] = part
             for lp in f.loops:
                 lp[cn] = nrm
+                lp[wd] = wv[vs.index(lp.vert)]
 
 
 def clump(g, c, r, squash, colors, seed, leaf_len, cover=0.5, others=(), cc=None, droop=0.6, lift=0.0, core="leaf_dark",
@@ -397,13 +412,17 @@ def strand(g, top, length, n, leaf_len, colors, out, seed, wide=0.36, sway=0.2):
     part = g.np
     nrm = (out + Vector((0, 0, 0.35))).normalized()
     ph = rs.uniform(0, 6.2832)
+    phase = rs.random()
+    amp = 0.09 * length                                  # balancement du bas du rameau (m)
     for k in range(n):
         t = k / n
         p = top + Vector((0, 0, -length * t)) + out * (sway * length * 0.3 * math.sin(t * 2.2)) \
             + side * (0.03 * length * math.sin(ph + t * 5.0))
         d = (Vector((0, 0, -1.0)) + side * (0.4 if k % 2 else -0.4) + out * rs.uniform(0.0, 0.25)).normalized()
         L = leaf_len * rs.uniform(0.85, 1.2) * (1.0 - 0.25 * t)
-        leaf(g, p, d, out, L, L * wide, colors[(k + seed) % len(colors)], nrm, part=part)
+        t1 = min(1.0, t + L / max(length, 0.1))
+        leaf(g, p, d, out, L, L * wide, colors[(k + seed) % len(colors)], nrm, part=part,
+             flut=(amp * t, amp * t1 + 0.08 * L), phase=phase)
 
 
 # ----------------------------------------------------------------- feuillus (charpente + houppier en touffes)
@@ -508,17 +527,17 @@ def leafy(g, H, trunk_h, trunk_r, W, colors, bark="bark", R=1.5, n=18, tm=0.42, 
 
 
 override("deciduous_a", lambda g: leafy(g, 10.0, 3.2, 0.28, 4.1, ("leaf_dark", "leaf", "leaf_light"), R=1.5, n=18),
-         no_resolve=True)
+         no_resolve=True, wind=0.022)
 override("deciduous_b", lambda g: leafy(g, 14.0, 4.5, 0.36, 3.8, ("leaf_dark", "leaf_dark", "leaf"), R=1.6, n=18, tm=0.38,
-                                        p=2.2, squash=0.95, heart=4), no_resolve=True)
+                                        p=2.2, squash=0.95, heart=4), no_resolve=True, wind=0.02)
 override("deciduous_c", lambda g: leafy(g, 8.0, 2.4, 0.3, 4.6, ("leaf", "leaf_light", "leaf_yellow"), R=1.45, n=20, tm=0.4,
-                                        p=2.4, squash=0.75, core="leaf"), no_resolve=True)
+                                        p=2.4, squash=0.75, core="leaf"), no_resolve=True, wind=0.022)
 override("birch_a", lambda g: leafy(g, 9.0, 3.4, 0.13, 1.95, ("leaf", "leaf_light", "leaf_yellow"), bark="birch_bark",
                                     R=0.9, n=11, tm=0.36, p=1.7, squash=1.15, marks="black", leaf_k=0.5, cover=0.45,
-                                    droop=1.0, core="leaf", hang=3, core_k=0.58, heart=2), no_resolve=True)
+                                    droop=1.0, core="leaf", hang=3, core_k=0.58, heart=2), no_resolve=True, wind=0.03)
 override("birch_b", lambda g: leafy(g, 12.0, 4.4, 0.16, 2.4, ("leaf", "leaf_light", "leaf_yellow"), bark="birch_bark",
                                     R=1.05, n=15, tm=0.36, p=1.7, squash=1.15, marks="black", leaf_k=0.5, cover=0.45,
-                                    droop=1.0, core="leaf", hang=3, core_k=0.58, heart=3), no_resolve=True)
+                                    droop=1.0, core="leaf", hang=3, core_k=0.58, heart=3), no_resolve=True, wind=0.028)
 
 
 def swiss_pine(g, H, width, tiers):
@@ -553,7 +572,7 @@ def poplar(g):
     foliage(g, cl, ("leaf_dark", "leaf", "leaf_light"), 0.72, cover=0.5, droop=0.0, lift=1.3, mix=0.5)
 
 
-override("poplar", poplar, no_resolve=True)
+override("poplar", poplar, no_resolve=True, wind=0.018)
 
 
 def willow(g):
@@ -603,7 +622,7 @@ def willow(g):
             strand(g, pol(a, r0, 5.3), ln, int(ln / 0.4), 0.7, hang, pol(a, 1.0), g.seed + 200 + k)
 
 
-override("willow", willow, no_resolve=True)
+override("willow", willow, no_resolve=True, wind=0.02)
 
 
 # ----------------------------------------------------------------- buissons

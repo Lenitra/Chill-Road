@@ -3,7 +3,8 @@
 // - lumière principale en aplats : rampe douce à deux tons, ombres teintées (froides) plutôt que noires ;
 // - reflet spéculaire « dessiné » (tache nette) dont la taille suit _Smoothness, liseré de contre-jour ;
 // - ambiance du ciel adoucie, lumières additionnelles (phares, lampadaires) en aplats doux ;
-// - émission (_EMISSION : optiques, fenêtres éclairées la nuit), brouillard, SSAO, instanciation, SRP Batcher.
+// - émission (_EMISSION : optiques, fenêtres éclairées la nuit), brouillard, SSAO, instanciation, SRP Batcher ;
+// - vent dans les arbres : seuls les sommets marqués (UV2.y = 2, feuillus du pack alpin) bougent.
 // Les noms des propriétés reprennent ceux d'URP/Lit (_BaseMap, _BaseColor, _Smoothness, _EmissionColor...) :
 // le code du jeu (teinte du trafic, cycle jour/nuit, feux arrière) fonctionne sans changement.
 Shader "NoHesi/Toon"
@@ -32,6 +33,8 @@ Shader "NoHesi/Toon"
         [NoScaleOffset] _DetailMap ("Motif par colonne de palette (R = 1 planches, 2 pierres, 3 tuiles, 4 écorce)", 2D) = "black" {}
         _DetailStrength ("Traits : intensité", Range(0, 1)) = 0.32
         [Toggle] _SnowCap ("Neige sur les faces tournées vers le ciel (zones enneigées de la carte)", Float) = 0
+        _TreeWind ("Vent dans les arbres : amplitude", Range(0, 3)) = 1
+        _TreeFlutter ("Vent : frémissement des feuilles", Range(0, 3)) = 1
     }
 
     SubShader
@@ -51,6 +54,7 @@ Shader "NoHesi/Toon"
             half _Smoothness, _Metallic, _EmissionToggle;
             half _RampMid, _RampSoft, _ShadeLevel, _AmbientFlat, _AmbientStrength, _SpecStrength, _RimStrength, _RimWidth;
             half _DetailLines, _DetailStrength, _SnowCap;
+            float _TreeWind, _TreeFlutter;
         CBUFFER_END
 
         // Neige (carte de la station de ski) : enneigement du sol lu dans la carte (MapTerrain), 0-1
@@ -84,6 +88,46 @@ Shader "NoHesi/Toon"
 
         // Réglage global de qualité (GameSettings) : 0 = éclairage simplifié (pas de reflet ni liseré)
         half _NoHesiToonDetail;
+
+        // Vent (GroundFlora, partagé avec l'herbe) : xy = direction au sol (x, z), z = force (1 calme, jusqu'à 2,7 en tempête)
+        float4 _NoHesiWind;
+
+        // Vent dans les arbres (2026-11-16). Sommets marqués par l'export Blender (alp_lib.finish, fiches `wind`) :
+        // UV1.x = balancement de l'arbre (m, croît comme le carré de la hauteur), UV1.y = frémissement (m, nul au pied
+        // des feuilles), UV2 = (phase de la feuille ou du rameau, marque 2). Un champ de déplacement continu : le
+        // maillage reste d'un seul tenant. Les autres modèles ne bougent pas : un canal
+        // d'UV absent est remplacé par l'UV0 (toujours dans 0-1), d'où la marque à 2.
+        float3 TreeWind(float3 positionWS, float2 w, float2 ph)
+        {
+            float3 d = float3(0, 0, 0);
+            UNITY_BRANCH
+            if (ph.y > 1.5)
+            {
+                float3 origin = float3(UNITY_MATRIX_M._m03, UNITY_MATRIX_M._m13, UNITY_MATRIX_M._m23);
+                float scale = length(float3(UNITY_MATRIX_M._m01, UNITY_MATRIX_M._m11, UNITY_MATRIX_M._m21));
+                float2 dir = _NoHesiWind.xy;
+                dir = dot(dir, dir) > 1e-4 ? normalize(dir) : float2(0.8, 0.6);
+                float force = _NoHesiWind.z > 0.0 ? _NoHesiWind.z : 1.0;
+                float2 side = float2(-dir.y, dir.x);
+                float t = _Time.y;
+                float seed = frac(sin(dot(origin.xz, float2(12.9898, 78.233))) * 43758.5453) * 6.2831853;
+                // Rafales qui traversent la vallée dans le sens du vent
+                float gust = 0.5 + 0.5 * sin(dot(origin.xz, dir) * 0.045 - t * (0.8 + 0.25 * force))
+                                       * sin(dot(origin.xz, side) * 0.021 + t * 0.37 + 1.3);
+                // Balancement de tout l'arbre : poussé dans le sens du vent, oscille lentement, un peu de travers
+                float bend = w.x * scale * force * _TreeWind;
+                float push = (0.25 + 0.75 * gust) + 0.45 * sin(t * 1.15 + seed) * (0.5 + 0.5 * gust);
+                d = float3(dir.x, 0.0, dir.y) * (bend * push)
+                  + float3(side.x, 0.0, side.y) * (bend * 0.3 * sin(t * 0.83 + seed * 1.7));
+                d.y -= bend * push * push * 0.08;
+                // Frémissement des feuilles (et balancement des rameaux du saule) : chaque feuille à son rythme
+                float f = w.y * scale * _TreeFlutter * (0.45 + 0.55 * gust) * (0.7 + 0.3 * force);
+                float a = t * (4.6 + 1.2 * force) + ph.x * 6.2831853;
+                d += float3(sin(a) * dir.x + cos(a * 0.87) * side.x, sin(a * 1.31 + 1.7) * 0.5,
+                            sin(a) * dir.y + cos(a * 0.87) * side.y) * f;
+            }
+            return positionWS + d;
+        }
         ENDHLSL
 
         Pass
@@ -115,6 +159,8 @@ Shader "NoHesi/Toon"
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
                 float2 uv : TEXCOORD0;
+                float2 wind : TEXCOORD1;
+                float2 windPhase : TEXCOORD2;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -137,12 +183,11 @@ Shader "NoHesi/Toon"
                 Varyings o = (Varyings)0;
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_TRANSFER_INSTANCE_ID(input, o);
-                VertexPositionInputs p = GetVertexPositionInputs(input.positionOS.xyz);
-                o.positionWS = p.positionWS;
-                o.positionCS = p.positionCS;
+                o.positionWS = TreeWind(TransformObjectToWorld(input.positionOS.xyz), input.wind, input.windPhase);
+                o.positionCS = TransformWorldToHClip(o.positionWS);
                 o.normalWS = TransformObjectToWorldNormal(input.normalOS);
                 o.uv = TRANSFORM_TEX(input.uv, _BaseMap);
-                o.fog = ComputeFogFactor(p.positionCS.z);
+                o.fog = ComputeFogFactor(o.positionCS.z);
                 #if defined(_DETAIL_LINES)
                     o.positionOS = input.positionOS.xyz;
                     o.normalOS = input.normalOS;
@@ -301,13 +346,15 @@ Shader "NoHesi/Toon"
             {
                 float4 positionOS : POSITION;
                 float3 normalOS : NORMAL;
+                float2 wind : TEXCOORD1;
+                float2 windPhase : TEXCOORD2;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             float4 ShadowVert(Attributes input) : SV_POSITION
             {
                 UNITY_SETUP_INSTANCE_ID(input);
-                float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                float3 positionWS = TreeWind(TransformObjectToWorld(input.positionOS.xyz), input.wind, input.windPhase);
                 float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
                 #if _CASTING_PUNCTUAL_LIGHT_SHADOW
                     float3 lightDirectionWS = normalize(_LightPosition - positionWS);
@@ -336,12 +383,18 @@ Shader "NoHesi/Toon"
             #pragma multi_compile_instancing
             #pragma instancing_options procedural:NoHesiInstanceSetup
 
-            struct Attributes { float4 positionOS : POSITION; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float2 wind : TEXCOORD1;
+                float2 windPhase : TEXCOORD2;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
 
             float4 DepthVert(Attributes input) : SV_POSITION
             {
                 UNITY_SETUP_INSTANCE_ID(input);
-                return TransformObjectToHClip(input.positionOS.xyz);
+                return TransformWorldToHClip(TreeWind(TransformObjectToWorld(input.positionOS.xyz), input.wind, input.windPhase));
             }
 
             half DepthFrag(float4 positionCS : SV_POSITION) : SV_Target { return positionCS.z; }
@@ -361,14 +414,21 @@ Shader "NoHesi/Toon"
             #pragma multi_compile_instancing
             #pragma instancing_options procedural:NoHesiInstanceSetup
 
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; UNITY_VERTEX_INPUT_INSTANCE_ID };
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS : NORMAL;
+                float2 wind : TEXCOORD1;
+                float2 windPhase : TEXCOORD2;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
             struct Varyings { float4 positionCS : SV_POSITION; half3 normalWS : TEXCOORD0; };
 
             Varyings NormalsVert(Attributes input)
             {
                 UNITY_SETUP_INSTANCE_ID(input);
                 Varyings o;
-                o.positionCS = TransformObjectToHClip(input.positionOS.xyz);
+                o.positionCS = TransformWorldToHClip(TreeWind(TransformObjectToWorld(input.positionOS.xyz), input.wind, input.windPhase));
                 o.normalWS = TransformObjectToWorldNormal(input.normalOS);
                 return o;
             }

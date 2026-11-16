@@ -740,6 +740,23 @@ def finish(geo, name, col, grad_h=None, base=0.0, resolve=None, sharp=SHARP_ANGL
         lim = math.radians(sharp)
         for e in bm.edges:
             e.smooth = len(e.link_faces) == 2 and e.calc_face_angle(0) <= lim
+    wd = bm.loops.layers.float_vector.get("wd")
+    wind = getattr(geo, "wind", None)
+    if wind:
+        # Vent (2026-11-16) : UV1 = (balancement de l'arbre en m, frémissement en m), UV2 = (phase 0-1, marque 2 :
+        # Unity remplace un canal d'UV absent par l'UV0, qui ne dépasse jamais 1).
+        # Le balancement croît comme (z / H)² : pied fixe, cime qui ploie de `wind` × H.
+        uw = bm.loops.layers.uv.new("UVWind")
+        up = bm.loops.layers.uv.new("UVPhase")
+        Ht = max(top - base, 1e-3)
+        for f in bm.faces:
+            for lp in f.loops:
+                z = max(lp.vert.co.z - base, 0.0) / Ht
+                w = lp[wd] if wd is not None else (0.0, 0.0, 0.0)
+                lp[uw].uv = (wind * Ht * z * z, w[0] if w[2] > 0.5 else 0.0)
+                lp[up].uv = (w[1] if w[2] > 0.5 else 0.0, 2.0)
+    if wd is not None:
+        bm.loops.layers.float_vector.remove(wd)
     me = bpy.data.meshes.new(name)
     me.materials.append(palette_material())
     bm.to_mesh(me)
@@ -774,6 +791,7 @@ def build(iid):
         plan = [(k, False) for k in range(lods)]
     for l, (old, hd) in enumerate(plan):
         g = Geo(old, seed_of(it), hd, l)
+        g.wind = it.get("wind")
         it["build"](g)
         zmax = max(v.co.z for v in g.bm.verts)
         zmin = min(v.co.z for v in g.bm.verts)
