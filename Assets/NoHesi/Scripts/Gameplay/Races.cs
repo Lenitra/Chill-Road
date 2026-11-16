@@ -73,6 +73,73 @@ namespace NoHesi
                 id = "lac", fr = "Tour du Lac", en = "Lake Loop", laps = 2, spacing = 700f, heading = new Vector2(0.4f, 1f), side = 0,
                 points = new[] { new Vector2(1655.9f, -910.5f), new Vector2(2106.3f, -287.1f), new Vector2(484.9f, -2077.8f), new Vector2(550.1f, -1775.2f) },
             },
+            // Les points intermédiaires sont posés au milieu des routes à suivre : chaque étape est l'itinéraire le plus
+            // rapide d'un point au suivant, ils obligent le tracé à passer par là.
+            // Sprint : la route de la station des Combes, de La Chenal au front de neige (≈ 3 km, haut enneigé)
+            new Def
+            {
+                id = "station", fr = "Montée des Combes", en = "Les Combes Climb", spacing = 500f, heading = new Vector2(0.23f, 0.97f), side = 1,
+                points = new[] { new Vector2(-1679.8f, 165.6f), new Vector2(-1107.3f, 116.4f) },
+            },
+            // Sprint : la route de balcon, du Plan aux Granges par Les Hauts et Les Moulins (≈ 6,6 km)
+            new Def
+            {
+                id = "balcon", fr = "Route du Balcon", en = "Balcony Road", spacing = 650f, heading = new Vector2(-0.97f, -0.23f), side = 1,
+                points = new[] { new Vector2(124.5f, -1631.9f), new Vector2(841.2f, -865.6f), new Vector2(1494.0f, 131.7f), new Vector2(1618.0f, -246.3f) },
+            },
+            // Sprint : la route du col par l'est, des Granges au col (≈ 3,2 km)
+            new Def
+            {
+                id = "col_est", fr = "Col par l'Est", en = "East Pass Climb", spacing = 500f, heading = new Vector2(-0.94f, -0.35f), side = -1,
+                points = new[] { new Vector2(1825.6f, 120.8f), new Vector2(1180.4f, 298.3f), new Vector2(298.2f, 420.8f) },
+            },
+            // Sprint : descente du col vers Praz-Dessus (≈ 2 km)
+            new Def
+            {
+                id = "col_nord", fr = "Descente du Nord", en = "North Descent", spacing = 400f, heading = new Vector2(-0.14f, 0.99f), side = 1,
+                points = new[] { new Vector2(122.2f, 578.8f), new Vector2(205.1f, 1680.0f) },
+            },
+            // Sprint : l'autoroute par l'échangeur des Granges et le tunnel du nord-est, sortie à Praz-Dessus (≈ 4,5 km)
+            new Def
+            {
+                id = "tunnel", fr = "Tunnel du Nord-Est", en = "North-East Tunnel", spacing = 700f, heading = new Vector2(0.94f, 0.34f), side = 1,
+                points = new[] { new Vector2(1896.4f, -117.5f), new Vector2(1992.9f, 1698.5f), new Vector2(332.0f, 1948.0f) },
+            },
+            // Sprints sur la terre : piste du Petit Pas (≈ 1,7 km, lacets), piste du Villard (≈ 1,7 km), route puis chemin
+            // des Chalets (≈ 2,2 km)
+            new Def
+            {
+                id = "petit_pas", fr = "Piste du Petit Pas", en = "Petit Pas Trail", spacing = 400f, heading = new Vector2(-0.45f, 0.89f), side = -1,
+                points = new[] { new Vector2(1731.0f, 1545.0f), new Vector2(1353.9f, 1124.5f) },
+            },
+            new Def
+            {
+                id = "villard", fr = "Piste du Villard", en = "Villard Trail", spacing = 400f, heading = new Vector2(-0.27f, -0.96f), side = 1,
+                points = new[] { new Vector2(-1691.2f, -772.7f), new Vector2(-1403.5f, -805.5f) },
+            },
+            new Def
+            {
+                id = "chalets", fr = "Chemin des Chalets", en = "Chalets Track", spacing = 450f, heading = new Vector2(0.88f, 0.48f), side = 1,
+                points = new[] { new Vector2(347.6f, 2353.4f), new Vector2(-37.8f, 2509.7f), new Vector2(-435.8f, 2490.1f) },
+            },
+            // Tours : route du lac jusqu'aux Rives, retour par le chemin des Bois (terre) et l'échangeur sud (≈ 3,7 km)
+            new Def
+            {
+                id = "rives", fr = "Boucle des Rives", en = "Lakeshore Loop", laps = 2, spacing = 600f, heading = new Vector2(0.99f, 0.12f), side = 0,
+                points = new[] { new Vector2(542.7f, -1776.2f), new Vector2(1430.4f, -1939.0f), new Vector2(1116.1f, -2176.9f), new Vector2(349.9f, -1927.7f) },
+            },
+            // Tours : route de la vallée vers le Villard, chemin de la Gorge sous le viaduc, retour par l'échangeur ouest (≈ 2,7 km)
+            new Def
+            {
+                id = "gorge", fr = "Boucle de la Gorge", en = "Gorge Loop", laps = 3, spacing = 450f, heading = new Vector2(-0.17f, -0.99f), side = -1,
+                points = new[] { new Vector2(-1795.6f, -227.8f), new Vector2(-2263.9f, -218.4f), new Vector2(-1972.8f, 403.5f), new Vector2(-1853.5f, 215.6f) },
+            },
+            // Tours : le triangle des rues enneigées de la station (≈ 0,5 km)
+            new Def
+            {
+                id = "station_tours", fr = "Critérium des Neiges", en = "Snow Criterium", laps = 5, spacing = 160f, heading = new Vector2(-0.46f, -0.89f), side = 0,
+                points = new[] { new Vector2(-1039.1f, 305.9f), new Vector2(-1012.5f, 176.5f), new Vector2(-970.8f, 267.2f) },
+            },
         };
 
         /// <summary>Porte : ligne en travers de la route, à franchir dans le sens de <see cref="forward"/>.</summary>

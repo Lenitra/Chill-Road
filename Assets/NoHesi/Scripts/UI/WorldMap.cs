@@ -525,6 +525,10 @@ namespace NoHesi
                 (new Color(0.28f, 0.54f, 0.77f), 12f, "Lac, rivière", "Lake, river"),
                 (new Color(0.48f, 0.26f, 0.2f), 12f, "Village", "Village"),
                 (new Color(0.2f, 0.38f, 0.24f), 12f, "Forêt", "Forest"),
+                // Courses : une ligne par genre (trop de tracés pour une ligne chacun) ; le nom est écrit au départ, le
+                // détail et le record s'affichent au survol
+                (Races.SprintTint, 6f, "Course : sprint", "Race: sprint"),
+                (Races.LapsTint, 6f, "Course : tours", "Race: laps"),
             };
             for (int i = 0; i < rows.Length; i++)
             {
@@ -534,23 +538,7 @@ namespace NoHesi
                 var text = Label(side, "", 23, TextAnchor.UpperLeft, Color.white, new Vector2(122f, y), new Vector2(400f, 32f), FontStyle.Normal, new Vector2(0f, 1f));
                 Loc.Bind(text, rows[i].fr, rows[i].en);
             }
-            // Courses : une ligne par tracé, de sa couleur (nom, puis record personnel ou longueur : RefreshRaceLabels)
             int row = rows.Length;
-            if (game.Races)
-                foreach (var t in game.Races.All)
-                {
-                    float y = rowTop - row++ * rowStep;
-                    var bar = Box(side, "Race_" + t.id, new Vector2(0f, 1f), new Vector2(72f, y - 15f), new Vector2(56f, 6f)).gameObject.AddComponent<Image>();
-                    bar.color = t.Tint;
-                    var text = Label(side, "", 23, TextAnchor.UpperLeft, Color.white, new Vector2(122f, y), new Vector2(sideWidth - 140f, 30f), FontStyle.Normal, new Vector2(0f, 1f));
-                    // La ligne rétrécit plutôt que de déborder (colonne étroite sur un écran 4:3)
-                    text.horizontalOverflow = HorizontalWrapMode.Wrap;
-                    text.verticalOverflow = VerticalWrapMode.Truncate;
-                    text.resizeTextForBestFit = true;
-                    text.resizeTextMinSize = 13;
-                    text.resizeTextMaxSize = 23;
-                    raceRows.Add(text);
-                }
             var you = Label(side, "▲", 26, TextAnchor.UpperLeft, Accent, new Vector2(58f, rowTop - row * rowStep + 4f), new Vector2(40f, 36f), FontStyle.Normal, new Vector2(0f, 1f));
             you.raycastTarget = false;
             var youText = Label(side, "", 23, TextAnchor.UpperLeft, Color.white, new Vector2(122f, rowTop - row * rowStep), new Vector2(400f, 32f), FontStyle.Normal, new Vector2(0f, 1f));
