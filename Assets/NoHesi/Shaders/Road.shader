@@ -386,7 +386,7 @@ Shader "NoHesi/Road"
                     {
                         SnowTrail trail = SampleSnowTrail(input.positionWS, GetWorldSpaceNormalizeViewDir(input.positionWS), 0.07);
                         half rut = trail.depth * cover;
-                        rs.albedo = lerp(rs.albedo, half3(0.56, 0.62, 0.72), smoothstep(0.25, 0.75, rut) * 0.8);
+                        rs.albedo = lerp(rs.albedo, half3(0.36, 0.41, 0.5), smoothstep(0.2, 0.7, rut) * 0.9);
                         rs.albedo = lerp(rs.albedo, half3(0.97, 0.98, 1.0), trail.rim * cover * 0.6);
                         rs.smoothness = lerp(rs.smoothness, 0.5, rut);
                         n = normalize(n + half3(trail.slope.x, 0.0, trail.slope.y) * (cover * 2.0));
