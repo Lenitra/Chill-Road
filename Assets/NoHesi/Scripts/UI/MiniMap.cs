@@ -6,9 +6,9 @@ using UnityEngine.UI;
 namespace NoHesi
 {
     /// <summary>
-    /// Minicarte du HUD (bas gauche, pendant du compte-tours), tout en niveaux de gris et en version claire : disque
-    /// découpé dans Resources/Map/map_minimap.png (fond gris clair, routes blanches bordées de gris, dessinée par
-    /// Tools/Map/map_minimap.py) et tourné avec la voiture (l'avant toujours en haut). La voiture, flèche noire cerclée de
+    /// Minicarte du HUD (bas gauche, pendant du compte-tours), en version claire : disque découpé dans
+    /// Resources/Map/map_minimap.png (style « épuré » : fond crème, routes blanches bordées de beige, autoroute orange,
+    /// dessinée par Tools/Map/map_minimap.py) et tourné avec la voiture (l'avant toujours en haut). La voiture, flèche noire cerclée de
     /// blanc, est un peu sous le centre pour voir plus loin devant ; le champ s'élargit avec la vitesse. Circulation en
     /// points gris foncé, autres joueurs en flèches grises (posées sur le bord quand ils sont hors champ), nord sur le
     /// bord du disque.
@@ -119,7 +119,7 @@ namespace NoHesi
             if (!ready) return;
             if (!disc.texture)
             {
-                // Carte en niveaux de gris (Tools/Map/map_minimap.py), sinon la carte en couleurs
+                // Carte de la minicarte (Tools/Map/map_minimap.py), sinon la carte globale
                 disc.texture = Resources.Load<Texture2D>("Map/map_minimap");
                 if (!disc.texture) disc.texture = Resources.Load<Texture2D>("Map/map_overview");
                 disc.half = map.Half;
