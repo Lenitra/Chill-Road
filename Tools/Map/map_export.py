@@ -32,7 +32,8 @@ def masks(g, H, info, edge, water, edges, urban_pts=(), blocked=None, pads=()):
     up = info["up"]
     fn = L.fbm(X / 420.0, Z / 420.0, 3, seed=D.SEED + 80)
     fn2 = L.fbm(X / 150.0, Z / 150.0, 2, seed=D.SEED + 81)
-    treeline = 470.0 + 45.0 * L.fbm(X / 600.0, Z / 600.0, 2, seed=D.SEED + 82)
+    import map_station as SK
+    treeline = 470.0 + 45.0 * L.fbm(X / 600.0, Z / 600.0, 2, seed=D.SEED + 82) + SK.TREELINE_UP * SK.zone(X, Z)
 
     # Zones bâties : rues de la ville et hameaux
     urban = 1.0 - L.smoothstep(22.0, 60.0, street_distance(g, edges))
@@ -68,7 +69,10 @@ def masks(g, H, info, edge, water, edges, urban_pts=(), blocked=None, pads=()):
     from map_roads import pad_distance
     for (px, pz, pr, py) in pads:
         paved = np.maximum(paved, 1.0 - L.smoothstep(-3.0, 1.0, pad_distance(X, Z, px, pz, pr)))
-    snow = L.smoothstep(690.0, 830.0, H + 70.0 * fn) * (1.0 - L.smoothstep(0.95, 1.35, slope))
+    # limite de la neige : 760 m en général, plus basse autour de la station (map_station.SNOW)
+    line = SK.snow_line(X, Z)
+    snow = L.smoothstep(line - 70.0, line + 70.0, H + 70.0 * fn) * (1.0 - L.smoothstep(0.95, 1.35, slope))
+    snow, forest, rock, dry = SK.masks(g, H, snow, forest, rock, dry, fn)
     if blocked is not None:
         forest = np.where(blocked, 0.0, forest)
 

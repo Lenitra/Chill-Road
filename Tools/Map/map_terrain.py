@@ -61,10 +61,12 @@ def build(step=D.STEP, verbose=True):
     Hc = np.full(Xc.shape, 1e9)
     Up = np.full(Xc.shape, 1e9)
     lines = {}
-    for vi, v in enumerate(D.VALLEYS):
+
+    def dig(vi, v, Hc, Up):
         line = valley_line(v)
         lines[v["id"]] = line
         pd, ph = profile_table(v["profile"])
+        ext = float(v.get("extend", 3.0))
         # Éperons et ravines : le versant avance ou recule (bruit du plan, continu partout)
         spur = L.fbm(Xc / 520.0, Zc / 520.0, 3, seed=D.SEED + 20 + vi) * 0.42
         Hv = np.full(Xc.shape, 1e9)
@@ -83,13 +85,18 @@ def build(step=D.STEP, verbose=True):
             # Au-delà de son bout le plus haut, le fond du tronçon continue de monter : sans cela chaque tronçon
             # creuse un palier dans le suivant et les vallons raides deviennent des escaliers (une marche tous les
             # 60 m). Vers l'aval, pas de prolongement : il creuserait un trou au pied des raidillons.
-            te = np.clip(tu, 0.0, 3.0) if eb >= ea else np.clip(tu, -2.0, 1.0)
+            te = np.clip(tu, 0.0, ext) if eb >= ea else np.clip(tu, 1.0 - ext, 1.0)
             Hs = ea + te * (eb - ea) + P
             m = Hs < Hv
             Hv = np.where(m, Hs, Hv)
             Pv = np.where(m, P, Pv)
         Up = np.where(Hv < Hc, Pv, Up)
-        Hc = L.smin(Hc, Hv, 22.0)
+        return L.smin(Hc, Hv, 22.0), Up
+
+    late = [(vi, v) for vi, v in enumerate(D.VALLEYS) if v.get("late")]
+    for vi, v in enumerate(D.VALLEYS):
+        if not v.get("late"):
+            Hc, Up = dig(vi, v, Hc, Up)
     # Sommets : plafond irrégulier
     cap = D.PEAK_BASE + D.PEAK_VAR * L.fbm(Xc / 1300.0, Zc / 1300.0, 3, seed=D.SEED + 60)         + 260.0 * (L.ridged(Xc / 800.0, Zc / 800.0, 4, seed=D.SEED + 61) - 0.5)
     Hc = L.smin(Hc, cap, 70.0)
@@ -99,6 +106,29 @@ def build(step=D.STEP, verbose=True):
     rim = D.RIM_HEIGHT * f ** 1.5 + 0.5 * np.minimum(Hc, 600.0)
     Hc = Hc + (L.smax(Hc, rim, 80.0) - Hc) * L.smoothstep(0.0, 0.2, f)
 
+    # Crêtes soulevées : toit à deux pentes le long d'une ligne de crête, limité à « reach » mètres de la ligne
+    for ri, r in enumerate(getattr(D, "RIDGES", ())):
+        line = L.catmull(r["pts"], 40.0)
+        fd, fh = profile_table(r["flank"])
+        spur = L.fbm(Xc / 300.0, Zc / 300.0, 3, seed=D.SEED + 90 + ri) * 0.35
+        T = np.full(Xc.shape, -1e9)
+        dmin = np.full(Xc.shape, 1e9)
+        for i in range(len(line) - 1):
+            ax, az, ha = line[i]
+            bx, bz, hb = line[i + 1]
+            dx, dz = bx - ax, bz - az
+            t = np.clip(((Xc - ax) * dx + (Zc - az) * dz) / max(dx * dx + dz * dz, 1e-9), 0.0, 1.0)
+            d = np.hypot(Xc - ax - t * dx, Zc - az - t * dz)
+            T = np.maximum(T, ha + t * (hb - ha) - np.interp(d * (1.0 + spur), fd, fh))
+            dmin = np.minimum(dmin, d)
+        # la crête elle-même ondule (brèches et pointes)
+        T = T + 28.0 * L.fbm(Xc / 170.0, Zc / 170.0, 3, seed=D.SEED + 95 + ri) * (1.0 - L.smoothstep(60.0, 220.0, dmin))
+        w = 1.0 - L.smoothstep(r["reach"] - 90.0, r["reach"], dmin)
+        U = (L.smax(Hc, T, 25.0) - Hc) * w
+        Hc = Hc + U
+        Up = Up + U
+    for vi, v in late:
+        Hc, Up = dig(vi, v, Hc, Up)
     shape = (g.n, g.n)
     H = L.upsample(Hc, shape) if g.n != coarse.n else Hc.copy()
     up = L.upsample(np.minimum(Up, 3000.0), shape) if g.n != coarse.n else np.minimum(Up, 3000.0)

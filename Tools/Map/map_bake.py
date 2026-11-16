@@ -60,9 +60,11 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
         return g, H, info, nodes, edges
     import map_village as VL
     import map_stunts as ST
-    pads = VL.pads(g, H, edges)
+    import map_station as SK
+    pads = VL.pads(g, H, edges) + SK.pads(g, H, edges)
     stunts = ST.resolve(edges)
     Hc, edge = R.carve(g, H, nodes, edges, pads, ST.strips(stunts))
+    Hc = SK.groom(g, Hc, edge)                 # pistes damées de la station
     water = water_masks(g, Hc)
     Hc = clear_water(g, Hc, water)
     hole = R.holes(g, Hc, edges, edge)
@@ -82,6 +84,7 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
             e["rail"][inside & ~span] &= ~np.uint8(3)
     placer = VL.populate(g, Hc, edge, water, nodes, edges, info["rivers"])
     ST.populate(placer, stunts)
+    SK.populate(placer, g, Hc, nodes, edges)
     pads = pads + ST.paved(stunts)             # bandes d'élan goudronnées (le relief, lui, est déjà terrassé)
     urban = [(v[2], v[3], v[4]) for v in D.VILLAGES + D.HAMLETS]
     rgba, paved, snow, forest, urban_m, slope = E.masks(g, Hc, info, edge, water, edges, urban_pts=urban,
@@ -93,7 +96,7 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
     print("cascades : %d tremplins, %d objets retires des bandes" % (len(stunts), removed))
     if export:
         E.export(g, Hc, info, nodes, edges, water, edge, rgba, paved, snow, places=places,
-                 pois=D.pois(nodes, edges) + VL.pois(), blocked=placer.blocked, holes=hole, tunnels=R.tunnel_zone(g, edges),
+                 pois=D.pois(nodes, edges) + VL.pois() + SK.pois(), blocked=placer.blocked, holes=hole, tunnels=R.tunnel_zone(g, edges),
                  stunts=ST.export(stunts))
         import map_overview as OV
         for e in edges:

@@ -22,6 +22,8 @@ PROFILE_RING = [(0, 0.03), (80, 0.55), (380, 0.6), (470, 0.3), (580, 0.3), (680,
 PROFILE_SIDE = [(0, 0.04), (60, 0.42), (380, 0.5), (520, 0.22), (740, 0.22), (950, 0.85)]
 # Combes en cul-de-sac : petites auges suspendues
 PROFILE_COMBE = [(0, 0.06), (70, 0.45), (300, 0.5), (420, 0.8)]
+# Haute combe de la station : fond large, versants skiables (20 à 40 %), parois au-dessus
+PROFILE_STATION = [(0, 0.08), (30, 0.25), (100, 0.55), (250, 0.9), (600, 1.0)]
 
 # Vallées : ligne de fond (x, z, altitude du fond, demi-largeur du fond plat). La rivière suit cette ligne.
 VALLEYS = [
@@ -52,11 +54,28 @@ VALLEYS = [
     dict(id="col_e", profile=PROFILE_SIDE, river=5.0, river_from=1, pts=[
         (60, 380, 300, 150), (480, 470, 287, 95), (820, 380, 266, 80), (1000, 320, 196, 40),
         (1300, 370, 170, 85), (1480, 410, 118, 45), (1700, 380, 88, 120), (1990, 330, 60, 200)]),
-    # Combes : alpage de l'ouest, cirque au-dessus du lac
-    dict(id="combe_o", profile=PROFILE_COMBE, river=4.0, river_to=2, pts=[
-        (-2000, 150, 112, 200), (-1500, 60, 215, 60), (-1080, 180, 340, 110), (-820, 330, 430, 60)]),
+    # Combes : gorge de l'ouest (torrent de la station, verrou), cirque au-dessus du lac
+    dict(id="combe_o", profile=PROFILE_COMBE, river=4.0, late=True, extend=1.0, pts=[
+        (-2000, 150, 112, 200), (-1500, 60, 215, 60), (-1330, 85, 300, 45)]),
     dict(id="combe_lac", profile=PROFILE_COMBE, river=4.0, river_to=2, pts=[
         (1380, -1560, 6, 150), (1180, -1180, 110, 60), (960, -760, 270, 100), (800, -420, 390, 50)]),
+    # Haute combe de la station, creusée dans le massif de l'Ours (voir RIDGES) : plateau du front de neige, puis
+    # auge des pistes qui monte au nord sous la Tête de l'Ours. « late » : creusée après le soulèvement du massif ;
+    # « extend » : le fond ne se prolonge pas au-delà de son bout (le cirque se referme).
+    dict(id="station", profile=PROFILE_STATION, river=0.0, late=True, extend=1.0, pts=[
+        (-1150, 145, 376, 55), (-1085, 168, 384, 90), (-985, 180, 394, 130), (-945, 355, 408, 120),
+        (-900, 540, 450, 100), (-860, 720, 520, 85), (-800, 880, 600, 70), (-770, 950, 645, 60)]),
+]
+
+# Crêtes soulevées au-dessus du relief des vallées : ligne de crête (x, z, altitude), versants extérieurs (distance,
+# pente), portée maximale (au-delà, le relief d'origine est intact : les routes des cols ne bougent pas). Les vallées
+# « late » sont creusées ensuite.
+# Massif de l'Ours : fer à cheval ouvert à l'ouest (gorge du torrent), autour de la combe de la station.
+RIDGES = [
+    dict(id="ours", reach=300.0, flank=[(0, 0.2), (40, 0.75), (120, 1.05), (600, 1.15)], pts=[
+        (-1200, 430, 540), (-1170, 640, 620), (-1100, 820, 700), (-1030, 1000, 790), (-1010, 1150, 850),
+        (-860, 1210, 800), (-680, 1160, 740), (-570, 1010, 700), (-600, 800, 660), (-640, 600, 640),
+        (-640, 350, 620), (-680, 120, 600), (-780, -60, 570), (-940, -130, 540), (-1090, -70, 500)]),
 ]
 
 # Plafond des sommets et cirque de bordure
@@ -73,7 +92,6 @@ LAKES = [
 # Replats aménagés dans le relief naturel : (x, z, rayon, raccord, altitude ou None = moyenne locale)
 PADS = [
     (50, 420, 140, 170, 301.0),       # col
-    (-1080, 180, 80, 110, None),      # alpage
 ]
 
 # Cônes de déjection aux débouchés des vallons : (x, z de l'apex, altitude de l'apex, rayon, pente). Les villages
@@ -94,7 +112,7 @@ VILLAGES = [
     ("praz", "Praz-Dessus", 190, 1810, 200),
     ("chenal", "La Chenal", -1830, 290, 190),
     ("col", "Col des Trois Vallons", 50, 420, 150),
-    ("alpage", "Alpage de la Combe", -1090, 215, 90),
+    ("station", "Les Combes · station", -1000, 230, 230),
 ]
 # Hameaux : posés par roads() sur les replats trouvés par le traceur (id, nom, x, z, rayon)
 HAMLETS = []
@@ -388,11 +406,27 @@ def roads(net):
     t.to(*branch(b_, "h_moulins", 1.0, (18.0, 40.0)))
     t.route("alp_cirque", label="chemin_cirque").node("alp_cirque")
 
-    # Route de l'alpage (départementale) : de La Chenal par la combe jusqu'à l'alpage, en cul-de-sac
-    N("alpage", -1105, 240)
-    w_ = net.road("route_alpage", "mountain", "r_combe", smooth=14.0)
+    # Route de la station (départementale) : de La Chenal, lacets sur le versant puis entrée dans la haute combe
+    # par le verrou, au-dessus de la gorge du torrent ; enneigée dans sa partie haute (map_station.SNOW)
+    N("st_ouest", -1045, 174)
+    net.fixed["st_ouest"] = net.h(-1045, 174) + 0.3
+    w_ = net.road("route_station", "mountain", "r_combe", smooth=14.0)
     w_.to(*stub("r_combe", 1.0))
-    w_.route("alpage", label="route_alpage", **RD).node("alpage")
+    # arrivée par le sud-ouest (la route longe le verrou), puis courbe vers la rue principale
+    w_.route((-1098, 118), goal_heading=(0.45, 0.89), label="route_station", margin=620.0, hair_cost=230.0, **RD)
+    w_.to((-1080, 150), (-1064, 166)).node("st_ouest")
+    # Rues de la station, sur le plateau : rue principale jusqu'à la place, montée au front de neige, retour par la
+    # rue des Chalets (triangle), et deux impasses (parking de la place, gare des remontées)
+    N("st_place", -985, 178)
+    N("st_front", -948, 352)
+    for name in ("st_place", "st_front"):
+        net.fixed[name] = net.h(*net.nodes[name]) + 0.3
+    net.road("rue_station", "mountain", "st_ouest", smooth=10.0).to((-1021, 176)).node("st_place")
+    net.road("rue_front", "lane", "st_place", smooth=10.0).to((-982, 204), (-972, 262), (-955, 326)).node("st_front")
+    net.road("rue_chalets", "lane", "st_front", smooth=10.0).to((-974, 356), (-1016, 338), (-1052, 272), (-1048, 200)
+                                                                 ).node("st_ouest")
+    net.road("rue_place", "lane", "st_place", smooth=10.0).to((-959, 172), (-905, 148)).node("st_parking")
+    net.road("rue_gare", "lane", "st_front", smooth=10.0).to((-942, 378), (-915, 430)).node("st_gare")
 
     # Les Chalets : versant nord, au soleil, au-dessus de l'autoroute (depuis l'échangeur nord)
     hamlet("h_chalets", "Les Chalets", (520, 2470), 180, 190, 330)
@@ -499,7 +533,7 @@ def pois(nodes, edges):
                     r=round(math.degrees(math.atan2(dx, dz)) % 360.0, 1)))
     left = {"plan", "port", "chenal"}
     for (vid, name, x, z, r) in VILLAGES + HAMLETS:
-        en = dict(col="Three Valleys Pass", alpage="Combe Pasture").get(vid, name)
+        en = dict(col="Three Valleys Pass", station="Les Combes · ski resort").get(vid, name)
         out.append(dict(id=vid, fr=name, en=en, x=float(x), z=float(z), r=float(r) * 1.6, side=-1 if vid in left else 1))
     out.append(dict(id="lac", fr="Lac de l'Envers", en="Lake Envers", x=1700.0, z=-1500.0, r=520.0))
     out.append(dict(id="col_ne", fr="Col du Petit Pas", en="Petit Pas Pass", x=1820.0, z=1560.0, r=150.0))
@@ -515,4 +549,6 @@ VIEWS = {
     "ne": (1000, 800, 2400, 2300),
     "col": (-700, -1900, 1900, 1900),
     "plan": (-300, -2150, 800, -1450),
+    "station": (-2000, -500, -400, 1400),
+    "village": (-1250, 0, -750, 600),
 }
