@@ -35,19 +35,36 @@ Material:
     m_Floats:
     - _AOHeight: 0.28
     - _AOStrength: 0.45
+    - _Comb: 0.6
+    - _CombShare: 0.6
     - _FadeEnd: 0
+    - _GustBright: 0.24
+    - _NoiseScale: 32
+    - _Push: 1.3
+    - _RampSoft: 0.22
+    - _Saturation: 0.88
+    - _ShadeLevel: 0.68
+    - _SlopeLean: 0.25
+    - _SlopeLit: 0
     - _Smoothness: 0.12
     - _TintAmount: 0.35
     - _TintScale: 48
-    - _Translucency: 0.8
+    - _TipAmount: 0.3
+    - _TipBright: 1.05
+    - _Translucency: 0.5
     - _Variation: 0.09
-    - _WindFlutter: 0.3
-    - _WindScale: 24
+    - _WindFlutter: 0.2
+    - _WindScale: 26
     - _WindSpeed: 1
-    - _WindStrength: 0.22
+    - _WindStrength: 0.5
     - _Wrap: 0.55
     m_Colors:
+    - _Grass: {r: 0.32999995, g: 0.56, b: 0.21999994, a: 1}
+    - _GrassLush: {r: 0.24999994, g: 0.47999996, b: 0.18999994, a: 1}
+    - _RootColor: {r: 0.41999993, g: 0.5, b: 0.45999986, a: 1}
+    - _ShadeColor: {r: 0.6, g: 0.6399999, b: 0.8, a: 1}
     - _TintColor: {r: 1.08, g: 1.02, b: 0.72, a: 1}
-    - _TransColor: {r: 1, g: 0.95, b: 0.62, a: 1}
+    - _TipColor: {r: 0.8, g: 0.8399999, b: 0.5, a: 1}
+    - _TransColor: {r: 0.95, g: 0.95, b: 0.72, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
