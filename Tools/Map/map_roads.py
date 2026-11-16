@@ -444,6 +444,46 @@ def _refine_spans(g, H, e, ha, hb):
     e["spans"] = sorted(out)
 
 
+def _cover_crossings(e, edges, reach=45.0, margin=6.0):
+    """Un pont dont la culée tombe sur une route qui passe dessous est prolongé jusqu'au-delà de cette route :
+    _refine_spans ne regarde que le relief, or une route à flanc de versant passe là où le tablier est encore
+    près du sol. On prolonge le tablier sur toute l'emprise croisée (plus une marge), si elle est à moins de
+    « reach » mètres du bout du pont."""
+    spans = [sp for sp in e["spans"] if sp[2] != "tunnel"]
+    if not spans:
+        return
+    P, s = e["pts"], e["s"]
+    t = L.tangents(P)
+    left = np.stack([-t[:, 1], t[:, 0]], axis=1)
+    tunnels = [(s0, s1) for (s0, s1, k) in e["spans"] if k == "tunnel"]
+    for o in edges:
+        if o is e or o["chain"] == e["chain"] or {o["a"], o["b"]} & {e["a"], e["b"]}:
+            continue
+        Q = o["pts"]
+        if (Q[:, 0].min() > P[:, 0].max() + 40 or Q[:, 0].max() < P[:, 0].min() - 40 or
+                Q[:, 1].min() > P[:, 1].max() + 40 or Q[:, 1].max() < P[:, 1].min() - 40):
+            continue
+        # points de l'ouvrage dont la largeur recouvre la chaussée de l'autre route
+        near = np.where(np.hypot(P[:, None, 0] - Q[None, ::2, 0], P[:, None, 1] - Q[None, ::2, 1]).min(axis=1)
+                        < e["hw"] + o["hw"] + 8.0)[0]
+        hit = []
+        for i in near:
+            for off in np.linspace(-e["hw"] - 1.0, e["hw"] + 1.0, 9):
+                q = P[i, :2] + left[i] * off
+                if np.hypot(Q[:, 0] - q[0], Q[:, 1] - q[1]).min() < o["hw"] + 2.5:
+                    hit.append(i)
+                    break
+        if not hit:
+            continue
+        for grp in np.split(np.array(hit), np.where(np.diff(hit) > 6)[0] + 1):
+            c0, c1 = s[grp[0]] - margin, s[grp[-1]] + margin
+            for sp in spans:
+                if c0 < sp[0] <= c1 + reach:
+                    sp[0] = max(c0, 0.0, max([t1 for (_, t1) in tunnels if t1 <= sp[0]], default=0.0))
+                if c1 > sp[1] >= c0 - reach:
+                    sp[1] = min(c1, s[-1], min([t0 for (t0, _) in tunnels if t0 >= sp[1]], default=s[-1]))
+
+
 def build_edges(net, rivers, lakes_level, verbose=True):
     """Découpe les chaînes en arêtes entre nœuds, calcule les profils en long. Renvoie (nœuds, arêtes)."""
     g, H = net.g, net.H
@@ -553,6 +593,7 @@ def build_edges(net, rivers, lakes_level, verbose=True):
         P = e["pts"]
         e["ground"] = np.array(g.sample(H, P[:, 0], P[:, 1]), dtype=np.float64)
         _refine_spans(g, H, e, node_h[e["a"]], node_h[e["b"]])
+        _cover_crossings(e, edges)
         e["target"] = _target(g, H, e)
     # Deux passes : les nœuds prennent la moyenne des profils lissés qui y arrivent
     for it in range(2):

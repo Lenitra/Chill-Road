@@ -236,7 +236,8 @@ def roads(net):
     N("a_sud", -300, -2195)
     lifts = [(1680, -1510, 14.0, 520, 300),          # viaduc du lac
              (-1870, -760, 8.0, 120, 250),           # viaduc de la gorge (rivière et route de la vallée)
-             (-1160, -1780, 8.5, 110, 230)]          # viaduc du sud-ouest (route de la vallée et rivière)
+             (-1160, -1780, 8.5, 110, 230),          # viaduc du sud-ouest (route de la vallée et rivière)
+             (-1292, -1645, 6.5, 70, 200)]         # ... la route de la vallée passe dessous dès la sortie du tunnel
     au = net.road("autoroute", "highway", "a_sud", closed=True, lift=lifts, smooth=40.0)
     au.to((350, -2130), (850, -2065))
     au.to((1180, -2010)).to((1700, -1560), (2175, -1010)).bridge(2)                 # viaduc du lac
