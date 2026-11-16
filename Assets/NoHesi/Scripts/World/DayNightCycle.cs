@@ -145,7 +145,7 @@ namespace NoHesi
             if (!reflectionCamera) return;
             reflectionTimer -= Time.unscaledDeltaTime;
             if (!force && reflectionTimer > 0f) return;
-            reflectionTimer = 0.5f;
+            reflectionTimer = GraphicsQuality.ReflectionInterval;      // 0,5 s (haute) à 2 s (basse)
             reflectionCamera.RenderToCubemap(reflection);
         }
 

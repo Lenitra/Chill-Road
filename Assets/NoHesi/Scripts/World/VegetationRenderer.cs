@@ -71,6 +71,7 @@ namespace NoHesi
         public void Add(Vector2Int tile, Bounds tileBounds, BatchKey key, Matrix4x4 matrix)
         {
             key.material = Instanced(key.material);
+            dirty = true;
             if (!tiles.TryGetValue(tile, out var t)) { t = new Tile { bounds = tileBounds }; tiles[tile] = t; }
             if (!t.batches.TryGetValue(key, out var list)) t.batches[key] = list = new List<Matrix4x4>();
             list.Add(matrix);
@@ -81,6 +82,7 @@ namespace NoHesi
         {
             var t = new Tile { bounds = tileBounds };
             tiles[tile] = t;
+            dirty = true;
             foreach (var kv in batches)
             {
                 if (kv.Value.Count == 0) continue;
@@ -91,7 +93,7 @@ namespace NoHesi
             }
         }
 
-        public void Remove(Vector2Int tile) => tiles.Remove(tile);
+        public void Remove(Vector2Int tile) { if (tiles.Remove(tile)) dirty = true; }
 
         /// <summary>
         /// Enregistre un modèle entier (ses niveaux de détail, ou son seul maillage aux trois niveaux) à une position.
@@ -140,11 +142,52 @@ namespace NoHesi
             }
         }
 
+        // Sélection mise en cache (optimisation, 2026-11-16) : le tri des cases et des plantes coûtait ~8 ms de
+        // processeur par image. Il n'est refait que si la caméra s'est déplacée de plus de RebuildMove mètres ou a
+        // tourné de plus de RebuildTurn degrés, si les cases ont changé, ou si un réglage de distance a changé ; le tri
+        // par champ de vision se fait avec un champ élargi pour que rien ne manque au bord de l'image entre deux tris.
+        const float RebuildMove = 5f, RebuildTurn = 5f, CullFovMargin = 14f;
+        bool dirty = true;
+        Vector3 lastPos;
+        Quaternion lastRot;
+        float lastSettings = -1f;
+        bool lastNoCull;
+        Camera lastCam;
+
+        float SettingsKey() => lod1Distance * 1.1f + lod2Distance * 2.3f + cullDistance * 0.7f + detailDistance * 3.1f + floraNear * 5.3f
+                              + floraMid * 7.9f + floraFar * 11.3f + denseNear * 13.7f + denseFar * 17.9f;
+
+        bool NeedsRebuild(Camera cam)
+        {
+            var t = cam.transform;
+            float key = SettingsKey();
+            bool need = dirty || cam != lastCam || NoFrustumCull != lastNoCull || !Mathf.Approximately(key, lastSettings)
+                        || (t.position - lastPos).sqrMagnitude > RebuildMove * RebuildMove
+                        || Quaternion.Angle(t.rotation, lastRot) > RebuildTurn;
+            if (!need) return false;
+            dirty = false;
+            lastCam = cam;
+            lastNoCull = NoFrustumCull;
+            lastSettings = key;
+            lastPos = t.position;
+            lastRot = t.rotation;
+            return true;
+        }
+
         void LateUpdate()
         {
             var cam = Camera.main;
             if (!cam) return;
-            GeometryUtility.CalculateFrustumPlanes(cam, planes);
+            if (NeedsRebuild(cam)) Select(cam);
+            Draw(cam.transform.position);
+        }
+
+        void Select(Camera cam)
+        {
+            // Champ de vision élargi (marge de rotation entre deux tris)
+            var proj = Matrix4x4.Perspective(Mathf.Min(cam.fieldOfView + CullFovMargin, 170f), cam.aspect * 1.15f,
+                                             cam.nearClipPlane, cam.farClipPlane);
+            GeometryUtility.CalculateFrustumPlanes(proj * cam.worldToCameraMatrix, planes);
             Vector3 camPos = cam.transform.position;
 
             foreach (var list in frame.Values) list.Clear();
@@ -200,7 +243,76 @@ namespace NoHesi
                     target.AddRange(kv.Value);
                 }
             }
+            Upload();
+        }
 
+        // ------------------------------------------------------------------ instanciation procédurale (GPU)
+
+        /// <summary>Lot dessiné par RenderMeshIndirect : matrices dans un tampon GPU, réécrites seulement au tri.</summary>
+        class GpuBatch
+        {
+            public GraphicsBuffer matrices, args;
+            public int capacity, count;
+            public MaterialPropertyBlock props;
+        }
+
+        readonly Dictionary<BatchKey, GpuBatch> gpu = new Dictionary<BatchKey, GpuBatch>();
+        readonly GraphicsBuffer.IndirectDrawIndexedArgs[] argsData = new GraphicsBuffer.IndirectDrawIndexedArgs[1];
+        static readonly int InstancesId = Shader.PropertyToID("_NoHesiInstances");
+
+        /// <summary>Instanciation procédurale possible (shaders du jeu prévus pour, plateforme compatible).</summary>
+        public static bool UseGpuInstancing = true;
+
+        static bool GpuCapable(Material m)
+        {
+            if (!UseGpuInstancing || !SystemInfo.supportsComputeShaders || !m || !m.shader) return false;
+            string n = m.shader.name;
+            return n == "NoHesi/Toon" || n == "NoHesi/Foliage";
+        }
+
+        void Upload()
+        {
+            foreach (var kv in frame)
+            {
+                var key = kv.Key;
+                var list = kv.Value;
+                if (!GpuCapable(key.material)) continue;
+                if (!gpu.TryGetValue(key, out var b)) gpu[key] = b = new GpuBatch { props = new MaterialPropertyBlock() };
+                b.count = list.Count;
+                if (list.Count == 0) continue;
+                if (b.capacity < list.Count)
+                {
+                    b.matrices?.Release();
+                    b.capacity = Mathf.NextPowerOfTwo(Mathf.Max(64, list.Count));
+                    b.matrices = new GraphicsBuffer(GraphicsBuffer.Target.Structured, b.capacity, 64);
+                    b.props.SetBuffer(InstancesId, b.matrices);
+                }
+                b.matrices.SetData(list, 0, 0, list.Count);
+                if (b.args == null) b.args = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
+                argsData[0] = new GraphicsBuffer.IndirectDrawIndexedArgs
+                {
+                    indexCountPerInstance = key.mesh.GetIndexCount(key.submesh),
+                    instanceCount = (uint)list.Count,
+                    startIndex = key.mesh.GetIndexStart(key.submesh),
+                    baseVertexIndex = key.mesh.GetBaseVertex(key.submesh),
+                    startInstance = 0,
+                };
+                b.args.SetData(argsData);
+            }
+        }
+
+        void OnDestroy()
+        {
+            foreach (var b in gpu.Values)
+            {
+                b.matrices?.Release();
+                b.args?.Release();
+            }
+            gpu.Clear();
+        }
+
+        void Draw(Vector3 camPos)
+        {
             DrawnInstances = 0;
             long sumFlora = 0, sumOther = 0, sumCasters = 0;
             foreach (var kv in frame)
@@ -215,12 +327,17 @@ namespace NoHesi
                     layer = 0,
                     worldBounds = new Bounds(camPos, Vector3.one * cullDistance * 2f),
                 };
-                for (int start = 0; start < list.Count; start += buffer.Length)
+                if (gpu.TryGetValue(key, out var b) && b.count == list.Count && b.args != null && GpuCapable(key.material))
                 {
-                    int n = Mathf.Min(buffer.Length, list.Count - start);
-                    list.CopyTo(start, buffer, 0, n);
-                    Graphics.RenderMeshInstanced(rp, key.mesh, key.submesh, buffer, n);
+                    rp.matProps = b.props;
+                    Graphics.RenderMeshIndirect(rp, key.mesh, b.args, 1, 0);
                 }
+                else
+                    for (int start = 0; start < list.Count; start += buffer.Length)
+                    {
+                        int n = Mathf.Min(buffer.Length, list.Count - start);
+                        Graphics.RenderMeshInstanced(rp, key.mesh, key.submesh, list, n, start);
+                    }
                 DrawnInstances += list.Count;
                 long tris = (long)key.mesh.GetIndexCount(key.submesh) / 3 * list.Count;
                 if (key.lod >= FloraNear) sumFlora += tris;

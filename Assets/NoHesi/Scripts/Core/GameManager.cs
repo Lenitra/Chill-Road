@@ -183,6 +183,7 @@ namespace NoHesi
             // Partie rejointe : la météo est celle du serveur
             if (Weather && !(Net && Net.IsClient)) Weather.SetChance(GameSettings.RainChance);
             if (local.Audio) local.Audio.masterVolume = GameSettings.EffectsVolume;
+            GraphicsQuality.Apply(this);
         }
 
         /// <summary>Annonce en bannière sur le HUD (météo, arrivée ou départ d'un joueur), pendant la partie.</summary>
@@ -206,7 +207,10 @@ namespace NoHesi
             menus = gameObject.AddComponent<MenuScreens>();
             menus.Init(this);
             if (DedicatedServer) AudioListener.volume = 0f;
+            GraphicsQuality.Apply(this);
             StartCoroutine(Load());
+            // Banc d'essai des performances : « Chill Road.exe -benchmark »
+            if (HasArgument("-benchmark") && !DedicatedServer) gameObject.AddComponent<Benchmark>().Init(this);
         }
 
         /// <summary>Charge la carte par étapes (écran de chargement), puis affiche l'accueil ou lance la partie.</summary>
@@ -251,6 +255,7 @@ namespace NoHesi
             if (!DedicatedServer)
                 for (int i = 0; i < 80; i++) Traffic.Tick(around, 0.2f);
             LoadProgress = 1f;
+            GraphicsQuality.Apply(this);       // distances de la végétation et de la flore (créées pendant le chargement)
             // Laisse l'écran de chargement visible au moins un instant
             while (Time.realtimeSinceStartup - started < 1.5f) yield return null;
 

@@ -67,6 +67,11 @@ namespace NoHesi
             // Commandes tactiles (téléphone, tablette) : façon de diriger, ou désactivées
             var touch = AddSlider(left, "Commandes tactiles", "Touch controls", 0f, 3f, 3, () => GameSettings.TouchSteer, v => GameSettings.TouchSteer = Mathf.RoundToInt(v),
                 v => v < 0.5f ? Loc.T("Désactivées", "Off") : v < 1.5f ? Loc.T("Glisser", "Slide") : v < 2.5f ? Loc.T("Boutons ‹ ›", "‹ › buttons") : Loc.T("Inclinaison", "Tilt"));
+            Section(left, "GRAPHISMES", "GRAPHICS", "basse = plus d'images/s", "low = more fps");
+            var quality = AddSlider(left, "Qualité graphique", "Graphics quality", 0f, 3f, 3, () => GameSettings.Quality, v => GameSettings.Quality = Mathf.RoundToInt(v),
+                v => GraphicsQuality.Name(Mathf.RoundToInt(v)));
+            var fps = AddSlider(left, "Limite d'images", "Frame rate limit", 0f, GraphicsQuality.FpsCaps.Length - 1, GraphicsQuality.FpsCaps.Length - 1,
+                () => GameSettings.FpsCap, v => GameSettings.FpsCap = Mathf.RoundToInt(v), v => GraphicsQuality.FpsName(Mathf.RoundToInt(v)));
             Spacer(left);
             var bottom = ButtonRow(left, 62);
             var defaults = AddButton(bottom, () => { GameSettings.ResetAll(); Changed(); RefreshAll(); });
@@ -105,9 +110,9 @@ namespace NoHesi
 
             // Navigation explicite : gauche/droite restent aux curseurs (réglage), haut/bas parcourent chaque plaque,
             // les boutons du bas passent d'une plaque à l'autre
-            Column(music, effects, traffic, rain, touch, defaults.button);
-            Nav(defaults.button, touch, music, null, back.button);
-            Nav(back.button, touch, music, defaults.button, apply.button);
+            Column(music, effects, traffic, rain, touch, quality, fps, defaults.button);
+            Nav(defaults.button, fps, music, null, back.button);
+            Nav(back.button, fps, music, defaults.button, apply.button);
             Nav(apply.button, null, null, back.button, null);
             first = music;
 

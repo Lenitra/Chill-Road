@@ -19,6 +19,7 @@ namespace NoHesi
         {
             public GameObject go;
             public Rigidbody rb;
+            public Vector3 cachedPos, cachedFwd;  // position et cap relus une fois par pas physique (optimisation)
             public RoadNetwork.Edge edge;
             public float s;
             public int direction;           // +1 : de a vers b, -1 : de b vers a
@@ -434,16 +435,44 @@ namespace NoHesi
         {
             if (road == null) return;
             float dt = Time.fixedDeltaTime;
+            // Positions lues une seule fois par pas (ObstacleAhead compare chaque véhicule à tous les autres)
+            for (int i = 0; i < Cars.Count; i++)
+            {
+                var c = Cars[i];
+                if (!c.go) continue;
+                var t = c.go.transform;
+                c.cachedPos = t.position;
+                c.cachedFwd = t.forward;
+            }
+            // Véhicules lointains (plus de FarSim m de tout joueur) : simulés un pas sur deux avec un pas double
+            // (optimisation ; leur mouvement reste lissé par l'interpolation des corps rigides)
+            step++;
             for (int i = 0; i < Cars.Count; i++)
             {
                 var c = Cars[i];
                 if (!c.go) continue;
                 if (c.remote) { FollowNet(c); continue; }
                 if (c.crashed || Replica) continue;
-                if (c.crossing) UpdateCrossing(c, dt);
-                else UpdateOnEdge(c, dt);
-                c.stuck = c.speed < 0.3f ? c.stuck + dt : 0f;
+                float cdt = dt;
+                if (FarFromDrivers(c.cachedPos))
+                {
+                    if (((i + step) & 1) == 1) continue;
+                    cdt = dt * 2f;
+                }
+                if (c.crossing) UpdateCrossing(c, cdt);
+                else UpdateOnEdge(c, cdt);
+                c.stuck = c.speed < 0.3f ? c.stuck + cdt : 0f;
             }
+        }
+
+        const float FarSim = 140f;
+        int step;
+
+        bool FarFromDrivers(Vector3 p)
+        {
+            foreach (var d in Drivers)
+                if (d && (d.transform.position - p).sqrMagnitude < FarSim * FarSim) return false;
+            return true;
         }
 
         /// <summary>Véhicule piloté par le réseau : montré entre deux états reçus, avec un léger retard.</summary>
@@ -786,8 +815,8 @@ namespace NoHesi
         /// <summary>Obstacle dans un cône devant (joueur, véhicule accidenté ou en travers) : ralentit ou s'arrête.</summary>
         float ObstacleAhead(Car c, float target)
         {
-            Vector3 pos = c.go.transform.position;
-            Vector3 f = c.go.transform.forward;
+            Vector3 pos = c.cachedPos;
+            Vector3 f = c.cachedFwd;
             f.y = 0f;
             f.Normalize();
             Vector3 r = new Vector3(f.z, 0f, -f.x);
@@ -797,7 +826,7 @@ namespace NoHesi
                 // Sur la même voie, le suivi de file s'en charge déjà
                 if (!c.crossing && !o.crossing && !o.crashed && o.edge == c.edge && o.direction == c.direction) continue;
                 if (!c.crossing && !o.crossing && !o.crashed && o.edge == c.edge) continue;   // véhicule d'en face, dans sa voie
-                Vector3 rel = o.go.transform.position - pos;
+                Vector3 rel = o.cachedPos - pos;
                 if (Mathf.Abs(rel.y) > 4f) continue;
                 float along = Vector3.Dot(rel, f);
                 if (along <= 0f || along > 40f) continue;

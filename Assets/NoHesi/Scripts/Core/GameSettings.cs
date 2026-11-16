@@ -32,6 +32,10 @@ namespace NoHesi
         // Commandes tactiles (téléphone, tablette) : 0 = désactivées, 1 = glisser pour diriger, 2 = boutons ‹ ›, 3 = inclinaison
         public static int TouchSteer = 1;
 
+        // Graphismes : qualité 0 basse, 1 moyenne, 2 haute, 3 ultra ; limite d'images (index de GraphicsQuality.FpsCaps)
+        public static int Quality = GraphicsQuality.High;
+        public static int FpsCap = 1;
+
         const string Prefix = "nohesi_opt_";
         static bool loaded;
 
@@ -53,6 +57,8 @@ namespace NoHesi
             RelayKm = PlayerPrefs.GetInt(Prefix + "relay", RelayKm);
             RainChance = Mathf.Clamp01(PlayerPrefs.GetFloat(Prefix + "rain", RainChance));
             TouchSteer = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "touch", TouchSteer), 0, 3);
+            Quality = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "quality", Application.isMobilePlatform ? GraphicsQuality.Low : Quality), 0, 3);
+            FpsCap = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "fpscap", FpsCap), 0, GraphicsQuality.FpsCaps.Length - 1);
         }
 
         public static void Save()
@@ -71,6 +77,8 @@ namespace NoHesi
             PlayerPrefs.SetInt(Prefix + "relay", RelayKm);
             PlayerPrefs.SetFloat(Prefix + "rain", RainChance);
             PlayerPrefs.SetInt(Prefix + "touch", TouchSteer);
+            PlayerPrefs.SetInt(Prefix + "quality", Quality);
+            PlayerPrefs.SetInt(Prefix + "fpscap", FpsCap);
             PlayerPrefs.Save();
         }
 
@@ -90,6 +98,8 @@ namespace NoHesi
             RelayKm = 2;
             RainChance = WeatherSystem.StormShare;
             TouchSteer = 1;
+            Quality = Application.isMobilePlatform ? GraphicsQuality.Low : GraphicsQuality.High;
+            FpsCap = 1;
         }
 
         /// <summary>Signature des réglages de route : sert à signaler qu'une nouvelle route est nécessaire.</summary>

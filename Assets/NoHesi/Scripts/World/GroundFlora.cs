@@ -160,6 +160,13 @@ namespace NoHesi
             StreamLayer(baseLayer, players, farDistance, start);
         }
 
+        /// <summary>Recrée toute la flore (changement de densité) : les carrés reviennent au fil du flux.</summary>
+        public void Rebuild()
+        {
+            Clear(baseLayer);
+            Clear(denseLayer);
+        }
+
         void Clear(Layer layer)
         {
             foreach (var c in layer.live) veg.Remove(layer.Key(c));

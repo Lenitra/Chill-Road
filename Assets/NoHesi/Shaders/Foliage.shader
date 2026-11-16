@@ -46,6 +46,26 @@ Shader "NoHesi/Foliage"
             half4 _TransColor, _TintColor;
         CBUFFER_END
 
+        // Instanciation procédurale (VegetationRenderer, RenderMeshIndirect) : matrices dans un tampon GPU rempli
+        // seulement quand la sélection change (2026-11-16 ; le processeur renvoyait des dizaines de milliers de matrices
+        // par image)
+        #if defined(UNITY_PROCEDURAL_INSTANCING_ENABLED)
+            StructuredBuffer<float4x4> _NoHesiInstances;
+        #endif
+        void NoHesiInstanceSetup()
+        {
+        #if defined(UNITY_PROCEDURAL_INSTANCING_ENABLED)
+            float4x4 m = _NoHesiInstances[unity_InstanceID];
+            unity_ObjectToWorld = m;
+            float3x3 a = (float3x3)m;
+            float3 c0 = cross(a[1], a[2]), c1 = cross(a[2], a[0]), c2 = cross(a[0], a[1]);
+            float det = dot(a[0], c0);
+            float3x3 inv = transpose(float3x3(c0, c1, c2)) / det;
+            float3 t = -mul(inv, float3(m._m03, m._m13, m._m23));
+            unity_WorldToObject = float4x4(float4(inv[0], t.x), float4(inv[1], t.y), float4(inv[2], t.z), float4(0, 0, 0, 1));
+        #endif
+        }
+
         // Origine des coordonnées de bruit (multiple de 960 m proche de la caméra), fournie par RoadNetwork
         float4 _NoHesiTexOrigin;
         // Sol mouillé (0-1), fourni par la météo
@@ -127,6 +147,7 @@ Shader "NoHesi/Foliage"
             #pragma multi_compile_fragment _ _SCREEN_SPACE_OCCLUSION
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Fog.hlsl"
             #pragma multi_compile_instancing
+            #pragma instancing_options procedural:NoHesiInstanceSetup
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
@@ -241,6 +262,7 @@ Shader "NoHesi/Foliage"
             #pragma vertex ShadowVert
             #pragma fragment ShadowFrag
             #pragma multi_compile_instancing
+            #pragma instancing_options procedural:NoHesiInstanceSetup
             #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
 
@@ -286,6 +308,7 @@ Shader "NoHesi/Foliage"
             #pragma vertex DepthVert
             #pragma fragment DepthFrag
             #pragma multi_compile_instancing
+            #pragma instancing_options procedural:NoHesiInstanceSetup
 
             struct Attributes { float4 positionOS : POSITION; float2 uv1 : TEXCOORD1; UNITY_VERTEX_INPUT_INSTANCE_ID };
 
@@ -311,6 +334,7 @@ Shader "NoHesi/Foliage"
             #pragma vertex NormalsVert
             #pragma fragment NormalsFrag
             #pragma multi_compile_instancing
+            #pragma instancing_options procedural:NoHesiInstanceSetup
 
             struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv1 : TEXCOORD1; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings { float4 positionCS : SV_POSITION; half3 normalWS : TEXCOORD0; };
