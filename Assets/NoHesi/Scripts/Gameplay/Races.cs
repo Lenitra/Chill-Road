@@ -140,6 +140,10 @@ namespace NoHesi
         Track announced;
         // Résultat de la dernière course (quelques secondes après l'arrivée)
         Track resultTrack;
+        // Chrono teinté de la couleur du dernier écart au record, qui revient au blanc
+        Color clockTint;
+        float clockTintTimer;
+        const float ClockTintTime = 3f;
         float resultTimer, resultTime;
         bool resultRecord;
 
@@ -373,6 +377,7 @@ namespace NoHesi
             announced = t;
             resultTimer = 0f;
             progress = 0f;
+            clockTintTimer = 0f;
             countdown = Beat * 3f;
             shownBeat = 0;
             next = 0;
@@ -449,6 +454,12 @@ namespace NoHesi
 
         static float Flat(Vector3 v) => new Vector2(v.x, v.z).magnitude;
 
+        void TintClock(Color c)
+        {
+            clockTint = c;
+            clockTintTimer = ClockTintTime;
+        }
+
         /// <summary>Sprint : part du parcours déjà couverte (0-1), point le plus proche entre la dernière porte et la suivante.</summary>
         float SprintProgress(Vector3 pos)
         {
@@ -497,7 +508,8 @@ namespace NoHesi
             if (t.splits != null && t.splits.Length == times.Length)
             {
                 float delta = time - t.splits[next];
-                game.Hud.Announce(Delta(delta), what + "  ·  " + Clock(time), delta <= 0f ? Good : Bad, 2.4f);
+                game.Hud.Announce(Delta(delta), what + "  ·  " + Clock(time), delta <= 0f ? Good : Bad, 3.2f, true);
+                TintClock(delta <= 0f ? Good : Bad);
             }
             else game.Hud.Announce(Clock(time), what, White, 2.4f);
             int passed = next++;
@@ -524,9 +536,12 @@ namespace NoHesi
             resultTime = time;
             resultRecord = record;
             resultTimer = 9f;
+            clockTintTimer = 0f;
             string finish = Loc.T("ARRIVÉE  ·  ", "FINISH  ·  ") + Clock(time);
-            if (record) game.Hud.Announce(Loc.T("NOUVEAU RECORD", "NEW BEST TIME"), finish + (old > 0f ? "  ·  " + Delta(time - old) : ""), Good, 4f);
-            else game.Hud.Announce(Delta(time - old), finish, Bad, 4f);
+            // L'écart au record en très grand ; « nouveau record » en titre pour un premier temps
+            if (old <= 0f) game.Hud.Announce(Loc.T("NOUVEAU RECORD", "NEW BEST TIME"), finish, Good, 4f, true);
+            else if (record) game.Hud.Announce(Delta(time - old), Loc.T("NOUVEAU RECORD  ·  ", "NEW BEST TIME  ·  ") + finish, Good, 4.5f, true);
+            else game.Hud.Announce(Delta(time - old), finish, Bad, 4.5f, true);
             game.Hud.Flash(record ? Good : t.Tint, 0.3f);
             game.Camera.Shake(0.25f);
             if (game.Local.Audio) game.Local.Audio.Chime();
@@ -1029,6 +1044,8 @@ namespace NoHesi
 
             // Chrono : pendant la course, puis le résultat quelques secondes
             if (resultTimer > 0f) resultTimer -= dt;
+            if (clockTintTimer > 0f) clockTintTimer = Mathf.Max(0f, clockTintTimer - dt);
+            Color clockColor = Color.Lerp(new Color(1f, 1f, 1f, 0.85f), clockTint, Mathf.Clamp01(clockTintTimer / (ClockTintTime * 0.5f)));
             var shown = Active ?? (resultTimer > 0f ? resultTrack : null);
             panelGroup.alpha = Mathf.MoveTowards(panelGroup.alpha, shown != null ? 1f : 0f, dt * 5f);
             if (Active != null)
@@ -1040,6 +1057,7 @@ namespace NoHesi
                     ? Loc.F($"TOUR {Mathf.Min(next / t.gates.Length + 1, t.laps)}/{t.laps}", $"LAP {Mathf.Min(next / t.gates.Length + 1, t.laps)}/{t.laps}")
                     : Loc.F($"{Mathf.FloorToInt(progress * 100f)} %", $"{Mathf.FloorToInt(progress * 100f)}%");
                 timeText.text = Clock(mode == Mode.Running ? elapsed : 0f);
+                timeText.color = clockColor;
                 // Rappel de la touche d'abandon au départ, puis seulement pendant l'appui
                 bool hint = mode == Mode.Running && !TouchInput.Showing && (elapsed < 7f || abandonHeld > 0f);
                 abandonText.text = !hint ? "" : GameInput.UsingGamepad ? Loc.T("Maintenir X : abandonner", "Hold X: abandon")
@@ -1053,6 +1071,7 @@ namespace NoHesi
                 progressText.text = Loc.T("ARRIVÉE", "FINISH");
                 progressText.color = resultRecord ? Good : White;
                 timeText.text = Clock(resultTime);
+                timeText.color = resultRecord ? Good : new Color(1f, 1f, 1f, 0.85f);
                 abandonText.text = "";
                 abandonFill.parent.gameObject.SetActive(false);
             }

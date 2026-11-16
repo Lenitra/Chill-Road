@@ -73,7 +73,8 @@ namespace NoHesi
         RectTransform announceRt;
         CanvasGroup announceGroup;
         Text announceTitle, announceDetail;
-        float announceTimer, announceTime;
+        HudShape announcePlate, announceStripe;
+        float announceTimer, announceTime, announcePunch;
         int walletSlide = -1;
         static readonly Vector2 WalletHome = new Vector2(26f, -84f);        // sous l'heure
         static readonly Vector2 WalletTouchHome = new Vector2(338f, -30f);  // à droite du bouton pause tactile
@@ -267,9 +268,14 @@ namespace NoHesi
             announceGroup = announceRt.gameObject.AddComponent<CanvasGroup>();
             announceGroup.alpha = 0f;
             announceGroup.blocksRaycasts = false;
+            // Plaque sombre inclinée (taillée sur le texte à chaque annonce) et liseré de la couleur du titre
+            announcePlate = Shape(announceRt, "Plate", new Vector2(0.5f, 1f), new Vector2(0f, 8f), new Vector2(400f, 80f), new Color(0.02f, 0.03f, 0.05f, 0.72f));
+            announcePlate.Set(22f, 90f, 90f);
+            announceStripe = Shape(announceRt, "Stripe", new Vector2(0.5f, 1f), new Vector2(0f, 8f), new Vector2(240f, 4f), Accent);
+            announceStripe.Set(0f, 80f, 80f);
             announceTitle = Label(announceRt, "", 36, TextAnchor.UpperCenter, White, new Vector2(0.5f, 1f), Vector2.zero, new Vector2(1000f, 44f), FontStyle.BoldAndItalic);
-            Outline(announceTitle, new Color(0f, 0f, 0f, 0.35f), 1.5f);
-            announceDetail = Label(announceRt, "", 19, TextAnchor.UpperCenter, new Color(1f, 1f, 1f, 0.82f), new Vector2(0.5f, 1f), new Vector2(0f, -44f), new Vector2(1000f, 26f), FontStyle.Bold);
+            Outline(announceTitle, new Color(0f, 0f, 0f, 0.45f), 2f);
+            announceDetail = Label(announceRt, "", 19, TextAnchor.UpperCenter, new Color(1f, 1f, 1f, 0.85f), new Vector2(0.5f, 1f), new Vector2(0f, -44f), new Vector2(1000f, 26f), FontStyle.Bold);
         }
 
         void BuildClock()
@@ -484,7 +490,8 @@ namespace NoHesi
                 announceTimer = Mathf.Max(0f, announceTimer - dt);
                 float shown = announceTime - announceTimer;
                 announceGroup.alpha = Mathf.Min(Mathf.Clamp01(shown / 0.12f), Mathf.Clamp01(announceTimer / 0.5f));
-                announceRt.localScale = Vector3.one * Mathf.Lerp(1.12f, 1f, 1f - (1f - Mathf.Clamp01(shown / 0.2f)) * (1f - Mathf.Clamp01(shown / 0.2f)));
+                float settle = 1f - Mathf.Clamp01(shown / 0.22f);
+                announceRt.localScale = Vector3.one * (1f + announcePunch * settle * settle);
             }
             else announceGroup.alpha = 0f;
             feedRt.anchoredPosition = new Vector2(0f, Mathf.Lerp(feedRt.anchoredPosition.y, feedY, 1f - Mathf.Exp(-dt * 12f)));
@@ -672,13 +679,28 @@ namespace NoHesi
 
         /// <summary>
         /// Annonce en haut au centre (titres et annonces : écart au record, course, cascades…) : titre dans la couleur
-        /// donnée, détail discret en dessous (facultatif). Remplace l'annonce en cours.
+        /// donnée, détail discret en dessous (facultatif), sur une plaque sombre au liseré de la même couleur.
+        /// <paramref name="big"/> : titre en très grand (écart au record d'une course). Remplace l'annonce en cours.
         /// </summary>
-        public void Announce(string title, string detail, Color color, float time = 2.6f)
+        public void Announce(string title, string detail, Color color, float time = 2.6f, bool big = false)
         {
+            detail ??= "";
+            float titleH = big ? 70f : 44f;
+            announceTitle.fontSize = big ? 66 : 36;
+            announceTitle.rectTransform.sizeDelta = new Vector2(1000f, titleH);
             announceTitle.text = title;
             announceTitle.color = color;
-            announceDetail.text = detail ?? "";
+            announceDetail.fontSize = big ? 21 : 19;
+            announceDetail.rectTransform.anchoredPosition = new Vector2(0f, -titleH);
+            announceDetail.text = detail;
+            // Plaque taillée sur le plus large des deux textes
+            float w = Mathf.Max(announceTitle.preferredWidth, detail.Length > 0 ? announceDetail.preferredWidth : 0f) + (big ? 200f : 170f);
+            float h = titleH + (detail.Length > 0 ? 30f : 0f) + 14f;
+            announcePlate.rectTransform.sizeDelta = new Vector2(w, h);
+            announceStripe.rectTransform.sizeDelta = new Vector2(w * 0.55f, 4f);
+            announceStripe.rectTransform.anchoredPosition = new Vector2(0f, 8f - h);
+            announceStripe.color = color;
+            announcePunch = big ? 0.3f : 0.12f;
             announceTimer = announceTime = time;
         }
 
