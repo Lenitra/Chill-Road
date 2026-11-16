@@ -134,7 +134,9 @@ Shader "NoHesi/GateFx"
                 alpha *= near;
 
             #elif defined(_GATE_CURTAIN)
-                float h = input.uv.y;
+                // Borné : avec le MSAA, les pixels de bord lisent un uv extrapolé hors du voile (h > 1), et pow d'un
+                // nombre négatif donne NaN, que le bloom transforme en énorme halo blanc visible de très loin
+                float h = saturate(input.uv.y);
                 half ends = 1.0 - smoothstep(_Half - 1.2, _Half - 0.1, abs(input.uv.x));
                 // Volutes qui dérivent et montent lentement
                 float n = Noise(float2(input.uv.x * 0.42 + t * 0.11, h * 2.1 - t * 0.2)) * 0.62
