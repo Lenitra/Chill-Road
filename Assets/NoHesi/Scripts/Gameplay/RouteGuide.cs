@@ -18,7 +18,6 @@ namespace NoHesi
     /// </summary>
     public class RouteGuide : MonoBehaviour
     {
-        static readonly Color Gps = new Color(0.35f, 0.85f, 1f);
         const float Recompute = 0.5f;
         const float ArriveDistance = 28f;
         const float RibbonLength = 650f, RibbonWidth = 1.7f, RibbonLift = 0.22f, ChevronSpacing = 5f;
@@ -175,9 +174,7 @@ namespace NoHesi
                 d.y = 0f;
                 if (d.magnitude < ArriveDistance || HasRoute && Remaining - along < ArriveDistance * 0.6f)
                 {
-                    string name = DestinationName;
                     ClearDestination();
-                    if (game.Hud) game.Hud.Banner(Loc.T("DESTINATION ATTEINTE", "DESTINATION REACHED") + (name.Length > 0 ? "  ·  " + name.ToUpperInvariant() : ""), Gps);
                 }
             }
             UpdateRibbon();

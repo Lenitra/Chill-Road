@@ -47,7 +47,6 @@ namespace NoHesi
         }
 
         const string NameKey = "nohesi_net_name";
-        static readonly Color JoinColor = new Color(0.35f, 0.85f, 1f), LeaveColor = new Color(1f, 0.6f, 0.3f);
 
         public Mode State { get; private set; }
         /// <summary>Serveur sans joueur local.</summary>
@@ -200,7 +199,7 @@ namespace NoHesi
                 p = new Peer { id = id, ep = from, name = name, nonce = theirNonce };
                 peers[from] = p;
                 peerList.Add(p);
-                Notify(Loc.T($"{name} a rejoint la partie", $"{name} joined the game"), JoinColor);
+                Log($"{name} joined the game");
             }
             p.heard = Time.unscaledTime;
             writer.Begin(NetMsg.Welcome);
@@ -253,7 +252,7 @@ namespace NoHesi
             peerList.Remove(p);
             RemoveRemote(p.car);
             game.Traffic.DropOwner(p.id);
-            Notify(Loc.T($"{p.name} a quitté la partie", $"{p.name} left the game"), LeaveColor);
+            Log($"{p.name} left the game");
         }
 
         void HostUpdate(float dt)
@@ -585,9 +584,9 @@ namespace NoHesi
             if (rosterKnown)
             {
                 foreach (var kv in fresh)
-                    if (kv.Key != LocalId && !names.ContainsKey(kv.Key)) Notify(Loc.T($"{kv.Value} a rejoint la partie", $"{kv.Value} joined the game"), JoinColor);
+                    if (kv.Key != LocalId && !names.ContainsKey(kv.Key)) Log($"{kv.Value} joined the game");
                 foreach (var kv in names)
-                    if (kv.Key != LocalId && !fresh.ContainsKey(kv.Key)) Notify(Loc.T($"{kv.Value} a quitté la partie", $"{kv.Value} left the game"), LeaveColor);
+                    if (kv.Key != LocalId && !fresh.ContainsKey(kv.Key)) Log($"{kv.Value} left the game");
             }
             names = fresh;
             rosterKnown = true;
@@ -660,7 +659,7 @@ namespace NoHesi
         void Disconnected(string message)
         {
             Shutdown(false);
-            Notify(message, LeaveColor);
+            Log(message);
         }
 
         // ------------------------------------------------------------------ commun
@@ -707,11 +706,7 @@ namespace NoHesi
                 if (r && r.Ready) positions.Add(r.transform.position);
         }
 
-        void Notify(string message, Color color)
-        {
-            Debug.Log("[Net] " + message);
-            game.Notify(message, color);
-        }
+        static void Log(string message) => Debug.Log("[Net] " + message);
 
         /// <summary>Quitte la partie en prévenant les autres (retour au menu, fermeture du jeu).</summary>
         public void Leave() => Shutdown(true);

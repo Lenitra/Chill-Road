@@ -37,8 +37,6 @@ namespace NoHesi
         GameManager game;
         List<Stunt> stunts;
         bool wasAirborne;
-        Stunt announced;
-        float announceQuiet;
 
         /// <summary>Cascade en cours : la voiture a décollé de ce tremplin et n'est pas encore retombée.</summary>
         public Stunt Active { get; private set; }
@@ -93,11 +91,9 @@ namespace NoHesi
             else if (!air && Active != null)
             {
                 // Saut interrompu sans réception (accident en l'air, voiture replacée)
-                if (!Active.done) game.Hud.Banner(Loc.T("CASCADE RATÉE", "STUNT FAILED"), new Color(1f, 0.3f, 0.25f));
                 Active = null;
             }
             wasAirborne = air;
-            Announce(pos, car, dt);
         }
 
         /// <summary>Tremplin d'où la voiture vient de décoller : elle est au-dessus de sa moitié haute et va dans son sens.</summary>
@@ -124,8 +120,6 @@ namespace NoHesi
             Active = null;
             if (s == null) return;
             var hud = game.Hud;
-            // Affichée arrondie vers le bas : jamais « 10 / 10 m » pour un saut de 9,6 m raté
-            float shown = Mathf.Floor(distance);
             bool record = clean && distance > s.best + 0.5f;
             if (record)
             {
@@ -137,67 +131,12 @@ namespace NoHesi
                 s.done = true;
                 Save();
                 Wallet.Add(s.data.reward);
-                string name = s.Name.ToUpperInvariant(), cash = Wallet.Format(s.data.reward);
-                int n = DoneCount, total = stunts.Count;
-                hud.Banner(Loc.F($"CASCADE RÉUSSIE  ·  {name}  ·  {shown:0} m  ·  +{cash}  ·  {n}/{total}",
-                                 $"STUNT COMPLETE  ·  {name}  ·  {shown:0} m  ·  +{cash}  ·  {n}/{total}"), DoneTint);
                 hud.Flash(Tint, 0.3f);
                 if (game.Local.Audio) game.Local.Audio.Chime();
                 game.Camera.Shake(0.25f);
                 Completed?.Invoke(s, distance);
             }
-            else if (!s.done)
-            {
-                float target = s.Target;
-                hud.Banner(clean
-                    ? Loc.F($"CASCADE RATÉE  ·  {shown:0} / {target:0} m", $"STUNT FAILED  ·  {shown:0} / {target:0} m")
-                    : Loc.T("CASCADE RATÉE  ·  RÉCEPTION MANQUÉE", "STUNT FAILED  ·  BAD LANDING"), new Color(1f, 0.3f, 0.25f));
-            }
-            else if (record)
-            {
-                string name = s.Name.ToUpperInvariant();
-                hud.Banner(Loc.F($"{name}  ·  NOUVEAU RECORD  {shown:0} m", $"{name}  ·  NEW RECORD  {shown:0} m"), DoneTint);
-            }
             if (record) PlayerPrefs.Save();
-        }
-
-        /// <summary>Annonce le tremplin dont la voiture approche (une fois par passage) : nom, distance à franchir, prime.</summary>
-        void Announce(Vector3 pos, VehicleController car, float dt)
-        {
-            Stunt near = null;
-            Vector3 v = car.Velocity;
-            v.y = 0f;
-            if (v.sqrMagnitude > 16f && Active == null)
-            {
-                v.Normalize();
-                foreach (var s in stunts)
-                {
-                    Vector3 d = pos - s.lip;
-                    float along = Vector3.Dot(d, s.forward);
-                    if (along > -s.data.length * 0.4f || along < -s.data.length - 160f) continue;
-                    if (Mathf.Abs(Vector3.Dot(d, s.right)) > 18f || Mathf.Abs(d.y) > 15f || Vector3.Dot(v, s.forward) < 0.7f) continue;
-                    near = s;
-                    break;
-                }
-            }
-            if (near == null)
-            {
-                // Un peu de répit avant de pouvoir réannoncer le même tremplin (demi-tour, nouveau passage)
-                if (announced != null && (announceQuiet += dt) > 5f) announced = null;
-                return;
-            }
-            announceQuiet = 0f;
-            if (near == announced) return;
-            announced = near;
-            string name = near.Name.ToUpperInvariant();
-            float target = near.Target, best = near.best;
-            if (near.done)
-                game.Hud.Banner(Loc.F($"{name}  ·  CASCADE RÉUSSIE  ·  RECORD {best:0} m", $"{name}  ·  STUNT COMPLETE  ·  BEST {best:0} m"), DoneTint);
-            else
-            {
-                string cash = Wallet.Format(near.data.reward);
-                game.Hud.Banner(Loc.F($"CASCADE  ·  {name}  ·  {target:0} m EN L'AIR  ·  +{cash}", $"STUNT  ·  {name}  ·  {target:0} m AIRBORNE  ·  +{cash}"), Tint);
-            }
         }
 
         void Save()

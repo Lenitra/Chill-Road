@@ -67,23 +67,15 @@ namespace NoHesi
         static readonly Vector2 WalletHome = new Vector2(26f, -84f);        // sous l'heure
         static readonly Vector2 WalletTouchHome = new Vector2(338f, -30f);  // à droite du bouton pause tactile
 
-        // Heure, épreuve
-        Text clockText, eventText, eventDetail;
-        CanvasGroup eventGroup;
+        // Heure
+        Text clockText;
 
         // Compteur
         Text speedText, gearText, distText, lightsText, assistLamp;
         float assistLampT;
         Image rpmArc, gearDisc;
 
-        // Centre : popups, bannière, drift, maintien du replacement
-        class Popup { public Text text; public RectTransform rt; public float life, max; }
-        readonly List<Popup> popups = new List<Popup>();
-        RectTransform bannerRt;
-        CanvasGroup bannerGroup;
-        Text bannerText;
-        HudShape bannerStripe;
-        float bannerTimer;
+        // Bas centre : drift, maintien du replacement, invite d'entrée
         CanvasGroup driftGroup;
         Text driftText, driftChain, driftTitle;
         Outline driftOutline;
@@ -168,7 +160,7 @@ namespace NoHesi
             flash.raycastTarget = false;
 
             BuildScore();
-            BuildTopCorners();
+            BuildClock();
             BuildGauge();
             BuildMiniMap();
             BuildCenter();
@@ -176,27 +168,11 @@ namespace NoHesi
             BuildPause();
             gameObject.AddComponent<CheatCodes>().Init(gm);
 
-            slot.Score.NearMiss += (pts, gap, onc) =>
-            {
-                string label = gap < 0.6f ? Loc.T("FRÔLEMENT EXTRÊME", "EXTREME NEAR MISS") : Loc.T("FRÔLEMENT", "NEAR MISS");
-                Pop(label + (onc ? Loc.T(" · CONTRESENS", " · ONCOMING") : ""), pts, gap < 0.6f ? Accent : White);
-                multPunch = 0.35f;
-            };
-            slot.Score.Bonus += (pts, label) => Pop(label, pts, Info);
-            slot.Score.DriftScored += pts => { Pop("DRIFT", pts, DriftColor); multPunch = 0.35f; };
-            slot.Score.JumpScored += (pts, air, dist) =>
-            {
-                string label = air >= 2.5f ? Loc.T("MÉGA SAUT", "MEGA JUMP") : air >= 1.5f ? Loc.T("GROS SAUT", "BIG JUMP") : Loc.T("SAUT", "JUMP");
-                Pop(Loc.F($"{label} · {air:0.0} s · {dist:0} m"), pts, JumpColor);
-                multPunch = 0.35f;
-            };
-            slot.Score.DriftLost += pts => Pop(Loc.T("DRIFT PERDU", "DRIFT LOST"), -pts, Danger);
-            slot.Score.Banked += cash => Pop(Loc.T("ENCAISSÉ", "BANKED"), cash, Money);
-            slot.Score.Lost += (pts, why) =>
-            {
-                Banner($"{why}  ·  {Loc.T("CAGNOTTE PERDUE", "COMBO LOST")}  -{Wallet.Format(pts)}", Danger);
-                Flash(new Color(1f, 0.1f, 0.05f), 0.35f);
-            };
+            // Gains : le badge du multiplicateur réagit ; accident : flash rouge
+            slot.Score.NearMiss += (pts, gap, onc) => multPunch = 0.35f;
+            slot.Score.DriftScored += pts => multPunch = 0.35f;
+            slot.Score.JumpScored += (pts, air, dist) => multPunch = 0.35f;
+            slot.Score.Lost += (pts, why) => Flash(new Color(1f, 0.1f, 0.05f), 0.35f);
             if (game.Music) game.Music.TrackChanged += name => { musicText.text = "♪  " + name; musicTimer = 5f; };
         }
 
@@ -244,23 +220,13 @@ namespace NoHesi
             AddSlide(combo, new Vector2(0f, 220f));
         }
 
-        void BuildTopCorners()
+        void BuildClock()
         {
             // Heure (haut gauche)
             var clock = Rect(canvas, "Clock", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(26f, -72f), new Vector2(226f, -28f));
             Shape(clock, "Plate", new Vector2(0f, 0.5f), new Vector2(0f, 0f), new Vector2(200f, 44f), Plate).Set(12f, 0f, 70f);
             clockText = Label(clock, "", 26, TextAnchor.MiddleLeft, White, new Vector2(0f, 0.5f), new Vector2(18f, 0f), new Vector2(190f, 40f), FontStyle.Bold);
             AddSlide(clock, new Vector2(-300f, 0f));
-
-            // Épreuve en cours (haut droite) : plaque avec liseré, visible seulement quand il y a quelque chose à dire
-            var ev = Rect(canvas, "Event", new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-526f, -114f), new Vector2(-26f, -28f));
-            eventGroup = ev.gameObject.AddComponent<CanvasGroup>();
-            eventGroup.alpha = 0f;
-            Shape(ev, "Plate", new Vector2(1f, 0.5f), new Vector2(0f, 0f), new Vector2(500f, 86f), Plate).Set(16f, 190f, 0f);
-            Shape(ev, "Stripe", new Vector2(1f, 0.5f), new Vector2(0f, 0f), new Vector2(6f, 86f), Info).Set(16f, 0f, 0f);
-            eventText = Label(ev, "", 28, TextAnchor.UpperRight, White, new Vector2(1f, 1f), new Vector2(-24f, -10f), new Vector2(480f, 36f), FontStyle.BoldAndItalic);
-            eventDetail = Label(ev, "", 21, TextAnchor.UpperRight, new Color(1f, 1f, 1f, 0.7f), new Vector2(1f, 1f), new Vector2(-24f, -50f), new Vector2(480f, 28f), FontStyle.Normal);
-            AddSlide(ev, new Vector2(700f, 0f));
         }
 
         /// <summary>Bas droite : compte-tours circulaire (arc de 270°), vitesse au centre, rapport en pastille.</summary>
@@ -313,15 +279,6 @@ namespace NoHesi
 
         void BuildCenter()
         {
-            // Bannière : ruban incliné qui entre en glissant
-            bannerRt = Rect(canvas, "Banner", new Vector2(0.5f, 0.64f), new Vector2(0.5f, 0.64f), new Vector2(-560f, -38f), new Vector2(560f, 38f));
-            bannerGroup = bannerRt.gameObject.AddComponent<CanvasGroup>();
-            bannerGroup.alpha = 0f;
-            Shape(bannerRt, "Plate", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1120f, 76f), Plate).Set(24f, 200f, 200f);
-            bannerStripe = Shape(bannerRt, "Stripe", new Vector2(0.5f, 1f), Vector2.zero, new Vector2(700f, 3f), Accent);
-            bannerStripe.Set(0f, 180f, 180f);
-            bannerText = Label(bannerRt, "", 40, TextAnchor.MiddleCenter, White, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1100f, 70f), FontStyle.BoldAndItalic);
-
             // Drift en cours : points en attente (encaissés à la sortie du drift) et jauge d'angle
             var drift = Rect(canvas, "Drift", new Vector2(0.5f, 0.27f), new Vector2(0.5f, 0.27f), new Vector2(-300f, -50f), new Vector2(300f, 50f));
             driftGroup = drift.gameObject.AddComponent<CanvasGroup>();
@@ -453,16 +410,9 @@ namespace NoHesi
             }
             multBadge.localScale = Vector3.one * (1f + multPunch);
 
-            // Heure (icône soleil ou lune), épreuve
+            // Heure (icône soleil ou lune)
             if (clockText && game.DayNight)
                 clockText.text = (game.Weather && game.Weather.Storm > 0.5f ? "☂  " : game.DayNight.Night > 0.5f ? "☾  " : "☀  ") + game.DayNight.Clock;
-            if (eventText)
-            {
-                // Lieu-dit traversé (ville, col, station, barrage…)
-                eventText.text = game.Place;
-                eventDetail.text = "";
-                eventGroup.alpha = Mathf.MoveTowards(eventGroup.alpha, string.IsNullOrEmpty(eventText.text) ? 0f : 1f, dt * 4f);
-            }
 
             // Drift : ce que rapportera le drift (multiplicateur compris) ; le compteur grossit avec l'angle
             // En l'air, le même cadre suit le saut : gain à la réception, distance, temps en l'air
@@ -526,22 +476,11 @@ namespace NoHesi
             dealerGroup.alpha = Mathf.MoveTowards(dealerGroup.alpha, dealer ? 1f : 0f, dt * 5f);
             dealerGroup.blocksRaycasts = dealerGroup.interactable = dealer;
 
-            // Bannière : entre en glissant, reste, puis s'efface
-            if (bannerTimer > 0f)
-            {
-                bannerTimer -= dt;
-                float shown = 2.8f - bannerTimer;
-                float x = Mathf.Clamp01(shown / 0.25f);
-                bannerRt.anchoredPosition = new Vector2(Mathf.Lerp(-90f, 0f, 1f - (1f - x) * (1f - x)), 0f);
-                bannerGroup.alpha = Mathf.Min(x, Mathf.Clamp01(bannerTimer / 0.5f));
-            }
-
             if (flashAlpha > 0f)
             {
                 flashAlpha = Mathf.MoveTowards(flashAlpha, 0f, dt * 2.2f);
                 var c = flash.color; c.a = flashAlpha; flash.color = c;
             }
-            UpdatePopups(dt);
             UpdateTouchLayout();
             UpdateSlides(dt);
             UpdateBottomLeft(dt);
@@ -634,48 +573,11 @@ namespace NoHesi
             }
         }
 
-        public void Banner(string text, Color color)
-        {
-            bannerText.text = text;
-            bannerText.color = Color.Lerp(color, White, 0.25f);
-            bannerStripe.color = color;
-            bannerTimer = 2.8f;
-        }
-
         public void Flash(Color c, float alpha)
         {
             c.a = alpha;
             flash.color = c;
             flashAlpha = alpha;
-        }
-
-        /// <summary>Gain au centre : libellé et montant, qui montent en s'effaçant (empilés).</summary>
-        void Pop(string label, float pts, Color color)
-        {
-            string sign = pts < 0f ? "-" : "+";
-            string hex = ColorUtility.ToHtmlStringRGB(pts < 0f ? Danger : Accent);
-            var t = Label(canvas, $"{label}   <color=#{hex}>{sign}{Wallet.Format(Mathf.Abs(pts))}</color>", 32, TextAnchor.MiddleCenter, color,
-                new Vector2(0.5f, 0.74f), Vector2.zero, new Vector2(1100f, 50f), FontStyle.BoldAndItalic);
-            t.supportRichText = true;
-            Outline(t, new Color(0f, 0f, 0f, 0.4f), 1.5f);
-            popups.Add(new Popup { text = t, rt = t.rectTransform, life = 1.7f, max = 1.7f });
-            if (popups.Count > 4) { Destroy(popups[0].rt.gameObject); popups.RemoveAt(0); }
-        }
-
-        void UpdatePopups(float dt)
-        {
-            for (int i = popups.Count - 1; i >= 0; i--)
-            {
-                var p = popups[i];
-                p.life -= dt;
-                if (p.life <= 0f) { Destroy(p.rt.gameObject); popups.RemoveAt(i); continue; }
-                float k = 1f - p.life / p.max;
-                // Empilés : le plus récent en bas, les anciens remontent
-                float stack = (popups.Count - 1 - i) * 42f;
-                p.rt.anchoredPosition = new Vector2(Mathf.Lerp(-30f, 0f, Mathf.Clamp01(k * 6f)), k * 36f + stack);
-                p.rt.localScale = Vector3.one * Mathf.Lerp(1.25f, 1f, Mathf.Clamp01(k * 6f));
-                var c = p.text.color; c.a = Mathf.Clamp01(Mathf.Min(k * 8f, p.life / 0.45f)); p.text.color = c;
-            }
         }
 
         // ------------------------------------------------------------------ pause

@@ -43,7 +43,6 @@ namespace NoHesi
             if (typed != MoneyCode) return;
             typed = "";
             Wallet.Add(MoneyAmount);
-            game.Notify(Loc.T("CODE TRICHE  ·  +", "CHEAT CODE  ·  +") + Wallet.Format(MoneyAmount), new Color(0.5f, 1f, 0.6f));
             if (game.Local != null && game.Local.Audio) game.Local.Audio.Chime();
         }
     }

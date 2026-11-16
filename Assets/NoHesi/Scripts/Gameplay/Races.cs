@@ -117,7 +117,7 @@ namespace NoHesi
         GameManager game;
         List<Track> tracks;
         Mode mode;
-        Track candidate, announced;
+        Track candidate;
         readonly List<Vector3> course = new List<Vector3>();
         float[] times;
         int next, shownBeat, teleports;
@@ -294,7 +294,7 @@ namespace NoHesi
             UpdateHud(Time.unscaledDeltaTime, !menu);
         }
 
-        /// <summary>Balade : annonce le départ dont on approche, et propose la course quand on s'y arrête.</summary>
+        /// <summary>Balade : propose la course quand on s'arrête sur un départ.</summary>
         void UpdateIdle(VehicleController car, Vector3 pos, bool menu)
         {
             Track near = null;
@@ -307,18 +307,6 @@ namespace NoHesi
                 if (d.magnitude < best) { best = d.magnitude; near = t; }
             }
             candidate = near != null && best < StartRadius && car.Speed < StartSpeed && !menu ? near : null;
-            if (near != null && best < 140f)
-            {
-                if (near != announced && !menu && candidate == null)
-                {
-                    announced = near;
-                    string name = near.Name.ToUpperInvariant(), kind = near.Kind;
-                    float km = near.Distance / 1000f;
-                    game.Hud.Banner(Loc.F($"COURSE  ·  {name}  ·  {kind}  ·  {km:0.0} km  ·  ARRÊTE-TOI AU DÉPART",
-                                          $"RACE  ·  {name}  ·  {kind}  ·  {km:0.0} km  ·  STOP AT THE START"), near.Tint);
-                }
-            }
-            else if (best > 220f) announced = null;
             if (candidate != null && GameInput.InteractPressed) Begin(candidate);
         }
 
@@ -329,7 +317,6 @@ namespace NoHesi
             Active = t;
             mode = Mode.Countdown;
             candidate = null;
-            announced = t;
             resultTimer = 0f;
             deltaTimer = 0f;
             countdown = Beat * 3f;
@@ -426,13 +413,7 @@ namespace NoHesi
             if (next == times.Length - 1) { Finish(time); return; }
             int passed = next++;
             sinceGate = 0f;
-            int perLap = t.gates.Length, lap = next / perLap;
-            if (next % perLap == 0)
-            {
-                string split = Clock(time);
-                game.Hud.Banner(lap == t.laps - 1 ? Loc.F($"DERNIER TOUR  ·  {split}", $"FINAL LAP  ·  {split}")
-                                                  : Loc.F($"TOUR {lap + 1}/{t.laps}  ·  {split}", $"LAP {lap + 1}/{t.laps}  ·  {split}"), t.Tint);
-            }
+            int perLap = t.gates.Length;
             game.Hud.Flash(t.Tint, 0.1f);
             if (game.Local.Audio) game.Local.Audio.Chime();
             // Le GPS ne garde que ce qu'il reste à parcourir
@@ -457,10 +438,6 @@ namespace NoHesi
             resultHasDelta = old > 0f;
             resultDelta = time - old;
             resultTimer = 9f;
-            string name = t.Name.ToUpperInvariant(), clock = Clock(time), gap = resultHasDelta ? "  (" + Delta(resultDelta) + ")" : "";
-            game.Hud.Banner(record
-                ? Loc.F($"ARRIVÉE  ·  {name}  ·  {clock}  ·  NOUVEAU RECORD{gap}", $"FINISH  ·  {name}  ·  {clock}  ·  NEW RECORD{gap}")
-                : Loc.F($"ARRIVÉE  ·  {name}  ·  {clock}{gap}", $"FINISH  ·  {name}  ·  {clock}{gap}"), record ? Good : t.Tint);
             game.Hud.Flash(record ? Good : t.Tint, 0.3f);
             game.Camera.Shake(0.25f);
             if (game.Local.Audio) game.Local.Audio.Chime();
@@ -470,7 +447,6 @@ namespace NoHesi
 
         void Abandon()
         {
-            game.Hud.Banner(Loc.T("COURSE ABANDONNÉE", "RACE ABANDONED"), Bad);
             Stop();
         }
 
@@ -479,7 +455,6 @@ namespace NoHesi
         {
             if (mode == Mode.Countdown && !(game.Hud && game.Hud.Paused)) game.SetInputEnabled(true);
             mode = Mode.Idle;
-            announced = Active;     // pas d'annonce du départ que l'on vient de quitter (ligne d'une boucle)
             Active = null;
             goTimer = abandonHeld = 0f;
             if (game.Nav) game.Nav.ClearCourse();

@@ -177,11 +177,6 @@ namespace NoHesi
             Weather = gameObject.AddComponent<WeatherSystem>();
             Weather.Init(mainCam, assets, audioFx, DayNight);
             DayNight.Weather = Weather;
-            Weather.Changed += storm =>
-            {
-                if (storm) Notify(Loc.T("ORAGE EN APPROCHE : ROUTE GLISSANTE", "STORM INCOMING: SLIPPERY ROAD"), new Color(0.45f, 0.65f, 1f));
-                else Notify(Loc.T("ÉCLAIRCIE : LA ROUTE SÈCHE", "CLEARING UP: ROAD DRYING"), new Color(1f, 0.8f, 0.35f));
-            };
 
             Net = gameObject.AddComponent<NetGame>();
             Net.Init(this);
@@ -196,12 +191,6 @@ namespace NoHesi
             if (Weather && !(Net && Net.IsClient)) Weather.SetChance(GameSettings.RainChance);
             if (local.Audio) local.Audio.masterVolume = GameSettings.EffectsVolume;
             GraphicsQuality.Apply(this);
-        }
-
-        /// <summary>Annonce en bannière sur le HUD (météo, arrivée ou départ d'un joueur), pendant la partie.</summary>
-        public void Notify(string text, Color color)
-        {
-            if (State == Phase.Playing && hud && !DedicatedServer) hud.Banner(text.ToUpperInvariant(), color);
         }
 
         void Start()
@@ -530,7 +519,6 @@ namespace NoHesi
             if (found == currentPoi) return;
             currentPoi = found;
             Place = found != null ? Loc.T(found.fr, found.en) : "";
-            if (found != null) hud.Banner(Place.ToUpperInvariant(), new Color(1f, 0.86f, 0.5f));
         }
 
         /// <summary>
@@ -546,10 +534,7 @@ namespace NoHesi
                 if (!p.ResetConsumed && p.ResetHeld >= HoldToChangeCar)
                 {
                     p.ResetConsumed = true;
-                    if (CycleCar(1, true))
-                        hud.Banner(Loc.T("VOITURE : ", "CAR: ") + Player.Spec.displayName, new Color(1f, 0.76f, 0.2f));
-                    else
-                        hud.Banner(Loc.T("ACHÈTE D'AUTRES VOITURES À LA CONCESSION", "BUY MORE CARS AT THE CAR DEALER"), new Color(0.35f, 0.85f, 1f));
+                    CycleCar(1, true);
                 }
             }
             else
