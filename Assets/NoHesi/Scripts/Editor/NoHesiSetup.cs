@@ -63,6 +63,8 @@ namespace NoHesi.EditorTools
             a.emissiveWhite = Emissive("EmissiveWhite", new Color(1f, 0.97f, 0.9f), 4f);
             a.emissiveRed = Emissive("EmissiveRed", new Color(1f, 0.08f, 0.05f), 5f);
             a.emissiveBlue = Emissive("EmissiveBlue", new Color(0.15f, 0.45f, 1f), 5f);
+            // Référencé ici pour être embarqué dans le jeu construit (ses matériaux sont créés à l'exécution)
+            a.gateFx = Shader.Find("NoHesi/GateFx");
             // Route : shader et textures faits maison (remplacent les matériaux Lit ci-dessus s'ils sont présents)
             RoadMaterials.Apply(a);
             // Terrain, eau, béton, terre : sans texture générique (remplacent les matériaux ci-dessus)

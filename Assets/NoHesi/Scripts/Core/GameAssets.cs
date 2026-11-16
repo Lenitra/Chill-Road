@@ -118,5 +118,8 @@ namespace NoHesi
         public Material particle;
         [Tooltip("Étincelles, flammes, traînées (additif)")] public Material spark;
         [Tooltip("Traces de pneus")] public Material skidMark;
+
+        [Header("Shaders")]
+        [Tooltip("Portes des courses : lumière au sol, faisceaux, fumée (NoHesi/GateFx)")] public Shader gateFx;
     }
 }

@@ -16,7 +16,8 @@ namespace NoHesi
     /// plus rapide de l'un à l'autre (<see cref="RouteGuide.Plan"/>), et ses points de passage sont posés dessus à
     /// intervalles réguliers. Rien n'est écrit dans la carte générée : les tracés suivent le réseau tel qu'il est.
     /// Déroulé : on s'arrête sur la porte de départ (visible de loin), l'invite propose de lancer le chrono ; décompte,
-    /// puis il faut franchir les portes dans l'ordre, dans le sens de la course. Le GPS affiche le parcours (ruban sur
+    /// puis il faut franchir les portes dans l'ordre, dans le sens de la course. Une porte n'a rien de solide : une
+    /// ligne de lumière posée sur la route, deux projecteurs de bas-côté et leur fumée (<see cref="GateFx"/>). Le GPS affiche le parcours (ruban sur
     /// la route, minicarte). À l'arrivée, le temps est comparé au record personnel du tracé, gardé avec ses temps de
     /// passage : à chaque porte, l'écart au record s'affiche.
     /// Chaque joueur court pour lui (rien ne passe par le réseau).
@@ -37,6 +38,8 @@ namespace NoHesi
         const float StartBack = 4f;             // la voiture est posée juste derrière la ligne
         const float Beat = 0.75f;               // durée d'un chiffre du décompte
         const float GateMargin = 4f;            // tolérance de part et d'autre d'une porte
+        // Sol relevé autour d'une porte, pour y poser sa lumière : de GateBefore m avant la ligne à GateAfter m après
+        const float GateBefore = 16f, GateAfter = 5f, GateStep = 1f;
         const float AbandonHold = 0.8f;
         const float LostDistance = 650f, LostTime = 6f, GateTimeout = 300f;
 
@@ -78,6 +81,11 @@ namespace NoHesi
             /// <summary>Demi-largeur (m) et indice du point du parcours qui suit la porte.</summary>
             public float half;
             public int index;
+            /// <summary>
+            /// Profil de la route autour de la porte, tous les <see cref="GateStep"/> m le long du parcours : point de
+            /// la chaussée dans l'axe de la porte, et vecteur « droite » à cet endroit (la route tourne et monte).
+            /// </summary>
+            public Vector3[] line, across;
         }
 
         public class Track
@@ -226,7 +234,37 @@ namespace NoHesi
                     g.half = e.TotalHalfWidth + 1f;
                 }
             }
+            // Profil du sol : le parcours donne la hauteur et le sens de la route, décalé jusqu'à l'axe de la porte
+            float shift = Vector3.Dot(g.pos - p, g.right);
+            int n = Mathf.RoundToInt((GateBefore + GateAfter) / GateStep) + 1;
+            g.line = new Vector3[n];
+            g.across = new Vector3[n];
+            for (int k = 0; k < n; k++)
+            {
+                float at = d - GateBefore + k * GateStep;
+                Vector3 c = PathAt(t, dist, at);
+                Vector3 dir = PathAt(t, dist, at + 1.5f) - PathAt(t, dist, at - 1.5f);
+                dir.y = 0f;
+                dir = dir.sqrMagnitude > 1e-4f ? dir.normalized : f;
+                g.across[k] = new Vector3(dir.z, 0f, -dir.x);
+                g.line[k] = c + g.across[k] * shift;
+            }
             return g;
+        }
+
+        /// <summary>Point du parcours à la distance d du départ : une boucle se referme, un sprint se prolonge tout droit.</summary>
+        static Vector3 PathAt(Track t, float[] dist, float d)
+        {
+            var path = t.path;
+            float length = dist[dist.Length - 1];
+            if (t.Loop) d = Mathf.Repeat(d, length);
+            float c = Mathf.Clamp(d, 0f, length);
+            int i = Array.BinarySearch(dist, c);
+            if (i < 0) i = ~i;
+            i = Mathf.Clamp(i, 1, path.Count - 1);
+            float seg = dist[i] - dist[i - 1];
+            if (seg <= 0f) return path[i];
+            return path[i - 1] + (path[i] - path[i - 1]) * ((d - dist[i - 1]) / seg);
         }
 
         Gate GateOf(int i) => Active.gates[i % Active.gates.Length];
@@ -463,93 +501,279 @@ namespace NoHesi
         // ------------------------------------------------------------------ portes (monde)
 
         /// <summary>
-        /// Porte : portique plein (deux poteaux et une traverse, lumineux, sans collision : on passe au travers) bien
-        /// visible de jour, prolongé par deux colonnes de lumière qui la signalent de loin et la nuit.
+        /// Porte, sans rien de solide en travers de la route : une ligne de lumière posée sur la chaussée (elle en suit
+        /// la pente et le virage), un tapis de lumière où des barres glissent vers la ligne, un voile de brume éclairé
+        /// au-dessus, et de chaque côté un projecteur au sol qui éclaire les abords et d'où monte une fumée colorée
+        /// (le repère de loin). La voie reste dégagée : la fumée ne naît que sur les bas-côtés et dérive vers
+        /// l'extérieur, et brume comme fumée s'effacent à l'approche de la caméra (shader NoHesi/GateFx).
         /// </summary>
         class GateFx
         {
-            static readonly int BaseColor = Shader.PropertyToID("_BaseColor"), EmissionColor = Shader.PropertyToID("_EmissionColor"), BaseMap = Shader.PropertyToID("_BaseMap");
-            const float PostHeight = 7f, PostWidth = 0.42f, BeamHeight = 55f;
-            readonly Transform root, leftPost, rightPost, bar;
-            readonly LineRenderer leftBeam, rightBeam;
-            readonly Material solid, glow;
+            static readonly int TintId = Shader.PropertyToID("_Tint"), StrengthId = Shader.PropertyToID("_Strength"),
+                HalfId = Shader.PropertyToID("_Half"), BackId = Shader.PropertyToID("_Back"), NearId = Shader.PropertyToID("_Near"),
+                BaseColor = Shader.PropertyToID("_BaseColor"), EmissionColor = Shader.PropertyToID("_EmissionColor");
+            const float Lift = 0.05f, Margin = 1.4f, CurtainHeight = 1.5f;
+            const float LampInset = 0.35f, LampHeight = 0.2f, SmokeDistance = 600f, LightDistance = 160f;
 
-            public GateFx(Transform parent, GameAssets assets)
+            readonly Transform root;
+            readonly Mesh groundMesh, curtainMesh;
+            readonly Material ground, curtain, smoke, housing, lens;
+            readonly Transform[] lamps = new Transform[2];
+            readonly Light[] lights = new Light[2];
+            readonly ParticleSystem[] plumes = new ParticleSystem[2];
+            readonly List<Vector3> verts = new List<Vector3>();
+            readonly List<Vector2> uvs = new List<Vector2>();
+            readonly List<int> tris = new List<int>();
+            Gate bound;
+            float level;
+
+            /// <summary>Nuit (0-1) : les projecteurs n'éclairent vraiment leurs abords qu'à la nuit tombée.</summary>
+            public static float Night;
+
+            /// <summary>Porte affichée (null si l'effet est éteint).</summary>
+            public Gate Bound => root.gameObject.activeSelf ? bound : null;
+
+            public static Shader Find(GameAssets assets) => assets.gateFx ? assets.gateFx : Shader.Find("NoHesi/GateFx");
+
+            public GateFx(Transform parent, GameAssets assets, Shader shader)
             {
                 root = new GameObject("RaceGate").transform;
                 root.SetParent(parent, false);
                 root.gameObject.SetActive(false);
-                solid = new Material(assets.emissiveWhite) { name = "Race gate (runtime)" };
-                solid.EnableKeyword("_EMISSION");
-                leftPost = Post("Left");
-                rightPost = Post("Right");
-                bar = Post("Bar");
-                if (!assets.spark) return;
-                // Colonnes : additif, sans la texture de point des étincelles (elle ne s'allumerait qu'à mi-hauteur)
-                glow = new Material(assets.spark) { name = "Race gate glow (runtime)" };
-                glow.SetTexture(BaseMap, Texture2D.whiteTexture);
-                leftBeam = Beam("LeftBeam");
-                rightBeam = Beam("RightBeam");
+
+                ground = Layer(shader, "_GATE_GROUND", 3008, Vector4.zero);
+                ground.SetFloat(BackId, GateBefore);
+                curtain = Layer(shader, "_GATE_CURTAIN", 3012, new Vector4(9f, 34f, 0f, 0f));
+                smoke = Layer(shader, "_GATE_SMOKE", 3013, new Vector4(5f, 16f, 0f, 0f));
+                groundMesh = Surface("Ground", ground);
+                curtainMesh = Surface("Curtain", curtain);
+
+                // Projecteurs : petit boîtier sombre, lentille de la couleur du tracé
+                housing = new Material(assets.emissiveWhite) { name = "Race gate lamp (runtime)" };
+                housing.SetColor(BaseColor, new Color(0.07f, 0.075f, 0.09f, 1f));
+                housing.SetColor(EmissionColor, Color.black);
+                lens = new Material(assets.emissiveWhite) { name = "Race gate lens (runtime)" };
+                lens.EnableKeyword("_EMISSION");
+                for (int i = 0; i < 2; i++)
+                {
+                    lamps[i] = new GameObject("Lamp").transform;
+                    lamps[i].SetParent(root, false);
+                    Solid("Housing", lamps[i], housing, new Vector3(0.62f, LampHeight * 0.5f, 0.62f), new Vector3(0f, LampHeight * 0.5f, 0f));
+                    Solid("Lens", lamps[i], lens, new Vector3(0.44f, 0.02f, 0.44f), new Vector3(0f, LampHeight + 0.005f, 0f));
+                    lights[i] = Glow(lamps[i]);
+                    plumes[i] = Plume(lamps[i]);
+                }
             }
 
-            Transform Post(string name)
+            static Material Layer(Shader shader, string keyword, int queue, Vector4 near)
             {
-                var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                go.name = name;
-                go.transform.SetParent(root, false);
-                var box = go.GetComponent<Collider>();
-                box.enabled = false;
-                Destroy(box);
-                var r = go.GetComponent<MeshRenderer>();
-                r.sharedMaterial = solid;
-                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                r.receiveShadows = false;
-                return go.transform;
+                var m = new Material(shader) { name = "Race gate " + keyword + " (runtime)", renderQueue = queue };
+                foreach (var k in new[] { "_GATE_GROUND", "_GATE_CURTAIN", "_GATE_SMOKE" })
+                {
+                    if (k == keyword) m.EnableKeyword(k);
+                    else m.DisableKeyword(k);
+                }
+                m.SetVector(NearId, near);
+                return m;
             }
 
-            LineRenderer Beam(string name)
+            Mesh Surface(string name, Material material)
             {
                 var go = new GameObject(name);
                 go.transform.SetParent(root, false);
-                var line = go.AddComponent<LineRenderer>();
-                line.sharedMaterial = glow;
-                line.positionCount = 2;
-                line.useWorldSpace = true;
-                line.alignment = LineAlignment.View;
-                line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                line.receiveShadows = false;
-                var gradient = new Gradient();
-                gradient.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
-                                 new[] { new GradientAlphaKey(0.75f, 0f), new GradientAlphaKey(0.35f, 0.3f), new GradientAlphaKey(0f, 1f) });
-                line.colorGradient = gradient;
-                return line;
+                var mesh = new Mesh { name = "RaceGate" + name };
+                go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                Plain(go.AddComponent<MeshRenderer>(), material);
+                return mesh;
             }
 
-            public void Show(Gate g, Color tint, float strength, Vector3 eye)
+            static void Plain(Renderer r, Material material)
             {
-                if (!root.gameObject.activeSelf) root.gameObject.SetActive(true);
-                root.SetPositionAndRotation(g.pos, Quaternion.LookRotation(g.forward, Vector3.up));
-                // Poteaux un peu enfoncés : la route peut être en dévers ou en pente
-                var post = new Vector3(PostWidth, PostHeight + 1f, PostWidth);
-                leftPost.localPosition = new Vector3(-g.half, PostHeight * 0.5f - 0.5f, 0f);
-                rightPost.localPosition = new Vector3(g.half, PostHeight * 0.5f - 0.5f, 0f);
-                leftPost.localScale = rightPost.localScale = post;
-                bar.localPosition = new Vector3(0f, PostHeight - 0.35f, 0f);
-                bar.localScale = new Vector3(g.half * 2f + PostWidth, 0.7f, PostWidth * 0.7f);
-                // Couleur surtout émise (lisible la nuit), sans dépasser le blanc : la teinte du tracé reste franche
-                float lit = Mathf.Clamp01(strength);
-                solid.SetColor(BaseColor, new Color(tint.r * 0.3f, tint.g * 0.3f, tint.b * 0.3f, 1f));
-                solid.SetColor(EmissionColor, new Color(tint.r * lit, tint.g * lit, tint.b * lit, 1f));
-                if (!glow) return;
-                glow.SetColor(BaseColor, new Color(tint.r * 1.6f * strength, tint.g * 1.6f * strength, tint.b * 1.6f * strength, 1f));
-                // Visibles de loin : l'épaisseur grandit avec la distance
-                float width = Mathf.Clamp(Vector3.Distance(eye, g.pos) * 0.0045f, PostWidth, 5f);
-                Vector3 a = g.pos - g.right * g.half + Vector3.up * (PostHeight - 0.5f), b = g.pos + g.right * g.half + Vector3.up * (PostHeight - 0.5f);
-                leftBeam.SetPosition(0, a);
-                leftBeam.SetPosition(1, a + Vector3.up * BeamHeight);
-                rightBeam.SetPosition(0, b);
-                rightBeam.SetPosition(1, b + Vector3.up * BeamHeight);
-                leftBeam.widthMultiplier = rightBeam.widthMultiplier = width;
+                r.sharedMaterial = material;
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                r.receiveShadows = false;
+                r.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+                r.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+            }
+
+            /// <summary>Cylindre sans collision (on roule au travers).</summary>
+            static void Solid(string name, Transform parent, Material material, Vector3 scale, Vector3 pos)
+            {
+                var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                go.name = name;
+                go.transform.SetParent(parent, false);
+                go.transform.localScale = scale;
+                go.transform.localPosition = pos;
+                var col = go.GetComponent<Collider>();
+                col.enabled = false;
+                Destroy(col);
+                Plain(go.GetComponent<MeshRenderer>(), material);
+            }
+
+            /// <summary>Lumière du projecteur : éclaire la chaussée, le bas-côté et la fumée (de près seulement).</summary>
+            static Light Glow(Transform lamp)
+            {
+                var go = new GameObject("Light");
+                go.transform.SetParent(lamp, false);
+                go.transform.localPosition = new Vector3(0f, 1.3f, 0f);
+                var l = go.AddComponent<Light>();
+                l.type = LightType.Point;
+                l.range = 9f;
+                l.shadows = LightShadows.None;
+                l.enabled = false;
+                return l;
+            }
+
+            /// <summary>Fumée d'un projecteur : bouffées lentes qui montent en grossissant et s'écartent de la route.</summary>
+            ParticleSystem Plume(Transform lamp)
+            {
+                var go = new GameObject("Smoke");
+                go.transform.SetParent(lamp, false);
+                go.transform.localPosition = new Vector3(0f, LampHeight + 0.1f, 0f);
+                var ps = go.AddComponent<ParticleSystem>();
+                ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                var main = ps.main;
+                main.loop = true;
+                main.prewarm = true;
+                main.duration = 5f;
+                main.playOnAwake = false;
+                main.startLifetime = new ParticleSystem.MinMaxCurve(4.2f, 5.8f);
+                main.startSpeed = 0f;
+                main.startSize = new ParticleSystem.MinMaxCurve(1f, 1.6f);
+                main.startRotation = new ParticleSystem.MinMaxCurve(0f, Mathf.PI * 2f);
+                main.simulationSpace = ParticleSystemSimulationSpace.World;
+                main.scalingMode = ParticleSystemScalingMode.Shape;
+                main.maxParticles = 64;
+                var emission = ps.emission;
+                emission.rateOverTime = 7f;
+                var shape = ps.shape;
+                shape.shapeType = ParticleSystemShapeType.Sphere;
+                shape.radius = 0.2f;
+                var spin = ps.rotationOverLifetime;
+                spin.enabled = true;
+                spin.z = new ParticleSystem.MinMaxCurve(-0.35f, 0.35f);
+                var wave = ps.noise;
+                wave.enabled = true;
+                wave.strength = 0.22f;
+                wave.frequency = 0.35f;
+                wave.scrollSpeed = 0.25f;
+                var size = ps.sizeOverLifetime;
+                size.enabled = true;
+                size.size = new ParticleSystem.MinMaxCurve(1f, new AnimationCurve(new Keyframe(0f, 0.45f, 0f, 2.4f), new Keyframe(1f, 2.1f, 0.6f, 0f)));
+                // Éclairée par le projecteur à la naissance, la fumée pâlit en montant puis se dissout
+                var colors = ps.colorOverLifetime;
+                colors.enabled = true;
+                var g = new Gradient();
+                g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(new Color(0.88f, 0.88f, 0.88f), 0.45f), new GradientColorKey(new Color(0.74f, 0.74f, 0.74f), 1f) },
+                          new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(0.85f, 0.12f), new GradientAlphaKey(0.5f, 0.55f), new GradientAlphaKey(0f, 1f) });
+                colors.color = g;
+                var r = go.GetComponent<ParticleSystemRenderer>();
+                Plain(r, smoke);
+                r.renderMode = ParticleSystemRenderMode.Billboard;
+                r.sortMode = ParticleSystemSortMode.Distance;
+                return ps;
+            }
+
+            /// <summary>Pose l'effet sur une porte : sol et voile taillés sur le profil de la route, projecteurs aux deux bouts de la ligne.</summary>
+            void Bind(Gate g)
+            {
+                bound = g;
+                level = 0f;
+                root.SetPositionAndRotation(g.pos, Quaternion.identity);
+                int n = g.line.Length, k0 = Mathf.Clamp(Mathf.RoundToInt(GateBefore / GateStep), 0, n - 1);
+                float w = g.half + Margin;
+                Vector3 up = Vector3.up * Lift;
+
+                verts.Clear(); uvs.Clear(); tris.Clear();
+                for (int k = 0; k < n; k++)
+                {
+                    Vector3 c = g.line[k] - g.pos + up;
+                    float z = (k - k0) * GateStep;
+                    verts.Add(c - g.across[k] * w);
+                    verts.Add(c + g.across[k] * w);
+                    uvs.Add(new Vector2(-w, z));
+                    uvs.Add(new Vector2(w, z));
+                }
+                for (int i = 0; i + 3 < verts.Count; i += 2)
+                {
+                    tris.Add(i); tris.Add(i + 2); tris.Add(i + 1);
+                    tris.Add(i + 1); tris.Add(i + 2); tris.Add(i + 3);
+                }
+                Fill(groundMesh);
+
+                verts.Clear(); uvs.Clear(); tris.Clear();
+                Vector3 mid = g.line[k0] - g.pos + up, side = g.across[k0];
+                verts.Add(mid - side * g.half); verts.Add(mid + side * g.half);
+                verts.Add(mid - side * g.half + Vector3.up * CurtainHeight); verts.Add(mid + side * g.half + Vector3.up * CurtainHeight);
+                uvs.Add(new Vector2(-g.half, 0f)); uvs.Add(new Vector2(g.half, 0f));
+                uvs.Add(new Vector2(-g.half, 1f)); uvs.Add(new Vector2(g.half, 1f));
+                tris.Add(0); tris.Add(2); tris.Add(1); tris.Add(1); tris.Add(2); tris.Add(3);
+                Fill(curtainMesh);
+                ground.SetFloat(HalfId, g.half);
+                curtain.SetFloat(HalfId, g.half);
+
+                for (int i = 0; i < 2; i++)
+                {
+                    float s = i == 0 ? -1f : 1f;
+                    lamps[i].localPosition = g.line[k0] - g.pos + side * (s * (g.half - LampInset));
+                    // La fumée monte et s'écarte de la chaussée
+                    Vector3 away = side * s;
+                    var drift = plumes[i].velocityOverLifetime;
+                    drift.enabled = true;
+                    drift.space = ParticleSystemSimulationSpace.World;
+                    drift.x = new ParticleSystem.MinMaxCurve(away.x * 0.3f, away.x * 0.6f);
+                    drift.y = new ParticleSystem.MinMaxCurve(1.2f, 1.9f);
+                    drift.z = new ParticleSystem.MinMaxCurve(away.z * 0.3f, away.z * 0.6f);
+                    plumes[i].Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                }
+            }
+
+            void Fill(Mesh mesh)
+            {
+                mesh.Clear();
+                mesh.SetVertices(verts);
+                mesh.SetUVs(0, uvs);
+                mesh.SetTriangles(tris, 0);
+                mesh.RecalculateBounds();
+            }
+
+            /// <summary>Affiche la porte ; l'intensité rejoint <paramref name="strength"/> en douceur (allumage, porte suivante qui devient la prochaine).</summary>
+            public void Show(Gate g, Color tint, float strength, Vector3 eye, float dt)
+            {
+                if (!root.gameObject.activeSelf)
+                {
+                    root.gameObject.SetActive(true);
+                    bound = null;
+                }
+                if (bound != g) Bind(g);
+                level = Mathf.MoveTowards(level, strength, dt * 2.2f);
+                float lit = Mathf.Clamp01(level);
+                var hdr = new Color(tint.r * 1.5f, tint.g * 1.5f, tint.b * 1.5f, 1f);
+                ground.SetColor(TintId, hdr);
+                ground.SetFloat(StrengthId, level);
+                curtain.SetColor(TintId, hdr);
+                curtain.SetFloat(StrengthId, level);
+                smoke.SetFloat(StrengthId, lit);
+                lens.SetColor(BaseColor, new Color(tint.r * 0.3f, tint.g * 0.3f, tint.b * 0.3f, 1f));
+                lens.SetColor(EmissionColor, new Color(tint.r * lit, tint.g * lit, tint.b * lit, 1f));
+
+                float dist = Vector3.Distance(eye, g.pos);
+                // Fumée teintée par le projecteur, un peu blanchie ; inutile de la simuler de très loin
+                bool smoking = dist < SmokeDistance;
+                var born = Color.Lerp(tint, Color.white, 0.3f);
+                // Vraie lumière seulement à l'approche (elle s'éteint en douceur avec la distance)
+                float glow = lit * Mathf.Clamp01((LightDistance - dist) / 40f);
+                for (int i = 0; i < 2; i++)
+                {
+                    lights[i].enabled = glow > 0.01f;
+                    lights[i].color = tint;
+                    lights[i].intensity = glow * Mathf.Lerp(0.8f, 4f, Night);
+                    var ps = plumes[i];
+                    var main = ps.main;
+                    main.startColor = born;
+                    if (smoking && !ps.isPlaying) ps.Play();
+                    else if (!smoking && ps.isPlaying) ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                }
             }
 
             public void Hide()
@@ -559,7 +783,7 @@ namespace NoHesi
         }
 
         GateFx[] startFx;
-        GateFx nextFx, afterFx;
+        readonly GateFx[] raceFx = new GateFx[2];
 
         /// <summary>
         /// En balade : la porte de départ de chaque tracé. En course : la prochaine porte, et la suivante en plus
@@ -569,33 +793,50 @@ namespace NoHesi
         {
             if (startFx == null)
             {
-                if (!game.assets.emissiveWhite) return;
+                var shader = GateFx.Find(game.assets);
+                if (!shader || !game.assets.emissiveWhite) return;
                 startFx = new GateFx[tracks.Count];
-                for (int i = 0; i < startFx.Length; i++) startFx[i] = new GateFx(transform, game.assets);
-                nextFx = new GateFx(transform, game.assets);
-                afterFx = new GateFx(transform, game.assets);
+                for (int i = 0; i < startFx.Length; i++) startFx[i] = new GateFx(transform, game.assets, shader);
+                for (int i = 0; i < raceFx.Length; i++) raceFx[i] = new GateFx(transform, game.assets, shader);
             }
             Vector3 eye = game.Camera.transform.position;
+            float dt = Time.unscaledDeltaTime;
             float pulse = 1f + Mathf.Sin(Time.unscaledTime * 3f) * 0.08f;
+            GateFx.Night = game.DayNight ? game.DayNight.Night : 0f;
             for (int i = 0; i < startFx.Length; i++)
             {
                 var t = tracks[i];
                 bool show = playing && (mode == Mode.Idle ? Flat(eye - t.start.pos) < 1800f : mode == Mode.Countdown && t == Active);
-                if (show) startFx[i].Show(t.start, t.Tint, pulse, eye);
+                if (show) startFx[i].Show(t.start, t.Tint, pulse, eye, dt);
                 else startFx[i].Hide();
             }
+
+            Gate first = null, second = null;
+            int last = 0;
             if (playing && mode != Mode.Idle)
             {
-                int last = Active.GateCount - 1;
-                nextFx.Show(GateOf(next), next == last ? FinishTint : Active.Tint, pulse, eye);
-                if (next < last) afterFx.Show(GateOf(next + 1), next + 1 == last ? FinishTint : Active.Tint, 0.4f, eye);
-                else afterFx.Hide();
+                last = Active.GateCount - 1;
+                first = GateOf(next);
+                if (next < last && GateOf(next + 1) != first) second = GateOf(next + 1);
             }
-            else
+            // Une porte garde son effet quand, de suivante, elle devient la prochaine : sa fumée reste en place
+            GateFx fxFirst = null, fxSecond = null;
+            foreach (var fx in raceFx)
             {
-                nextFx.Hide();
-                afterFx.Hide();
+                var b = fx.Bound;
+                if (b == null) continue;
+                if (b == first && fxFirst == null) fxFirst = fx;
+                else if (b == second && fxSecond == null) fxSecond = fx;
             }
+            foreach (var fx in raceFx)
+            {
+                if (fx == fxFirst || fx == fxSecond) continue;
+                if (first != null && fxFirst == null) fxFirst = fx;
+                else if (second != null && fxSecond == null) fxSecond = fx;
+                else fx.Hide();
+            }
+            if (fxFirst != null) fxFirst.Show(first, next == last ? FinishTint : Active.Tint, pulse, eye, dt);
+            if (fxSecond != null) fxSecond.Show(second, next + 1 == last ? FinishTint : Active.Tint, 0.4f, eye, dt);
         }
 
         // ------------------------------------------------------------------ minicarte
