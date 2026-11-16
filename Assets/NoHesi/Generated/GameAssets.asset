@@ -377,3 +377,4 @@ MonoBehaviour:
   spark: {fileID: 2100000, guid: 7e541a876ee490c4fbff095354053862, type: 2}
   skidMark: {fileID: 2100000, guid: 81b4e50a9cf68604cb16f1737573022c, type: 2}
   gateFx: {fileID: 4800000, guid: 9b9364bb60e1b844c8771abc80727673, type: 3}
+  ghost: {fileID: 4800000, guid: 1201a02ae6363ee48b0dd8e6817037af, type: 3}

@@ -121,5 +121,6 @@ namespace NoHesi
 
         [Header("Shaders")]
         [Tooltip("Portes des courses : lumière au sol, faisceaux, fumée (NoHesi/GateFx)")] public Shader gateFx;
+        [Tooltip("Fantôme du record d'une course : coque translucide (NoHesi/Ghost)")] public Shader ghost;
     }
 }

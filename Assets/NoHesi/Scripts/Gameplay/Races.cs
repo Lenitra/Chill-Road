@@ -21,6 +21,7 @@ namespace NoHesi
     /// la route, minicarte). À l'arrivée, le temps est comparé au record personnel du tracé, gardé avec ses temps de
     /// passage : à chaque porte, l'écart au record s'annonce en haut au centre (<see cref="Hud.Announce"/>).
     /// Pendant la course, le cadre en haut à droite ne montre que l'avancement (pourcentage du sprint, ou tour) et le chrono.
+    /// Le record court avec nous : sa voiture, en fantôme translucide, refait son parcours (<see cref="RaceGhost"/>).
     /// Chaque joueur court pour lui (rien ne passe par le réseau).
     /// </summary>
     public class Races : MonoBehaviour
@@ -180,6 +181,9 @@ namespace NoHesi
             public float best;
             public string bestCar;
             public float[] splits;
+            /// <summary>Parcours du record, rejoué en fantôme (null : pas de record) ; lu à la première course du tracé.</summary>
+            public RaceGhost.Run ghost;
+            public bool ghostLoaded;
 
             public bool Loop => laps > 1;
             public string Name => Loc.T(fr, en);
@@ -206,6 +210,9 @@ namespace NoHesi
         int next, shownBeat, teleports;
         float elapsed, countdown, goTimer, sinceGate, lostTimer, abandonHeld;
         Vector3 prevPos;
+        // Fantôme du record, et relevé de la course en cours (le prochain fantôme si le record tombe)
+        RaceGhost ghostFx;
+        RaceGhost.Run recording;
 
         // Sprint : longueur du parcours jusqu'à chaque point, et avancement (0-1, ne recule pas)
         float[] alongPath;
@@ -381,6 +388,8 @@ namespace NoHesi
                 t.best = 0f;
                 t.bestCar = "";
                 t.splits = null;
+                t.ghost = null;
+                RaceGhost.Run.Delete(t.id);
                 PlayerPrefs.DeleteKey(BestKey + t.id);
                 PlayerPrefs.DeleteKey(CarKey + t.id);
                 PlayerPrefs.DeleteKey(SplitsKey + t.id);
@@ -408,6 +417,7 @@ namespace NoHesi
             {
                 if (mode != Mode.Idle) Stop();
                 candidate = null;
+                ghostFx?.Hide();
                 UpdateGates(false);
                 UpdateHud(0f, false);
                 return;
@@ -423,6 +433,7 @@ namespace NoHesi
                 case Mode.Running: UpdateRace(car, pos, menu, dt); break;
             }
             UpdateGates(true);
+            UpdateGhost();
             UpdateHud(Time.unscaledDeltaTime, !menu);
         }
 
@@ -468,6 +479,12 @@ namespace NoHesi
             next = 0;
             elapsed = 0f;
             times = new float[t.GateCount];
+            recording = new RaceGhost.Run();
+            if (!t.ghostLoaded)
+            {
+                t.ghostLoaded = true;
+                t.ghost = t.best > 0f ? RaceGhost.Run.Load(t.id, t.best) ?? GhostFromSplits(t) : null;
+            }
             course.Clear();
             for (int lap = 0; lap < t.laps; lap++) course.AddRange(t.path);
             alongPath = new float[t.path.Count];
@@ -501,6 +518,7 @@ namespace NoHesi
             goTimer = 0.9f;
             prevPos = pos;
             teleports = car.TeleportCount;
+            recording.Record(0f, car.transform);
             game.Hud.Flash(Active.Tint, 0.18f);
             if (game.Local.Audio) game.Local.Audio.Chime();
         }
@@ -509,6 +527,7 @@ namespace NoHesi
         {
             elapsed += dt;
             sinceGate += dt;
+            recording.Record(elapsed, car.transform);
             // Replacement sur la route : pas de franchissement entre l'ancienne et la nouvelle position
             if (car.TeleportCount != teleports) { teleports = car.TeleportCount; prevPos = pos; }
             var g = GateOf(next);
@@ -616,6 +635,12 @@ namespace NoHesi
                 t.splits = (float[])times.Clone();
                 t.bestCar = game.Player.Spec != null ? game.Player.Spec.displayName : "";
                 Save(t);
+                // Le relevé de cette course devient le fantôme du tracé
+                recording.time = time;
+                recording.car = game.Player.Spec != null ? game.Player.Spec.id ?? "" : "";
+                recording.Save(t.id);
+                t.ghost = recording;
+                t.ghostLoaded = true;
             }
             resultTrack = t;
             resultTime = time;
@@ -648,7 +673,61 @@ namespace NoHesi
             announced = Active;     // pas d'annonce du départ que l'on vient de quitter (ligne d'une boucle)
             Active = null;
             goTimer = abandonHeld = 0f;
+            recording = null;
             if (game.Nav) game.Nav.ClearCourse();
+        }
+
+        /// <summary>Fantôme du record : sur la ligne pendant le décompte, puis à sa place de l'instant du chrono.</summary>
+        void UpdateGhost()
+        {
+            var run = Active != null ? Active.ghost : null;
+            if (run == null)
+            {
+                ghostFx?.Hide();
+                return;
+            }
+            ghostFx ??= new RaceGhost(transform, game);
+            ghostFx.Show(run, mode == Mode.Running ? elapsed : 0f, Time.unscaledDeltaTime);
+        }
+
+        /// <summary>
+        /// Fantôme d'un record sans relevé (établi avant les fantômes) : dans la voie du parcours, chaque porte franchie
+        /// à l'instant du record, à vitesse régulière d'une porte à l'autre ; la voiture du record si on la retrouve.
+        /// </summary>
+        RaceGhost.Run GhostFromSplits(Track t)
+        {
+            var path = t.path;
+            int n = path.Count;
+            var dist = new float[n];
+            for (int i = 1; i < n; i++) dist[i] = dist[i - 1] + Vector3.Distance(path[i - 1], path[i]);
+            float length = dist[n - 1];
+            int count = t.GateCount, per = t.gates.Length;
+            bool splits = t.splits != null && t.splits.Length == count;
+            // Repères (temps, distance depuis la ligne) : départ arrêté juste derrière la ligne, portes, arrivée
+            var keyT = new List<float> { 0f };
+            var keyD = new List<float> { -StartBack };
+            for (int k = 0; k < count; k++)
+            {
+                float at = k == count - 1 ? t.best : splits ? t.splits[k] : -1f;
+                if (at <= keyT[keyT.Count - 1]) continue;
+                keyT.Add(at);
+                keyD.Add(k / per * length + length * (k % per + 1) / per);
+            }
+            if (keyT.Count < 2) return null;
+
+            var run = new RaceGhost.Run { time = t.best };
+            foreach (var spec in game.assets.playerCars)
+                if (spec != null && spec.displayName == t.bestCar) { run.car = spec.id ?? ""; break; }
+            int seg = 1;
+            for (int s = 0; s / RaceGhost.Rate <= t.best; s++)
+            {
+                float time = s / RaceGhost.Rate;
+                while (seg < keyT.Count - 1 && time > keyT[seg]) seg++;
+                float d = Mathf.Lerp(keyD[seg - 1], keyD[seg], Mathf.InverseLerp(keyT[seg - 1], keyT[seg], time));
+                Vector3 p = PathAt(t, dist, d), dir = PathAt(t, dist, d + 2.5f) - PathAt(t, dist, d - 2.5f);
+                run.Add(p, dir.sqrMagnitude > 1e-4f ? Quaternion.LookRotation(dir, Vector3.up) : Quaternion.LookRotation(t.start.forward, Vector3.up));
+            }
+            return run.Count >= 2 ? run : null;
         }
 
         // ------------------------------------------------------------------ portes (monde)
