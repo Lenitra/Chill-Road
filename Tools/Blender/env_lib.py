@@ -60,6 +60,7 @@ CI = {n: i for i, n in enumerate(NAMES)}
 NCOL = len(PALETTE)
 PAL_W = 8
 ITEMS = {}
+SHARP_ANGLE = 40.0
 
 
 def reg(d):
@@ -287,10 +288,13 @@ def finish(geo, name, col, height=None):
     uv = bm.loops.layers.uv.verify()
     for f in bm.faces:
         u = (f[geo.col] + 0.5) / NCOL
-        f.smooth = False
+        f.smooth = True                 # style cartoon (2026-11-15) : normales lisses, arêtes vives > SHARP_ANGLE
         f.material_index = 0
         for lp in f.loops:
             lp[uv].uv = (u, min(0.99, max(0.01, (lp.vert.co.z - min(zmin, 0.0)) / max(top, 1e-3))))
+    lim = math.radians(SHARP_ANGLE)
+    for e in bm.edges:
+        e.smooth = len(e.link_faces) == 2 and e.calc_face_angle(0) <= lim
     me = bpy.data.meshes.new(name)
     me.materials.append(palette_material())
     bm.to_mesh(me)

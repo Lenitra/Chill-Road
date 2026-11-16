@@ -710,8 +710,13 @@ def resolve_coplanar(geo, tol=0.01, gap=0.022, skip_below=0.0, xlim=None, max_ar
     return len(_pairs_bm(bm, play, tol, skip_below))
 
 
-def finish(geo, name, col, grad_h=None, base=0.0, resolve=None):
-    """Objet final : triangles, UV (colonne de palette, hauteur relative), matériau AP_Palette, facettes à plat.
+SHARP_ANGLE = 40.0      # style cartoon (2026-11-15) : normales lisses, arêtes vives au-delà de cet angle
+
+
+def finish(geo, name, col, grad_h=None, base=0.0, resolve=None, sharp=SHARP_ANGLE):
+    """Objet final : triangles, UV (colonne de palette, hauteur relative), matériau AP_Palette.
+    Normales lisses (volumes arrondis : feuillages, troncs, rochers) avec arêtes vives au-delà de `sharp` degrés
+    (murs, toits, boîtes restent nets) ; sharp = None : facettes à plat (ancien style).
     resolve : paramètres de resolve_coplanar (None : pas de correction automatique du z-fighting)."""
     bm = geo.bm
     bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 3])
@@ -727,10 +732,14 @@ def finish(geo, name, col, grad_h=None, base=0.0, resolve=None):
     uv = bm.loops.layers.uv.verify()
     for f in bm.faces:
         u = (f[geo.col] + 0.5) / NCOL
-        f.smooth = False
+        f.smooth = sharp is not None
         f.material_index = 0
         for lp in f.loops:
             lp[uv].uv = (u, min(0.99, max(0.01, (lp.vert.co.z - base) / H)))
+    if sharp is not None:
+        lim = math.radians(sharp)
+        for e in bm.edges:
+            e.smooth = len(e.link_faces) == 2 and e.calc_face_angle(0) <= lim
     me = bpy.data.meshes.new(name)
     me.materials.append(palette_material())
     bm.to_mesh(me)
@@ -771,7 +780,7 @@ def build(iid):
         if l < 2 and not it.get("no_resolve"):
             rs = dict(skip_below=None if it.get("base", 0.0) < -0.5 or "hanging" in it.get("tags", []) else 0.0,
                       xlim=it["fp"][0] / 2 if it.get("cat") == "townhouse" else None)
-        _, n = finish(g, "%s_LOD%d" % (it["file"], l), col, gh, base, rs)
+        _, n = finish(g, "%s_LOD%d" % (it["file"], l), col, gh, base, rs, it.get("sharp", SHARP_ANGLE))
         it.setdefault("_left", {})[l] = g.left
         tris.append(n)
     for n, ob in enumerate(sorted(col.objects, key=lambda o: o.name)):

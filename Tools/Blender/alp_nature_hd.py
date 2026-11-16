@@ -63,8 +63,15 @@ def tube(g, pts, radii, n, color, cap_start=False, cap_end=True):
     return g.paint(faces, color)
 
 
+CARTOON = True      # style cartoon (2026-11-15) : boules plus lisses, calotte éclairée nette au lieu de facettes éparses
+
+
 def blob(g, c, r, sub, color, squash=1.0, seed=0, amp=0.16, top=None):
     """Boule de feuillage bosselée (icosphère déformée par un bruit stable). top : couleur des facettes du dessus."""
+    if CARTOON:
+        amp *= 0.45
+        if sub < 3 and r > 0.6:
+            sub += 1
     rr = random.Random(seed)
     k1 = Vector((rr.uniform(-1, 1), rr.uniform(-1, 1), rr.uniform(-1, 1))) * 3.0
     k2 = Vector((rr.uniform(-1, 1), rr.uniform(-1, 1), rr.uniform(-1, 1))) * 5.5
@@ -73,13 +80,13 @@ def blob(g, c, r, sub, color, squash=1.0, seed=0, amp=0.16, top=None):
     c = Vector(c)
     for v in {v for q in f for v in q.verts}:
         d = v.co.normalized()
-        k = 1.0 + amp * (0.6 * math.sin(d.dot(k1) + p1) + 0.4 * math.sin(d.dot(k2) + p2)) + rr.uniform(-0.04, 0.04)
+        k = 1.0 + amp * (0.6 * math.sin(d.dot(k1) + p1) + 0.4 * math.sin(d.dot(k2) + p2)) + rr.uniform(-0.04, 0.04) * (0.2 if CARTOON else 1.0)
         v.co = Vector((d.x * r * k, d.y * r * k, d.z * r * k * squash)) + c
     if top:
         ci = A.CI[top]
         for q in f:
             q.normal_update()
-            if q.normal.z > 0.55 and rr.random() < 0.6:
+            if (q.normal.z > 0.62) if CARTOON else (q.normal.z > 0.55 and rr.random() < 0.6):
                 q[g.col] = ci
     return f
 
@@ -322,11 +329,11 @@ def leafy(g, H, trunk_h, trunk_r, spread, colors, bark="bark", n_scaf=5, blob_r=
             # petites touffes sur le pourtour : cassent l'effet « boule », donnent le grain du feuillage
             out = (c - cc)
             out = out.normalized() if out.length > 1e-3 else Vector((0, 0, 1))
-            for j in range(sat if kind == 0 else max(2, sat - 2)):
+            for j in range((sat if kind == 0 else max(2, sat - 2)) // (2 if CARTOON else 1)):
                 d = Vector((rs.uniform(-1, 1), rs.uniform(-1, 1), rs.uniform(-0.6, 1))) + out * 0.9
                 d.normalize()
                 pc = c + Vector((d.x * r, d.y * r, d.z * r * squash)) * 0.86
-                blob(g, pc, r * rs.uniform(0.3, 0.44), 1, colors[(i * 7 + j + 1 + g.seed) % len(colors)], squash,
+                blob(g, pc, r * rs.uniform(0.3, 0.44), 2 if CARTOON else 1, colors[(i * 7 + j + 1 + g.seed) % len(colors)], squash,
                      g.seed * 1000 + i * 10 + j, amp * 1.3)
     elif L == 1:
         for i, (c, r, kind) in enumerate(blobs):
@@ -519,7 +526,11 @@ def rock(g, c, size, color="rock", seed=0, sub=2, block=0.7, strata=0.0, rot=0.0
         for q in f:
             q.normal_update()
             cm = q.calc_center_median()
-            if q.normal.z > 0.8 and q[g.col] != dk and g.h(round(cm.x, 1), round(cm.y, 1), seed) < moss_p:
+            if CARTOON:     # calotte de mousse d'un seul tenant, au bord ondulé (et non des facettes éparses)
+                wav = 0.12 * math.sin(cm.x * 1.7 + seed) + 0.10 * math.cos(cm.y * 2.1 + seed * 0.7)
+                if q.normal.z + wav > 1.0 - moss_p * 0.55 and q[g.col] != dk:
+                    q[g.col] = ci
+            elif q.normal.z > 0.8 and q[g.col] != dk and g.h(round(cm.x, 1), round(cm.y, 1), seed) < moss_p:
                 q[g.col] = ci
     return f
 
@@ -532,6 +543,17 @@ def boulders(g, parts, moss="moss"):
         big = max(s) > 2.0
         rock(g, c, s, col, g.seed * 10 + k, lv(g, 3, 2, 1) if big else lv(g, 2, 1, 1), 0.72, rot=k * 1.1,
              crack=1 if (L == 0 and big) else 0, moss=moss if L < 2 else None, moss_p=0.45)
+    if L == 0 and CARTOON:      # détail : cailloux éparpillés au pied des blocs
+        rs = random.Random(g.seed * 17 + 3)
+        c0, s0, _ = parts[0]
+        R = max(s0[0], s0[1]) * 0.55
+        for k in range(9):
+            a = rs.uniform(0, 6.283)
+            r = R * rs.uniform(1.0, 1.45)
+            sz = rs.uniform(0.12, 0.32) * (1.0 + R * 0.08)
+            rock(g, (c0[0] + math.cos(a) * r, c0[1] + math.sin(a) * r, sz * 0.18),
+                 (sz * rs.uniform(0.9, 1.3), sz, sz * 0.65), "rock_light" if k % 3 else "rock", g.seed * 100 + k, 1, 0.7,
+                 rot=a)
 
 
 override("boulder_a", lambda g: boulders(g, [((0, 0, 0.15), (2.9, 2.2, 2.2), "rock"), ((1.5, 0.7, 0.05), (1.1, 0.9, 0.8), "rock_light"),

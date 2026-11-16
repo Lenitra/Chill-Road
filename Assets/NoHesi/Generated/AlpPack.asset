@@ -349,7 +349,7 @@ MonoBehaviour:
     tags:
     - service
     prefab: {fileID: 919132149155446097, guid: 6246bbb433ada6b42a6eb1dd49d92d3e, type: 3}
-    size: {x: 17.93, y: 19.5, z: 16.46}
+    size: {x: 17.93, y: 19.52, z: 16.46}
     footprint: {x: 16, y: 11}
     collider: box
     radius: 0
@@ -362,7 +362,7 @@ MonoBehaviour:
     - service
     - fuel
     prefab: {fileID: 919132149155446097, guid: 39c542f23207800438641d13ee4699fd, type: 3}
-    size: {x: 16.81, y: 6.53, z: 14.86}
+    size: {x: 16.81, y: 6.53, z: 14.9}
     footprint: {x: 18, y: 16}
     collider: mesh
     radius: 0
@@ -377,7 +377,7 @@ MonoBehaviour:
     - service
     - shop
     prefab: {fileID: 919132149155446097, guid: 279533f2b902f294f924a77a45018b4b, type: 3}
-    size: {x: 24.44, y: 7.22, z: 21.4}
+    size: {x: 24.46, y: 7.24, z: 21.42}
     footprint: {x: 24, y: 16}
     collider: box
     radius: 0
@@ -454,7 +454,7 @@ MonoBehaviour:
     - ruin
     - viewpoint
     prefab: {fileID: 919132149155446097, guid: a31025d696088924ab91cc73bf2f1abe, type: 3}
-    size: {x: 20.53, y: 15.5, z: 14.38}
+    size: {x: 20.55, y: 15.5, z: 14.38}
     footprint: {x: 18, y: 9}
     collider: capsule
     radius: 4.3
@@ -466,7 +466,7 @@ MonoBehaviour:
     tags:
     - plaza
     prefab: {fileID: 919132149155446097, guid: 240bb875311ee4045aa65922fff3cbea, type: 3}
-    size: {x: 6.48, y: 9.02, z: 6.48}
+    size: {x: 6.48, y: 9.06, z: 6.48}
     footprint: {x: 5, y: 5}
     collider: box
     radius: 0
@@ -491,7 +491,7 @@ MonoBehaviour:
     tags:
     - plaza
     prefab: {fileID: 919132149155446097, guid: fc3640b747cf0264b93c5508627daab1, type: 3}
-    size: {x: 8.45, y: 7.2, z: 8.97}
+    size: {x: 8.5, y: 7.23, z: 9.02}
     footprint: {x: 7.6, y: 7.6}
     collider: mesh
     radius: 0
@@ -517,7 +517,7 @@ MonoBehaviour:
     - tower
     - summit
     prefab: {fileID: 919132149155446097, guid: ba463110edf63f946b6666b7008beb9f, type: 3}
-    size: {x: 10.47, y: 43, z: 8.48}
+    size: {x: 10.51, y: 43, z: 8.58}
     footprint: {x: 7.6, y: 5}
     collider: box
     radius: 0
@@ -529,7 +529,7 @@ MonoBehaviour:
     tags:
     - summit
     prefab: {fileID: 919132149155446097, guid: 2491723af92fb73419cc181ceff79cff, type: 3}
-    size: {x: 5.22, y: 5.73, z: 2.86}
+    size: {x: 5.25, y: 5.76, z: 2.88}
     footprint: {x: 3, y: 3}
     collider: capsule
     radius: 1
@@ -655,7 +655,7 @@ MonoBehaviour:
     tags:
     - fountain
     prefab: {fileID: 919132149155446097, guid: 143c447ef7e435745a32e4725c2618dd, type: 3}
-    size: {x: 3.38, y: 1.5, z: 1.02}
+    size: {x: 3.36, y: 1.5, z: 1.02}
     footprint: {x: 3, y: 1}
     collider: box
     radius: 0
@@ -679,8 +679,8 @@ MonoBehaviour:
     tags:
     - hay
     prefab: {fileID: 919132149155446097, guid: 2207e9c65283c844aa48822c506cde2a, type: 3}
-    size: {x: 2.13, y: 1.6, z: 1.72}
-    footprint: {x: 2.13, y: 1.72}
+    size: {x: 2.12, y: 1.6, z: 1.72}
+    footprint: {x: 2.12, y: 1.72}
     collider: box
     radius: 0
     module: 0
@@ -704,7 +704,7 @@ MonoBehaviour:
     - hay
     - farm
     prefab: {fileID: 919132149155446097, guid: e46bebaca574aa144bd1f06fe4ac4a9b, type: 3}
-    size: {x: 1.83, y: 2.55, z: 5.27}
+    size: {x: 1.8, y: 2.51, z: 5.24}
     footprint: {x: 1.8, y: 3.4}
     collider: box
     radius: 0
@@ -742,7 +742,7 @@ MonoBehaviour:
     - wall
     - linear
     prefab: {fileID: 919132149155446097, guid: 247a4ad7b17714e43b1cf82a66544ed6, type: 3}
-    size: {x: 4.18, y: 1.1, z: 0.74}
+    size: {x: 4.17, y: 1.09, z: 0.74}
     footprint: {x: 4, y: 0.6}
     collider: box
     radius: 0
@@ -1335,12 +1335,12 @@ MonoBehaviour:
     - info
     - summit
     prefab: {fileID: 919132149155446097, guid: 6349a2efaaccc1845a169babc2d3dd9c, type: 3}
-    size: {x: 3.32, y: 2.9, z: 1.55}
+    size: {x: 3.29, y: 2.9, z: 1.46}
     footprint: {x: 2.8, y: 1}
     collider: box
     radius: 0.06
     module: 0
-    ymin: -0.31
+    ymin: -0.28
     lights: []
   - id: road_barrier_closed
     category: sign
@@ -1613,7 +1613,7 @@ MonoBehaviour:
     - gallery
     - linear
     prefab: {fileID: 919132149155446097, guid: 3df172ba739ebf141b5d27452f8379a7, type: 3}
-    size: {x: 12.7, y: 7.71, z: 8.11}
+    size: {x: 12.7, y: 7.7, z: 8.21}
     footprint: {x: 12.6, y: 8}
     collider: mesh
     radius: 0
@@ -1768,20 +1768,20 @@ MonoBehaviour:
     tags:
     - rock
     prefab: {fileID: 919132149155446097, guid: eac55a86d59beba48aa89e69cea2166f, type: 3}
-    size: {x: 3.83, y: 1.29, z: 2.54}
-    footprint: {x: 3.83, y: 2.54}
+    size: {x: 4.48, y: 1.32, z: 4.1}
+    footprint: {x: 4.48, y: 4.1}
     collider: capsule
     radius: 1
     module: 0
-    ymin: -1.13
+    ymin: -1.1
     lights: []
   - id: boulder_b
     category: nature
     tags:
     - rock
     prefab: {fileID: 919132149155446097, guid: 9da349738e47a71498f3c005ce1fd4df, type: 3}
-    size: {x: 5.32, y: 1.96, z: 5.27}
-    footprint: {x: 5.32, y: 5.27}
+    size: {x: 5.64, y: 2.02, z: 6.64}
+    footprint: {x: 5.64, y: 6.64}
     collider: capsule
     radius: 1.7
     module: 0
@@ -1792,12 +1792,12 @@ MonoBehaviour:
     tags:
     - rock
     prefab: {fileID: 919132149155446097, guid: 4d33e8bd95503e5499cf8315518717c4, type: 3}
-    size: {x: 8.38, y: 3.7, z: 6.38}
-    footprint: {x: 8.38, y: 6.38}
+    size: {x: 8.38, y: 3.74, z: 8.81}
+    footprint: {x: 8.38, y: 8.81}
     collider: capsule
     radius: 2.4
     module: 0
-    ymin: -2.23
+    ymin: -2.27
     lights: []
   - id: spruce_young
     category: nature
@@ -1858,8 +1858,8 @@ MonoBehaviour:
     - tree
     - broadleaf
     prefab: {fileID: 919132149155446097, guid: b3499e570ee673e44aba42f939290617, type: 3}
-    size: {x: 8.69, y: 10.41, z: 8.22}
-    footprint: {x: 8.69, y: 8.22}
+    size: {x: 8.44, y: 10.11, z: 8.37}
+    footprint: {x: 8.44, y: 8.37}
     collider: capsule
     radius: 0.3
     module: 0
@@ -1871,8 +1871,8 @@ MonoBehaviour:
     - tree
     - broadleaf
     prefab: {fileID: 919132149155446097, guid: 0914d58ea1516604983fcdc0cdea895c, type: 3}
-    size: {x: 7.99, y: 14.52, z: 8.01}
-    footprint: {x: 7.99, y: 8.01}
+    size: {x: 7.87, y: 14, z: 7.7}
+    footprint: {x: 7.87, y: 7.7}
     collider: capsule
     radius: 0.38
     module: 0
@@ -1884,8 +1884,8 @@ MonoBehaviour:
     - tree
     - broadleaf
     prefab: {fileID: 919132149155446097, guid: 180afacc449c21f429294a8cbbf1441e, type: 3}
-    size: {x: 9.23, y: 8.36, z: 8.76}
-    footprint: {x: 9.23, y: 8.76}
+    size: {x: 9.17, y: 8.06, z: 9.28}
+    footprint: {x: 9.17, y: 9.28}
     collider: capsule
     radius: 0.3
     module: 0
@@ -1897,8 +1897,8 @@ MonoBehaviour:
     - tree
     - broadleaf
     prefab: {fileID: 919132149155446097, guid: 1c43a682b4ac0c24a871da6d08a17100, type: 3}
-    size: {x: 4.09, y: 9.32, z: 3.97}
-    footprint: {x: 4.09, y: 3.97}
+    size: {x: 3.92, y: 9.21, z: 3.9}
+    footprint: {x: 3.92, y: 3.9}
     collider: capsule
     radius: 0.15
     module: 0
@@ -1910,8 +1910,8 @@ MonoBehaviour:
     - tree
     - broadleaf
     prefab: {fileID: 919132149155446097, guid: 53eb36b2a819d8a458e747fb24881661, type: 3}
-    size: {x: 4.85, y: 12.21, z: 4.99}
-    footprint: {x: 4.85, y: 4.99}
+    size: {x: 4.84, y: 12.23, z: 5.08}
+    footprint: {x: 4.84, y: 5.08}
     collider: capsule
     radius: 0.18
     module: 0
@@ -1924,8 +1924,8 @@ MonoBehaviour:
     - broadleaf
     - tall
     prefab: {fileID: 919132149155446097, guid: 1d37ea84f2c96d0469d12f7bb747c011, type: 3}
-    size: {x: 4.2, y: 18.03, z: 4.31}
-    footprint: {x: 4.2, y: 4.31}
+    size: {x: 4.33, y: 18, z: 4.28}
+    footprint: {x: 4.33, y: 4.28}
     collider: capsule
     radius: 0.3
     module: 0
@@ -1938,8 +1938,8 @@ MonoBehaviour:
     - broadleaf
     - water
     prefab: {fileID: 919132149155446097, guid: 6d4760d419cfe8e4abff729134ee7737, type: 3}
-    size: {x: 8.53, y: 7.41, z: 8.08}
-    footprint: {x: 8.53, y: 8.08}
+    size: {x: 8.54, y: 7.49, z: 8.1}
+    footprint: {x: 8.54, y: 8.1}
     collider: capsule
     radius: 0.4
     module: 0
@@ -1950,12 +1950,12 @@ MonoBehaviour:
     tags:
     - rock
     prefab: {fileID: 919132149155446097, guid: 2d616dfc474fa4e479c25654cfb10290, type: 3}
-    size: {x: 4.2, y: 0.84, z: 2.89}
-    footprint: {x: 4.2, y: 2.89}
+    size: {x: 4.22, y: 0.8, z: 2.88}
+    footprint: {x: 4.22, y: 2.88}
     collider: capsule
     radius: 1.3
     module: 0
-    ymin: -0.67
+    ymin: -0.65
     lights: []
   - id: cliff_a
     category: nature
@@ -1963,12 +1963,12 @@ MonoBehaviour:
     - rock
     - cliff
     prefab: {fileID: 919132149155446097, guid: 6bd19ae3c7da6c740a300fbef9e3f960, type: 3}
-    size: {x: 12.73, y: 7.89, z: 8.3}
-    footprint: {x: 12.73, y: 8.3}
+    size: {x: 12.75, y: 8.07, z: 8.33}
+    footprint: {x: 12.75, y: 8.33}
     collider: capsule
     radius: 4
     module: 0
-    ymin: -5.05
+    ymin: -5.04
     lights: []
   - id: cliff_b
     category: nature
@@ -1977,12 +1977,12 @@ MonoBehaviour:
     - cliff
     - large
     prefab: {fileID: 919132149155446097, guid: 40f955e535b92eb43b7120a123f7c852, type: 3}
-    size: {x: 19.79, y: 12.03, z: 9.51}
-    footprint: {x: 19.79, y: 9.51}
+    size: {x: 19.74, y: 12.05, z: 9.33}
+    footprint: {x: 19.74, y: 9.33}
     collider: capsule
     radius: 6
     module: 0
-    ymin: -4.6
+    ymin: -4.46
     lights: []
   - id: cliff_c
     category: nature
@@ -1991,12 +1991,12 @@ MonoBehaviour:
     - cliff
     - pinnacle
     prefab: {fileID: 919132149155446097, guid: 672e25453efebb74fb8f8906728e1188, type: 3}
-    size: {x: 10.96, y: 16.73, z: 7.51}
-    footprint: {x: 10.96, y: 7.51}
+    size: {x: 10.89, y: 16.68, z: 7.57}
+    footprint: {x: 10.89, y: 7.57}
     collider: capsule
     radius: 3.4
     module: 0
-    ymin: -4.18
+    ymin: -4.32
     lights: []
   - id: scree
     category: nature
@@ -2016,7 +2016,7 @@ MonoBehaviour:
     tags:
     - snow
     prefab: {fileID: 919132149155446097, guid: 219ce8d722631d34686ad4f458025419, type: 3}
-    size: {x: 8.93, y: 0.28, z: 5.6}
+    size: {x: 8.93, y: 0.29, z: 5.6}
     footprint: {x: 8.93, y: 5.6}
     collider: none
     radius: 0
