@@ -19,7 +19,8 @@ namespace NoHesi
     /// puis il faut franchir les portes dans l'ordre, dans le sens de la course. Une porte n'a rien de solide : une
     /// ligne de lumière posée sur la route, deux projecteurs de bas-côté et leur fumée (<see cref="GateFx"/>). Le GPS affiche le parcours (ruban sur
     /// la route, minicarte). À l'arrivée, le temps est comparé au record personnel du tracé, gardé avec ses temps de
-    /// passage : à chaque porte, l'écart au record s'affiche.
+    /// passage : à chaque porte, l'écart au record s'annonce en haut au centre (<see cref="Hud.Announce"/>).
+    /// Pendant la course, le cadre en haut à droite ne montre que l'avancement (pourcentage du sprint, ou tour) et le chrono.
     /// Chaque joueur court pour lui (rien ne passe par le réseau).
     /// </summary>
     public class Races : MonoBehaviour
@@ -132,11 +133,15 @@ namespace NoHesi
         float elapsed, countdown, goTimer, sinceGate, lostTimer, abandonHeld;
         Vector3 prevPos;
 
-        // Dernier écart au record affiché, et résultat de la dernière course (quelques secondes après l'arrivée)
-        float deltaTimer, deltaValue;
+        // Sprint : longueur du parcours jusqu'à chaque point, et avancement (0-1, ne recule pas)
+        float[] alongPath;
+        float progress;
+        // Départ déjà annoncé en approchant (une fois par passage)
+        Track announced;
+        // Résultat de la dernière course (quelques secondes après l'arrivée)
         Track resultTrack;
-        float resultTimer, resultTime, resultDelta;
-        bool resultRecord, resultHasDelta;
+        float resultTimer, resultTime;
+        bool resultRecord;
 
         /// <summary>Tous les tracés (vide tant que la carte n'est pas chargée).</summary>
         public IReadOnlyList<Track> All { get { Load(); return tracks ?? None; } }
@@ -332,7 +337,7 @@ namespace NoHesi
             UpdateHud(Time.unscaledDeltaTime, !menu);
         }
 
-        /// <summary>Balade : propose la course quand on s'arrête sur un départ.</summary>
+        /// <summary>Balade : annonce le départ dont on approche, et propose la course quand on s'y arrête.</summary>
         void UpdateIdle(VehicleController car, Vector3 pos, bool menu)
         {
             Track near = null;
@@ -345,6 +350,16 @@ namespace NoHesi
                 if (d.magnitude < best) { best = d.magnitude; near = t; }
             }
             candidate = near != null && best < StartRadius && car.Speed < StartSpeed && !menu ? near : null;
+            if (near != null && best < 140f)
+            {
+                if (near != announced && !menu && candidate == null)
+                {
+                    announced = near;
+                    string hint = Loc.T("arrête-toi au départ", "stop at the start");
+                    game.Hud.Announce(near.Kind + "  ·  " + near.Name.ToUpperInvariant(), Loc.F($"{near.Distance / 1000f:0.0} km  ·  {hint}"), near.Tint, 3f);
+                }
+            }
+            else if (best > 220f) announced = null;
             if (candidate != null && GameInput.InteractPressed) Begin(candidate);
         }
 
@@ -355,8 +370,9 @@ namespace NoHesi
             Active = t;
             mode = Mode.Countdown;
             candidate = null;
+            announced = t;
             resultTimer = 0f;
-            deltaTimer = 0f;
+            progress = 0f;
             countdown = Beat * 3f;
             shownBeat = 0;
             next = 0;
@@ -364,6 +380,8 @@ namespace NoHesi
             times = new float[t.GateCount];
             course.Clear();
             for (int lap = 0; lap < t.laps; lap++) course.AddRange(t.path);
+            alongPath = new float[t.path.Count];
+            for (int i = 1; i < t.path.Count; i++) alongPath[i] = alongPath[i - 1] + Flat(t.path[i] - t.path[i - 1]);
             var car = game.Player;
             Vector3 f = t.start.forward;
             Vector3 p = t.path[0] - f * StartBack + Vector3.up * 0.5f;
@@ -418,6 +436,7 @@ namespace NoHesi
                 }
             }
             prevPos = pos;
+            if (!Active.Loop) progress = Mathf.Max(progress, SprintProgress(pos));
 
             // Abandon : touche maintenue, magasin ouvert, parcours quitté pour de bon ou plus aucune porte franchie
             if (Dealership.IsOpen || TuningGarage.IsOpen) { Abandon(); return; }
@@ -429,6 +448,29 @@ namespace NoHesi
         }
 
         static float Flat(Vector3 v) => new Vector2(v.x, v.z).magnitude;
+
+        /// <summary>Sprint : part du parcours déjà couverte (0-1), point le plus proche entre la dernière porte et la suivante.</summary>
+        float SprintProgress(Vector3 pos)
+        {
+            var path = Active.path;
+            float total = alongPath[alongPath.Length - 1];
+            if (path.Count < 2 || total <= 0f) return 0f;
+            int lo = Mathf.Clamp(next > 0 ? GateOf(next - 1).index - 1 : 0, 0, path.Count - 2);
+            int hi = Mathf.Clamp(GateOf(next).index, lo, path.Count - 2);
+            float bestDist = float.MaxValue, along = 0f;
+            for (int i = lo; i <= hi; i++)
+            {
+                Vector3 a = path[i], ab = path[i + 1] - a;
+                ab.y = 0f;
+                float len = ab.magnitude;
+                Vector3 ap = pos - a;
+                ap.y = 0f;
+                float k = len > 0.01f ? Mathf.Clamp(Vector3.Dot(ap, ab) / len, 0f, len) : 0f;
+                float d = (ap - (len > 0.01f ? ab / len * k : Vector3.zero)).sqrMagnitude;
+                if (d < bestDist) { bestDist = d; along = alongPath[i] + k; }
+            }
+            return Mathf.Clamp01(along / total);
+        }
 
         static bool AbandonKey
         {
@@ -446,12 +488,20 @@ namespace NoHesi
         {
             var t = Active;
             times[next] = time;
-            bool compare = t.splits != null && t.splits.Length == times.Length;
-            if (compare) { deltaValue = time - t.splits[next]; deltaTimer = 4f; }
             if (next == times.Length - 1) { Finish(time); return; }
+            // Écart au record à ce point de passage (le temps tout court tant qu'il n'y a pas de record) ; nouveau tour
+            int perLap = t.gates.Length;
+            string what = t.Loop && (next + 1) % perLap == 0
+                ? ((next + 1) / perLap == t.laps - 1 ? Loc.T("DERNIER TOUR", "FINAL LAP") : Loc.F($"TOUR {(next + 1) / perLap + 1}/{t.laps}", $"LAP {(next + 1) / perLap + 1}/{t.laps}"))
+                : Loc.T("POINT DE PASSAGE", "CHECKPOINT");
+            if (t.splits != null && t.splits.Length == times.Length)
+            {
+                float delta = time - t.splits[next];
+                game.Hud.Announce(Delta(delta), what + "  ·  " + Clock(time), delta <= 0f ? Good : Bad, 2.4f);
+            }
+            else game.Hud.Announce(Clock(time), what, White, 2.4f);
             int passed = next++;
             sinceGate = 0f;
-            int perLap = t.gates.Length;
             game.Hud.Flash(t.Tint, 0.1f);
             if (game.Local.Audio) game.Local.Audio.Chime();
             // Le GPS ne garde que ce qu'il reste à parcourir
@@ -473,9 +523,10 @@ namespace NoHesi
             resultTrack = t;
             resultTime = time;
             resultRecord = record;
-            resultHasDelta = old > 0f;
-            resultDelta = time - old;
             resultTimer = 9f;
+            string finish = Loc.T("ARRIVÉE  ·  ", "FINISH  ·  ") + Clock(time);
+            if (record) game.Hud.Announce(Loc.T("NOUVEAU RECORD", "NEW BEST TIME"), finish + (old > 0f ? "  ·  " + Delta(time - old) : ""), Good, 4f);
+            else game.Hud.Announce(Delta(time - old), finish, Bad, 4f);
             game.Hud.Flash(record ? Good : t.Tint, 0.3f);
             game.Camera.Shake(0.25f);
             if (game.Local.Audio) game.Local.Audio.Chime();
@@ -485,6 +536,7 @@ namespace NoHesi
 
         void Abandon()
         {
+            game.Hud.Announce(Loc.T("COURSE ABANDONNÉE", "RACE ABANDONED"), "", Bad, 2.4f);
             Stop();
         }
 
@@ -493,6 +545,7 @@ namespace NoHesi
         {
             if (mode == Mode.Countdown && !(game.Hud && game.Hud.Paused)) game.SetInputEnabled(true);
             mode = Mode.Idle;
+            announced = Active;     // pas d'annonce du départ que l'on vient de quitter (ligne d'une boucle)
             Active = null;
             goTimer = abandonHeld = 0f;
             if (game.Nav) game.Nav.ClearCourse();
@@ -895,7 +948,7 @@ namespace NoHesi
         RectTransform hudRoot;
         CanvasGroup panelGroup, promptGroup, countGroup;
         HudShape panelStripe, promptStripe;
-        Text titleText, timeText, progressText, recordText, deltaText, abandonText, countText, promptTitle, promptDetail;
+        Text progressText, timeText, abandonText, countText, promptTitle, promptDetail;
         RectTransform abandonFill;
 
         void BuildHud()
@@ -911,25 +964,21 @@ namespace NoHesi
             scaler.matchWidthOrHeight = 0.5f;
             hudRoot = (RectTransform)go.transform;
 
-            // Chrono : haut droite, sous le lieu-dit ; textes calés à droite, liseré de la couleur du tracé
+            // Haut droite : avancement en grand (pourcentage du sprint, ou tour), chrono en dessous ; liseré de la couleur du tracé
             var corner = new Vector2(1f, 1f);
-            var panel = Box(hudRoot, "Timer", corner, new Vector2(-26f, -128f), new Vector2(500f, 168f));
+            var panel = Box(hudRoot, "Timer", corner, new Vector2(-26f, -28f), new Vector2(250f, 100f));
             panel.pivot = corner;
             panelGroup = panel.gameObject.AddComponent<CanvasGroup>();
             panelGroup.alpha = 0f;
             panelGroup.blocksRaycasts = panelGroup.interactable = false;
-            Shape(panel, "Plate", new Vector2(1f, 0.5f), Vector2.zero, new Vector2(500f, 168f), Plate).Set(16f, 190f, 0f);
-            panelStripe = Shape(panel, "Stripe", new Vector2(1f, 0.5f), Vector2.zero, new Vector2(6f, 168f), SprintTint);
+            Shape(panel, "Plate", new Vector2(1f, 0.5f), Vector2.zero, new Vector2(250f, 100f), Plate).Set(16f, 120f, 0f);
+            panelStripe = Shape(panel, "Stripe", new Vector2(1f, 0.5f), Vector2.zero, new Vector2(6f, 100f), SprintTint);
             panelStripe.Set(16f, 0f, 0f);
-            titleText = Label(panel, 22, TextAnchor.UpperRight, White, corner, new Vector2(-24f, -10f), new Vector2(470f, 28f), FontStyle.BoldAndItalic);
-            timeText = Label(panel, 62, TextAnchor.UpperRight, White, corner, new Vector2(-24f, -32f), new Vector2(470f, 70f), FontStyle.BoldAndItalic);
-            // Écart au record : à gauche du temps
-            deltaText = Label(panel, 30, TextAnchor.UpperRight, Good, corner, new Vector2(-285f, -58f), new Vector2(200f, 36f), FontStyle.BoldAndItalic);
-            progressText = Label(panel, 22, TextAnchor.UpperRight, White, corner, new Vector2(-24f, -104f), new Vector2(470f, 28f), FontStyle.Bold);
-            recordText = Label(panel, 20, TextAnchor.UpperRight, Dim, corner, new Vector2(-24f, -134f), new Vector2(470f, 26f), FontStyle.Normal);
+            progressText = Label(panel, 48, TextAnchor.UpperRight, White, corner, new Vector2(-22f, -4f), new Vector2(230f, 56f), FontStyle.BoldAndItalic);
+            timeText = Label(panel, 24, TextAnchor.UpperRight, new Color(1f, 1f, 1f, 0.85f), corner, new Vector2(-22f, -62f), new Vector2(230f, 30f), FontStyle.Bold);
             // Abandon : rappel de la touche au départ, jauge pendant l'appui
-            abandonText = Label(panel, 17, TextAnchor.UpperRight, Dim, corner, new Vector2(-24f, -176f), new Vector2(470f, 22f), FontStyle.Normal);
-            var bar = Box(panel, "AbandonBar", corner, new Vector2(-24f, -202f), new Vector2(200f, 4f));
+            abandonText = Label(panel, 16, TextAnchor.UpperRight, Dim, corner, new Vector2(-22f, -108f), new Vector2(470f, 22f), FontStyle.Normal);
+            var bar = Box(panel, "AbandonBar", corner, new Vector2(-22f, -134f), new Vector2(200f, 4f));
             bar.pivot = corner;
             bar.gameObject.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.14f);
             abandonFill = Box(bar, "Fill", new Vector2(1f, 0.5f), Vector2.zero, new Vector2(200f, 4f));
@@ -980,22 +1029,17 @@ namespace NoHesi
 
             // Chrono : pendant la course, puis le résultat quelques secondes
             if (resultTimer > 0f) resultTimer -= dt;
-            if (deltaTimer > 0f) deltaTimer -= dt;
             var shown = Active ?? (resultTimer > 0f ? resultTrack : null);
             panelGroup.alpha = Mathf.MoveTowards(panelGroup.alpha, shown != null ? 1f : 0f, dt * 5f);
             if (Active != null)
             {
                 var t = Active;
-                int perLap = t.gates.Length;
-                panelStripe.color = titleText.color = t.Tint;
-                titleText.text = t.Kind + "  ·  " + t.Name.ToUpperInvariant();
+                panelStripe.color = t.Tint;
+                progressText.color = White;
+                progressText.text = t.Loop
+                    ? Loc.F($"TOUR {Mathf.Min(next / t.gates.Length + 1, t.laps)}/{t.laps}", $"LAP {Mathf.Min(next / t.gates.Length + 1, t.laps)}/{t.laps}")
+                    : Loc.F($"{Mathf.FloorToInt(progress * 100f)} %", $"{Mathf.FloorToInt(progress * 100f)}%");
                 timeText.text = Clock(mode == Mode.Running ? elapsed : 0f);
-                timeText.color = White;
-                string points = Loc.F($"PORTE {next}/{times.Length}", $"GATE {next}/{times.Length}");
-                progressText.text = t.Loop ? Loc.F($"TOUR {next / perLap + 1}/{t.laps}   ·   ", $"LAP {next / perLap + 1}/{t.laps}   ·   ") + points : points;
-                recordText.text = t.best > 0f ? Loc.T("RECORD  ", "BEST  ") + Clock(t.best) : Loc.T("PAS ENCORE DE RECORD", "NO BEST TIME YET");
-                deltaText.text = deltaTimer > 0f ? Delta(deltaValue) : "";
-                deltaText.color = deltaValue <= 0f ? Good : Bad;
                 // Rappel de la touche d'abandon au départ, puis seulement pendant l'appui
                 bool hint = mode == Mode.Running && !TouchInput.Showing && (elapsed < 7f || abandonHeld > 0f);
                 abandonText.text = !hint ? "" : GameInput.UsingGamepad ? Loc.T("Maintenir X : abandonner", "Hold X: abandon")
@@ -1005,16 +1049,10 @@ namespace NoHesi
             }
             else if (shown != null)
             {
-                panelStripe.color = titleText.color = shown.Tint;
-                titleText.text = Loc.T("ARRIVÉE  ·  ", "FINISH  ·  ") + shown.Name.ToUpperInvariant();
+                panelStripe.color = shown.Tint;
+                progressText.text = Loc.T("ARRIVÉE", "FINISH");
+                progressText.color = resultRecord ? Good : White;
                 timeText.text = Clock(resultTime);
-                timeText.color = resultRecord ? Good : White;
-                progressText.text = resultRecord ? Loc.T("NOUVEAU RECORD", "NEW BEST TIME") : "";
-                recordText.text = resultRecord
-                    ? (resultHasDelta ? Loc.T("ANCIEN RECORD  ", "PREVIOUS BEST  ") + Clock(resultTime - resultDelta) : "")
-                    : Loc.T("RECORD  ", "BEST  ") + Clock(shown.best);
-                deltaText.text = resultHasDelta ? Delta(resultDelta) : "";
-                deltaText.color = resultDelta <= 0f ? Good : Bad;
                 abandonText.text = "";
                 abandonFill.parent.gameObject.SetActive(false);
             }

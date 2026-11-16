@@ -69,6 +69,11 @@ namespace NoHesi
         RectTransform feedRt;
         const int FeedLines = 3;
         const float FeedStep = 24f, FeedTime = 1.6f;
+        // Annonces (haut centre, sous le combo) : titre en couleur et détail discret (écart au record, cascades…)
+        RectTransform announceRt;
+        CanvasGroup announceGroup;
+        Text announceTitle, announceDetail;
+        float announceTimer, announceTime;
         int walletSlide = -1;
         static readonly Vector2 WalletHome = new Vector2(26f, -84f);        // sous l'heure
         static readonly Vector2 WalletTouchHome = new Vector2(338f, -30f);  // à droite du bouton pause tactile
@@ -253,6 +258,18 @@ namespace NoHesi
                 t.supportRichText = true;
                 feed.Add(new FeedLine { rt = rt, group = group, text = t });
             }
+
+            // Annonces : sous le combo et ses lignes de gains
+            announceRt = Rect(canvas, "Announce", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
+            announceRt.pivot = new Vector2(0.5f, 1f);
+            announceRt.sizeDelta = new Vector2(1000f, 72f);
+            announceRt.anchoredPosition = new Vector2(0f, -192f);
+            announceGroup = announceRt.gameObject.AddComponent<CanvasGroup>();
+            announceGroup.alpha = 0f;
+            announceGroup.blocksRaycasts = false;
+            announceTitle = Label(announceRt, "", 36, TextAnchor.UpperCenter, White, new Vector2(0.5f, 1f), Vector2.zero, new Vector2(1000f, 44f), FontStyle.BoldAndItalic);
+            Outline(announceTitle, new Color(0f, 0f, 0f, 0.35f), 1.5f);
+            announceDetail = Label(announceRt, "", 19, TextAnchor.UpperCenter, new Color(1f, 1f, 1f, 0.82f), new Vector2(0.5f, 1f), new Vector2(0f, -44f), new Vector2(1000f, 26f), FontStyle.Bold);
         }
 
         void BuildClock()
@@ -461,6 +478,15 @@ namespace NoHesi
                 line.rt.anchoredPosition = new Vector2(0f, y);
             }
             float feedY = combo && score.Oncoming ? -100f : -76f;
+            // Annonce : arrive en grand puis se pose, reste, s'efface
+            if (announceTimer > 0f)
+            {
+                announceTimer = Mathf.Max(0f, announceTimer - dt);
+                float shown = announceTime - announceTimer;
+                announceGroup.alpha = Mathf.Min(Mathf.Clamp01(shown / 0.12f), Mathf.Clamp01(announceTimer / 0.5f));
+                announceRt.localScale = Vector3.one * Mathf.Lerp(1.12f, 1f, 1f - (1f - Mathf.Clamp01(shown / 0.2f)) * (1f - Mathf.Clamp01(shown / 0.2f)));
+            }
+            else announceGroup.alpha = 0f;
             feedRt.anchoredPosition = new Vector2(0f, Mathf.Lerp(feedRt.anchoredPosition.y, feedY, 1f - Mathf.Exp(-dt * 12f)));
 
             // Heure (icône soleil ou lune)
@@ -630,10 +656,10 @@ namespace NoHesi
         void Feed(string label, float pts) => Feed(label, "+" + Wallet.Format(pts), Accent);
 
         /// <summary>
-        /// Ligne discrète sous le combo (gains, cascades) : libellé, puis une valeur en couleur (facultative).
+        /// Ligne discrète sous le combo : libellé, puis une valeur en couleur (facultative).
         /// Prend la place en haut ; les précédentes descendent, la plus ancienne disparaît.
         /// </summary>
-        public void Feed(string label, string value, Color valueColor, float time = FeedTime)
+        void Feed(string label, string value, Color valueColor, float time = FeedTime)
         {
             if (feed.Count == 0) return;
             var line = feed[feed.Count - 1];
@@ -642,6 +668,18 @@ namespace NoHesi
             line.text.text = string.IsNullOrEmpty(value) ? label : $"{label}   <color=#{ColorUtility.ToHtmlStringRGB(valueColor)}>{value}</color>";
             line.timer = line.time = time;
             line.rt.anchoredPosition = Vector2.zero;
+        }
+
+        /// <summary>
+        /// Annonce en haut au centre (titres et annonces : écart au record, course, cascades…) : titre dans la couleur
+        /// donnée, détail discret en dessous (facultatif). Remplace l'annonce en cours.
+        /// </summary>
+        public void Announce(string title, string detail, Color color, float time = 2.6f)
+        {
+            announceTitle.text = title;
+            announceTitle.color = color;
+            announceDetail.text = detail ?? "";
+            announceTimer = announceTime = time;
         }
 
         public void Flash(Color c, float alpha)
