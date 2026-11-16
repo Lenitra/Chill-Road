@@ -56,6 +56,13 @@ namespace NoHesi
             public Vector2[] points;
             /// <summary>Côté de l'étiquette du départ sur la carte globale : -1 à gauche du repère, 0 au-dessus, 1 à droite.</summary>
             public int side;
+            /// <summary>
+            /// Sprint : nom du même tracé couru dans l'autre sens (de l'arrivée au départ). Donné, le sprint se court
+            /// dans les deux sens : deux tracés, un départ à chaque bout, chacun son record (id + « _r »).
+            /// </summary>
+            public string fr2, en2;
+            /// <summary>Côté de l'étiquette du départ à rebours sur la carte globale.</summary>
+            public int side2 = 1;
         }
 
         static readonly Def[] Defs =
@@ -63,7 +70,7 @@ namespace NoHesi
             // Sprint : la route du col depuis Le Plan, du pied de la montée jusque sous le col (≈ 3,4 km, 250 m de dénivelé)
             new Def
             {
-                id = "col", fr = "Montée du Col", en = "Pass Hill Climb", laps = 1, spacing = 500f, heading = new Vector2(-0.1f, 1f), side = -1,
+                id = "col", fr = "Montée du Col", en = "Pass Hill Climb", laps = 1, spacing = 500f, heading = new Vector2(-0.1f, 1f), side = -1, fr2 = "Descente du Col", en2 = "Pass Descent", side2 = -1,
                 points = new[] { new Vector2(-35.8f, -1717.1f), new Vector2(118.7f, 243.3f) },
             },
             // Tours : départ sur la route de la vallée au bord du lac, vers Les Granges ; retour par l'autoroute et son
@@ -78,48 +85,48 @@ namespace NoHesi
             // Sprint : la route de la station des Combes, de La Chenal au front de neige (≈ 3 km, haut enneigé)
             new Def
             {
-                id = "station", fr = "Montée des Combes", en = "Les Combes Climb", spacing = 500f, heading = new Vector2(0.23f, 0.97f), side = 1,
+                id = "station", fr = "Montée des Combes", en = "Les Combes Climb", spacing = 500f, heading = new Vector2(0.23f, 0.97f), side = 1, fr2 = "Descente des Combes", en2 = "Les Combes Descent", side2 = -1,
                 points = new[] { new Vector2(-1679.8f, 165.6f), new Vector2(-1107.3f, 116.4f) },
             },
             // Sprint : la route de balcon, du Plan aux Granges par Les Hauts et Les Moulins (≈ 6,6 km)
             new Def
             {
-                id = "balcon", fr = "Route du Balcon", en = "Balcony Road", spacing = 650f, heading = new Vector2(-0.97f, -0.23f), side = 1,
+                id = "balcon", fr = "Route du Balcon", en = "Balcony Road", spacing = 650f, heading = new Vector2(-0.97f, -0.23f), side = 1, fr2 = "Balcon à rebours", en2 = "Balcony Road Reversed", side2 = -1,
                 points = new[] { new Vector2(124.5f, -1631.9f), new Vector2(841.2f, -865.6f), new Vector2(1494.0f, 131.7f), new Vector2(1618.0f, -246.3f) },
             },
             // Sprint : la route du col par l'est, des Granges au col (≈ 3,2 km)
             new Def
             {
-                id = "col_est", fr = "Col par l'Est", en = "East Pass Climb", spacing = 500f, heading = new Vector2(-0.94f, -0.35f), side = -1,
+                id = "col_est", fr = "Col par l'Est", en = "East Pass Climb", spacing = 500f, heading = new Vector2(-0.94f, -0.35f), side = -1, fr2 = "Descente de l'Est", en2 = "East Descent", side2 = 1,
                 points = new[] { new Vector2(1825.6f, 120.8f), new Vector2(1180.4f, 298.3f), new Vector2(298.2f, 420.8f) },
             },
             // Sprint : descente du col vers Praz-Dessus (≈ 2 km)
             new Def
             {
-                id = "col_nord", fr = "Descente du Nord", en = "North Descent", spacing = 400f, heading = new Vector2(-0.14f, 0.99f), side = 1,
+                id = "col_nord", fr = "Descente du Nord", en = "North Descent", spacing = 400f, heading = new Vector2(-0.14f, 0.99f), side = 1, fr2 = "Col par le Nord", en2 = "North Pass Climb", side2 = -1,
                 points = new[] { new Vector2(122.2f, 578.8f), new Vector2(205.1f, 1680.0f) },
             },
             // Sprint : l'autoroute par l'échangeur des Granges et le tunnel du nord-est, sortie à Praz-Dessus (≈ 4,5 km)
             new Def
             {
-                id = "tunnel", fr = "Tunnel du Nord-Est", en = "North-East Tunnel", spacing = 700f, heading = new Vector2(0.94f, 0.34f), side = 1,
+                id = "tunnel", fr = "Tunnel du Nord-Est", en = "North-East Tunnel", spacing = 700f, heading = new Vector2(0.94f, 0.34f), side = 1, fr2 = "Tunnel du Nord-Est, retour", en2 = "North-East Tunnel Return", side2 = 1,
                 points = new[] { new Vector2(1896.4f, -117.5f), new Vector2(1992.9f, 1698.5f), new Vector2(332.0f, 1948.0f) },
             },
             // Sprints sur la terre : piste du Petit Pas (≈ 1,7 km, lacets), piste du Villard (≈ 1,7 km), route puis chemin
             // des Chalets (≈ 2,2 km)
             new Def
             {
-                id = "petit_pas", fr = "Piste du Petit Pas", en = "Petit Pas Trail", spacing = 400f, heading = new Vector2(-0.45f, 0.89f), side = -1,
+                id = "petit_pas", fr = "Piste du Petit Pas", en = "Petit Pas Trail", spacing = 400f, heading = new Vector2(-0.45f, 0.89f), side = -1, fr2 = "Descente du Petit Pas", en2 = "Petit Pas Descent", side2 = 1,
                 points = new[] { new Vector2(1731.0f, 1545.0f), new Vector2(1353.9f, 1124.5f) },
             },
             new Def
             {
-                id = "villard", fr = "Piste du Villard", en = "Villard Trail", spacing = 400f, heading = new Vector2(-0.27f, -0.96f), side = 1,
+                id = "villard", fr = "Piste du Villard", en = "Villard Trail", spacing = 400f, heading = new Vector2(-0.27f, -0.96f), side = 1, fr2 = "Descente du Villard", en2 = "Villard Descent", side2 = 1,
                 points = new[] { new Vector2(-1691.2f, -772.7f), new Vector2(-1403.5f, -805.5f) },
             },
             new Def
             {
-                id = "chalets", fr = "Chemin des Chalets", en = "Chalets Track", spacing = 450f, heading = new Vector2(0.88f, 0.48f), side = 1,
+                id = "chalets", fr = "Chemin des Chalets", en = "Chalets Track", spacing = 450f, heading = new Vector2(0.88f, 0.48f), side = 1, fr2 = "Chalets, retour", en2 = "Chalets Track Return", side2 = 0,
                 points = new[] { new Vector2(347.6f, 2353.4f), new Vector2(-37.8f, 2509.7f), new Vector2(-435.8f, 2490.1f) },
             },
             // Tours : route du lac jusqu'aux Rives, retour par le chemin des Bois (terre) et l'échangeur sud (≈ 3,7 km)
@@ -240,21 +247,33 @@ namespace NoHesi
             tracks = new List<Track>();
             foreach (var def in Defs)
             {
-                var t = Build(def);
+                var t = Build(def, false, new Vector3(def.heading.x, 0f, def.heading.y));
                 if (t != null) tracks.Add(t);
                 else Debug.LogWarning($"[Races] Tracé « {def.id} » introuvable sur le réseau routier");
+                if (t == null || t.Loop || string.IsNullOrEmpty(def.fr2)) continue;
+                // Sprint dans l'autre sens : départ à l'arrivée, cap opposé à celui de l'arrivée
+                Vector3 back = t.path[Mathf.Max(0, t.path.Count - 8)] - t.Finish;
+                back.y = 0f;
+                var r = Build(def, true, back);
+                if (r != null) tracks.Add(r);
+                else Debug.LogWarning($"[Races] Tracé « {def.id} » à rebours introuvable sur le réseau routier");
             }
         }
 
-        Track Build(Def def)
+        Track Build(Def def, bool reverse, Vector3 heading)
         {
-            var t = new Track { id = def.id, fr = def.fr, en = def.en, laps = Mathf.Max(1, def.laps), side = def.side };
-            Vector3 heading = new Vector3(def.heading.x, 0f, def.heading.y).normalized;
-            int n = def.points.Length;
+            var t = reverse
+                ? new Track { id = def.id + "_r", fr = def.fr2, en = def.en2, laps = 1, side = def.side2 }
+                : new Track { id = def.id, fr = def.fr, en = def.en, laps = Mathf.Max(1, def.laps), side = def.side };
+            heading.y = 0f;
+            heading = heading.sqrMagnitude > 1e-6f ? heading.normalized : Vector3.forward;
+            var points = (Vector2[])def.points.Clone();
+            if (reverse) Array.Reverse(points);
+            int n = points.Length;
             int legs = t.Loop ? n : n - 1;
             for (int i = 0; i < legs; i++)
             {
-                Vector2 a = def.points[i], b = def.points[(i + 1) % n];
+                Vector2 a = points[i], b = points[(i + 1) % n];
                 if (!game.Nav.Plan(new Vector3(a.x, 0f, a.y), heading, new Vector3(b.x, 0f, b.y), t.path, out heading)) return null;
             }
             if (t.path.Count < 2) return null;
