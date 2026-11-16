@@ -131,8 +131,9 @@ namespace NoHesi.EditorTools
         }
 
         /// <summary>
-        /// Matériau de la végétation au sol : shader NoHesi/Foliage (normales douces, translucidité, vent, fondu),
-        /// palette Flora (dégradé de la base à la pointe de chaque brin), bruits partagés pour les rafales et les teintes.
+        /// Matériau de la végétation au sol : shader NoHesi/Foliage (aplats cartoon, couleur du pré, vent, fondu),
+        /// palette Flora (dégradé de la base à la pointe de chaque brin), bruits du terrain ; couleurs et réglages
+        /// repris du terrain et du champ d'herbe (GroundFlora.MatchField).
         /// </summary>
         public static Material FloraMaterial()
         {
@@ -151,6 +152,9 @@ namespace NoHesi.EditorTools
             m.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(FloraPalettePath));
             m.SetTexture("_Noise", AssetDatabase.LoadAssetAtPath<Texture2D>(NoisePath));
             m.SetFloat("_FadeEnd", 0f);
+            m.SetFloat("_SlopeLit", 0f);
+            GroundFlora.MatchField(m, AssetDatabase.LoadAssetAtPath<Material>("Assets/NoHesi/Generated/TerrainBlend.mat"),
+                Resources.Load<Material>("GrassField"));
             m.enableInstancing = true;
             EditorUtility.SetDirty(m);
             AssetDatabase.SaveAssets();

@@ -13,6 +13,9 @@ namespace NoHesi
     /// Le shader NoHesi/Foliage fait rétrécir chaque plante vers son pied avant qu'elle ne quitte son palier, et fait
     /// onduler le pré au vent (rafales qui le traversent, plus fortes sous l'orage). Les fleurs poussent en dérives
     /// (marguerites, lupins, trèfle, gentianes) plutôt qu'au hasard uniforme.
+    /// Raccord avec le champ d'herbe (<see cref="GrassField"/>) : les matériaux des plantes reprennent les couleurs
+    /// du terrain et les réglages de l'herbe (<see cref="MatchField"/>), et chaque plante porte la normale du terrain
+    /// dans l'axe Y de sa matrice : le shader la redresse et l'éclaire comme le pré.
     /// </summary>
     public class GroundFlora : MonoBehaviour
     {
@@ -35,9 +38,45 @@ namespace NoHesi
         static readonly int WindScrollId = Shader.PropertyToID("_NoHesiWindScroll");
         static readonly int FadeId = Shader.PropertyToID("_NoHesiFloraFade");
         static readonly int FadeEndId = Shader.PropertyToID("_FadeEnd");
+        static readonly int SlopeLitId = Shader.PropertyToID("_SlopeLit");
+
+        // Réglages repris du terrain (couleurs du pré, aplats cartoon) et de l'herbe (dégradé des brins, vent)
+        static readonly string[] TerrainColors = { "_Grass", "_GrassLush", "_ShadeColor" };
+        static readonly string[] TerrainFloats = { "_NoiseScale", "_ShadeLevel", "_RampSoft" };
+        static readonly string[] FieldColors = { "_RootColor", "_TipColor", "_TransColor" };
+        static readonly string[] FieldFloats = { "_TipAmount", "_TipBright", "_Saturation", "_GustBright", "_Translucency",
+                                                 "_WindScale", "_WindStrength", "_WindFlutter", "_Comb" };
+
+        /// <summary>
+        /// Raccorde un matériau NoHesi/Foliage au pré : couleurs et aplats du terrain, dégradé et vent de l'herbe
+        /// (Resources/GrassField). Sans effet sur les propriétés absentes d'un côté ou de l'autre.
+        /// </summary>
+        public static void MatchField(Material m, Material terrain, Material field)
+        {
+            if (!m) return;
+            Copy(terrain, m, TerrainColors, TerrainFloats);
+            Copy(field, m, FieldColors, FieldFloats);
+            if (terrain && terrain.HasProperty("_Noise") && terrain.GetTexture("_Noise") && m.HasProperty("_Noise"))
+                m.SetTexture("_Noise", terrain.GetTexture("_Noise"));
+        }
+
+        static void Copy(Material from, Material to, string[] colors, string[] floats)
+        {
+            if (!from) return;
+            foreach (var p in colors) if (from.HasProperty(p) && to.HasProperty(p)) to.SetColor(p, from.GetColor(p));
+            foreach (var p in floats) if (from.HasProperty(p) && to.HasProperty(p)) to.SetFloat(p, from.GetFloat(p));
+        }
 
         class Part { public Mesh mesh; public int submesh; public Material[] mats; public Matrix4x4 local; }
-        class Kind { public string id; public Part[][] lods; public float scaleMin = 0.8f, scaleMax = 1.25f; }
+        class Kind { public string id; public Part[][] lods; public float scaleMin = 0.8f, scaleMax = 1.25f, rise, riseMax = 1.5f; }
+
+        /// <summary>Hauteur d'herbe (m) à partir de laquelle la plante grandit pour garder ses fleurs au-dessus des brins.</summary>
+        static void Rise(Kind k, float height, float max = 1.5f)
+        {
+            if (k == null) return;
+            k.rise = height;
+            k.riseMax = max;
+        }
 
         class Layer
         {
@@ -68,6 +107,13 @@ namespace NoHesi
         WeatherSystem weather;
         float weatherLookup;
         Vector2 windScroll;
+        GrassField grass;
+        Material terrainMat, fieldMat;
+        Kind buttercup, poppy;
+
+        /// <summary>Herbe des prés (champ de brins, shader NoHesi/Grass) : remplace les touffes d'herbe du pack.</summary>
+        public GrassField Grass => grass;
+        bool FieldOn => grass && grass.Ready;
 
         public int Chunks => baseLayer.live.Count + denseLayer.live.Count;
 
@@ -77,6 +123,8 @@ namespace NoHesi
             veg = renderer;
             byDistance = (a, b) => ChunkDistance(a, focus, focusChunk).CompareTo(ChunkDistance(b, focus, focusChunk));
             var pack = assets ? assets.alp : null;
+            terrainMat = assets ? assets.terrain : null;
+            fieldMat = Resources.Load<Material>("GrassField");
             Kind K(string id, float s0 = 0.8f, float s1 = 1.25f)
             {
                 var prefab = pack ? pack.Prefab(id) : null;
@@ -94,6 +142,12 @@ namespace NoHesi
             fern = K("fern", 0.8f, 1.2f);
             fernYoung = K("fern_young", 0.85f, 1.25f);
             blueberry = K("blueberry", 0.8f, 1.3f);
+            buttercup = K("flowers_buttercup", 0.9f, 1.2f);
+            poppy = K("flowers_poppy", 0.9f, 1.2f);
+            Rise(meadow, 0.36f); Rise(daisy, 0.36f); Rise(buttercup, 0.3f); Rise(poppy, 0.42f); Rise(lupin, 0.6f, 1.3f);
+            Rise(clover, 0.22f, 1.3f); Rise(gentian, 0.14f, 1.4f); Rise(edelweiss, 0.16f, 1.4f);
+            grass = gameObject.AddComponent<GrassField>();
+            grass.Init(m, assets ? assets.terrain : null);
         }
 
         Kind MakeKind(string id, GameObject prefab, float s0, float s1)
@@ -127,7 +181,13 @@ namespace NoHesi
             if (!variants.TryGetValue(m, out var v))
             {
                 v = new Material[4];
-                for (int b = 0; b < 4; b++) v[b] = new Material(m) { enableInstancing = true, name = m.name + " (sol " + b + ")" };
+                for (int b = 0; b < 4; b++)
+                {
+                    v[b] = new Material(m) { enableInstancing = true, name = m.name + " (sol " + b + ")" };
+                    MatchField(v[b], terrainMat, fieldMat);
+                    // L'axe Y de la matrice de chaque plante porte la normale du terrain (voir Build)
+                    if (v[b].HasProperty(SlopeLitId)) v[b].SetFloat(SlopeLitId, 1f);
+                }
                 variants[m] = v;
                 ApplyFade(v);
             }
@@ -153,6 +213,13 @@ namespace NoHesi
             veg.floraFar = farDistance;
             veg.denseNear = denseNear;
             veg.denseFar = denseCarpet ? denseFar : 0f;
+            if (FieldOn)
+            {
+                // Herbe des prés : moins loin et moins serrée sur les petits réglages graphiques
+                grass.density = Mathf.Clamp(density, 0.3f, 1.2f);
+                grass.endDistance = Mathf.Lerp(55f, 100f, Mathf.InverseLerp(0.45f, 1f, density));
+                grass.Stream(players);
+            }
             float start = Time.realtimeSinceStartup;
             // Le tapis dense d'abord : c'est lui qu'on voit sous les roues
             if (denseCarpet) StreamLayer(denseLayer, players, denseFar, start);
@@ -249,12 +316,22 @@ namespace NoHesi
                 int gi = map.Nearest(x, z);
                 float edge = map.Info[gi * 4] * 0.25f - 1f;
                 if (edge < 2.0f || (map.Info[gi * 4 + 1] & 15) != 0 || map.Info[gi * 4 + 2] > 60 || map.Info[gi * 4 + 3] > 120) continue;
+                // Terre battue (rives, plages, chemins) : rien n'y pousse, le champ d'herbe non plus
+                if (map.Masks[gi * 4 + 3] > 90) continue;
                 var kind = layer.dense ? ChooseDense(x, z, gi, edge, roll) : Choose(x, z, gi, edge, roll);
                 if (kind == null) continue;
                 float y = map.Height(x, z);
-                float sink = 0.03f + Mathf.Min(map.Slope(x, z), 1f) * 0.18f;
-                var place = Matrix4x4.TRS(new Vector3(x, y - sink, z), Quaternion.Euler(0f, yaw, 0f),
-                    Vector3.one * Mathf.Lerp(kind.scaleMin, kind.scaleMax, sr));
+                // Pente du terrain (même pas que le champ d'herbe) : la matrice penche la plante sur la normale du
+                // terrain, le shader la redresse et s'en sert pour l'éclairer comme le pré
+                const float e = 1.5f;
+                float gx = (map.Height(x + e, z) - map.Height(x - e, z)) / (2f * e);
+                float gz = (map.Height(x, z + e) - map.Height(x, z - e)) / (2f * e);
+                float sink = 0.03f + Mathf.Min(Mathf.Sqrt(gx * gx + gz * gz), 1f) * 0.18f;
+                var tilt = Quaternion.FromToRotation(Vector3.up, new Vector3(-gx, 1f, -gz));
+                float grow = Mathf.Lerp(kind.scaleMin, kind.scaleMax, sr);
+                // Les fleurs dépassent de l'herbe : elles grandissent avec elle (hautes herbes, grandes fleurs)
+                if (kind.rise > 0f && FieldOn) grow *= Mathf.Clamp(grass.HeightAt(x, z) / kind.rise, 1f, kind.riseMax);
+                var place = Matrix4x4.TRS(new Vector3(x, y - sink, z), tilt * Quaternion.Euler(0f, yaw, 0f), Vector3.one * grow);
                 if (layer.dense)
                 {
                     // Tapis dense : modèle détaillé tout près, moyen ensuite, puis rétrécit avant la fin du tapis
@@ -293,9 +370,22 @@ namespace NoHesi
             return Mathf.Clamp01((p - 0.45f) * 3.3f);
         }
 
-        void Option(Kind k, float w)
+        /// <summary>Dérive de fleurs : taches nettes sur une petite part du pré, le reste sans fleurs (pré sobre, les
+        /// fleurs en accents de couleur plutôt qu'en semis uniforme).</summary>
+        static float Drift(float x, float z, float freq, float offset)
+        {
+            float p = Mathf.PerlinNoise(x * freq + offset, z * freq - offset * 0.7f);
+            return Mathf.Clamp01((p - 0.53f) * 4.5f);
+        }
+
+        /// <summary>Part du trèfle gardée : il vit dans l'herbe courte, les hautes herbes le cachent.</summary>
+        float ShortGrass(float x, float z) => FieldOn && grass.HeightAt(x, z) > 0.42f ? 0.15f : 1f;
+
+        void Option(Kind k, float w, bool withField = false)
         {
             if (k == null || w <= 0f) return;
+            // Le champ d'herbe remplace les touffes d'herbe (sauf sur la roche, où il ne pousse pas)
+            if (!withField && FieldOn && (k == grassShort || k == grassTall || k == grassDry)) return;
             pick[picks] = k;
             weight[picks] = w * density;
             picks++;
@@ -327,7 +417,7 @@ namespace NoHesi
             picks = 0;
             if (rock > 0.5f)
             {
-                Option(grassDry, 0.05f);
+                Option(grassDry, 0.05f, true);
                 Option(edelweiss, h > 300f ? 0.02f * Patch(x, z, 0.06f, 71.3f) : 0f);
             }
             else if (forest > 0.5f)
@@ -347,7 +437,8 @@ namespace NoHesi
                 Option(fern, 0.04f);
                 Option(fernYoung, 0.03f);
                 Option(blueberry, 0.04f);
-                Option(daisy, 0.08f * Patch(x, z, 0.031f, 11.3f));
+                Option(daisy, 0.08f * Drift(x, z, 0.031f, 11.3f));
+                Option(buttercup, 0.06f * Drift(x, z, 0.035f, 23.9f));
             }
             else if (dry > 0.5f)
             {
@@ -366,10 +457,13 @@ namespace NoHesi
                 // Pré : nappes de hautes herbes, dérives de marguerites et de lupins, trèfle
                 Option(grassShort, 0.28f);
                 Option(grassTall, 0.08f + 0.2f * Patch(x, z, 0.04f, 5.9f));
-                Option(clover, 0.02f + 0.1f * Patch(x, z, 0.05f, 83.7f));
-                Option(meadow, 0.08f);
-                Option(daisy, 0.2f * Patch(x, z, 0.031f, 11.3f));
-                Option(lupin, 0.12f * Patch(x, z, 0.022f, 47.1f));
+                Option(clover, 0.1f * Drift(x, z, 0.05f, 83.7f) * ShortGrass(x, z));
+                Option(meadow, 0.015f);
+                // Dérives d'une seule espèce : marguerites, lupins, boutons d'or, coquelicots
+                Option(daisy, 0.22f * Drift(x, z, 0.031f, 11.3f));
+                Option(lupin, 0.12f * Drift(x, z, 0.022f, 47.1f));
+                Option(buttercup, 0.2f * Drift(x, z, 0.035f, 23.9f));
+                Option(poppy, 0.12f * Drift(x, z, 0.027f, 61.3f));
                 Option(gentian, h > 260f ? 0.03f * Patch(x, z, 0.045f, 29.3f) : 0f);
             }
             return Pick(roll, edge);
@@ -382,7 +476,7 @@ namespace NoHesi
             float h = map.H[gi];
             picks = 0;
             if (rock > 0.5f)
-                Option(grassDry, 0.08f);
+                Option(grassDry, 0.08f, true);
             else if (forest > 0.5f)
             {
                 Option(grassShort, 0.07f);
@@ -393,7 +487,7 @@ namespace NoHesi
             {
                 Option(grassShort, 0.42f);
                 Option(grassTall, 0.05f);
-                Option(clover, 0.05f * Patch(x, z, 0.05f, 83.7f));
+                Option(clover, 0.05f * Drift(x, z, 0.05f, 83.7f) * ShortGrass(x, z));
             }
             else if (dry > 0.5f)
             {
@@ -406,9 +500,10 @@ namespace NoHesi
             else
             {
                 Option(grassShort, 0.5f);
-                Option(clover, 0.03f + 0.14f * Patch(x, z, 0.05f, 83.7f));
-                Option(meadow, 0.03f);
-                Option(daisy, 0.08f * Patch(x, z, 0.031f, 11.3f));
+                Option(clover, 0.12f * Drift(x, z, 0.05f, 83.7f) * ShortGrass(x, z));
+                Option(meadow, 0.006f);
+                Option(daisy, 0.06f * Drift(x, z, 0.031f, 11.3f));
+                Option(buttercup, 0.06f * Drift(x, z, 0.035f, 23.9f));
                 Option(grassTall, 0.04f * Patch(x, z, 0.04f, 5.9f));
             }
             return Pick(roll, edge);
