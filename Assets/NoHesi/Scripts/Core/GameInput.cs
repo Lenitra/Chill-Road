@@ -214,6 +214,26 @@ namespace NoHesi
             }
         }
 
+        /// <summary>Onglet précédent des menus : LB sur n'importe quelle manette, ou Maj+Tab.</summary>
+        public static bool TabPrevPressed
+        {
+            get
+            {
+                foreach (var p in Gamepad.all) if (p.leftShoulder.wasPressedThisFrame) return true;
+                return Kb != null && Kb.tabKey.wasPressedThisFrame && Kb.shiftKey.isPressed;
+            }
+        }
+
+        /// <summary>Onglet suivant des menus : RB sur n'importe quelle manette, ou Tab.</summary>
+        public static bool TabNextPressed
+        {
+            get
+            {
+                foreach (var p in Gamepad.all) if (p.rightShoulder.wasPressedThisFrame) return true;
+                return Kb != null && Kb.tabKey.wasPressedThisFrame && !Kb.shiftKey.isPressed;
+            }
+        }
+
         /// <summary>Retour : B sur n'importe quelle manette, ou Échap.</summary>
         public static bool CancelPressed
         {

@@ -8,12 +8,12 @@ namespace NoHesi
 {
     /// <summary>
     /// Menu Options (construit en code), ouvert depuis l'accueil ou la pause, dans le langage visuel du HUD et de la
-    /// pause : voile sombre, deux plaques inclinées anthracite (<see cref="HudShape"/>), police du HUD, titre or,
-    /// rubriques cyan, curseurs or.
-    /// À gauche, audio et partie (appliqués tout de suite, dont la probabilité de pluie) ; à droite, génération de la
-    /// route (appliqués à la prochaine route, bouton « Appliquer et générer »).
-    /// Manette : haut/bas pour choisir (la ligne choisie s'éclaire), gauche/droite pour régler ; les boutons du bas
-    /// relient les deux plaques.
+    /// pause : voile sombre, plaque inclinée anthracite (<see cref="HudShape"/>), police du HUD, titre or, rubriques
+    /// cyan, curseurs or.
+    /// Rangé par onglets : Audio, Jeu (trafic, pluie, commandes tactiles), Graphismes (qualité, distance des détails,
+    /// limite d'images), Carte (retour au départ). Tout s'applique tout de suite.
+    /// Manette : LB/RB (clavier : Tab, Maj+Tab) pour changer d'onglet, haut/bas pour choisir (la ligne choisie
+    /// s'éclaire), gauche/droite pour régler.
     /// </summary>
     public class OptionsMenu : MonoBehaviour
     {
@@ -36,6 +36,14 @@ namespace NoHesi
         readonly List<Action> refreshers = new List<Action>();
         readonly List<(GameObject target, Graphic plate, Graphic bar)> rows = new List<(GameObject, Graphic, Graphic)>();
 
+        // Onglets : pages (une seule visible), lignes réglables de chaque page, boutons d'onglet
+        static int lastTab;
+        int tab;
+        RectTransform[] pages;
+        Selectable[][] pageItems;
+        (Button button, Text text, Graphic mark)[] tabs;
+        Button defaultsButton, backButton;
+
         public void Init(GameManager gm)
         {
             game = gm;
@@ -50,39 +58,70 @@ namespace NoHesi
             scaler.matchWidthOrHeight = 0.5f;
             root = cgo;
 
-            // Voile sombre de la pause, puis deux plaques côte à côte : réglages de jeu à gauche, route à droite
+            // Voile sombre de la pause, puis une plaque : titre, onglets, page de l'onglet, boutons du bas
             var shade = Rect(cgo.transform, "Shade", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             shade.gameObject.AddComponent<Image>().color = new Color(0.01f, 0.01f, 0.03f, 0.62f);
-            var left = Panel(shade, "Game", new Vector2(-900, -380), new Vector2(-20, 390));
-            var right = Panel(shade, "Road", new Vector2(20, -380), new Vector2(900, 390));
+            var panel = Panel(shade, "Options", new Vector2(-720, -372), new Vector2(720, 400));
 
-            var title = Label(left, "OPTIONS", 64, TextAnchor.MiddleLeft, Accent, FontStyle.BoldAndItalic);
+            var title = Label(panel, "OPTIONS", 64, TextAnchor.MiddleLeft, Accent, FontStyle.BoldAndItalic);
             title.gameObject.AddComponent<LayoutElement>().preferredHeight = 84;
-            Section(left, "AUDIO", "AUDIO", "", "");
-            var music = AddSlider(left, "Musique", "Music", 0f, 1f, 20, () => GameSettings.MusicVolume, v => GameSettings.MusicVolume = v, Percent);
-            var effects = AddSlider(left, "Effets et moteur", "Effects and engine", 0f, 1f, 20, () => GameSettings.EffectsVolume, v => GameSettings.EffectsVolume = v, Percent);
-            Section(left, "PARTIE", "GAMEPLAY", "appliqué tout de suite", "applied immediately");
-            var traffic = AddSlider(left, "Densité du trafic", "Traffic density", 0.2f, 2f, 18, () => GameSettings.TrafficDensity, v => GameSettings.TrafficDensity = v, Percent);
-            var rain = AddSlider(left, "Probabilité de pluie", "Rain probability", 0f, 1f, 20, () => GameSettings.RainChance, v => GameSettings.RainChance = v, v => v < 0.01f ? Loc.T("Jamais", "Never") : v > 0.99f ? Loc.T("Toujours", "Always") : Percent(v));
-            // Commandes tactiles (téléphone, tablette) : façon de diriger, ou désactivées
-            var touch = AddSlider(left, "Commandes tactiles", "Touch controls", 0f, 3f, 3, () => GameSettings.TouchSteer, v => GameSettings.TouchSteer = Mathf.RoundToInt(v),
-                v => v < 0.5f ? Loc.T("Désactivées", "Off") : v < 1.5f ? Loc.T("Glisser", "Slide") : v < 2.5f ? Loc.T("Boutons ‹ ›", "‹ › buttons") : Loc.T("Inclinaison", "Tilt"));
-            Section(left, "GRAPHISMES", "GRAPHICS", "basse = plus d'images/s", "low = more fps");
-            var quality = AddSlider(left, "Qualité graphique", "Graphics quality", 0f, 3f, 3, () => GameSettings.Quality, v => GameSettings.Quality = Mathf.RoundToInt(v),
-                v => GraphicsQuality.Name(Mathf.RoundToInt(v)));
-            var fps = AddSlider(left, "Limite d'images", "Frame rate limit", 0f, GraphicsQuality.FpsCaps.Length - 1, GraphicsQuality.FpsCaps.Length - 1,
-                () => GameSettings.FpsCap, v => GameSettings.FpsCap = Mathf.RoundToInt(v), v => GraphicsQuality.FpsName(Mathf.RoundToInt(v)));
-            Spacer(left);
-            var bottom = ButtonRow(left, 62);
-            var defaults = AddButton(bottom, () => { GameSettings.ResetAll(); Changed(); RefreshAll(); });
-            Loc.Bind(defaults.text, "Par défaut", "Defaults");
-            var back = AddButton(bottom, Close);
-            Loc.Bind(back.text, "Retour", "Back");
+            var tabRow = Rect(panel, "Tabs", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Fixed(tabRow, 58);
+            var th = tabRow.gameObject.AddComponent<HorizontalLayoutGroup>();
+            th.spacing = 14;
+            th.childControlWidth = true; th.childControlHeight = true;
+            th.childForceExpandWidth = false; th.childForceExpandHeight = true;
+            var tabNames = new[] { ("AUDIO", "AUDIO"), ("JEU", "GAMEPLAY"), ("GRAPHISMES", "GRAPHICS"), ("CARTE", "MAP") };
+            TabGlyph(tabRow, "LB", TextAnchor.MiddleRight);
+            tabs = new (Button, Text, Graphic)[tabNames.Length];
+            pages = new RectTransform[tabNames.Length];
+            for (int i = 0; i < tabNames.Length; i++)
+            {
+                tabs[i] = AddTab(tabRow, tabNames[i].Item1, tabNames[i].Item2, i);
+                pages[i] = Page(panel, tabNames[i].Item2);
+            }
+            TabGlyph(tabRow, "RB", TextAnchor.MiddleLeft);
 
-            var roadTitle = Label(right, "", 34, TextAnchor.MiddleLeft, Info, FontStyle.BoldAndItalic);
-            Loc.Bind(roadTitle, "LA CARTE", "THE MAP");
-            roadTitle.gameObject.AddComponent<LayoutElement>().preferredHeight = 84;
-            Section(right, "", "", "balade libre", "free roam");
+            // Audio
+            var audio = pages[0];
+            Section(audio, "AUDIO", "AUDIO", "", "");
+            var music = AddSlider(audio, "Musique", "Music", 0f, 1f, 20, () => GameSettings.MusicVolume, v => GameSettings.MusicVolume = v, Percent);
+            var effects = AddSlider(audio, "Effets et moteur", "Effects and engine", 0f, 1f, 20, () => GameSettings.EffectsVolume, v => GameSettings.EffectsVolume = v, Percent);
+
+            // Jeu
+            var play = pages[1];
+            Section(play, "PARTIE", "GAMEPLAY", "appliqué tout de suite", "applied immediately");
+            var traffic = AddSlider(play, "Densité du trafic", "Traffic density", 0.2f, 2f, 18, () => GameSettings.TrafficDensity, v => GameSettings.TrafficDensity = v, Percent);
+            var rain = AddSlider(play, "Probabilité de pluie", "Rain probability", 0f, 1f, 20, () => GameSettings.RainChance, v => GameSettings.RainChance = v, v => v < 0.01f ? Loc.T("Jamais", "Never") : v > 0.99f ? Loc.T("Toujours", "Always") : Percent(v));
+            Section(play, "COMMANDES", "CONTROLS", "téléphone, tablette", "phone, tablet");
+            // Commandes tactiles (téléphone, tablette) : façon de diriger, ou désactivées
+            var touch = AddSlider(play, "Commandes tactiles", "Touch controls", 0f, 3f, 3, () => GameSettings.TouchSteer, v => GameSettings.TouchSteer = Mathf.RoundToInt(v),
+                v => v < 0.5f ? Loc.T("Désactivées", "Off") : v < 1.5f ? Loc.T("Glisser", "Slide") : v < 2.5f ? Loc.T("Boutons ‹ ›", "‹ › buttons") : Loc.T("Inclinaison", "Tilt"));
+
+            // Graphismes : changer la qualité remet la distance des détails au niveau conseillé
+            var gfx = pages[2];
+            Section(gfx, "GRAPHISMES", "GRAPHICS", "basse = plus d'images/s", "low = more fps");
+            var quality = AddSlider(gfx, "Qualité graphique", "Graphics quality", 0f, 3f, 3, () => GameSettings.Quality, v =>
+                {
+                    // (l'éditeur rappelle les curseurs sans changement de valeur : ne pas écraser la distance choisie)
+                    int q = Mathf.RoundToInt(v);
+                    if (q == GameSettings.Quality) return;
+                    GameSettings.Quality = q;
+                    GameSettings.DetailDistance = GraphicsQuality.DefaultDetail(q);
+                },
+                v => GraphicsQuality.Name(Mathf.RoundToInt(v)));
+            var detail = AddSlider(gfx, "Distance des détails", "Detail distance", 0f, GraphicsQuality.DetailLevels - 1, GraphicsQuality.DetailLevels - 1,
+                () => GameSettings.DetailDistance, v => GameSettings.DetailDistance = Mathf.RoundToInt(v), v => GraphicsQuality.DetailName(Mathf.RoundToInt(v)));
+            var fps = AddSlider(gfx, "Limite d'images", "Frame rate limit", 0f, GraphicsQuality.FpsCaps.Length - 1, GraphicsQuality.FpsCaps.Length - 1,
+                () => GameSettings.FpsCap, v => GameSettings.FpsCap = Mathf.RoundToInt(v), v => GraphicsQuality.FpsName(Mathf.RoundToInt(v)));
+            Note(gfx, "Distance des détails : jusqu'où arbres, rochers, maisons et objets gardent leur modèle complet.",
+                      "Detail distance: how far trees, rocks, houses and props keep their full model.");
+            Note(gfx, "Plus loin = plus beau, mais moins d'images/s. Changer la qualité la remet au niveau conseillé.",
+                      "Further = nicer, but fewer fps. Changing the quality resets it to the suggested level.");
+
+            // Carte
+            var mapPage = pages[3];
+            Section(mapPage, "LA CARTE", "THE MAP", "balade libre", "free roam");
             foreach (var (fr, en) in new[]
             {
                 ("Un massif alpin de 5 km : la vallée qui en fait le tour, le lac, les cols et les alpages.", "A 5 km alpine massif: the valley around it, the lake, the passes and the pastures."),
@@ -90,31 +129,39 @@ namespace NoHesi
                 ("Y (ou R) : replacer la voiture sur la route la plus proche.", "Y (or R): put the car back on the nearest road."),
                 ("Y (ou R) maintenu : changer de voiture.", "Hold Y (or R): switch cars."),
             })
-            {
-                var line = Label(right, "", 24, TextAnchor.MiddleLeft, Dim, FontStyle.Normal);
-                Loc.Bind(line, fr, en);
-                line.gameObject.AddComponent<LayoutElement>().preferredHeight = 44;
-            }
-            Spacer(right);
-            var apply = AddButton(right, ApplyRoad);
+                Note(mapPage, fr, en, 24, 44);
+            var gap = Rect(mapPage, "Gap", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Fixed(gap, 12);
+            var apply = AddButton(mapPage, ApplyRoad);
             applyText = apply.text;
             Loc.Bind(applyText, "Revenir au départ (route de la vallée)", "Back to the start (valley road)");
 
-            // Aide manette / clavier sous les plaques
+            var bottom = ButtonRow(panel, 62);
+            var defaults = AddButton(bottom, () => { GameSettings.ResetAll(); Changed(); RefreshAll(); });
+            Loc.Bind(defaults.text, "Par défaut", "Defaults");
+            var back = AddButton(bottom, Close);
+            Loc.Bind(back.text, "Retour", "Back");
+            defaultsButton = defaults.button;
+            backButton = back.button;
+
+            // Aide manette / clavier sous la plaque
             var hint = Label(shade, "", 21, TextAnchor.MiddleCenter, Dim, FontStyle.Normal);
             var hintRt = hint.rectTransform;
             hintRt.anchorMin = hintRt.anchorMax = new Vector2(0.5f, 0.5f);
-            hintRt.anchoredPosition = new Vector2(0f, -422f);
+            hintRt.anchoredPosition = new Vector2(0f, -414f);
             hintRt.sizeDelta = new Vector2(1600f, 40f);
-            Loc.Bind(hint, "↑ ↓  choisir   ·   ← →  régler   ·   B / Échap  retour", "↑ ↓  select   ·   ← →  adjust   ·   B / Esc  back");
+            Loc.Bind(hint, "LB RB / Tab  catégorie   ·   ↑ ↓  choisir   ·   ← →  régler   ·   B / Échap  retour",
+                           "LB RB / Tab  category   ·   ↑ ↓  select   ·   ← →  adjust   ·   B / Esc  back");
 
-            // Navigation explicite : gauche/droite restent aux curseurs (réglage), haut/bas parcourent chaque plaque,
-            // les boutons du bas passent d'une plaque à l'autre
-            Column(music, effects, traffic, rain, touch, quality, fps, defaults.button);
-            Nav(defaults.button, fps, music, null, back.button);
-            Nav(back.button, fps, music, defaults.button, apply.button);
-            Nav(apply.button, null, null, back.button, null);
-            first = music;
+            // Navigation explicite par page (voir ShowTab) : gauche/droite restent aux curseurs (réglage)
+            pageItems = new[]
+            {
+                new Selectable[] { music, effects },
+                new Selectable[] { traffic, rain, touch },
+                new Selectable[] { quality, detail, fps },
+                new Selectable[] { apply.button },
+            };
+            ShowTab(lastTab);
 
             RefreshAll();
             root.SetActive(false);
@@ -129,6 +176,7 @@ namespace NoHesi
         {
             onClose = closed;
             roadAtOpen = GameSettings.RoadSignature;
+            ShowTab(lastTab);
             RefreshAll();
             root.SetActive(true);
             IsOpen = true;
@@ -178,8 +226,45 @@ namespace NoHesi
                 Close();
                 return;
             }
+            if (GameInput.TabPrevPressed) ShowTab(tab - 1);
+            else if (GameInput.TabNextPressed) ShowTab(tab + 1);
+            // Onglet cliqué à la souris puis manette : revenir sur une ligne de la page
+            var current = EventSystem.current ? EventSystem.current.currentSelectedGameObject : null;
+            if (current && GameInput.UsingGamepad)
+                foreach (var t in tabs)
+                    if (current == t.button.gameObject) EventSystem.current.SetSelectedGameObject(first.gameObject);
             if (EventSystem.current && EventSystem.current.currentSelectedGameObject == null && GameInput.UsingGamepad)
                 EventSystem.current.SetSelectedGameObject(first.gameObject);
+            HighlightRows();
+        }
+
+        /// <summary>Affiche la page d'un onglet, relie sa colonne aux boutons du bas et choisit sa première ligne.</summary>
+        void ShowTab(int index)
+        {
+            tab = lastTab = (index % pages.Length + pages.Length) % pages.Length;
+            for (int i = 0; i < pages.Length; i++)
+            {
+                bool on = i == tab;
+                pages[i].gameObject.SetActive(on);
+                tabs[i].mark.enabled = on;
+                tabs[i].text.color = on ? Accent : new Color(White.r, White.g, White.b, 0.7f);
+                var colors = tabs[i].button.colors;
+                colors.normalColor = on ? new Color(0.24f, 0.27f, 0.33f, 1f) : new Color(0.14f, 0.16f, 0.2f, 0.95f);
+                tabs[i].button.colors = colors;
+            }
+
+            // Colonne de la page puis « Par défaut », en boucle ; « Retour » à droite de « Par défaut »
+            var items = pageItems[tab];
+            var column = new Selectable[items.Length + 1];
+            items.CopyTo(column, 0);
+            column[items.Length] = defaultsButton;
+            Column(column);
+            Selectable last = items[items.Length - 1];
+            first = items[0];
+            Nav(defaultsButton, last, first, null, backButton);
+            Nav(backButton, last, first, defaultsButton, null);
+
+            if (IsOpen && EventSystem.current) EventSystem.current.SetSelectedGameObject(first.gameObject);
             HighlightRows();
         }
 
@@ -210,6 +295,51 @@ namespace NoHesi
             layout.childControlHeight = true; layout.childControlWidth = true;
             layout.childForceExpandHeight = false; layout.childForceExpandWidth = true;
             return panel;
+        }
+
+        /// <summary>Page d'un onglet : colonne de lignes qui prend la place libre de la plaque.</summary>
+        static RectTransform Page(RectTransform parent, string name)
+        {
+            var page = Rect(parent, name, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            page.gameObject.AddComponent<LayoutElement>().flexibleHeight = 1f;
+            var layout = page.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 8;
+            layout.childAlignment = TextAnchor.UpperLeft;
+            layout.childControlHeight = true; layout.childControlWidth = true;
+            layout.childForceExpandHeight = false; layout.childForceExpandWidth = true;
+            return page;
+        }
+
+        /// <summary>Onglet : bouton incliné, libellé or et trait or dessous quand il est ouvert (voir ShowTab).</summary>
+        (Button button, Text text, Graphic mark) AddTab(Transform parent, string fr, string en, int index)
+        {
+            var (button, text) = AddButton(parent, () => ShowTab(index));
+            button.GetComponent<LayoutElement>().flexibleWidth = 1f;
+            button.navigation = new Navigation { mode = Navigation.Mode.None };
+            text.fontSize = 25;
+            Loc.Bind(text, fr, en);
+            var mark = Shape(button.transform, "Active", Accent).Set(4f, 0f, 0f);
+            var rt = mark.rectTransform;
+            rt.anchorMin = new Vector2(0.08f, 0f);
+            rt.anchorMax = new Vector2(0.92f, 0f);
+            rt.offsetMin = new Vector2(0f, 3f);
+            rt.offsetMax = new Vector2(0f, 7f);
+            return (button, text, mark);
+        }
+
+        /// <summary>Repère de bouton manette (LB, RB) au bord de la rangée d'onglets.</summary>
+        void TabGlyph(Transform parent, string glyph, TextAnchor align)
+        {
+            var t = Label(parent, glyph, 21, align, Dim, FontStyle.Bold);
+            t.gameObject.AddComponent<LayoutElement>().preferredWidth = 44;
+        }
+
+        /// <summary>Ligne de texte estompée (précisions sous les réglages).</summary>
+        void Note(RectTransform parent, string fr, string en, int size = 21, float height = 36)
+        {
+            var line = Label(parent, "", size, TextAnchor.MiddleLeft, Dim, FontStyle.Normal);
+            Loc.Bind(line, fr, en);
+            line.gameObject.AddComponent<LayoutElement>().preferredHeight = height;
         }
 
         /// <summary>Rubrique : nom en cyan, précision estompée, filet cyan qui s'efface vers la droite.</summary>
