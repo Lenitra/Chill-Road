@@ -2200,6 +2200,266 @@ MonoBehaviour:
     module: 0
     ymin: -1
     lights: []
+  - id: snow_groomer
+    category: ski
+    tags:
+    - piste
+    - vehicle
+    prefab: {fileID: 919132149155446097, guid: cbf5707b55551d54bbee9af77f921461, type: 3}
+    size: {x: 5.37, y: 3.16, z: 7.3}
+    footprint: {x: 4.9, y: 7.2}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
+  - id: snowmobile
+    category: ski
+    tags:
+    - piste
+    - vehicle
+    prefab: {fileID: 919132149155446097, guid: d2aebda5ae5344340964f877ff371ffe, type: 3}
+    size: {x: 1.21, y: 1.4, z: 3.23}
+    footprint: {x: 1.2, y: 3.1}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: 0.03
+    lights: []
+  - id: snow_bank_a
+    category: ski
+    tags:
+    - snow
+    - roadside
+    prefab: {fileID: 919132149155446097, guid: 9bcbd31f494913f48a4279cdd98dba59, type: 3}
+    size: {x: 9, y: 1.18, z: 2.76}
+    footprint: {x: 9, y: 2.3}
+    collider: none
+    radius: 0
+    module: 8
+    ymin: -0.6
+    lights: []
+  - id: snow_bank_b
+    category: ski
+    tags:
+    - snow
+    - roadside
+    prefab: {fileID: 919132149155446097, guid: 941049b2c89d41143933359bdca25c1c, type: 3}
+    size: {x: 6, y: 0.91, z: 2.38}
+    footprint: {x: 6, y: 2}
+    collider: none
+    radius: 0
+    module: 5.2
+    ymin: -0.6
+    lights: []
+  - id: snow_pile
+    category: ski
+    tags:
+    - snow
+    prefab: {fileID: 919132149155446097, guid: 0c76fff689d7d7744bb15a1249b35104, type: 3}
+    size: {x: 5.97, y: 2.03, z: 5.31}
+    footprint: {x: 5.4, y: 5}
+    collider: capsule
+    radius: 2.2
+    module: 0
+    ymin: -1.72
+    lights: []
+  - id: snowman
+    category: ski
+    tags:
+    - snow
+    - prop
+    prefab: {fileID: 919132149155446097, guid: 504fbbb158f9528428db060ab7a21a77, type: 3}
+    size: {x: 1.92, y: 2.14, z: 1.11}
+    footprint: {x: 1.2, y: 1.1}
+    collider: capsule
+    radius: 0.5
+    module: 0
+    ymin: -0.08
+    lights: []
+  - id: igloo
+    category: ski
+    tags:
+    - snow
+    - prop
+    prefab: {fileID: 919132149155446097, guid: b6357e84d7ec2b6469ece3752bb0fbea, type: 3}
+    size: {x: 4.2, y: 3, z: 5.12}
+    footprint: {x: 4.3, y: 5.2}
+    collider: capsule
+    radius: 2
+    module: 0
+    ymin: -0.51
+    lights: []
+  - id: sled
+    category: ski
+    tags:
+    - snow
+    - prop
+    - small
+    prefab: {fileID: 919132149155446097, guid: 729edfa3f6a2bd348b7be186e30f038a, type: 3}
+    size: {x: 0.44, y: 0.27, z: 1.46}
+    footprint: {x: 0.5, y: 1.3}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: 0.01
+    lights: []
+  - id: ski_shop
+    category: ski
+    tags:
+    - piste
+    - shop
+    prefab: {fileID: 919132149155446097, guid: da2462170d69450458bfe226a72079cc, type: 3}
+    size: {x: 11.58, y: 7.19, z: 9.54}
+    footprint: {x: 9, y: 7}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: -3
+    lights: []
+  - id: ticket_office
+    category: ski
+    tags:
+    - piste
+    - station
+    prefab: {fileID: 919132149155446097, guid: c83d783152953f3468d3a05649dd1b00, type: 3}
+    size: {x: 8.51, y: 3.72, z: 7.13}
+    footprint: {x: 7, y: 5.6}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: -3
+    lights: []
+  - id: resort_totem
+    category: ski
+    tags:
+    - piste
+    - sign
+    prefab: {fileID: 919132149155446097, guid: 3ce57ca8026c88847af8489ea8caa2ae, type: 3}
+    size: {x: 6.9, y: 5.82, z: 2.49}
+    footprint: {x: 5.8, y: 1.6}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: -1
+    lights: []
+  - id: piste_sign_green
+    category: ski
+    tags:
+    - piste
+    - prop
+    prefab: {fileID: 919132149155446097, guid: f4cbf42be77f8244489d269aa064e774, type: 3}
+    size: {x: 0.9, y: 2.62, z: 0.26}
+    footprint: {x: 0.9, y: 0.2}
+    collider: capsule
+    radius: 0.08
+    module: 0
+    ymin: -0.5
+    lights: []
+  - id: piste_sign_blue
+    category: ski
+    tags:
+    - piste
+    - prop
+    prefab: {fileID: 919132149155446097, guid: 2d529af9e46225b439566c7a3f906829, type: 3}
+    size: {x: 0.9, y: 2.62, z: 0.26}
+    footprint: {x: 0.9, y: 0.2}
+    collider: capsule
+    radius: 0.08
+    module: 0
+    ymin: -0.5
+    lights: []
+  - id: piste_sign_red
+    category: ski
+    tags:
+    - piste
+    - prop
+    prefab: {fileID: 919132149155446097, guid: 5cb8fd75e2eb3ae4287df8e3816b4816, type: 3}
+    size: {x: 0.9, y: 2.62, z: 0.26}
+    footprint: {x: 0.9, y: 0.2}
+    collider: capsule
+    radius: 0.08
+    module: 0
+    ymin: -0.5
+    lights: []
+  - id: piste_sign_black
+    category: ski
+    tags:
+    - piste
+    - prop
+    prefab: {fileID: 919132149155446097, guid: 8793fa58801f95643b980f623c970b26, type: 3}
+    size: {x: 0.9, y: 2.62, z: 0.26}
+    footprint: {x: 0.9, y: 0.2}
+    collider: capsule
+    radius: 0.08
+    module: 0
+    ymin: -0.5
+    lights: []
+  - id: piste_net
+    category: ski
+    tags:
+    - piste
+    - net
+    prefab: {fileID: 919132149155446097, guid: 7956ea2b265dcb04b9af7a6ee85fb2ad, type: 3}
+    size: {x: 6.04, y: 1.55, z: 0.1}
+    footprint: {x: 6, y: 0.2}
+    collider: none
+    radius: 0
+    module: 6
+    ymin: -0.4
+    lights: []
+  - id: slalom_gate_red
+    category: ski
+    tags:
+    - piste
+    - small
+    prefab: {fileID: 919132149155446097, guid: 70a6c37d51d2b594684c2ccbf91656b7, type: 3}
+    size: {x: 0.67, y: 1.75, z: 0.03}
+    footprint: {x: 0.7, y: 0.1}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: -0.3
+    lights: []
+  - id: slalom_gate_blue
+    category: ski
+    tags:
+    - piste
+    - small
+    prefab: {fileID: 919132149155446097, guid: c37090886208ea241911f2a5dd0abbfd, type: 3}
+    size: {x: 0.67, y: 1.75, z: 0.03}
+    footprint: {x: 0.7, y: 0.1}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: -0.3
+    lights: []
+  - id: sign_snow
+    category: sign
+    tags:
+    - warning
+    - snow
+    prefab: {fileID: 919132149155446097, guid: 348c6a314980e8d47a98eb230926e5e0, type: 3}
+    size: {x: 0.79, y: 2.7, z: 0.22}
+    footprint: {x: 0.79, y: 0.22}
+    collider: capsule
+    radius: 0.06
+    module: 0
+    ymin: -0.5
+    lights: []
+  - id: sign_chains
+    category: sign
+    tags:
+    - snow
+    - info
+    prefab: {fileID: 919132149155446097, guid: 13391f972684b094db02521db6b23a9d, type: 3}
+    size: {x: 0.72, y: 2.68, z: 0.22}
+    footprint: {x: 0.72, y: 0.22}
+    collider: capsule
+    radius: 0.06
+    module: 0
+    ymin: -0.5
+    lights: []
   - id: reeds
     category: lake
     tags:

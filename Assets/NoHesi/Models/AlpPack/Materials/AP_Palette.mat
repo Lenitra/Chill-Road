@@ -136,6 +136,7 @@ Material:
     - _ShadeLevel: 0.62
     - _Smoothness: 0.12
     - _SmoothnessTextureChannel: 0
+    - _SnowCap: 1
     - _SpecStrength: 0.7
     - _SpecularHighlights: 1
     - _SrcBlend: 1
