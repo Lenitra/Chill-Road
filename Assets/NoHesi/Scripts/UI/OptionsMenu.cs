@@ -196,13 +196,6 @@ namespace NoHesi
         void ApplyRoad()
         {
             GameSettings.Save();
-            // En réseau, la partie continue : la voiture revient au départ et le menu se referme
-            if (game.Online)
-            {
-                game.Restart();
-                Close();
-                return;
-            }
             IsOpen = false;
             game.Restart();
         }

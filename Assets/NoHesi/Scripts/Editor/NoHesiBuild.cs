@@ -54,24 +54,7 @@ namespace NoHesi.EditorTools
             File.WriteAllText("Builds/last_build.txt", text);
             Debug.Log("NoHesi build : " + text);
             if (s.result != BuildResult.Succeeded) Debug.LogError("NoHesi build : échec, pas de zip.");
-            else WriteServerLauncher();
             return s.result == BuildResult.Succeeded;
-        }
-
-        /// <summary>
-        /// Lanceur du serveur dédié, posé à côté du jeu : la même application lancée avec « -server » (pas d'accueil ni
-        /// de voiture, la caméra suit les joueurs). Texte sans accents : les .bat n'aiment pas l'UTF-8.
-        /// </summary>
-        static void WriteServerLauncher()
-        {
-            string exe = PlayerSettings.productName + ".exe";
-            string bat = "@echo off\r\n" +
-                "rem Serveur dedie Chill Road : heberge une partie sans y jouer (fermer sa fenetre l'arrete).\r\n" +
-                "rem Options : -port 47777   -name \"Mon serveur\"   -players 8\r\n" +
-                "rem Sans fenetre : ajouter -batchmode -nographics -logFile server.log (arret par le Gestionnaire des taches).\r\n" +
-                "rem Par Internet : rediriger le port UDP 47777 de la box vers cette machine.\r\n" +
-                $"start \"\" \"%~dp0{exe}\" -server -port 47777 %*\r\n";
-            File.WriteAllText($"{OutputFolder}/Serveur dedie.bat", bat, new System.Text.UTF8Encoding(false));
         }
 
         /// <summary>

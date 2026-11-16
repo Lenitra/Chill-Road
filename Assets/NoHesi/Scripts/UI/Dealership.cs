@@ -116,7 +116,7 @@ namespace NoHesi
         bool InZone()
         {
             var poi = game.DealerPoi;
-            if (poi == null || GameManager.DedicatedServer || game.State != GameManager.Phase.Playing) return false;
+            if (poi == null || game.State != GameManager.Phase.Playing) return false;
             if ((game.Hud && game.Hud.Paused) || OptionsMenu.IsOpen || WorldMap.IsOpen) return false;
             var car = game.Player;
             if (!car || car.Speed > EnterSpeed) return false;

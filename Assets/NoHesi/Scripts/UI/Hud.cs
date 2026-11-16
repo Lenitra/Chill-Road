@@ -17,7 +17,6 @@ namespace NoHesi
     /// - bas gauche : minicarte (pendant du compte-tours), à sa droite le morceau en cours et l'aide des commandes
     ///   (quelques secondes seulement) ;
     /// - menu pause avec le panneau des contrôles (manette ou clavier selon le dernier appareil utilisé).
-    /// En réseau, le menu pause n'arrête pas le monde : la partie continue pour les autres joueurs.
     /// </summary>
     public class Hud : MonoBehaviour
     {
@@ -125,7 +124,7 @@ namespace NoHesi
 
         // Pause
         GameObject pausePanel;
-        Text carLabel, timeLabel, netLabel, pauseTitle;
+        Text carLabel, timeLabel;
         bool inPause;
         Text controlsTitle;
         readonly List<(Text action, Text key)> controlRows = new List<(Text, Text)>();
@@ -133,8 +132,7 @@ namespace NoHesi
         Button firstButton;
         int openedFrame;
         /// <summary>
-        /// Menu pause (ou options ouvertes depuis la pause), carte : le joueur ne conduit pas. Seul, le monde est arrêté ;
-        /// en réseau, il continue.
+        /// Menu pause (ou options ouvertes depuis la pause), carte : le joueur ne conduit pas et le monde est arrêté.
         /// </summary>
         public bool Paused => WorldMap.IsOpen || inPause || Dealership.IsOpen || TuningGarage.IsOpen;
 
@@ -710,18 +708,12 @@ namespace NoHesi
             layout.childControlHeight = true; layout.childControlWidth = true; layout.childForceExpandHeight = false;
             var title = Label(box, "PAUSE", 64, TextAnchor.MiddleLeft, Accent, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600, 90), FontStyle.BoldAndItalic);
             title.gameObject.AddComponent<LayoutElement>().preferredHeight = 90;
-            pauseTitle = title;
-            // Partie en réseau : nombre de joueurs, adresse à donner aux autres (hôte)
-            netLabel = Label(box, "", 22, TextAnchor.MiddleLeft, Info, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600, 30), FontStyle.Bold);
-            netLabel.gameObject.AddComponent<LayoutElement>().preferredHeight = 30;
-            netLabel.gameObject.SetActive(false);
 
             var resume = Button(box, "", () => SetPaused(false));
             Loc.Bind(resume.text, "Reprendre", "Resume");
             firstButton = resume.button;
             carLabel = Button(box, "", () => { game.CycleCar(1); RefreshPause(); }).text;
-            // L'heure d'une partie rejointe est celle du serveur
-            timeLabel = Button(box, "", () => { if (!(game.Net && game.Net.IsClient)) game.DayNight.Advance(3f); RefreshPause(); }).text;
+            timeLabel = Button(box, "", () => { game.DayNight.Advance(3f); RefreshPause(); }).text;
             Button(box, "Options", OpenOptions);
             Loc.Bind(Button(box, "", game.ReturnToTitle).text, "Menu principal", "Main menu");
             Loc.Bind(Button(box, "", game.Quit).text, "Quitter le jeu", "Quit game");
@@ -784,26 +776,14 @@ namespace NoHesi
             // Une seule voiture achetée : pas de bouton de choix
             carLabel.transform.parent.gameObject.SetActive(game.OwnedCars > 1);
             carLabel.text = Loc.T($"Voiture : {game.Player.Spec.displayName}  >", $"Car: {game.Player.Spec.displayName}  >");
-            var net = game.Net;
-            bool online = game.Online;
-            timeLabel.text = online && net.IsClient
-                ? Loc.T($"Heure : {game.DayNight.Clock}  (réglée par l'hôte)", $"Time: {game.DayNight.Clock}  (set by the host)")
-                : Loc.T($"Heure : {game.DayNight.Clock}  (+3 h)  >", $"Time: {game.DayNight.Clock}  (+3 h)  >");
-            // En réseau, rien ne s'arrête : c'est un menu, pas une pause
-            pauseTitle.text = online ? "MENU" : "PAUSE";
-            netLabel.gameObject.SetActive(online);
-            if (online)
-                netLabel.text = net.IsHost
-                    ? Loc.T($"EN LIGNE  ·  joueurs : {net.PlayerCount}  ·  ton adresse : {net.LocalAddress}", $"ONLINE  ·  players: {net.PlayerCount}  ·  your address: {net.LocalAddress}")
-                    : Loc.T($"EN LIGNE  ·  {net.ServerName}  ·  joueurs : {net.PlayerCount}", $"ONLINE  ·  {net.ServerName}  ·  players: {net.PlayerCount}");
+            timeLabel.text = Loc.T($"Heure : {game.DayNight.Clock}  (+3 h)  >", $"Time: {game.DayNight.Clock}  (+3 h)  >");
         }
 
         public void SetPaused(bool paused)
         {
             pausePanel.SetActive(paused);
             inPause = paused;
-            // En réseau, le monde continue pour tous : seule notre voiture n'est plus conduite
-            Time.timeScale = paused && !game.Online ? 0f : 1f;
+            Time.timeScale = paused ? 0f : 1f;
             game.SetInputEnabled(!paused);
             openedFrame = Time.frameCount;
             if (paused)
@@ -828,7 +808,7 @@ namespace NoHesi
 
         void UpdatePause()
         {
-            if (OptionsMenu.IsOpen || Dealership.IsOpen || TuningGarage.IsOpen || game.Demo || GameManager.DedicatedServer) return;
+            if (OptionsMenu.IsOpen || Dealership.IsOpen || TuningGarage.IsOpen || game.Demo) return;
             // Carte globale ouverte (ou tout juste fermée par Échap) : la pause attend
             if (WorldMap.IsOpen || Time.frameCount == WorldMap.ChangedFrame || Time.frameCount == Dealership.ChangedFrame
                 || Time.frameCount == TuningGarage.ChangedFrame) return;

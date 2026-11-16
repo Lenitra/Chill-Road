@@ -117,7 +117,7 @@ namespace NoHesi
             if (open && !root) Build();
             IsOpen = open;
             root.SetActive(open);
-            Time.timeScale = open && !game.Online ? 0f : 1f;
+            Time.timeScale = open ? 0f : 1f;
             game.SetInputEnabled(!open);
             openedFrame = Time.frameCount;
             ChangedFrame = Time.frameCount;
@@ -213,7 +213,7 @@ namespace NoHesi
         {
             var nav = game.Nav;
             // Pendant une course, le GPS affiche son parcours : pas d'autre destination
-            if (!nav || nav.OnCourse || GameManager.DedicatedServer) return;
+            if (!nav || nav.OnCourse) return;
             // Clic sur le départ d'une course : le GPS y mène
             if (game.Races)
                 foreach (var t in game.Races.All)
@@ -322,20 +322,11 @@ namespace NoHesi
             content.anchoredPosition = -Local(center.x, center.y) * zoom;
             // Repères et noms : taille constante à l'écran quel que soit le zoom
             foreach (var m in fixedSize) m.localScale = Vector3.one / zoom;
-            var remotes = game.Net ? game.Net.Remotes : null;
-            int others = remotes != null ? remotes.Count : 0;
-            while (playerMarks.Count < 1 + others) playerMarks.Add(PlayerMark(playerMarks.Count));
             for (int i = 0; i < playerMarks.Count; i++)
             {
-                var remote = i > 0 && i - 1 < others ? remotes[i - 1] : null;
-                Transform t = i == 0 ? (GameManager.DedicatedServer ? null : game.Player.transform) : remote && remote.Ready ? remote.transform : null;
+                Transform t = i == 0 && game.Player ? game.Player.transform : null;
                 playerMarks[i].gameObject.SetActive(t);
                 if (!t) continue;
-                if (remote)
-                {
-                    markArrows[i].color = remote.Color;
-                    markNames[i].text = remote.Name;
-                }
                 playerMarks[i].anchoredPosition = Local(t.position.x, t.position.z);
                 markArrows[i].rectTransform.localEulerAngles = new Vector3(0f, 0f, -t.eulerAngles.y);
                 float pulse = i == 0 ? 1f + Mathf.Sin(Time.unscaledTime * 5f) * 0.08f : 0.85f;

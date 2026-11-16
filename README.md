@@ -1,6 +1,6 @@
 # Chill Road
 
-**A low-poly driving game in an alpine valley: motorway loops, hairpin passes, country roads and dirt tracks, at your own pace, alone or with friends.**
+**A low-poly driving game in an alpine valley: motorway loops, hairpin passes, country roads and dirt tracks, at your own pace.**
 
 ![The garage](Marketing/itch/screenshots/04_neuf_voitures_jouables.png)
 
@@ -26,7 +26,6 @@ Every line of code, every 3D model, shader, sound and texture was made with AI (
 - **Physics with some weight**: raycast suspension, a tire model, gearboxes from 3 to 9 speeds and a handbrake. Drifts come from real sliding, and stability control only catches real spins.
 - **Day/night cycle and storms**: rain, lightning, a road that slowly gets wet (reflections, less grip). The chance of rain is a setting.
 - **Synthesized audio**: every engine voice is generated live (V8, flat-plane turbo V8, V12, V6, turbo six, four-cylinder, 49 cc two-stroke, electric), and so is the synthwave soundtrack. The game ships no audio files. To play your own music, drop `.ogg`, `.mp3` or `.wav` files into `StreamingAssets/Music` in the build.
-- **Network multiplayer (experimental)**: host or join from *Multiplayer* on the title screen. Games on the local network are discovered automatically, and you can also join by IP. It runs on custom UDP netcode, port 47777.
 - **Minimap, world map and GPS route guide.**
 - Touch controls for a future mobile build, and an English/French interface.
 
@@ -65,28 +64,17 @@ Everything else lives under the **NoHesi** editor menu:
 | `Matériaux de route` · `Matériaux du monde` | Recreates the road and world materials |
 | `Build Windows` · `Build Windows + zip` | Builds `Builds/Windows/Chill Road.exe`, optionally zipped |
 
-### Dedicated server
-
-A Windows build can run as a dedicated server, with no local car and a spectator camera:
-
-```
-"Chill Road.exe" -server [-port 47777] [-name "My server"] [-players N]
-```
-
-The build also writes a `Serveur dedie.bat` next to the executable.
-
 ## Repository layout
 
 ```
 Assets/NoHesi/
-  Scripts/      C# game code: Core, Vehicle, Traffic, World, Net, UI, Gameplay, Editor, DebugTools
+  Scripts/      C# game code: Core, Vehicle, Traffic, World, UI, Gameplay, Editor, DebugTools
   Shaders/      flat-style road, terrain, sky, water and foliage shaders
   Models/       FBX exported from Blender: CarPack (traffic), PlayerCars, Vision74, EnvPack, AlpPack
   Resources/Map baked map data (heights, masks, road network, minimap and overview images)
 Tools/
   Blender/      Python scripts that build every model in Blender, plus the .blend sources
   Map/          Python map baker (terrain, roads, earthworks, signage) → Resources/Map
-  Net/          netbot.py, a fake client/server to test the netcode against the editor
   ItchCapture/  scripted screenshot director used for the itch.io page
   RoadTextures/ road texture generator
 Marketing/itch/ itch.io page text (EN/FR), covers and screenshots
@@ -99,7 +87,7 @@ Marketing/itch/ itch.io page text (EN/FR), covers and screenshots
 
 ## En français
 
-**Chill Road** est un jeu de conduite low-poly sous Unity 6 (URP), **en cours de développement**. Tu roules librement dans une vallée alpine de 5 km, appelée « Tour du massif ». Elle a une autoroute en boucle avec échangeurs, viaduc et tunnels, une route de vallée, trois routes de col en lacets et des chemins de terre. On y trouve du trafic, un cycle jour/nuit et des orages, et on peut jouer en multijoueur réseau (LAN ou serveur dédié, expérimental). L'interface est en français et en anglais.
+**Chill Road** est un jeu de conduite low-poly sous Unity 6 (URP), **en cours de développement**. Tu roules librement dans une vallée alpine de 5 km, appelée « Tour du massif ». Elle a une autoroute en boucle avec échangeurs, viaduc et tunnels, une route de vallée, trois routes de col en lacets et des chemins de terre. On y trouve du trafic, un cycle jour/nuit et des orages. L'interface est en français et en anglais.
 
 Tout le projet a été réalisé avec l'IA (Claude via Claude Code), sur les directions d'un humain : le code, les modèles 3D construits par scripts Blender, les shaders, et les sons et la musique synthétisés en direct. Le projet n'utilise aucun asset tiers.
 

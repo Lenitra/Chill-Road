@@ -6,7 +6,7 @@ namespace NoHesi
 {
     /// <summary>
     /// Écrans hors partie (construits en code) : chargement avec barre de progression, écran d'accueil
-    /// (Jouer / Multijoueur / Options / Langue / Quitter) par-dessus la vue tournante de la voiture,
+    /// (Jouer / Options / Langue / Quitter) par-dessus la vue tournante de la voiture,
     /// et mise en scène du départ :
     /// l'accueil s'éjecte, bandes néon et flash, bandes cinéma, compte à rebours néon, « GO ! ».
     /// </summary>
@@ -45,8 +45,6 @@ namespace NoHesi
              "The car dealer, east of the start, sells the whole range: stop in front of it to enter."),
             ("Drift : un coup de frein à main en gardant les gaz, puis dose l'accélérateur.",
              "Drift: tap the handbrake while keeping the throttle on, then feather it."),
-            ("À plusieurs : « Multijoueur » sur l'accueil, pour héberger une partie ou en rejoindre une sur le réseau local.",
-             "With friends: pick “Multiplayer” on the title screen to host a game or join one on the local network."),
             ("L3 (ou L) allume les phares : indispensable la nuit et sous l'orage.",
              "L3 (or L) toggles the headlights: a must at night and in storms."),
         };
@@ -69,7 +67,6 @@ namespace NoHesi
         float loadingT, tipTimer = 5f;
         int tipIndex;
         Button playButton;
-        NetLobby lobby;
         float countdownTimer;
         GameManager.Phase shown = (GameManager.Phase)(-1);
 
@@ -94,8 +91,6 @@ namespace NoHesi
             countdownText.fontStyle = FontStyle.BoldAndItalic;
             countdownGlow = countdownText.gameObject.AddComponent<Outline>();
             countdownGlow.effectDistance = new Vector2(6, -6);
-            lobby = gameObject.AddComponent<NetLobby>();
-            lobby.Init(game);
             Refresh();
         }
 
@@ -253,8 +248,6 @@ namespace NoHesi
             layout.spacing = 12;
             layout.childControlHeight = true; layout.childControlWidth = true; layout.childForceExpandHeight = false;
             playButton = Button(box, "JOUER", "PLAY", () => game.StartCountdown());
-            // Partie en réseau : héberger, ou rejoindre une partie du réseau local ou d'une adresse IP
-            Button(box, "MULTIJOUEUR", "MULTIPLAYER", OpenLobby);
             Button(box, "OPTIONS", "OPTIONS", OpenOptions);
             // Langue : affiche celle en cours, un clic passe à l'autre
             var language = Button(box, "LANGUE : FRANÇAIS", "LANGUAGE: ENGLISH", Loc.Toggle);
@@ -307,17 +300,6 @@ namespace NoHesi
             launchLen = duration;
             title.interactable = false;
             title.blocksRaycasts = false;
-        }
-
-        /// <summary>Bouton « Multijoueur » : salon pour héberger ou rejoindre une partie en réseau.</summary>
-        void OpenLobby()
-        {
-            title.interactable = false;
-            lobby.Open(() =>
-            {
-                title.interactable = game.State == GameManager.Phase.Title;
-                if (EventSystem.current) EventSystem.current.SetSelectedGameObject(playButton.gameObject);
-            });
         }
 
         void OpenOptions()
@@ -423,7 +405,7 @@ namespace NoHesi
                     stage = null;
                 }
             }
-            if (launchT < 0f) title.alpha = Mathf.MoveTowards(title.alpha, game.State == GameManager.Phase.Title && !OptionsMenu.IsOpen && !NetLobby.IsOpen ? 1f : 0f, dt * 3f);
+            if (launchT < 0f) title.alpha = Mathf.MoveTowards(title.alpha, game.State == GameManager.Phase.Title && !OptionsMenu.IsOpen ? 1f : 0f, dt * 3f);
             UpdateLaunch(dt);
 
             // Compte à rebours : le chiffre claque (grossit d'un coup puis se pose), puis s'efface
@@ -441,7 +423,7 @@ namespace NoHesi
             else countdownText.text = "";
 
             // Manette : garde un bouton sélectionné sur l'écran d'accueil
-            if (game.State == GameManager.Phase.Title && !NetLobby.IsOpen && EventSystem.current && EventSystem.current.currentSelectedGameObject == null)
+            if (game.State == GameManager.Phase.Title && EventSystem.current && EventSystem.current.currentSelectedGameObject == null)
                 EventSystem.current.SetSelectedGameObject(playButton.gameObject);
         }
 

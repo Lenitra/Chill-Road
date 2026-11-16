@@ -128,7 +128,7 @@ namespace NoHesi
             lampPool = new LightPool<Transform>(lamps);
             headPool = new LightPool<TrafficSystem.Car>(heads);
             tailPool = new LightPool<TrafficSystem.Car>(tails);
-            // (pas de carte graphique : serveur dédié lancé sans affichage)
+            // (pas de carte graphique : jeu lancé sans affichage)
             if (sky && SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null) InitReflection();
             Apply();
             UpdateReflection(true);
@@ -184,20 +184,6 @@ namespace NoHesi
             timeOfDay = Mathf.Repeat(timeOfDay + hours, 24f);
             Apply();
             UpdateReflection(true);
-        }
-
-        /// <summary>Heure du serveur (partie en réseau rejointe) : on ne se recale que si l'écart devient sensible.</summary>
-        public void SyncTime(float hour)
-        {
-            float gap = Mathf.Abs(Mathf.DeltaAngle(timeOfDay * 15f, hour * 15f)) / 15f;
-            if (gap < 0.04f) return;
-            timeOfDay = Mathf.Repeat(hour, 24f);
-            // Saut d'heure (l'hôte avance le temps) : ciel et reflets refaits tout de suite
-            if (gap > 0.25f)
-            {
-                Apply();
-                UpdateReflection(true);
-            }
         }
 
         void Update()

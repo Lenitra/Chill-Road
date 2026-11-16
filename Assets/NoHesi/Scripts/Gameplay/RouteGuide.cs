@@ -65,7 +65,6 @@ namespace NoHesi
         public void Init(GameManager g)
         {
             game = g;
-            if (GameManager.DedicatedServer) return;
             BuildWorld();
             MiniMap.Overlay += DrawOnMiniMap;
         }
@@ -119,7 +118,7 @@ namespace NoHesi
         /// </summary>
         public void SetCourse(IReadOnlyList<Vector3> points, int first, string fr, string en)
         {
-            if (GameManager.DedicatedServer || points == null || points.Count - first < 2) return;
+            if (points == null || points.Count - first < 2) return;
             if (!OnCourse)
             {
                 savedHas = HasDestination;
@@ -153,7 +152,7 @@ namespace NoHesi
 
         void Update()
         {
-            if (!game || GameManager.DedicatedServer) return;
+            if (!game) return;
             if (OnCourse)
             {
                 if (game.State == GameManager.Phase.Playing) Track();

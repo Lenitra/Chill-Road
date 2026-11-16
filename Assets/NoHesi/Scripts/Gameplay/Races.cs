@@ -232,7 +232,6 @@ namespace NoHesi
         public void Init(GameManager g)
         {
             game = g;
-            if (GameManager.DedicatedServer) return;
             MiniMap.Overlay += DrawOnMiniMap;
         }
 
@@ -402,7 +401,7 @@ namespace NoHesi
 
         void Update()
         {
-            if (!game || GameManager.DedicatedServer) return;
+            if (!game) return;
             Load();
             if (tracks == null) return;
             if (game.State != GameManager.Phase.Playing)
