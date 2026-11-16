@@ -63,6 +63,12 @@ namespace NoHesi
         HudShape multShape;
         float displayedScore = -1f, multPunch, comboAlpha;
         CanvasGroup comboGroup;
+        // Dernier gain (frôlement, vitesse, drift validé) : ligne discrète sous le compteur du combo
+        RectTransform feedRt;
+        CanvasGroup feedGroup;
+        Text feedText;
+        float feedTimer;
+        const float FeedTime = 1.6f;
         int walletSlide = -1;
         static readonly Vector2 WalletHome = new Vector2(26f, -84f);        // sous l'heure
         static readonly Vector2 WalletTouchHome = new Vector2(338f, -30f);  // à droite du bouton pause tactile
@@ -168,9 +174,15 @@ namespace NoHesi
             BuildPause();
             gameObject.AddComponent<CheatCodes>().Init(gm);
 
-            // Gains : le badge du multiplicateur réagit ; accident : flash rouge
-            slot.Score.NearMiss += (pts, gap, onc) => multPunch = 0.35f;
-            slot.Score.DriftScored += pts => multPunch = 0.35f;
+            // Gains : le badge du multiplicateur réagit, une ligne discrète nomme le gain ; accident : flash rouge
+            slot.Score.NearMiss += (pts, gap, onc) =>
+            {
+                multPunch = 0.35f;
+                string label = gap < 0.6f ? Loc.T("FRÔLEMENT EXTRÊME", "EXTREME NEAR MISS") : Loc.T("FRÔLEMENT", "NEAR MISS");
+                Feed(label + (onc ? Loc.T(" · CONTRESENS", " · ONCOMING") : ""), pts);
+            };
+            slot.Score.Bonus += (pts, label) => Feed(label, pts);
+            slot.Score.DriftScored += pts => { multPunch = 0.35f; Feed("DRIFT", pts); };
             slot.Score.JumpScored += (pts, air, dist) => multPunch = 0.35f;
             slot.Score.Lost += (pts, why) => Flash(new Color(1f, 0.1f, 0.05f), 0.35f);
             if (game.Music) game.Music.TrackChanged += name => { musicText.text = "♪  " + name; musicTimer = 5f; };
@@ -218,6 +230,17 @@ namespace NoHesi
             comboFill.gameObject.AddComponent<Image>().color = Accent;
             oncomingText = Label(combo, "", 16, TextAnchor.UpperCenter, Danger, new Vector2(0.5f, 1f), new Vector2(0f, -50f), new Vector2(240f, 22f), FontStyle.Bold);
             AddSlide(combo, new Vector2(0f, 220f));
+
+            // Dernier gain, sous le combo (indépendant de son fondu : le texte reste lisible si le combo s'arrête)
+            feedRt = Rect(canvas, "Feed", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
+            feedRt.pivot = new Vector2(0.5f, 1f);
+            feedRt.sizeDelta = new Vector2(600f, 24f);
+            feedRt.anchoredPosition = new Vector2(0f, -76f);
+            feedGroup = feedRt.gameObject.AddComponent<CanvasGroup>();
+            feedGroup.alpha = 0f;
+            feedGroup.blocksRaycasts = false;
+            feedText = Label(feedRt, "", 18, TextAnchor.UpperCenter, new Color(1f, 1f, 1f, 0.8f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(600f, 24f), FontStyle.Italic);
+            feedText.supportRichText = true;
         }
 
         void BuildClock()
@@ -409,6 +432,16 @@ namespace NoHesi
                 bestText.text = "+" + Wallet.Format(score.AtStake) + Loc.T("  en jeu", "  at stake");
             }
             multBadge.localScale = Vector3.one * (1f + multPunch);
+            // Dernier gain : apparaît vite, reste, puis s'efface ; descend sous la ligne du contresens quand elle est là
+            if (feedTimer > 0f)
+            {
+                feedTimer = Mathf.Max(0f, feedTimer - dt);
+                float shown = FeedTime - feedTimer;
+                feedGroup.alpha = Mathf.Min(Mathf.Clamp01(shown / 0.12f), Mathf.Clamp01(feedTimer / 0.5f));
+                feedRt.localScale = Vector3.one * Mathf.Lerp(1.08f, 1f, Mathf.Clamp01(shown / 0.15f));
+            }
+            float feedY = combo && score.Oncoming ? -100f : -76f;
+            feedRt.anchoredPosition = new Vector2(0f, Mathf.Lerp(feedRt.anchoredPosition.y, feedY, 1f - Mathf.Exp(-dt * 12f)));
 
             // Heure (icône soleil ou lune)
             if (clockText && game.DayNight)
@@ -571,6 +604,14 @@ namespace NoHesi
                 foreach (var sl in slides) sl.rt.anchoredPosition = sl.home;
                 slideT = -1f;
             }
+        }
+
+        /// <summary>Nomme le dernier gain sous le combo (remplace le précédent) : libellé discret, montant en couleur.</summary>
+        void Feed(string label, float pts)
+        {
+            string hex = ColorUtility.ToHtmlStringRGB(Accent);
+            feedText.text = $"{label}   <color=#{hex}>+{Wallet.Format(pts)}</color>";
+            feedTimer = FeedTime;
         }
 
         public void Flash(Color c, float alpha)
