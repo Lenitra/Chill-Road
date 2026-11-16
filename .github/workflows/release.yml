@@ -1,0 +1,100 @@
+# Release lancée à la main : Actions → « Release » → Run workflow.
+# Claude lit les commits depuis la release précédente et rédige les notes de version (anglais + français),
+# puis la release GitHub est créée avec ces notes (en brouillon par défaut, pour relire avant de publier).
+#
+# Prérequis : un secret de dépôt ANTHROPIC_API_KEY (Settings → Secrets and variables → Actions).
+# Optionnel : une variable de dépôt CLAUDE_MODEL pour changer de modèle (par défaut claude-opus-5-5).
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version à publier (ex. v0.2.0)"
+        required: true
+        type: string
+      draft:
+        description: "Créer la release en brouillon (à relire puis publier sur GitHub)"
+        required: false
+        type: boolean
+        default: true
+      prerelease:
+        description: "Marquer comme pré-version"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - name: Vérifier la version
+        run: |
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Version invalide : « $VERSION ». Format attendu : v1.2.3 (ou v1.2.3-beta.1)."
+            exit 1
+          fi
+
+      # Tout l'historique (pour trouver la release précédente) mais sans le contenu des fichiers
+      # du projet Unity : seuls les dossiers utiles au script sont extraits.
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          sparse-checkout: |
+            .github
+            Marketing/itch
+
+      - name: Vérifier que le tag n'existe pas
+        run: |
+          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            echo "::error::Le tag $VERSION existe déjà."
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer le SDK Anthropic
+        run: pip install --quiet anthropic
+
+      - name: Rédiger les notes de version avec Claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_MODEL: ${{ vars.CLAUDE_MODEL }}
+        run: python .github/scripts/release_notes.py --version "$VERSION" --out release_notes.md
+
+      - name: Créer la release GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRAFT: ${{ inputs.draft }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          flags=()
+          [[ "$DRAFT" == "true" ]] && flags+=(--draft)
+          [[ "$PRERELEASE" == "true" ]] && flags+=(--prerelease)
+          gh release create "$VERSION" \
+            --target "$GITHUB_SHA" \
+            --title "Chill Road $VERSION" \
+            --notes-file release_notes.md \
+            "${flags[@]}"
+
+      - name: Résumé
+        run: |
+          {
+            echo "## Chill Road $VERSION"
+            echo
+            cat release_notes.md
+          } >> "$GITHUB_STEP_SUMMARY"
