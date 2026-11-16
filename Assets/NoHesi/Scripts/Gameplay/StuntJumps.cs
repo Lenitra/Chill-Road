@@ -19,6 +19,9 @@ namespace NoHesi
         /// <summary>Couleur des cascades (HUD, carte) et des cascades réussies.</summary>
         public static readonly Color Tint = new Color(1f, 0.55f, 0.12f);
         public static readonly Color DoneTint = new Color(0.45f, 0.95f, 0.5f);
+        static readonly Color FailTint = new Color(1f, 0.3f, 0.25f);
+        /// <summary>Durée des lignes de cascade sous le combo (plus longue que celle d'un gain).</summary>
+        const float FeedTime = 2.6f;
 
         public class Stunt
         {
@@ -37,6 +40,11 @@ namespace NoHesi
         GameManager game;
         List<Stunt> stunts;
         bool wasAirborne;
+        Stunt announced;
+        float announceQuiet;
+        // Résultat de la réception, affiché en fin de Tick : la ligne passe au-dessus de celle du saut (même image)
+        string pendingLabel, pendingValue;
+        Color pendingColor;
 
         /// <summary>Cascade en cours : la voiture a décollé de ce tremplin et n'est pas encore retombée.</summary>
         public Stunt Active { get; private set; }
@@ -91,9 +99,16 @@ namespace NoHesi
             else if (!air && Active != null)
             {
                 // Saut interrompu sans réception (accident en l'air, voiture replacée)
+                if (!Active.done) Report(Loc.T("CASCADE RATÉE", "STUNT FAILED"), "", FailTint);
                 Active = null;
             }
             wasAirborne = air;
+            Announce(pos, car, dt);
+            if (pendingLabel != null)
+            {
+                if (game.Hud) game.Hud.Feed(pendingLabel, pendingValue, pendingColor, FeedTime);
+                pendingLabel = null;
+            }
         }
 
         /// <summary>Tremplin d'où la voiture vient de décoller : elle est au-dessus de sa moitié haute et va dans son sens.</summary>
@@ -120,6 +135,8 @@ namespace NoHesi
             Active = null;
             if (s == null) return;
             var hud = game.Hud;
+            // Affichée arrondie vers le bas : jamais « 10 / 10 m » pour un saut de 9,6 m raté
+            float shown = Mathf.Floor(distance);
             bool record = clean && distance > s.best + 0.5f;
             if (record)
             {
@@ -131,12 +148,67 @@ namespace NoHesi
                 s.done = true;
                 Save();
                 Wallet.Add(s.data.reward);
+                string name = s.Name.ToUpperInvariant();
+                int n = DoneCount, total = stunts.Count;
+                Report(Loc.F($"CASCADE RÉUSSIE · {name} · {shown:0} m · {n}/{total}", $"STUNT COMPLETE · {name} · {shown:0} m · {n}/{total}"),
+                       "+" + Wallet.Format(s.data.reward), DoneTint);
                 hud.Flash(Tint, 0.3f);
                 if (game.Local.Audio) game.Local.Audio.Chime();
                 game.Camera.Shake(0.25f);
                 Completed?.Invoke(s, distance);
             }
+            else if (!s.done)
+            {
+                if (clean) Report(Loc.T("CASCADE RATÉE", "STUNT FAILED"), Loc.F($"{shown:0} / {s.Target:0} m"), FailTint);
+                else Report(Loc.T("CASCADE RATÉE", "STUNT FAILED"), Loc.T("RÉCEPTION MANQUÉE", "BAD LANDING"), FailTint);
+            }
+            else if (record)
+                Report(Loc.F($"{s.Name.ToUpperInvariant()} · NOUVEAU RECORD", $"{s.Name.ToUpperInvariant()} · NEW RECORD"), Loc.F($"{shown:0} m"), DoneTint);
             if (record) PlayerPrefs.Save();
+        }
+
+        /// <summary>Ligne de cascade sous le combo, affichée en fin de <see cref="Tick"/>.</summary>
+        void Report(string label, string value, Color color)
+        {
+            pendingLabel = label;
+            pendingValue = value;
+            pendingColor = color;
+        }
+
+        /// <summary>Annonce le tremplin dont la voiture approche (une fois par passage) : nom, distance à franchir, prime.</summary>
+        void Announce(Vector3 pos, VehicleController car, float dt)
+        {
+            Stunt near = null;
+            Vector3 v = car.Velocity;
+            v.y = 0f;
+            if (v.sqrMagnitude > 16f && Active == null)
+            {
+                v.Normalize();
+                foreach (var s in stunts)
+                {
+                    Vector3 d = pos - s.lip;
+                    float along = Vector3.Dot(d, s.forward);
+                    if (along > -s.data.length * 0.4f || along < -s.data.length - 160f) continue;
+                    if (Mathf.Abs(Vector3.Dot(d, s.right)) > 18f || Mathf.Abs(d.y) > 15f || Vector3.Dot(v, s.forward) < 0.7f) continue;
+                    near = s;
+                    break;
+                }
+            }
+            if (near == null)
+            {
+                // Un peu de répit avant de pouvoir réannoncer le même tremplin (demi-tour, nouveau passage)
+                if (announced != null && (announceQuiet += dt) > 5f) announced = null;
+                return;
+            }
+            announceQuiet = 0f;
+            if (near == announced || !game.Hud) return;
+            announced = near;
+            string name = near.Name.ToUpperInvariant();
+            if (near.done)
+                game.Hud.Feed(Loc.F($"CASCADE · {name} · RECORD", $"STUNT · {name} · BEST"), Loc.F($"{near.best:0} m"), DoneTint, FeedTime);
+            else
+                game.Hud.Feed(Loc.F($"CASCADE · {name} · {near.Target:0} m EN L'AIR", $"STUNT · {name} · {near.Target:0} m AIRBORNE"),
+                              "+" + Wallet.Format(near.data.reward), Tint, FeedTime);
         }
 
         void Save()

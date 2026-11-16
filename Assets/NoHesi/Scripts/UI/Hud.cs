@@ -63,12 +63,12 @@ namespace NoHesi
         HudShape multShape;
         float displayedScore = -1f, multPunch, comboAlpha;
         CanvasGroup comboGroup;
-        // Dernier gain (frôlement, vitesse, drift validé) : ligne discrète sous le compteur du combo
+        // Derniers gains et cascades : lignes discrètes sous le compteur du combo, la plus récente en haut
+        class FeedLine { public RectTransform rt; public CanvasGroup group; public Text text; public float timer, time; }
+        readonly List<FeedLine> feed = new List<FeedLine>();
         RectTransform feedRt;
-        CanvasGroup feedGroup;
-        Text feedText;
-        float feedTimer;
-        const float FeedTime = 1.6f;
+        const int FeedLines = 3;
+        const float FeedStep = 24f, FeedTime = 1.6f;
         int walletSlide = -1;
         static readonly Vector2 WalletHome = new Vector2(26f, -84f);        // sous l'heure
         static readonly Vector2 WalletTouchHome = new Vector2(338f, -30f);  // à droite du bouton pause tactile
@@ -183,7 +183,12 @@ namespace NoHesi
             };
             slot.Score.Bonus += (pts, label) => Feed(label, pts);
             slot.Score.DriftScored += pts => { multPunch = 0.35f; Feed("DRIFT", pts); };
-            slot.Score.JumpScored += (pts, air, dist) => multPunch = 0.35f;
+            slot.Score.JumpScored += (pts, air, dist) =>
+            {
+                multPunch = 0.35f;
+                string label = air >= 2.5f ? Loc.T("MÉGA SAUT", "MEGA JUMP") : air >= 1.5f ? Loc.T("GROS SAUT", "BIG JUMP") : Loc.T("SAUT", "JUMP");
+                Feed(Loc.F($"{label} · {air:0.0} s · {dist:0} m"), pts);
+            };
             slot.Score.Lost += (pts, why) => Flash(new Color(1f, 0.1f, 0.05f), 0.35f);
             if (game.Music) game.Music.TrackChanged += name => { musicText.text = "♪  " + name; musicTimer = 5f; };
         }
@@ -231,16 +236,23 @@ namespace NoHesi
             oncomingText = Label(combo, "", 16, TextAnchor.UpperCenter, Danger, new Vector2(0.5f, 1f), new Vector2(0f, -50f), new Vector2(240f, 22f), FontStyle.Bold);
             AddSlide(combo, new Vector2(0f, 220f));
 
-            // Dernier gain, sous le combo (indépendant de son fondu : le texte reste lisible si le combo s'arrête)
+            // Derniers gains, sous le combo (indépendants de son fondu : le texte reste lisible si le combo s'arrête)
             feedRt = Rect(canvas, "Feed", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
             feedRt.pivot = new Vector2(0.5f, 1f);
-            feedRt.sizeDelta = new Vector2(600f, 24f);
+            feedRt.sizeDelta = new Vector2(700f, FeedStep * FeedLines);
             feedRt.anchoredPosition = new Vector2(0f, -76f);
-            feedGroup = feedRt.gameObject.AddComponent<CanvasGroup>();
-            feedGroup.alpha = 0f;
-            feedGroup.blocksRaycasts = false;
-            feedText = Label(feedRt, "", 18, TextAnchor.UpperCenter, new Color(1f, 1f, 1f, 0.8f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(600f, 24f), FontStyle.Italic);
-            feedText.supportRichText = true;
+            for (int i = 0; i < FeedLines; i++)
+            {
+                var rt = Rect(feedRt, "Line", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
+                rt.pivot = new Vector2(0.5f, 1f);
+                rt.sizeDelta = new Vector2(700f, FeedStep);
+                var group = rt.gameObject.AddComponent<CanvasGroup>();
+                group.alpha = 0f;
+                group.blocksRaycasts = false;
+                var t = Label(rt, "", 18, TextAnchor.UpperCenter, new Color(1f, 1f, 1f, 0.8f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(700f, FeedStep), FontStyle.Italic);
+                t.supportRichText = true;
+                feed.Add(new FeedLine { rt = rt, group = group, text = t });
+            }
         }
 
         void BuildClock()
@@ -432,13 +444,21 @@ namespace NoHesi
                 bestText.text = "+" + Wallet.Format(score.AtStake) + Loc.T("  en jeu", "  at stake");
             }
             multBadge.localScale = Vector3.one * (1f + multPunch);
-            // Dernier gain : apparaît vite, reste, puis s'efface ; descend sous la ligne du contresens quand elle est là
-            if (feedTimer > 0f)
+            // Derniers gains : chaque ligne apparaît vite, reste, puis s'efface ; les anciennes descendent d'un cran.
+            // Le tout descend sous la ligne du contresens quand elle est là
+            for (int i = 0; i < feed.Count; i++)
             {
-                feedTimer = Mathf.Max(0f, feedTimer - dt);
-                float shown = FeedTime - feedTimer;
-                feedGroup.alpha = Mathf.Min(Mathf.Clamp01(shown / 0.12f), Mathf.Clamp01(feedTimer / 0.5f));
-                feedRt.localScale = Vector3.one * Mathf.Lerp(1.08f, 1f, Mathf.Clamp01(shown / 0.15f));
+                var line = feed[i];
+                if (line.timer > 0f)
+                {
+                    line.timer = Mathf.Max(0f, line.timer - dt);
+                    float shown = line.time - line.timer;
+                    line.group.alpha = Mathf.Min(Mathf.Clamp01(shown / 0.12f), Mathf.Clamp01(line.timer / 0.5f)) * (i == 0 ? 1f : 0.75f);
+                    line.rt.localScale = Vector3.one * Mathf.Lerp(1.08f, 1f, Mathf.Clamp01(shown / 0.15f));
+                }
+                else line.group.alpha = 0f;
+                float y = Mathf.Lerp(line.rt.anchoredPosition.y, -i * FeedStep, 1f - Mathf.Exp(-dt * 14f));
+                line.rt.anchoredPosition = new Vector2(0f, y);
             }
             float feedY = combo && score.Oncoming ? -100f : -76f;
             feedRt.anchoredPosition = new Vector2(0f, Mathf.Lerp(feedRt.anchoredPosition.y, feedY, 1f - Mathf.Exp(-dt * 12f)));
@@ -606,12 +626,22 @@ namespace NoHesi
             }
         }
 
-        /// <summary>Nomme le dernier gain sous le combo (remplace le précédent) : libellé discret, montant en couleur.</summary>
-        void Feed(string label, float pts)
+        /// <summary>Gain sous le combo : libellé discret, montant en couleur.</summary>
+        void Feed(string label, float pts) => Feed(label, "+" + Wallet.Format(pts), Accent);
+
+        /// <summary>
+        /// Ligne discrète sous le combo (gains, cascades) : libellé, puis une valeur en couleur (facultative).
+        /// Prend la place en haut ; les précédentes descendent, la plus ancienne disparaît.
+        /// </summary>
+        public void Feed(string label, string value, Color valueColor, float time = FeedTime)
         {
-            string hex = ColorUtility.ToHtmlStringRGB(Accent);
-            feedText.text = $"{label}   <color=#{hex}>+{Wallet.Format(pts)}</color>";
-            feedTimer = FeedTime;
+            if (feed.Count == 0) return;
+            var line = feed[feed.Count - 1];
+            feed.RemoveAt(feed.Count - 1);
+            feed.Insert(0, line);
+            line.text.text = string.IsNullOrEmpty(value) ? label : $"{label}   <color=#{ColorUtility.ToHtmlStringRGB(valueColor)}>{value}</color>";
+            line.timer = line.time = time;
+            line.rt.anchoredPosition = Vector2.zero;
         }
 
         public void Flash(Color c, float alpha)
