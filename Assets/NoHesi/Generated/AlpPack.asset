@@ -2121,6 +2121,45 @@ MonoBehaviour:
     module: 0
     ymin: -0.03
     lights: []
+  - id: car_showroom
+    category: landmark
+    tags:
+    - service
+    - shop
+    - car
+    prefab: {fileID: 919132149155446097, guid: 9cdc671e1e8171b4f8fb4ff6c0ecb731, type: 3}
+    size: {x: 38.4, y: 8.9, z: 23.25}
+    footprint: {x: 38, y: 18}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: -0.9
+    lights: []
+  - id: dealer_sign
+    category: street
+    tags:
+    - car
+    - sign
+    prefab: {fileID: 919132149155446097, guid: a21e2ae1796d6164c9c8c84a63df7503, type: 3}
+    size: {x: 2.2, y: 8.4, z: 0.9}
+    footprint: {x: 2.2, y: 0.9}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: -0.4
+    lights: []
+  - id: car_podium
+    category: street
+    tags:
+    - car
+    prefab: {fileID: 919132149155446097, guid: 88c4f5b5ed806a6468af1c0ecefbf521, type: 3}
+    size: {x: 5.6, y: 0.3, z: 5.6}
+    footprint: {x: 5.6, y: 5.6}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: -0.15
+    lights: []
   - id: reeds
     category: lake
     tags:
