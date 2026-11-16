@@ -65,6 +65,15 @@ Shader "NoHesi/Road"
         // Route mouillée (0-1), fournie par la météo (WeatherSystem)
         float _NoHesiWet;
 
+        // Neige (carte de la station de ski) : enneigement du sol lu dans la carte (MapTerrain), 0-1
+        TEXTURE2D(_NoHesiSnowMap);
+        float4 _NoHesiSnowRect;      // xy = coin sud-ouest de la carte, z = 1 / côté
+        float _NoHesiSnowOn;
+        half SnowAt(float3 pos)
+        {
+            return (half)_NoHesiSnowOn * SAMPLE_TEXTURE2D(_NoHesiSnowMap, sampler_LinearClamp, (pos.xz - _NoHesiSnowRect.xy) * _NoHesiSnowRect.z).r;
+        }
+
         // Hachage entier (PCG 3D) : valeurs aléatoires stables par cellule de l'espace route
         uint3 Pcg3(uint3 v)
         {
@@ -337,6 +346,41 @@ Shader "NoHesi/Road"
                 UNITY_SETUP_INSTANCE_ID(input);
                 half3 n = normalize(input.normalWS);
                 RoadSurface rs = Evaluate(input.positionWS, input.road, input.info);
+
+                // Route enneigée : neige tassée sur la chaussée, traces de roues grises (l'enrobé réapparaît là où
+                // la neige s'amincit), accotements blancs, marquages recouverts
+                half snow = SnowAt(input.positionWS);
+                {
+                    float2 sxz = input.positionWS.xz - _NoHesiTexOrigin.xz;
+                    half4 sn = SAMPLE_TEXTURE2D(_Noise, sampler_Noise, sxz / _NoiseScale + 0.23);
+                    float coverField = snow + (sn.g - 0.5) * 0.5 + (sn.r - 0.5) * 0.2;
+                    half cover = Crisp(coverField, 0.5, fwidth(coverField));
+                    half3 fresh = half3(0.88, 0.92, 0.97) * (1.0 + (sn.r - 0.5) * 0.05);
+                    half3 packed = lerp(half3(0.78, 0.83, 0.9), half3(0.68, 0.74, 0.83), Crisp(sn.b, 0.55, fwidth(sn.b)));
+                    #if defined(_SURFACE_VERGE)
+                        rs.albedo = lerp(rs.albedo, fresh, cover);
+                    #elif defined(_SURFACE_MARKING)
+                        rs.albedo = lerp(rs.albedo, packed, cover);
+                        rs.smoothness = lerp(rs.smoothness, 0.3, cover);
+                    #else
+                        float hwS = max(input.info.z, 0.5);
+                        float axS = abs(input.road.x);
+                        // deux traces par voie (voie unique par sens : axe à mi-largeur ; chemins : _DirtLane)
+                        #if defined(_SURFACE_DIRT)
+                            float laneS = _DirtLane;
+                        #else
+                            float laneS = lerp(hwS * 0.47, _Lanes.y + _Lanes.x * (min(floor(max(axS - _Lanes.y, 0.0) / _Lanes.x), 2.0) + 0.5), saturate(input.info.x));
+                        #endif
+                        float tr = abs(abs(axS - laneS) - 0.8) + (sn.a - 0.5) * 0.14;
+                        half track = step(0.5, input.info.w) * Line(tr, 0.27, fwidth(input.road.x));
+                        // au cœur de la zone la trace reste de la neige grise ; en lisière elle montre l'enrobé mouillé
+                        half3 slush = lerp(rs.albedo * 0.8, half3(0.5, 0.55, 0.63), saturate(snow * 2.0 - 0.9) * 0.7);
+                        // bourrelets blancs sur les rives et entre les traces
+                        half3 body = lerp(packed, fresh, saturate((axS - (hwS - 0.9)) * 2.0));
+                        rs.albedo = lerp(rs.albedo, lerp(body, slush, track), cover);
+                        rs.smoothness = lerp(rs.smoothness, lerp(0.22, 0.5, track), cover);
+                    #endif
+                }
 
                 // Route mouillée : revêtement assombri et lustré (reflets du ciel, des lampadaires et des phares), flaques
                 // nettes dans les creux de l'enrobé et les ornières ; la terre devient boue, l'herbe fonce à peine

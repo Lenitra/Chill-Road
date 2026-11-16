@@ -444,6 +444,7 @@ namespace NoHesi
             Player.RoadGrip = surface.grip;
             Player.SurfaceDirt = surface.onRoad ? surface.dirt : 0f;
             Player.Wetness = Weather.Wetness;
+            Weather.SnowZone = Mathf.InverseLerp(0.3f, 0.8f, Map.Snow(pos.x, pos.z));
             around.Clear();
             around.Add(pos);
             Road.UpdateOrigin(pos);

@@ -55,6 +55,7 @@ namespace NoHesi.EditorTools
             if (!map) { Debug.LogWarning("Carte de motifs introuvable : " + mapPath); return; }
             m.SetTexture("_DetailMap", map);
             m.SetFloat("_DetailLines", 1f);
+            m.SetFloat("_SnowCap", 1f);          // décors : neige sur les toits et les branches dans les zones enneigées
             m.EnableKeyword("_DETAIL_LINES");
             EditorUtility.SetDirty(m);
         }

@@ -31,6 +31,7 @@ Shader "NoHesi/Toon"
         [Toggle(_DETAIL_LINES)] _DetailLines ("Traits de détail (planches, pierres, tuiles)", Float) = 0
         [NoScaleOffset] _DetailMap ("Motif par colonne de palette (R = 1 planches, 2 pierres, 3 tuiles, 4 écorce)", 2D) = "black" {}
         _DetailStrength ("Traits : intensité", Range(0, 1)) = 0.32
+        [Toggle] _SnowCap ("Neige sur les faces tournées vers le ciel (zones enneigées de la carte)", Float) = 0
     }
 
     SubShader
@@ -49,8 +50,17 @@ Shader "NoHesi/Toon"
             half4 _BaseColor, _EmissionColor, _ShadeColor;
             half _Smoothness, _Metallic, _EmissionToggle;
             half _RampMid, _RampSoft, _ShadeLevel, _AmbientFlat, _AmbientStrength, _SpecStrength, _RimStrength, _RimWidth;
-            half _DetailLines, _DetailStrength;
+            half _DetailLines, _DetailStrength, _SnowCap;
         CBUFFER_END
+
+        // Neige (carte de la station de ski) : enneigement du sol lu dans la carte (MapTerrain), 0-1
+        TEXTURE2D(_NoHesiSnowMap);
+        float4 _NoHesiSnowRect;      // xy = coin sud-ouest de la carte, z = 1 / côté
+        float _NoHesiSnowOn;
+        half SnowAt(float3 pos)
+        {
+            return (half)_NoHesiSnowOn * SAMPLE_TEXTURE2D(_NoHesiSnowMap, sampler_LinearClamp, (pos.xz - _NoHesiSnowRect.xy) * _NoHesiSnowRect.z).r;
+        }
 
         // Instanciation procédurale (VegetationRenderer, RenderMeshIndirect) : matrices dans un tampon GPU rempli
         // seulement quand la sélection change (2026-11-16 ; le processeur renvoyait des dizaines de milliers de matrices
@@ -199,6 +209,14 @@ Shader "NoHesi/Toon"
 
                 half3 n = normalize(input.normalWS);
                 n = frontFace ? n : -n;
+                // Décors des zones enneigées : la neige tient sur ce qui regarde le ciel (toits, branches, murets)
+                UNITY_BRANCH
+                if (_SnowCap > 0.5 && _NoHesiSnowOn > 0.5)
+                {
+                    half snow = SnowAt(input.positionWS);
+                    half cap = saturate((n.y - 0.38) * 6.0 + (snow - 0.75) * 2.0) * saturate(snow * 4.0 - 1.2);
+                    albedo = lerp(albedo, half3(0.93, 0.95, 0.99), cap);
+                }
                 half3 v = GetWorldSpaceNormalizeViewDir(input.positionWS);
                 float2 screenUV = GetNormalizedScreenSpaceUV(input.positionCS);
 

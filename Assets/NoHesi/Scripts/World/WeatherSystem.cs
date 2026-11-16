@@ -40,6 +40,11 @@ namespace NoHesi
         GameAudio audioFx;
         DayNightCycle dayNight;
         ParticleSystem rain;
+        ParticleSystem snow;
+        ParticleSystem.EmissionModule snowEmission;
+        /// <summary>Enneigement du sol sous la caméra (0-1), fourni par le jeu : dans la station de ski, la pluie
+        /// tombe en neige et quelques flocons volent par beau temps.</summary>
+        public float SnowZone { get; set; }
         bool rainAdditive;
         // Seconde caméra (décor de l'écran de chargement) : la pluie tombe aussi autour d'elle
         Camera cam2;
@@ -72,6 +77,7 @@ namespace NoHesi
             nextStrike = UnityEngine.Random.Range(3f, 8f);
             if (assets.spark) BuildRain(assets.spark, true);
             else if (assets.particle) BuildRain(assets.particle, false);
+            if (assets.particle) BuildSnow(assets.particle);
             if (assets.spark) BuildBolt(assets.spark);
             BuildAudio();
             Shader.SetGlobalFloat("_NoHesiWet", Wetness);
@@ -200,7 +206,7 @@ namespace NoHesi
             {
                 // Gouttes semées autour de la caméra, en avance sur son déplacement (on roule vers elles)
                 rain.transform.position = p + camVelocity * 0.4f + Vector3.up * 6f;
-                rainEmission.rateOverTime = Rain * 5200f;
+                rainEmission.rateOverTime = Rain * 5200f * (1f - SnowZone);
                 float night = dayNight ? dayNight.Night : 0f;
                 if (rainAdditive)
                 {
@@ -232,6 +238,12 @@ namespace NoHesi
             {
                 var emission2 = rain2.emission;
                 emission2.rateOverTime = 0f;
+            }
+
+            if (snow)
+            {
+                snow.transform.position = p + camVelocity * 0.6f + Vector3.up * 5f;
+                snowEmission.rateOverTime = SnowZone * Mathf.Lerp(260f, 1500f, Rain);
             }
 
             bool paused = Time.timeScale < 0.01f;
@@ -352,6 +364,46 @@ namespace NoHesi
             r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             r.receiveShadows = false;
             rain.Play();
+        }
+
+        /// <summary>Flocons : gros points blancs qui tombent lentement en dérivant, autour de la caméra.</summary>
+        void BuildSnow(Material source)
+        {
+            var material = new Material(source) { name = "Snow (runtime)" };
+            var go = new GameObject("Snowfall");
+            go.transform.SetParent(transform, false);
+            snow = go.AddComponent<ParticleSystem>();
+            snow.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = snow.main;
+            main.loop = true;
+            main.duration = 1f;
+            main.startLifetime = 4.5f;
+            main.startSpeed = 0f;
+            main.startSize = new ParticleSystem.MinMaxCurve(0.05f, 0.11f);
+            main.startColor = new Color(1f, 1f, 1f, 0.85f);
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.maxParticles = 7000;
+            main.playOnAwake = false;
+            snowEmission = snow.emission;
+            snowEmission.rateOverTime = 0f;
+            var shape = snow.shape;
+            shape.shapeType = ParticleSystemShapeType.Box;
+            shape.scale = new Vector3(44f, 16f, 44f);
+            var vel = snow.velocityOverLifetime;
+            vel.enabled = true;
+            vel.space = ParticleSystemSimulationSpace.World;
+            vel.x = new ParticleSystem.MinMaxCurve(-0.6f, 1.4f);
+            vel.y = new ParticleSystem.MinMaxCurve(-2.6f, -1.6f);
+            vel.z = new ParticleSystem.MinMaxCurve(-0.8f, 0.8f);
+            var noise = snow.noise;
+            noise.enabled = true;
+            noise.strength = 0.5f;
+            noise.frequency = 0.35f;
+            var r = go.GetComponent<ParticleSystemRenderer>();
+            r.sharedMaterial = material;
+            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            r.receiveShadows = false;
+            snow.Play();
         }
 
         void BuildBolt(Material spark)

@@ -177,6 +177,8 @@ namespace NoHesi
             extra = new Vector2(I(2), I(3));
         }
         public float Paved(float x, float z) => Info[Nearest(x, z) * 4 + 2] / 255f;
+        /// <summary>Enneigement du sol (0-1) : sommets, et station de ski où les routes sont enneigées.</summary>
+        public float Snow(float x, float z) => Info[Nearest(x, z) * 4 + 3] / 255f;
         public float Forest(float x, float z) => Masks[Nearest(x, z) * 4] / 255f;
         public float Dry(float x, float z) => Masks[Nearest(x, z) * 4 + 1] / 255f;
         public float Rock(float x, float z) => Masks[Nearest(x, z) * 4 + 2] / 255f;

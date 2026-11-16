@@ -61,6 +61,37 @@ namespace NoHesi
             side = (map.N - 1) / TileCells;
             tileSize = TileCells * map.Step;
             tiles = new Tile[side * side];
+            BuildSnowMap();
+        }
+
+        Texture2D snowMap;
+
+        /// <summary>
+        /// Carte de l'enneigement pour les shaders (routes enneigées, neige sur les toits et les sapins) : un texel
+        /// pour deux nœuds de la grille (8 m), lue par position dans le monde.
+        /// </summary>
+        void BuildSnowMap()
+        {
+            int n = (map.N + 1) / 2;
+            var px = new byte[n * n];
+            for (int z = 0; z < n; z++)
+            for (int x = 0; x < n; x++)
+                px[z * n + x] = map.Info[map.Index(x * 2, z * 2) * 4 + 3];
+            snowMap = new Texture2D(n, n, TextureFormat.R8, false, true) { name = "SnowMap", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            snowMap.SetPixelData(px, 0);
+            snowMap.Apply(false, true);
+            float size = (n - 1) * map.Step * 2f;
+            // centres des texels sur les nœuds : décalage d'un demi-texel
+            float texel = size / (n - 1);
+            Shader.SetGlobalTexture("_NoHesiSnowMap", snowMap);
+            Shader.SetGlobalVector("_NoHesiSnowRect", new Vector4(-map.Half - texel * 0.5f, -map.Half - texel * 0.5f, 1f / (size + texel), 0f));
+            Shader.SetGlobalFloat("_NoHesiSnowOn", 1f);
+        }
+
+        void OnDestroy()
+        {
+            Shader.SetGlobalFloat("_NoHesiSnowOn", 0f);
+            if (snowMap) Destroy(snowMap);
         }
 
         /// <summary>Construit le terrain lointain de toute la carte, l'eau et la nature (écran de chargement).</summary>
@@ -474,19 +505,19 @@ namespace NoHesi
                     {
                         // Lisière : arbres épars, buissons
                         if (roll < 0.22f * dens * far) Add(h > 360f ? Pick(f.highTrees) : roll2 < 0.5f ? Pick(f.larches) : Pick(f.spruces), p, R(0.7f, 1.15f), collide ? 0.45f : 0f);
-                        else if (roll < 0.3f * far) Add(Pick(f.shrubs), p, R(0.8f, 1.5f), 0f);
+                        else if (roll < 0.3f * far && snow < 0.4f) Add(Pick(f.shrubs), p, R(0.8f, 1.5f), 0f);
                         continue;
                     }
                     if (dry > 0.55f)
                     {
                         // Pelouse alpine : rhododendrons, genévriers, blocs épars
-                        if (roll < 0.03f * far) Add(Pick(f.alpineShrubs), p, R(0.8f, 1.6f), 0f);
+                        if (roll < 0.03f * far && snow < 0.4f) Add(Pick(f.alpineShrubs), p, R(0.8f, 1.6f), 0f);
                         else if (roll < 0.045f * far) Add(Pick(f.boulders), p, R(0.5f, 1.6f), collide ? 0.9f : 0f);
                         continue;
                     }
                     // Prés du fond de vallée et des replats : feuillus isolés, haies
-                    if (roll < 0.012f * dens) Add(h < 150f ? Pick(f.valleyTrees) : Pick(f.larches), p, R(0.8f, 1.2f), collide ? 0.5f : 0f);
-                    else if (roll < 0.02f) Add(Pick(f.shrubs), p, R(0.7f, 1.3f), 0f);
+                    if (roll < 0.012f * dens) Add(h < 150f ? Pick(f.valleyTrees) : snow > 0.4f ? Pick(f.spruces) : Pick(f.larches), p, R(0.8f, 1.2f), collide ? 0.5f : 0f);
+                    else if (roll < 0.02f && snow < 0.4f) Add(Pick(f.shrubs), p, R(0.7f, 1.3f), 0f);
                 }
                 Herds();
             }
@@ -499,7 +530,7 @@ namespace NoHesi
                     float x = origin.x + R(30f, size - 30f), z = origin.z + R(30f, size - 30f);
                     if (R() > 0.3f) continue;
                     if (map.Forest(x, z) > 0.15f || map.Rock(x, z) > 0.3f || map.Slope(x, z) > 0.28f || map.Water(x, z) != 0
-                        || map.RoadEdge(x, z) < 25f || map.Paved(x, z) > 0.1f || Mathf.Max(Mathf.Abs(x), Mathf.Abs(z)) > map.Half - 700f) continue;
+                        || map.RoadEdge(x, z) < 25f || map.Paved(x, z) > 0.1f || map.Snow(x, z) > 0.3f || Mathf.Max(Mathf.Abs(x), Mathf.Abs(z)) > map.Half - 700f) continue;
                     bool high = map.Dry(x, z) > 0.6f;
                     var herd = high ? f.sheep : f.cows;
                     int count = rng.Next(4, 10);

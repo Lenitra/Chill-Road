@@ -24,6 +24,8 @@ namespace NoHesi
         public const float CountryHalfWidth = LaneWidth + 1.0f;
         public const float DirtLaneOffset = 1.1f;
         public const float DirtGrip = 0.72f;
+        /// <summary>Adhérence sur chaussée enneigée (neige tassée), relative au goudron sec.</summary>
+        public const float SnowGrip = 0.62f;
         const float BucketSize = 32f;
         const int SectionsPerChunk = 48;
 
@@ -139,7 +141,7 @@ namespace NoHesi
             public bool Found => edge != null;
         }
 
-        public struct Surface { public bool onRoad; public float grip, dirt; }
+        public struct Surface { public bool onRoad; public float grip, dirt, snow; }
 
         public readonly List<Edge> Edges = new List<Edge>();
         public readonly Dictionary<string, Node> Nodes = new Dictionary<string, Node>();
@@ -423,6 +425,9 @@ namespace NoHesi
             // Places et cours pavées de la ville : on y roule comme sur la route
             if (!r.onRoad && Map.Paved(pos.x, pos.z) > 0.45f) r.onRoad = true;
             r.grip = Mathf.Lerp(1f, DirtGrip, r.dirt);
+            // Chaussée enneigée (station de ski) : la neige tassée glisse, franchement au cœur de la zone
+            r.snow = Mathf.InverseLerp(0.35f, 0.75f, Map.Snow(pos.x, pos.z));
+            r.grip *= Mathf.Lerp(1f, SnowGrip, r.snow);
             return r;
         }
 
