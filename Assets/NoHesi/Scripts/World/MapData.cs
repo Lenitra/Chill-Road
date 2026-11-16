@@ -43,7 +43,8 @@ namespace NoHesi
         }
         [Serializable] public class RiverJson { public string id; public float width; public float[] pts; }
         [Serializable] public class PlaceJson { public string item; public float x, y, z, yaw, scale = 1f; public int flags; }
-        [Serializable] public class PoiJson { public string id, fr, en; public float x, z, r; }
+        /// <summary>Lieu-dit : side = côté de l'étiquette sur la carte globale (-1 : à gauche du repère, sinon à droite).</summary>
+        [Serializable] public class PoiJson { public string id, fr, en; public float x, z, r; public int side; }
         [Serializable]
         public class MapJson
         {

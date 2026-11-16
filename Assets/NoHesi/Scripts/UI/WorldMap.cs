@@ -358,14 +358,20 @@ namespace NoHesi
                 {
                     if (poi.id == "depart" || string.IsNullOrEmpty(poi.fr)) continue;
                     var mark = Box(content, "Poi_" + poi.id, new Vector2(0.5f, 0.5f), Local(poi.x, poi.z), new Vector2(10f, 10f));
-                    var dot = Box(mark, "Dot", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(12f, 12f)).gameObject.AddComponent<Image>();
+                    // La concession (achat de voitures) : repère plus grand, cyan, bien visible
+                    bool dealer = poi.id == "dealer";
+                    float size = dealer ? 18f : 12f;
+                    var dot = Box(mark, "Dot", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size, size)).gameObject.AddComponent<Image>();
                     dot.sprite = HudArt.Disc;
                     dot.color = Plate;
-                    var core = Box(mark, "Core", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(7f, 7f)).gameObject.AddComponent<Image>();
+                    var core = Box(mark, "Core", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size - 5f, size - 5f)).gameObject.AddComponent<Image>();
                     core.sprite = HudArt.Disc;
-                    core.color = Accent;
-                    var label = Label(mark, "", 21, TextAnchor.MiddleLeft, Color.white, new Vector2(14f, 0f), new Vector2(420f, 30f), FontStyle.BoldAndItalic);
-                    label.rectTransform.pivot = new Vector2(0f, 0.5f);
+                    core.color = dealer ? Info : Accent;
+                    // étiquette à droite du repère, ou à gauche (side = -1) quand deux lieux sont voisins
+                    bool left = poi.side < 0;
+                    var label = Label(mark, "", 21, left ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, dealer ? Info : Color.white,
+                        new Vector2(left ? -size * 0.5f - 8f : size * 0.5f + 8f, 0f), new Vector2(420f, 30f), FontStyle.BoldAndItalic);
+                    label.rectTransform.pivot = new Vector2(left ? 1f : 0f, 0.5f);
                     Loc.Bind(label, poi.fr, poi.en);
                     var outline = label.gameObject.AddComponent<Outline>();
                     outline.effectColor = new Color(0f, 0f, 0f, 0.85f);
@@ -419,7 +425,7 @@ namespace NoHesi
             var title = Label(side, "", 64, TextAnchor.UpperLeft, Accent, new Vector2(40f, -36f), new Vector2(textWidth, 84f), FontStyle.BoldAndItalic, new Vector2(0f, 1f));
             Loc.Bind(title, "CARTE", "MAP");
             var sub = Label(side, "", 26, TextAnchor.UpperLeft, Info, new Vector2(42f, -122f), new Vector2(textWidth, 36f), FontStyle.BoldAndItalic, new Vector2(0f, 1f));
-            Loc.Bind(sub, "VALLÉE DE VALOMBRE", "VALOMBRE VALLEY");
+            Loc.Bind(sub, "LES TROIS VALLONS", "THREE VALLEYS");
             var here = Label(side, "", 22, TextAnchor.UpperLeft, Dim, new Vector2(42f, -190f), new Vector2(textWidth, 30f), FontStyle.Normal, new Vector2(0f, 1f));
             Loc.Bind(here, "Vous êtes ici", "You are here");
             placeText = Label(side, "", 30, TextAnchor.UpperLeft, Color.white, new Vector2(42f, -222f), new Vector2(textWidth, 80f), FontStyle.Bold, new Vector2(0f, 1f));
@@ -430,24 +436,25 @@ namespace NoHesi
             var rows = new (Color color, float width, string fr, string en)[]
             {
                 (new Color(1f, 0.59f, 0.31f), 12f, "Autoroute", "Motorway"),
-                (new Color(0.99f, 0.98f, 0.94f), 9f, "Route de campagne", "Country road"),
-                (new Color(1f, 0.84f, 0.43f), 7f, "Route de col", "Pass road"),
+                (new Color(0.99f, 0.98f, 0.94f), 9f, "Route principale", "Main road"),
+                (new Color(1f, 0.84f, 0.43f), 7f, "Route de montagne", "Mountain road"),
                 (new Color(0.92f, 0.91f, 0.86f), 4f, "Chemin", "Lane"),
                 (new Color(0.74f, 0.59f, 0.42f), 4f, "Chemin de terre", "Dirt track"),
                 (new Color(0.28f, 0.54f, 0.77f), 12f, "Lac, rivière", "Lake, river"),
+                (new Color(0.48f, 0.26f, 0.2f), 12f, "Village", "Village"),
                 (new Color(0.2f, 0.38f, 0.24f), 12f, "Forêt", "Forest"),
             };
             for (int i = 0; i < rows.Length; i++)
             {
-                float y = -384f - i * 38f;
+                float y = -384f - i * 34f;
                 var bar = Box(side, "Key" + i, new Vector2(0f, 1f), new Vector2(72f, y - 15f), new Vector2(56f, rows[i].width)).gameObject.AddComponent<Image>();
                 bar.color = rows[i].color;
                 var text = Label(side, "", 23, TextAnchor.UpperLeft, Color.white, new Vector2(122f, y), new Vector2(400f, 32f), FontStyle.Normal, new Vector2(0f, 1f));
                 Loc.Bind(text, rows[i].fr, rows[i].en);
             }
-            var you = Label(side, "▲", 26, TextAnchor.UpperLeft, Accent, new Vector2(58f, -384f - rows.Length * 38f + 4f), new Vector2(40f, 36f), FontStyle.Normal, new Vector2(0f, 1f));
+            var you = Label(side, "▲", 26, TextAnchor.UpperLeft, Accent, new Vector2(58f, -384f - rows.Length * 34f + 4f), new Vector2(40f, 36f), FontStyle.Normal, new Vector2(0f, 1f));
             you.raycastTarget = false;
-            var youText = Label(side, "", 23, TextAnchor.UpperLeft, Color.white, new Vector2(122f, -384f - rows.Length * 38f), new Vector2(400f, 32f), FontStyle.Normal, new Vector2(0f, 1f));
+            var youText = Label(side, "", 23, TextAnchor.UpperLeft, Color.white, new Vector2(122f, -384f - rows.Length * 34f), new Vector2(400f, 32f), FontStyle.Normal, new Vector2(0f, 1f));
             Loc.Bind(youText, "Votre voiture", "Your car");
 
             // GPS : destination choisie, distance et temps estimé
