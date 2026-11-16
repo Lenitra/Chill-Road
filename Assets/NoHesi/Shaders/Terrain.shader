@@ -46,6 +46,7 @@ Shader "NoHesi/Terrain"
         float4 _NoHesiTexOrigin;
         // Sol mouillé (0-1), fourni par la météo (WeatherSystem)
         float _NoHesiWet;
+        #include "SnowTrail.hlsl"
 
         // Seuil net : 0 → 1 quand x dépasse e, sur environ un pixel
         half Crisp(float x, float e)
@@ -55,7 +56,7 @@ Shader "NoHesi/Terrain"
 
         // Couleur du sol ; nFlat = normale de la facette (roche sur les pentes)
         // extra (UV2 du maillage) : x = pavé, y = neige
-        half3 GroundAlbedo(float3 p, half3 nFlat, half4 mask, half2 extra)
+        half3 GroundAlbedo(float3 p, half3 nFlat, half4 mask, half2 extra, out half snowMask)
         {
             float2 xz = p.xz - _NoHesiTexOrigin.xz;
             half4 n = SAMPLE_TEXTURE2D(_Noise, sampler_Noise, xz / _NoiseScale);
@@ -81,7 +82,10 @@ Shader "NoHesi/Terrain"
             col = lerp(col, lerp(_Rock.rgb, _RockDark.rgb, Crisp(huge * 0.75 + n.r * 0.25, 0.52)), rock);
 
             // Neige des sommets : tient sur les facettes peu inclinées, laisse la roche à nu dans les parois
-            col = lerp(col, _Snow.rgb, Crisp(extra.y + (n.g - 0.5) * 0.35 - slope * 0.55, 0.42));
+            // (deux tons : grandes congères bleutées dans les creux du bruit, neige fraîche ailleurs)
+            snowMask = Crisp(extra.y + (n.g - 0.5) * 0.35 - slope * 0.55, 0.42);
+            half3 snowCol = lerp(_Snow.rgb, _Snow.rgb * half3(0.86, 0.91, 0.99), Crisp(huge * 0.7 + n.r * 0.3, 0.56));
+            col = lerp(col, snowCol, snowMask);
 
             // Très grandes variations de teinte, à peine visibles
             return col * (1.0 + (giant - 0.5) * 0.1);
@@ -153,6 +157,14 @@ Shader "NoHesi/Terrain"
                 float3 nFlat = normalize(cross(ddy(input.positionWS), ddx(input.positionWS)));
                 nFlat *= nFlat.y < 0.0 ? -1.0 : 1.0;
                 half3 n = normalize(lerp(normalize(input.normalWS), nFlat, _Facets));
+                half snowMask;
+                half3 groundCol = GroundAlbedo(input.positionWS, nFlat, input.color, input.extra, snowMask);
+                // Neige déformable : sillons des roues (fond tassé plus sombre, bords éclairés ou ombrés, bourrelet)
+                SnowTrail trail = SampleSnowTrail(input.positionWS, GetWorldSpaceNormalizeViewDir(input.positionWS), 0.14);
+                half rut = trail.depth * snowMask;
+                groundCol = lerp(groundCol, half3(0.66, 0.74, 0.88), smoothstep(0.25, 0.75, rut) * 0.85);
+                groundCol = lerp(groundCol, half3(1.0, 1.0, 1.0), trail.rim * snowMask * 0.6);
+                n = normalize(n + half3(trail.slope.x, 0.0, trail.slope.y) * (snowMask * 2.4));
 
                 InputData inputData = (InputData)0;
                 inputData.positionWS = input.positionWS;
@@ -169,7 +181,7 @@ Shader "NoHesi/Terrain"
                 inputData.shadowMask = half4(1, 1, 1, 1);
 
                 SurfaceData surface = (SurfaceData)0;
-                surface.albedo = GroundAlbedo(input.positionWS, nFlat, input.color, input.extra) * lerp(1.0, 0.8, _NoHesiWet);
+                surface.albedo = groundCol * lerp(1.0, 0.8, _NoHesiWet);
                 surface.alpha = 1;
                 surface.metallic = 0;
                 surface.specular = half3(0, 0, 0);

@@ -64,6 +64,7 @@ Shader "NoHesi/Road"
         float4 _NoHesiTexOrigin;
         // Route mouillée (0-1), fournie par la météo (WeatherSystem)
         float _NoHesiWet;
+        #include "SnowTrail.hlsl"
 
         // Neige (carte de la station de ski) : enneigement du sol lu dans la carte (MapTerrain), 0-1
         TEXTURE2D(_NoHesiSnowMap);
@@ -379,6 +380,17 @@ Shader "NoHesi/Road"
                         half3 body = lerp(packed, fresh, saturate((axS - (hwS - 0.9)) * 2.0));
                         rs.albedo = lerp(rs.albedo, lerp(body, slush, track), cover);
                         rs.smoothness = lerp(rs.smoothness, lerp(0.22, 0.5, track), cover);
+                    #endif
+                    // Neige déformable : sillons creusés par les roues (fond tassé, gris au cœur ; bords éclairés)
+                    #if !defined(_SURFACE_MARKING)
+                    {
+                        SnowTrail trail = SampleSnowTrail(input.positionWS, GetWorldSpaceNormalizeViewDir(input.positionWS), 0.07);
+                        half rut = trail.depth * cover;
+                        rs.albedo = lerp(rs.albedo, half3(0.56, 0.62, 0.72), smoothstep(0.25, 0.75, rut) * 0.8);
+                        rs.albedo = lerp(rs.albedo, half3(0.97, 0.98, 1.0), trail.rim * cover * 0.6);
+                        rs.smoothness = lerp(rs.smoothness, 0.5, rut);
+                        n = normalize(n + half3(trail.slope.x, 0.0, trail.slope.y) * (cover * 2.0));
+                    }
                     #endif
                 }
 

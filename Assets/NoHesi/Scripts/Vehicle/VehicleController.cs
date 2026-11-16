@@ -89,6 +89,9 @@ namespace NoHesi
         public float RoadGrip { get; set; } = 1f;
         /// <summary>Part de terre sous la voiture (0 = goudron, 1 = chemin de terre).</summary>
         public float SurfaceDirt { get; set; }
+        /// <summary>Neige sous la voiture (0-1) et enfoncement des roues dans la neige (m).</summary>
+        public float SurfaceSnow { get; set; }
+        public float SnowSink { get; set; }
         /// <summary>Route mouillée (0-1, fournie par la météo) : moins d'adhérence, glisse plus franche, aquaplaning à haute vitesse.</summary>
         public float Wetness { get; set; }
         public int GroundedWheels { get; private set; }
@@ -568,7 +571,7 @@ namespace NoHesi
                 float length = suspensionTravel + w.radius;
                 w.prevCompression = w.compression;
                 w.grounded = Physics.Raycast(origin, -up, out w.hit, length, layerMask, QueryTriggerInteraction.Ignore);
-                w.compression = w.grounded ? Mathf.Clamp(length - w.hit.distance, 0f, suspensionTravel) : 0f;
+                w.compression = w.grounded ? Mathf.Clamp(length - w.hit.distance - SnowSink, 0f, suspensionTravel) : 0f;
                 if (w.grounded) GroundedWheels++;
             }
             foreach (var w in wheels)
@@ -710,7 +713,7 @@ namespace NoHesi
             float v2 = Speed * Speed;
             rb.AddForce(-v * Speed * 0.5f * AirDensity * Spec.dragArea);
             if (GroundedWheels > 0) rb.AddForce(-up * 0.5f * AirDensity * Spec.downforceArea * v2);
-            rb.AddForce(-v * Spec.mass * 0.015f * (OnRoad ? 1f + SurfaceDirt * 1.5f : 6f));
+            rb.AddForce(-v * Spec.mass * 0.015f * (OnRoad ? 1f + SurfaceDirt * 1.5f + SurfaceSnow * 0.8f : 6f + SurfaceSnow * 3f));
         }
 
         /// <summary>

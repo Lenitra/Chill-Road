@@ -62,6 +62,7 @@ namespace NoHesi
             tileSize = TileCells * map.Step;
             tiles = new Tile[side * side];
             BuildSnowMap();
+            gameObject.AddComponent<SnowTrails>().Init(m);
         }
 
         Texture2D snowMap;
