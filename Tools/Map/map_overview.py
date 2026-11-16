@@ -1,7 +1,10 @@
 """Carte globale affichée en jeu (touche « , ») : vue de dessus stylisée, aplats de couleur comme le reste du jeu.
 
-Prés, forêts, roche, neige, eau, relief ombré léger, courbes de niveau discrètes, routes par type, bâtiments.
-Aucun texte dans l'image : les noms de lieux sont posés par le jeu (deux langues).
+Teintes d'altitude en paliers (esprit low-poly), ombrage doux, courbes de niveau discrètes, forêts aux bords adoucis,
+neige, eau avec un liseré de rive, routes par type (casing sombre + remplissage, tunnels en pointillés, ponts cerclés),
+bâtiments. Loin des routes (hors de la zone où l'on roule) la carte s'éteint, puis se fond dans le fond du menu (BG).
+Aucun texte dans l'image : les noms de lieux sont posés par le jeu (deux langues). Les couleurs des routes et de l'eau
+sont reprises dans la légende de UI/WorldMap.cs : changer les deux ensemble.
 
 La minicarte du HUD (map_minimap.png, niveaux de gris) est dessinée par map_minimap.py, appelé ici à chaque bake.
 `from_export()` relit les données exportées dans Assets/NoHesi/Resources/Map (utile sans bake).
@@ -15,72 +18,132 @@ import numpy as np
 from PIL import Image, ImageDraw
 import map_lib as L
 
-SIZE = 2048          # image finale (carrée, couvre tout le relief)
+SIZE = 4096          # image finale (carrée, couvre tout le relief) : ~1,6 m par pixel, nette au zoom maximal
 SS = 2               # suréchantillonnage du tracé des routes (anticrénelage)
 
-MEADOW = np.array([104, 152, 78], dtype=np.float64)
-FOREST = np.array([52, 96, 62], dtype=np.float64)
-DRY = np.array([156, 158, 98], dtype=np.float64)
-ROCK = np.array([128, 130, 134], dtype=np.float64)
-SNOW = np.array([238, 242, 248], dtype=np.float64)
-PAVED = np.array([150, 146, 138], dtype=np.float64)
-WATER = np.array([72, 138, 196], dtype=np.float64)
+def _roads(hw, ramp, main, mountain, lane, track):
+    """Table des routes : type -> (largeur dessinée en mètres, remplissage, bord)."""
+    return {"highway": (34.0,) + hw, "ramp": (12.0,) + ramp, "main": (22.0,) + main, "mountain": (18.0,) + mountain,
+            "lane": (12.0,) + lane, "track": (9.0,) + track}
 
-ROADS = {      # type : (largeur dessinée en mètres, couleur, liseré)
-    "main": (26.0, (252, 250, 240), (40, 44, 52)),
-    "mountain": (20.0, (255, 214, 110), (60, 48, 24)),
-    "street": (13.0, (250, 250, 250), (60, 62, 68)),
-    "lane": (12.0, (236, 232, 220), (60, 62, 68)),
-    "track": (9.0, (188, 150, 106), (70, 52, 34)),
-    "highway": (46.0, (255, 150, 80), (70, 34, 16)),
-    "ramp": (11.0, (255, 176, 120), (70, 34, 16)),
-}
 
-# Palette de la carte globale (la minicarte a son propre rendu en niveaux de gris : map_minimap.py)
-PALETTES = {
-    "overview": dict(meadow=MEADOW, forest=FOREST, dry=DRY, rock=ROCK, snow=SNOW, paved=PAVED, water=WATER,
-                     shore=(214, 232, 244), building=(122, 66, 52), roads=ROADS, shade=(0.62, 0.55), contour=0.9),
+# Styles de la carte globale. hypso : teintes d'altitude (m au-dessus du plus bas point du relief) interpolées puis
+# posées en paliers de `band` m ; shade : (base, amplitude) de l'ombrage, `toon` le pose en 3 niveaux ; contours :
+# (tous les n m, facteur) ; far : (part de gris, part du fond) loin des routes ; bg : fond du menu (WorldMap.cs, Back).
+# Les couleurs des routes, de l'eau, de la forêt et des bâtiments sont reprises dans la légende de UI/WorldMap.cs.
+STYLES = {
+    "alpin": dict(       # retenu le 2026-11-16 : couleurs naturelles, fond et hors-zone sombres comme le style « nuit »
+        bg=(9, 11, 15), band=45.0, toon=False, shade=(0.80, 0.34), contours=((50.0, 0.93), (250.0, 0.84)), far=(0.75, 0.74),
+        hypso=[(0, (128, 172, 96)), (140, (140, 178, 98)), (300, (164, 182, 106)), (480, (184, 178, 122)),
+               (680, (170, 162, 146)), (900, (190, 188, 186))],
+        forest=(62, 112, 74), dry=(186, 176, 112), rock=(150, 146, 142), snow=(236, 241, 248), paved=(206, 198, 186),
+        water=(78, 150, 212), water_deep=(52, 112, 178), shore=(206, 232, 246), building=(104, 88, 84), bridge=(34, 36, 44),
+        casing=7.0,
+        roads=_roads(((255, 168, 60), (96, 44, 14)), ((255, 192, 110), (96, 44, 14)), ((255, 255, 252), (66, 70, 80)),
+                     ((255, 222, 128), (104, 78, 34)), ((238, 234, 224), (92, 92, 98)), ((212, 176, 128), (104, 76, 48)))),
+    "nuit": dict(
+        bg=(9, 11, 15), band=60.0, toon=False, shade=(0.78, 0.5), contours=((50.0, 1.12), (250.0, 1.3)), far=(0.7, 0.55),
+        hypso=[(0, (40, 52, 54)), (300, (48, 58, 62)), (600, (60, 66, 74)), (900, (82, 88, 98))],
+        forest=(30, 46, 42), dry=(56, 60, 54), rock=(58, 60, 68), snow=(84, 94, 112), paved=(70, 72, 80),
+        water=(22, 50, 80), water_deep=(14, 34, 60), shore=(66, 120, 160), building=(128, 118, 112), bridge=(4, 5, 8),
+        casing=6.0,
+        roads=_roads(((255, 186, 64), (60, 34, 6)), ((255, 204, 110), (60, 34, 6)), ((232, 238, 246), (14, 16, 22)),
+                     ((96, 214, 255), (10, 36, 52)), ((160, 168, 180), (14, 16, 22)), ((156, 132, 100), (20, 16, 12)))),
+    "papier": dict(
+        bg=(16, 19, 25), band=60.0, toon=False, shade=(0.93, 0.18), contours=((50.0, 0.95), (250.0, 0.88)), far=(0.4, 0.3),
+        hypso=[(0, (238, 234, 214)), (300, (230, 228, 204)), (600, (220, 212, 194)), (900, (226, 222, 216))],
+        forest=(184, 210, 164), dry=(234, 224, 184), rock=(208, 202, 194), snow=(250, 250, 252), paved=(226, 216, 202),
+        water=(154, 200, 232), water_deep=(128, 182, 224), shore=(84, 136, 186), building=(196, 122, 110), bridge=(40, 40, 46),
+        casing=5.0,
+        roads=_roads(((228, 56, 44), (118, 22, 18)), ((236, 104, 84), (118, 22, 18)), ((255, 212, 76), (132, 98, 26)),
+                     ((255, 255, 255), (112, 112, 116)), ((255, 255, 255), (150, 150, 154)), ((206, 170, 126), (150, 118, 86)))),
+    "cartoon": dict(
+        bg=(16, 19, 25), band=90.0, toon=True, shade=(0.86, 0.3), contours=((90.0, 0.8),), far=(0.55, 0.38),
+        width=1.35, outline=0.55,
+        hypso=[(0, (134, 208, 70)), (220, (178, 218, 78)), (440, (224, 212, 108)), (660, (204, 172, 128)),
+               (880, (238, 234, 238))],
+        forest=(28, 130, 98), dry=(232, 206, 96), rock=(168, 150, 146), snow=(248, 250, 255), paved=(226, 212, 188),
+        water=(40, 192, 232), water_deep=(22, 142, 212), shore=(250, 252, 255), building=(222, 92, 70), bridge=(24, 24, 30),
+        casing=9.0,
+        roads=_roads(((255, 138, 36), (24, 24, 30)), ((255, 170, 90), (24, 24, 30)), ((255, 255, 255), (24, 24, 30)),
+                     ((255, 214, 56), (24, 24, 30)), ((236, 236, 236), (24, 24, 30)), ((214, 160, 96), (24, 24, 30)))),
+    "epure": dict(
+        bg=(16, 19, 25), band=200.0, toon=False, shade=(0.96, 0.14), contours=(), far=(0.5, 0.35),
+        hypso=[(0, (222, 228, 218)), (900, (234, 234, 232))],
+        forest=(200, 216, 196), dry=(226, 228, 214), rock=(216, 216, 216), snow=(248, 250, 252), paved=(232, 228, 222),
+        water=(172, 208, 234), water_deep=(154, 196, 230), shore=(206, 226, 240), building=(190, 184, 182), bridge=(150, 150, 156),
+        casing=5.0,
+        roads=_roads(((255, 150, 60), (226, 118, 40)), ((255, 178, 110), (226, 118, 40)), ((255, 255, 255), (178, 182, 190)),
+                     ((255, 212, 122), (208, 168, 88)), ((255, 255, 255), (196, 196, 200)), ((222, 202, 172), (196, 176, 150)))),
 }
+STYLE = "alpin"      # style de map_overview.png (le jeu)
+
+
+ORDER = ["track", "lane", "mountain", "main", "ramp", "highway"]   # du dessous vers le dessus
+
+
+def hypso(h, st):
+    """Couleur d'altitude en paliers (h relatif, m)."""
+    band, table = st["band"], st["hypso"]
+    hq = np.floor(h / band) * band + band * 0.5
+    xs = [a for a, _ in table]
+    return np.stack([np.interp(hq, xs, [c[i] for _, c in table]) for i in range(3)], axis=-1)
+
+
+def soft(mask, lo, hi):
+    """Masque [0, 1] adouci (seuil progressif) : bords nets mais sans escalier."""
+    return np.clip((mask - lo) / (hi - lo), 0.0, 1.0)
 
 
 def render(g, H, rgba, paved, snow, water, edges, rivers, buildings, out_path, palette="overview"):
-    pal = PALETTES[palette]
+    st = STYLES[STYLE if palette == "overview" else palette]
+    C = {k: np.array(st[k], dtype=np.float64) for k in ("forest", "dry", "rock", "snow", "paved", "water", "water_deep")}
     n = g.n
-    f = rgba[..., 0][..., None] / 255.0
-    dry = rgba[..., 1][..., None] / 255.0
-    rock = rgba[..., 2][..., None] / 255.0
-    meadow, forest_c, dry_c, rock_c, snow_c, paved_c, water_c = (
-        np.array(pal[k], dtype=np.float64) for k in ("meadow", "forest", "dry", "rock", "snow", "paved", "water"))
-    col = np.broadcast_to(meadow, (n, n, 3)).copy()
-    col = col * (1 - np.clip(dry * 1.2, 0, 1)) + dry_c * np.clip(dry * 1.2, 0, 1)
-    fm = (f > 0.45).astype(np.float64)
-    col = col * (1 - fm) + forest_c * fm
-    rm = (rock > 0.5).astype(np.float64)
-    col = col * (1 - rm) + rock_c * rm
-    pm = (paved[..., None] / 255.0 > 0.5).astype(np.float64)
-    col = col * (1 - pm) + paved_c * pm
-    sm = (snow[..., None] / 255.0 > 0.45).astype(np.float64)
-    col = col * (1 - sm) + snow_c * sm
-    # relief : ombrage doux, courbes de niveau tous les 100 m
-    shade = L.hillshade(L.blur2d(H, 1.5), g.step, az=315.0, alt=50.0)
-    base, amount = pal["shade"]
-    col *= (base + amount * shade)[..., None]
-    c = np.floor(H / 100.0)
-    line = np.zeros((n, n), dtype=bool)
-    line[:-1, :] |= c[:-1, :] != c[1:, :]
-    line[:, :-1] |= c[:, :-1] != c[:, 1:]
-    col[line] *= pal["contour"]
+    h = H - np.percentile(H, 2)
+    col = hypso(h, st)
+    dry = soft(L.blur2d(rgba[..., 1] / 255.0, 1.0), 0.45, 0.75)[..., None]
+    col = col * (1 - dry * 0.6) + C["dry"] * dry * 0.6
+    forest = soft(L.blur2d(rgba[..., 0] / 255.0, 1.2), 0.40, 0.55)[..., None]
+    col = col * (1 - forest) + C["forest"] * forest
+    if st.get("outline"):
+        # trait sombre au bord des forêts (style dessin animé)
+        fb = soft(L.blur2d(rgba[..., 0] / 255.0, 1.2), 0.36, 0.59)
+        col[(fb > 0.05) & (fb < 0.6)] *= st["outline"]
+    rock = soft(L.blur2d(rgba[..., 2] / 255.0, 1.0), 0.45, 0.6)[..., None]
+    col = col * (1 - rock) + C["rock"] * rock
+    pv = soft(L.blur2d(paved / 255.0, 0.8), 0.4, 0.6)[..., None]
+    col = col * (1 - pv) + C["paved"] * pv
+    sn = soft(L.blur2d(snow / 255.0, 1.2), 0.35, 0.55)[..., None]
+    col = col * (1 - sn) + C["snow"] * sn
+    # relief : ombrage doux (en 3 niveaux pour le style toon ; la neige le garde un peu bleuté), courbes de niveau
+    shade = L.hillshade(L.blur2d(H, 2.0), g.step, az=315.0, alt=45.0)
+    if st["toon"]:
+        shade = np.where(shade > 0.78, 0.85, np.where(shade > 0.55, 0.5, 0.15))
+    base, amount = st["shade"]
+    lit = base + amount * (shade - 0.5)
+    col *= lit[..., None]
+    col += (np.array([-6.0, 0.0, 14.0]) * (1 - lit)[..., None] * sn * 2.0)
+    for every, k in st["contours"]:
+        c = np.floor(H / every)
+        line = np.zeros((n, n), dtype=bool)
+        line[:-1, :] |= c[:-1, :] != c[1:, :]
+        line[:, :-1] |= c[:, :-1] != c[:, 1:]
+        col[line] *= k
+    # eau : plus sombre au large, liseré clair sur la rive
     wm = water > 0
-    col[wm] = water_c
-    # rive : liseré clair
-    shore = np.zeros((n, n), dtype=bool)
-    shore[1:, :] |= wm[1:, :] != wm[:-1, :]
-    shore[:, 1:] |= wm[:, 1:] != wm[:, :-1]
-    col[shore] = pal["shore"]
+    depth = soft(L.blur2d(wm.astype(np.float64), 6.0), 0.5, 1.0)[..., None]
+    wc = C["water"] * (1 - depth) + C["water_deep"] * depth
+    col[wm] = wc[wm]
 
     img = Image.fromarray(np.clip(col, 0, 255).astype(np.uint8)[::-1])        # nord en haut
     big = SIZE * SS
     img = img.resize((big, big), Image.BICUBIC)
+    # rives nettes et lisses : masque de l'eau agrandi puis seuillé (pas d'escalier de la grille), liseré clair autour
+    from PIL import ImageFilter
+    wbig = Image.fromarray((L.blur2d(wm.astype(np.float64), 0.8)[::-1] * 255).astype(np.uint8)).resize((big, big), Image.BICUBIC)
+    wbig = wbig.point(lambda v: 255 if v >= 128 else 0)
+    img.paste(tuple(st["shore"]), mask=wbig.filter(ImageFilter.MaxFilter(2 * max(1, int(2.5 * big / (2 * g.half))) + 1)))
+    img.paste(Image.fromarray(np.clip(wc, 0, 255).astype(np.uint8)[::-1]).resize((big, big), Image.BICUBIC), mask=wbig)
     dr = ImageDraw.Draw(img)
     k = big / (2 * g.half)
 
@@ -91,35 +154,42 @@ def render(g, H, rgba, paved, snow, water, edges, rivers, buildings, out_path, p
     from map_minimap import stroke
     for rv in rivers:
         p = rv["pts"]
-        w = max(2, int(float(p[0][3]) * 1.6 * k))
-        stroke(dr, [px(a[0], a[1]) for a in p], w, tuple(int(v) for v in water_c))
+        w = max(3, int(float(p[0][3]) * 1.4 * k))
+        stroke(dr, [px(a[0], a[1]) for a in p], w + max(2, int(3 * k)), tuple(st["shore"]))
+        stroke(dr, [px(a[0], a[1]) for a in p], w, tuple(st["water"]))
     # bâtiments sous les routes : les rues restent lisibles
     for b in buildings:
-        dr.polygon([px(q[0], q[1]) for q in b], fill=tuple(pal["building"]))
-    order = ["track", "lane", "mountain", "main", "ramp", "highway"]
-    for outline in (True, False):
-        for kind in order:
-            w_m, fill, edge_col = pal["roads"][kind]
+        dr.polygon([px(q[0], q[1]) for q in b], fill=tuple(st["building"]))
+    cas = max(2, int(round(st["casing"] * k)))
+    for layer in ("bridge", "casing", "fill"):
+        for kind in ORDER:
+            w_m, fill, edge_col = st["roads"][kind]
+            w = max(3, int(round(w_m * st.get("width", 1.0) * k)))
             for e in edges:
                 if e["kind"] != kind:
                     continue
-                w = max(2, int(round(w_m * k)))
-                # en tunnel la route ne se voit pas : seulement un pointillé discret
-                for (seg, tunnel) in pieces(e):
+                for (seg, part) in pieces(e):
                     pts = [px(a[0], a[1]) for a in seg]
                     if len(pts) < 2:
                         continue
-                    if tunnel:
-                        if not outline:
-                            for j in range(0, len(pts) - 6, 12):
-                                dr.line(pts[j:j + 6], fill=edge_col, width=max(2, w // 3))
-                    elif outline:
-                        stroke(dr, pts, w + max(2, int(8 * k)), edge_col)
+                    if part == "tunnel":
+                        # en tunnel la route ne se voit pas : pointillé du bord, cœur clair
+                        if layer == "fill":
+                            dash = max(4, int(36 * k))
+                            for d0 in _dashes(pts, dash, dash * 0.8):
+                                stroke(dr, d0, max(3, w // 2) + cas, edge_col)
+                                stroke(dr, d0, max(2, w // 3), fill)
+                    elif layer == "bridge":
+                        if part == "bridge":
+                            stroke(dr, pts, w + 2 * cas + max(4, int(10 * k)), tuple(st["bridge"]))
+                    elif layer == "casing":
+                        stroke(dr, pts, w + 2 * cas, edge_col)
                     else:
                         stroke(dr, pts, w, fill)
     img = img.resize((SIZE, SIZE), Image.LANCZOS)
+    img = _focus(img, edges, g, st)
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    img.save(out_path)
+    img.save(out_path, optimize=True)
     # Au bake, la minicarte suit la carte globale
     if palette == "overview" and os.path.basename(out_path) == "map_overview.png":
         import map_minimap
@@ -127,17 +197,74 @@ def render(g, H, rgba, paved, snow, water, edges, rivers, buildings, out_path, p
     return out_path
 
 
+def _dashes(pts, on, off):
+    """Découpe une polyligne (px) en tirets de longueur `on` séparés de `off`."""
+    out, cur, acc, drawing = [], [pts[0]], 0.0, True
+    for a, b in zip(pts[:-1], pts[1:]):
+        seg = math.hypot(b[0] - a[0], b[1] - a[1])
+        t0 = 0.0
+        while seg - t0 > 1e-6:
+            left = (on if drawing else off) - acc
+            step = min(left, seg - t0)
+            t1 = t0 + step
+            q = (a[0] + (b[0] - a[0]) * t1 / seg, a[1] + (b[1] - a[1]) * t1 / seg)
+            if drawing:
+                cur.append(q)
+            acc += step
+            t0 = t1
+            if acc >= (on if drawing else off) - 1e-6:
+                if drawing and len(cur) > 1:
+                    out.append(cur)
+                drawing, acc, cur = not drawing, 0.0, [q]
+    if drawing and len(cur) > 1:
+        out.append(cur)
+    return out
+
+
+def _focus(img, edges, g, st):
+    """Loin des routes, la carte s'éteint (désaturée, assombrie) puis se fond dans le fond du menu près des bords."""
+    from PIL import ImageFilter
+    lo = 512
+    m = Image.new("L", (lo, lo), 0)
+    dr = ImageDraw.Draw(m)
+    k = lo / (2 * g.half)
+    for e in edges:
+        pts = [((a[0] + g.half) * k, (g.half - a[1]) * k) for a in e["pts"]]
+        if len(pts) > 1:
+            dr.line(pts, fill=255, width=max(1, int(260 * k)))
+    m = m.filter(ImageFilter.MaxFilter(9)).filter(ImageFilter.GaussianBlur(lo * 0.035))
+    near = np.asarray(m.resize(img.size, Image.BICUBIC), dtype=np.float64) / 255.0
+    near = soft(near, 0.05, 0.55)[..., None]
+    a = np.asarray(img, dtype=np.float64)
+    grey = a.mean(axis=2, keepdims=True)
+    bg = np.array(st["bg"], dtype=np.float64)
+    grey_part, bg_part = st["far"]
+    far = (a * (1 - grey_part) + grey * grey_part) * (1 - bg_part) + bg * bg_part
+    a = far * (1 - near) + a * near
+    # fondu carré vers BG sur les derniers 9 % de l'image
+    s = img.size[0]
+    t = np.abs(np.linspace(-1.0, 1.0, s))
+    edge = soft(np.maximum(t[:, None], t[None, :]), 0.91, 0.995)
+    edge = (edge * edge * (3 - 2 * edge))[..., None]
+    a = a * (1 - edge) + bg * edge
+    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8))
+
+
 def pieces(e):
-    """Découpe une arête en tronçons à l'air libre et en tunnel : [(points, en tunnel)]."""
+    """Découpe une arête en tronçons : [(points, "open" | "tunnel" | "bridge")] (index de points dans e["tunnels"] et
+    e["bridges"], ce dernier facultatif)."""
     P = e["pts"]
     n = len(P)
-    tun = np.zeros(n, dtype=bool)
+    part = np.zeros(n, dtype=np.int8)
+    for (i0, i1) in e.get("bridges", ()):
+        part[i0:i1 + 1] = 2
     for (i0, i1) in e.get("tunnels", ()):
-        tun[i0:i1 + 1] = True
+        part[i0:i1 + 1] = 1
+    names = ("open", "tunnel", "bridge")
     out, start = [], 0
     for i in range(1, n + 1):
-        if i == n or tun[i] != tun[start]:
-            out.append((P[start:min(i + 1, n)], bool(tun[start])))
+        if i == n or part[i] != part[start]:
+            out.append((P[start:min(i + 1, n)], names[part[start]]))
             start = i
     return out
 
@@ -162,9 +289,10 @@ def from_export(res_dir):
         p = e["pts"]
         P3 = np.array(p, dtype=np.float64).reshape(-1, 3)
         s3 = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(P3, axis=0), axis=1))])
-        tunnels = [(int(np.searchsorted(s3, sp["s0"])), int(np.searchsorted(s3, sp["s1"]))) for sp in e.get("spans", [])
-                   if sp["kind"] == "tunnel"]
-        edges.append(dict(kind=e["kind"], pts=[(p[i], p[i + 2]) for i in range(0, len(p), 3)], tunnels=tunnels))
+        spans = {kind: [(int(np.searchsorted(s3, sp["s0"])), int(np.searchsorted(s3, sp["s1"]))) for sp in e.get("spans", [])
+                        if sp["kind"] == kind] for kind in ("tunnel", "bridge")}
+        edges.append(dict(kind=e["kind"], pts=[(p[i], p[i + 2]) for i in range(0, len(p), 3)], tunnels=spans["tunnel"],
+                          bridges=spans["bridge"]))
     rivers = [dict(pts=[(p[i], p[i + 2], p[i + 1], r["width"]) for i in range(0, len(p), 3)]) for r in d["rivers"] for p in [r["pts"]]]
     buildings = []
     items = {}
@@ -191,5 +319,10 @@ if __name__ == "__main__":
         out = sys.argv[sys.argv.index("--out") + 1] if "--out" in sys.argv else os.path.join(res, "map_minimap.png")
         g, H, rgba, paved, snow, water, edges, rivers, buildings = from_export(res)
         print(map_minimap.render(g, H, rgba, snow, water, edges, rivers, out))
+    elif "--overview" in sys.argv:
+        # refait la carte globale (et la minicarte) à partir des données exportées, sans bake
+        out = sys.argv[sys.argv.index("--out") + 1] if "--out" in sys.argv else os.path.join(res, "map_overview.png")
+        style = sys.argv[sys.argv.index("--style") + 1] if "--style" in sys.argv else "overview"
+        print(render(*from_export(res), out, palette=style))
     else:
         print(__doc__)
