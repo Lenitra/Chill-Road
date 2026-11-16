@@ -69,8 +69,10 @@ namespace NoHesi
         }
 
         /// <summary>
-        /// Niveaux de détail des modèles posés : le maillage complet (10 000 triangles et plus pour une maison) seulement
-        /// de près, le niveau intermédiaire ensuite, les volumes simples au loin ; jamais masqué.
+        /// Niveaux de détail des modèles posés : le maillage complet (10 000 triangles et plus pour une maison) de près, le
+        /// niveau intermédiaire ensuite, les volumes simples au loin ; jamais masqué. Seuils divisés par
+        /// QualitySettings.lodBias (option « Distance des détails ») : à « Loin », une maison de 8 m garde son modèle
+        /// complet jusqu'à ~60 m (avec l'ancien seuil 0,85 elle le perdait vers 15 m).
         /// </summary>
         static void TuneLods(GameObject go)
         {
@@ -78,7 +80,7 @@ namespace NoHesi
             if (!group) return;
             var lods = group.GetLODs();
             if (lods.Length < 2) return;
-            lods[0].screenRelativeTransitionHeight = 0.85f;
+            lods[0].screenRelativeTransitionHeight = 0.4f;
             for (int i = 1; i < lods.Length - 1; i++) lods[i].screenRelativeTransitionHeight = 0.12f;
             lods[lods.Length - 1].screenRelativeTransitionHeight = 0.002f;
             group.SetLODs(lods);

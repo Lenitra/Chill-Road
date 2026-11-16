@@ -34,7 +34,7 @@ namespace NoHesi
         IEnumerator Run()
         {
             while (game.State != GameManager.Phase.Title && game.State != GameManager.Phase.Playing) yield return null;
-            int quality = GameSettings.Quality, cap = GameSettings.FpsCap;
+            int quality = GameSettings.Quality, cap = GameSettings.FpsCap, detail = GameSettings.DetailDistance;
             Application.runInBackground = true;
             if (game.State == GameManager.Phase.Title) game.StartCountdown();
             yield return new WaitForSeconds(4f);
@@ -45,6 +45,7 @@ namespace NoHesi
             for (int q = 0; q < 4; q++)
             {
                 GameSettings.Quality = q;
+                GameSettings.DetailDistance = GraphicsQuality.DefaultDetail(q);
                 GraphicsQuality.Apply(game);
                 report.AppendLine();
                 report.AppendLine("Qualité " + GraphicsQuality.Name(q));
@@ -65,6 +66,7 @@ namespace NoHesi
             }
             GameSettings.Quality = quality;
             GameSettings.FpsCap = cap;
+            GameSettings.DetailDistance = detail;
             GraphicsQuality.Apply(game);
             string text = report.ToString();
             Debug.Log(text);

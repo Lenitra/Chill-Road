@@ -35,6 +35,9 @@ namespace NoHesi
         // Graphismes : qualité 0 basse, 1 moyenne, 2 haute, 3 ultra ; limite d'images (index de GraphicsQuality.FpsCaps)
         public static int Quality = GraphicsQuality.High;
         public static int FpsCap = 1;
+        // Distance des détails (index de GraphicsQuality.DetailLevels) : jusqu'où arbres, maisons et objets gardent leur
+        // modèle complet ; remise au niveau conseillé quand la qualité change
+        public static int DetailDistance = GraphicsQuality.DefaultDetail(GraphicsQuality.High);
 
         const string Prefix = "nohesi_opt_";
         static bool loaded;
@@ -59,6 +62,7 @@ namespace NoHesi
             TouchSteer = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "touch", TouchSteer), 0, 3);
             Quality = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "quality", Application.isMobilePlatform ? GraphicsQuality.Low : Quality), 0, 3);
             FpsCap = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "fpscap", FpsCap), 0, GraphicsQuality.FpsCaps.Length - 1);
+            DetailDistance = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "detail", GraphicsQuality.DefaultDetail(Quality)), 0, GraphicsQuality.DetailLevels - 1);
         }
 
         public static void Save()
@@ -79,6 +83,7 @@ namespace NoHesi
             PlayerPrefs.SetInt(Prefix + "touch", TouchSteer);
             PlayerPrefs.SetInt(Prefix + "quality", Quality);
             PlayerPrefs.SetInt(Prefix + "fpscap", FpsCap);
+            PlayerPrefs.SetInt(Prefix + "detail", DetailDistance);
             PlayerPrefs.Save();
         }
 
@@ -100,6 +105,7 @@ namespace NoHesi
             TouchSteer = 1;
             Quality = Application.isMobilePlatform ? GraphicsQuality.Low : GraphicsQuality.High;
             FpsCap = 1;
+            DetailDistance = GraphicsQuality.DefaultDetail(Quality);
         }
 
         /// <summary>Signature des réglages de route : sert à signaler qu'une nouvelle route est nécessaire.</summary>
