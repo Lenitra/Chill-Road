@@ -42,7 +42,7 @@ namespace NoHesi
 
             car.GearChanged += g => Play(blip, 0.1f, g > 1 ? 0.5f : 0.4f);
             car.Impacted += (col, impact) => { if (impact > 3f) Play(crash, Mathf.Clamp01(impact / 15f), Random.Range(0.85f, 1.1f)); };
-            score.NearMiss += (pts, gap, onc) => Play(whoosh, 0.8f, Random.Range(0.9f, 1.2f));
+            score.NearMiss += (pts, gap) => Play(whoosh, 0.8f, Random.Range(0.9f, 1.2f));
             score.Bonus += (pts, label) => Play(blip, 0.18f, 1.4f);       // vitesse : petite note, toutes les 5 s
             score.Banked += cash => Play(bonus, 0.5f, 1f);
             score.Lost += (pts, why) => Play(lose, 0.6f, 1f);

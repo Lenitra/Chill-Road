@@ -141,7 +141,7 @@ namespace NoHesi.DebugTools
             Log("title reached");
             SetupCapture();
             gm.Score.Protect(1e6f);
-            gm.Score.NearMiss += (p, g, o) => { pendingNearMiss = true; nearMissAt = Time.time; };
+            gm.Score.NearMiss += (p, g) => { pendingNearMiss = true; nearMissAt = Time.time; };
 
             if (plan.split)
             {
@@ -151,7 +151,7 @@ namespace NoHesi.DebugTools
                 bool ok = gm.StartSplitScreen();
                 Log($"split start={ok} slots={gm.Slots.Count}");
                 if (!ok) gm.StartCountdown();
-                if (Split) gm.Slots[1].Score.NearMiss += (p, g, o) => { pendingNearMiss = true; nearMissAt = Time.time; };
+                if (Split) gm.Slots[1].Score.NearMiss += (p, g) => { pendingNearMiss = true; nearMissAt = Time.time; };
             }
             else gm.StartCountdown();
             while (gm.State != GameManager.Phase.Playing) yield return null;
@@ -257,7 +257,7 @@ namespace NoHesi.DebugTools
                 uiCam.Render();
                 Save(uiRT, uiHalfRT, baseName + "_uiw", false);
             }
-            Log($"shot {baseName} kmh={gm.Player.SpeedKmh:0} kind={gm.Road.KindAt(gm.PlayerS)} score={gm.Score.RunScore:0} x{gm.Score.Multiplier:0.0}");
+            Log($"shot {baseName} kmh={gm.Player.SpeedKmh:0} kind={gm.Road.KindAt(gm.PlayerS)} score={gm.Score.RunScore:0}");
             shotsTaken++;
             lastShot = Time.time;
         }

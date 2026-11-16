@@ -29,7 +29,7 @@ namespace NoHesi
                 chroma.intensity.overrideState = true;
                 lens.intensity.overrideState = true;
             }
-            score.NearMiss += (pts, gap, onc) => pulse = Mathf.Max(pulse, gap < 0.6f ? 0.8f : 0.5f);
+            score.NearMiss += (pts, gap) => pulse = Mathf.Max(pulse, gap < 0.6f ? 0.8f : 0.5f);
             car.Impacted += (col, impact) => { if (impact > 6f) pulse = 1f; };
             if (cam && streakMaterial) streaks = MakeStreaks(cam.transform, streakMaterial);
         }

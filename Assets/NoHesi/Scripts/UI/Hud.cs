@@ -58,10 +58,9 @@ namespace NoHesi
         float flashAlpha;
 
         // Argent et combo
-        Text scoreText, multText, bestText, oncomingText;
-        RectTransform multBadge, comboFill;
-        HudShape multShape;
-        float displayedScore = -1f, multPunch, comboAlpha;
+        Text scoreText, bestText;
+        RectTransform comboFill;
+        float displayedScore = -1f, stakePunch, comboAlpha;
         CanvasGroup comboGroup;
         // Derniers gains et cascades : lignes discrètes sous le compteur du combo, la plus récente en haut
         class FeedLine { public RectTransform rt; public CanvasGroup group; public Text text; public float timer, time; }
@@ -180,18 +179,17 @@ namespace NoHesi
             BuildPause();
             gameObject.AddComponent<CheatCodes>().Init(gm);
 
-            // Gains : le badge du multiplicateur réagit, une ligne discrète nomme le gain ; accident : flash rouge
-            slot.Score.NearMiss += (pts, gap, onc) =>
+            // Gains : la cagnotte en jeu réagit, une ligne discrète nomme le gain ; accident : flash rouge
+            slot.Score.NearMiss += (pts, gap) =>
             {
-                multPunch = 0.35f;
-                string label = gap < 0.6f ? Loc.T("FRÔLEMENT EXTRÊME", "EXTREME NEAR MISS") : Loc.T("FRÔLEMENT", "NEAR MISS");
-                Feed(label + (onc ? Loc.T(" · CONTRESENS", " · ONCOMING") : ""), pts);
+                stakePunch = 0.25f;
+                Feed(gap < 0.6f ? Loc.T("FRÔLEMENT EXTRÊME", "EXTREME NEAR MISS") : Loc.T("FRÔLEMENT", "NEAR MISS"), pts);
             };
             slot.Score.Bonus += (pts, label) => Feed(label, pts);
-            slot.Score.DriftScored += pts => { multPunch = 0.35f; Feed("DRIFT", pts); };
+            slot.Score.DriftScored += pts => { stakePunch = 0.25f; Feed("DRIFT", pts); };
             slot.Score.JumpScored += (pts, air, dist) =>
             {
-                multPunch = 0.35f;
+                stakePunch = 0.25f;
                 string label = air >= 2.5f ? Loc.T("MÉGA SAUT", "MEGA JUMP") : air >= 1.5f ? Loc.T("GROS SAUT", "BIG JUMP") : Loc.T("SAUT", "JUMP");
                 Feed(Loc.F($"{label} · {air:0.0} s · {dist:0} m"), pts);
             };
@@ -222,24 +220,16 @@ namespace NoHesi
             comboGroup = combo.gameObject.AddComponent<CanvasGroup>();
             comboGroup.alpha = 0f;
             comboGroup.blocksRaycasts = false;
-            // Badge du multiplicateur, à gauche de la cagnotte en jeu
-            multBadge = Rect(combo, "Mult", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
-            multBadge.sizeDelta = new Vector2(74f, 32f);
-            multBadge.anchoredPosition = new Vector2(-84f, -20f);
-            multShape = Shape(multBadge, "Fill", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(74f, 32f), Accent);
-            multShape.Set(12f, 0f, 0f);
-            multText = Label(multBadge, "x1.0", 21, TextAnchor.MiddleCenter, new Color(0.06f, 0.06f, 0.08f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(74f, 32f), FontStyle.BoldAndItalic);
-            multText.GetComponent<Shadow>().enabled = false;
-            bestText = Label(combo, "", 24, TextAnchor.MiddleLeft, Accent, new Vector2(0.5f, 1f), new Vector2(-38f, -20f), new Vector2(260f, 32f), FontStyle.BoldAndItalic);
-            bestText.rectTransform.pivot = new Vector2(0f, 0.5f);
+            // Cagnotte en jeu, centrée
+            bestText = Label(combo, "", 26, TextAnchor.MiddleCenter, Accent, new Vector2(0.5f, 1f), new Vector2(0f, -20f), new Vector2(400f, 34f), FontStyle.BoldAndItalic);
+            bestText.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             Outline(bestText, new Color(0f, 0f, 0f, 0.35f), 1.5f);
 
-            // Jauge du combo : fine ligne qui se vide ; en dessous, le contresens
+            // Jauge du combo : fine ligne qui se vide
             var comboBar = Rect(combo, "Timer", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-120f, -45f), new Vector2(120f, -42f));
             comboBar.gameObject.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.12f);
             comboFill = Rect(comboBar, "Fill", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             comboFill.gameObject.AddComponent<Image>().color = Accent;
-            oncomingText = Label(combo, "", 16, TextAnchor.UpperCenter, Danger, new Vector2(0.5f, 1f), new Vector2(0f, -50f), new Vector2(240f, 22f), FontStyle.Bold);
             AddSlide(combo, new Vector2(0f, 220f));
 
             // Derniers gains, sous le combo (indépendants de son fondu : le texte reste lisible si le combo s'arrête)
@@ -456,19 +446,15 @@ namespace NoHesi
             bool combo = score.ComboActive;
             comboAlpha = Mathf.MoveTowards(comboAlpha, combo ? 1f : 0f, dt * (combo ? 6f : 2.5f));
             comboGroup.alpha = comboAlpha;
-            multPunch = Mathf.MoveTowards(multPunch, 0f, dt * 1.5f);
+            stakePunch = Mathf.MoveTowards(stakePunch, 0f, dt * 1.2f);
             if (combo)
             {
-                multText.text = Loc.F($"x{score.Multiplier:0.0}");
-                multShape.color = score.Oncoming ? Danger : Accent;
-                oncomingText.text = score.Oncoming ? Loc.T("CONTRESENS x2", "ONCOMING x2") : "";
                 bool kept = score.Drifting || score.Speeding || score.Jumping;
                 comboFill.localScale = new Vector3(kept ? 1f : Mathf.Clamp01(score.ComboTimer / score.comboWindow), 1f, 1f);
                 bestText.text = "+" + Wallet.Format(score.AtStake) + Loc.T("  en jeu", "  at stake");
             }
-            multBadge.localScale = Vector3.one * (1f + multPunch);
-            // Derniers gains : chaque ligne apparaît vite, reste, puis s'efface ; les anciennes descendent d'un cran.
-            // Le tout descend sous la ligne du contresens quand elle est là
+            bestText.rectTransform.localScale = Vector3.one * (1f + stakePunch);
+            // Derniers gains : chaque ligne apparaît vite, reste, puis s'efface ; les anciennes descendent d'un cran
             for (int i = 0; i < feed.Count; i++)
             {
                 var line = feed[i];
@@ -483,7 +469,6 @@ namespace NoHesi
                 float y = Mathf.Lerp(line.rt.anchoredPosition.y, -i * FeedStep, 1f - Mathf.Exp(-dt * 14f));
                 line.rt.anchoredPosition = new Vector2(0f, y);
             }
-            float feedY = combo && score.Oncoming ? -100f : -76f;
             // Annonce : arrive en grand puis se pose, reste, s'efface
             if (announceTimer > 0f)
             {
@@ -494,7 +479,6 @@ namespace NoHesi
                 announceRt.localScale = Vector3.one * (1f + announcePunch * settle * settle);
             }
             else announceGroup.alpha = 0f;
-            feedRt.anchoredPosition = new Vector2(0f, Mathf.Lerp(feedRt.anchoredPosition.y, feedY, 1f - Mathf.Exp(-dt * 12f)));
 
             // Heure (icône soleil ou lune)
             if (clockText && game.DayNight)
@@ -503,7 +487,7 @@ namespace NoHesi
             // Drift : ce que rapportera le drift (multiplicateur compris) ; le compteur grossit avec l'angle
             // En l'air, le même cadre suit le saut : gain à la réception, distance, temps en l'air
             bool showJump = score.Jumping && !Paused;
-            bool showDrift = !showJump && score.Drifting && score.DriftPoints * score.Multiplier >= 8f && !Paused;
+            bool showDrift = !showJump && score.Drifting && score.DriftPoints >= 8f && !Paused;
             if (showJump || showDrift)   // pendant le fondu de sortie, le cadre garde l'allure du dernier affiché
             {
                 Color tint = showJump ? JumpColor : DriftColor;
@@ -513,7 +497,7 @@ namespace NoHesi
             }
             if (showJump)
             {
-                driftText.text = "+" + Wallet.Format(score.JumpPoints * score.Multiplier);
+                driftText.text = "+" + Wallet.Format(score.JumpPoints);
                 driftChain.text = Loc.F($"{score.JumpDistance:0} m");
                 driftBar.localScale = new Vector3(Mathf.Clamp01(score.JumpTime / 3f), 1f, 1f);
                 driftText.rectTransform.localScale = Vector3.one * (1f + Mathf.Clamp01(score.JumpTime / 3f) * 0.18f);
@@ -532,8 +516,8 @@ namespace NoHesi
             }
             else if (showDrift)
             {
-                driftText.text = "+" + Wallet.Format(score.DriftPoints * score.Multiplier);
-                driftChain.text = Loc.F($"x{score.DriftChain:0.0}");
+                driftText.text = "+" + Wallet.Format(score.DriftPoints);
+                driftChain.text = "";
                 driftBar.localScale = new Vector3(Mathf.Clamp01((score.DriftAngle - 12f) / 48f), 1f, 1f);
                 driftText.rectTransform.localScale = Vector3.one * (1f + Mathf.Clamp01((score.DriftAngle - 12f) / 48f) * 0.18f);
             }

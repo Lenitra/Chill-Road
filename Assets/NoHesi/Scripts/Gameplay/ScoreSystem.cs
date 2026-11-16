@@ -6,8 +6,8 @@ namespace NoHesi
 {
     /// <summary>
     /// Gains en conduisant : frôlements du trafic, drifts et vitesse rapportent de l'argent.
-    /// Les gains s'ajoutent à la cagnotte du combo en cours (<see cref="RunScore"/>), avec un multiplicateur qui monte à
-    /// chaque frôlement et à chaque drift. Tant qu'on enchaîne (ou qu'on roule vite), le combo continue ; quand il retombe
+    /// Les gains s'ajoutent à la cagnotte du combo en cours (<see cref="RunScore"/>), sans multiplicateur.
+    /// Tant qu'on enchaîne (ou qu'on roule vite), le combo continue ; quand il retombe
     /// (<see cref="comboWindow"/> secondes sans rien), la cagnotte est encaissée dans le portefeuille (<see cref="Wallet"/>).
     /// Un accident avant l'encaissement fait tout perdre.
     /// Suit aussi la distance parcourue.
@@ -17,7 +17,6 @@ namespace NoHesi
         public const string BestKey = "nohesi_best";
 
         [Tooltip("Durée du combo sans nouvelle action avant l'encaissement (s)")] public float comboWindow = 6f;
-        [Tooltip("Multiplicateur maximal du combo")] public float maxMultiplier = 5f;
 
         [Header("Frôlements")]
         [Tooltip("Vitesse minimale du joueur (km/h)")] public float nearMissMinKmh = 60f;
@@ -46,12 +45,9 @@ namespace NoHesi
 
         /// <summary>Cagnotte du combo en cours (pas encore encaissée).</summary>
         public float RunScore { get; private set; }
-        public float Multiplier { get; private set; } = 1f;
         public float ComboTimer { get; private set; }
         /// <summary>Combo en cours (cagnotte en jeu).</summary>
         public bool ComboActive => RunScore > 0f || Drifting || Speeding || Jumping;
-        /// <summary>Vient de frôler un véhicule à contresens (gain doublé).</summary>
-        public bool Oncoming => Time.time - lastOncoming < 2.5f;
         /// <summary>Meilleur combo encaissé.</summary>
         public float Best { get; private set; }
         /// <summary>Distance parcourue depuis le départ (m).</summary>
@@ -59,9 +55,8 @@ namespace NoHesi
         public bool Recording { get; set; } = true;
 
         public bool Drifting { get; private set; }
-        /// <summary>Gain du drift en cours (avant multiplicateur), encaissé dans le combo à la sortie du drift.</summary>
+        /// <summary>Gain du drift en cours, encaissé dans le combo à la sortie du drift.</summary>
         public float DriftPoints { get; private set; }
-        public float DriftChain { get; private set; } = 1f;
         public float DriftAngle { get; private set; }
 
         /// <summary>Au-dessus du seuil de vitesse : la vitesse rapporte et entretient le combo.</summary>
@@ -74,13 +69,13 @@ namespace NoHesi
         public float JumpTime { get; private set; }
         /// <summary>Distance parcourue en l'air, à plat (m).</summary>
         public float JumpDistance { get; private set; }
-        /// <summary>Gain du saut en cours (avant multiplicateur), versé dans le combo à la réception.</summary>
+        /// <summary>Gain du saut en cours, versé dans le combo à la réception.</summary>
         public float JumpPoints => jumpCashPerSecond * Mathf.Min(JumpTime, jumpMaxAir) + jumpCashPerMeter * Mathf.Min(JumpDistance, jumpMaxAir * 40f);
 
         public event Action<float, float, float> JumpScored; // gain, temps en l'air, distance
         /// <summary>Réception de tout saut, même court ou raté (cascades) : temps en l'air, distance, retombée sur les roues.</summary>
         public event Action<float, float, bool> Landed;
-        public event Action<float, float, bool> NearMiss;   // gain, écart, contresens
+        public event Action<float, float> NearMiss;         // gain, écart
         public event Action<float, string> Lost;            // cagnotte perdue, raison
         public event Action<float, string> Bonus;           // gain, libellé (vitesse)
         public event Action<Vector3> NearMissAt;            // point entre la voiture et le véhicule frôlé
@@ -90,7 +85,7 @@ namespace NoHesi
 
         VehicleController player;
         TrafficSystem traffic;
-        float protect, lastOncoming = -10f;
+        float protect;
         float driftCalm, speedChunk, speedChunkTime, speedTop;
         Vector3 takeoff;
         float jumpMinUp, sinceLand = 10f;
@@ -101,7 +96,7 @@ namespace NoHesi
         {
             public TrafficSystem.Car car;
             public float startAlong, minGap = float.MaxValue;
-            public bool overlapped, hit, oncoming;
+            public bool overlapped, hit;
             public float relSpeed;
             public Vector3 closest;
         }
@@ -128,7 +123,7 @@ namespace NoHesi
             if (player.TeleportCount != teleports)
             {
                 teleports = player.TeleportCount;
-                Drifting = false; DriftPoints = 0f; DriftChain = 1f;
+                Drifting = false; DriftPoints = 0f;
                 Speeding = false; speedChunk = 0f;
                 Airborne = false;
                 passes.Clear();
@@ -204,7 +199,7 @@ namespace NoHesi
                 if (Mathf.Abs(along) < TrafficSystem.Extent(c, fwd) + halfLen + 0.3f) continue;
                 if (Mathf.Abs(Vector3.Dot(d, right)) > 8f) continue;
                 if (Tracked(c)) continue;
-                passes.Add(new Pass { car = c, startAlong = along, oncoming = Vector3.Dot(c.velocity, player.Velocity) < 0f });
+                passes.Add(new Pass { car = c, startAlong = along });
             }
         }
 
@@ -220,11 +215,9 @@ namespace NoHesi
             bool extreme = gap < extremeGap;
             float baseCash = extreme ? extremeCash : Mathf.Lerp(nearMissCash * 1.6f, nearMissCash, Mathf.InverseLerp(extremeGap, nearMissGap, gap));
             float speedFactor = Mathf.Clamp(player.SpeedKmh / 100f, 0.7f, 2.5f);
-            float cash = baseCash * speedFactor * (p.oncoming ? 2f : 1f) * Multiplier;
-            if (p.oncoming) lastOncoming = Time.time;
+            float cash = baseCash * speedFactor;
             Add(cash);
-            Multiplier = Mathf.Min(maxMultiplier, Multiplier + (extreme ? 0.4f : 0.2f) * (p.oncoming ? 1.5f : 1f));
-            NearMiss?.Invoke(cash, gap, p.oncoming);
+            NearMiss?.Invoke(cash, gap);
             NearMissAt?.Invoke(p.closest);
         }
 
@@ -239,12 +232,11 @@ namespace NoHesi
                            && player.ForwardSpeed > 0f;
             if (sliding)
             {
-                if (!Drifting) { Drifting = true; DriftPoints = 0f; DriftChain = 1f; }
+                if (!Drifting) { Drifting = true; DriftPoints = 0f; }
                 driftCalm = 0f;
                 float angleFactor = Mathf.Clamp(angle / 30f, 0.5f, 2f);
                 float speedFactor = Mathf.Clamp(player.SpeedKmh / 60f, 0.5f, 2.5f);
-                DriftChain = Mathf.Min(3f, DriftChain + dt * 0.25f);
-                DriftPoints += driftCashPerSecond * angleFactor * speedFactor * DriftChain * dt;
+                DriftPoints += driftCashPerSecond * angleFactor * speedFactor * dt;
             }
             else if (Drifting)
             {
@@ -258,19 +250,17 @@ namespace NoHesi
         void EndDrift()
         {
             Drifting = false;
-            float cash = DriftPoints * Multiplier;
+            float cash = DriftPoints;
             DriftPoints = 0f;
-            DriftChain = 1f;
             // Simple coup de volant : rien
             if (cash < 8f) return;
             Add(cash);
-            Multiplier = Mathf.Min(maxMultiplier, Multiplier + Mathf.Clamp(cash / 400f, 0.1f, 0.5f));
             DriftScored?.Invoke(cash);
         }
 
         // ------------------------------------------------------------------ vitesse
 
-        /// <summary>Au-delà du seuil, la vitesse rapporte un peu chaque seconde (sans multiplicateur), versé par tranches de 5 s.</summary>
+        /// <summary>Au-delà du seuil, la vitesse rapporte un peu chaque seconde, versé par tranches de 5 s.</summary>
         void UpdateSpeed(float dt)
         {
             if (Airborne) return;   // en l'air, la vitesse en cours attend la réception
@@ -340,9 +330,8 @@ namespace NoHesi
             if (JumpTime < jumpMinAir) return;
             // Réception sur le toit ou sur le flanc, ou tonneau en l'air : rien
             if (Vector3.Dot(player.transform.up, Vector3.up) < 0.5f || jumpMinUp < 0.2f) return;
-            float cash = JumpPoints * Multiplier;
+            float cash = JumpPoints;
             Add(cash);
-            Multiplier = Mathf.Min(maxMultiplier, Multiplier + Mathf.Clamp(JumpTime * 0.2f, 0.1f, 0.5f));
             JumpScored?.Invoke(cash, JumpTime, JumpDistance);
         }
 
@@ -374,16 +363,15 @@ namespace NoHesi
 
         void ResetCombo()
         {
-            Drifting = false; DriftPoints = 0f; DriftChain = 1f;
+            Drifting = false; DriftPoints = 0f;
             Speeding = false; speedChunk = speedChunkTime = speedTop = 0f;
             Airborne = false;
             RunScore = 0f;
-            Multiplier = 1f;
             ComboTimer = 0f;
         }
 
         /// <summary>Tout ce qui est en jeu : cagnotte, drift et vitesse pas encore versés.</summary>
-        public float AtStake => RunScore + DriftPoints * Multiplier + speedChunk;
+        public float AtStake => RunScore + DriftPoints + speedChunk;
 
         void OnImpact(Collision c, float impact)
         {
@@ -396,7 +384,7 @@ namespace NoHesi
             bool floor = c.contactCount > 0 && c.GetContact(0).normal.y > 0.65f && Vector3.Dot(player.transform.up, Vector3.up) > 0.6f;
             if (protect > 0f || (car == null && (hard < crashImpact || floor))) return;
             float lost = AtStake;
-            bool drifting = Drifting && DriftPoints * Multiplier >= 8f && RunScore < 1f;
+            bool drifting = Drifting && DriftPoints >= 8f && RunScore < 1f;
             ResetCombo();
             if (drifting) DriftLost?.Invoke(lost);
             else if (lost >= 1f) Lost?.Invoke(lost, Loc.T("ACCIDENT", "CRASH"));
