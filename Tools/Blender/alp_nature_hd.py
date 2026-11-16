@@ -254,55 +254,221 @@ def dead_spruce(g):
 override("dead_spruce", dead_spruce)
 
 
-# ----------------------------------------------------------------- feuillus (charpente + houppier en boules)
-def leafy(g, H, trunk_h, trunk_r, spread, colors, bark="bark", n_scaf=5, blob_r=0.17, squash=0.85, elev=(35, 60),
-          fill=3, along=False, top=None, marks=None, lean=0.0, amp=0.16, sec=2, sat=5):
-    """Feuillu générique. La structure (branches, boules) est tirée une fois, identique aux trois niveaux."""
+# ----------------------------------------------------------------- feuillages en touffes de feuilles
+# (2026-11-16) Les houppiers en boules lisses donnaient des ballons sous l'éclairage cartoon. Une masse de feuillage
+# est maintenant un noyau sombre (le volume, l'ombre du dedans) hérissé de feuilles en losange qui en débordent et
+# retombent. Les normales des feuilles sont imposées (celles de la masse) : l'ombrage reste d'un seul tenant, sans
+# papillotement feuille à feuille.
+def _cn(g):
+    lay = g.bm.loops.layers.float_vector.get("cn")
+    return lay if lay is not None else g.bm.loops.layers.float_vector.new("cn")
+
+
+def leaf(g, p, d, out, length, width, color, nrm, fold=0.14, part=0):
+    """Feuille en losange pliée sur sa nervure, visible des deux côtés (4 triangles). p : attache, d : direction,
+    out : côté vers lequel la feuille présente sa face, nrm : normale d'ombrage imposée."""
+    bm = g.bm
+    cn = _cn(g)
+    side = d.cross(out)
+    if side.length < 1e-4:
+        side = d.orthogonal()
+    side.normalize()
+    up = side.cross(d).normalized()
+    m = p + d * (length * 0.42) - up * (fold * width)
+    pts = (p, m + side * (width * 0.5), p + d * length, m - side * (width * 0.5))
+    ci = A.CI[color]
+    for sgn in (1, -1):
+        o = up * (-0.004 if sgn < 0 else 0.0)
+        vb, vl, vt, vr = [bm.verts.new(q + o) for q in pts]
+        for tri in (((vb, vl, vt), (vb, vt, vr)) if sgn > 0 else ((vb, vt, vl), (vb, vr, vt))):
+            f = bm.faces.new(tri)
+            f[g.col] = ci
+            f[g.part] = part
+            for lp in f.loops:
+                lp[cn] = nrm
+
+
+def clump(g, c, r, squash, colors, seed, leaf_len, cover=0.5, others=(), cc=None, droop=0.6, lift=0.0, core="leaf_dark",
+          core_k=0.7, sub=1, mix=0.4, wide=0.68, count=None, low=-0.86, roll=1.1):
+    """Touffe : noyau bosselé + feuilles réparties sur son pourtour. colors = (sombre, moyen, clair) ; droop : feuilles
+    qui retombent ; lift : feuilles dressées (peuplier) ; others : touffes voisines (pas de feuille enfouie dedans) ;
+    cc : centre du houppier (les normales suivent en partie la masse d'ensemble)."""
+    rs = random.Random(seed * 7 + 3)
+    c = Vector(c)
+    if core:
+        blob(g, c, r * core_k, sub, core, squash, seed, 0.16)
+    g.np += 1
+    part = g.np
+    n = count or max(6, int(cover * 45.0 * (r / leaf_len) ** 2 * (0.5 + 0.5 * squash)))
+    ga = math.pi * (3.0 - math.sqrt(5.0))
+    off = rs.uniform(0, 6.2832)
+    cc = c if cc is None else Vector(cc)
+    for i in range(n):
+        z = 1.0 - 2.0 * (i + 0.5) / n
+        a = ga * i + off
+        s = math.sqrt(max(0.0, 1.0 - z * z))
+        u = Vector((math.cos(a) * s + rs.uniform(-0.2, 0.2), math.sin(a) * s + rs.uniform(-0.2, 0.2),
+                    z + rs.uniform(-0.2, 0.2))).normalized()
+        jit = (rs.uniform(-1, 1), rs.uniform(-1, 1), rs.uniform(-1, 1), rs.uniform(0.8, 1.25), rs.uniform(-0.4, 0.4),
+               rs.uniform(-1, 1))
+        if u.z < low:
+            continue
+        e = Vector((u.x * r, u.y * r, u.z * r * squash))
+        q = c + e
+        if any(((q.x - oc.x) / orr) ** 2 + ((q.y - oc.y) / orr) ** 2 + ((q.z - oc.z) / (orr * osq)) ** 2 < 0.6
+               for oc, orr, osq in others):
+            continue
+        ns = Vector((u.x, u.y, u.z / squash)).normalized()
+        td = Vector((ns.x * ns.z, ns.y * ns.z, ns.z * ns.z - 1.0))       # pente descendante le long de la surface
+        rt = ns.cross(Vector(jit[:3]))
+        if td.length < 0.3:                                              # sommet : feuilles couchées en rosette
+            d = ns * 0.3 + rt.normalized() + Vector((0, 0, lift))
+        else:
+            d = ns * (1.0 - 0.45 * droop) + td.normalized() * droop + rt * 0.28 + Vector((0, 0, lift))
+        d.normalize()
+        ro = roll * jit[5]                                               # vrille : au contour, des feuilles de face
+        face = ns * math.cos(ro) + d.cross(ns) * math.sin(ro)
+        L = leaf_len * jit[3]
+        tone = ns.z * 0.7 + jit[4]
+        col = colors[2] if tone > 0.38 else colors[0] if tone < -0.3 else colors[1]
+        cd = q - cc
+        nrm = ns * (1.0 - mix) + (cd.normalized() if cd.length > 1e-3 else ns) * mix + Vector((0, 0, 0.12))
+        nrm.normalize()
+        leaf(g, c + e * (core_k * 0.92), d, face, L, L * wide, col, nrm, part=part)
+
+
+def hull(g, clumps, cc, color, k=0.94):
+    """Niveau lointain : une seule enveloppe bosselée qui suit les touffes (portée de chaque rayon lancé du centre)."""
+    f = g.ico((0, 0, 0), 1.0, 2, color, auto=False)
+    rmin = min(r for _, r, _, _ in clumps) * 0.6
+    for v in {v for q in f for v in q.verts}:
+        u = v.co.normalized()
+        h = rmin
+        for c, r, sq, _ in clumps:
+            o = Vector(((cc.x - c.x) / r, (cc.y - c.y) / r, (cc.z - c.z) / (r * sq)))
+            d = Vector((u.x / r, u.y / r, u.z / (r * sq)))
+            qa, qb, qc = d.dot(d), 2.0 * o.dot(d), o.dot(o) - 1.0
+            disc = qb * qb - 4.0 * qa * qc
+            if disc > 0.0:
+                h = max(h, (-qb + math.sqrt(disc)) / (2.0 * qa))
+        v.co = cc + u * (h * k * (0.93 + 0.14 * g.h(round(u.x, 2), round(u.y, 2), round(u.z, 2))))
+    return f
+
+
+def foliage(g, clumps, colors, leaf_len, cover=0.5, droop=0.6, lift=0.0, core="leaf_dark", mix=0.4, wide=0.68,
+            core_k=0.7, far=0):
+    """Houppier. clumps : (centre, rayon, écrasement, genre) ; genre 0 = masse principale, gardée au niveau moyen.
+    Niveau lointain : enveloppe seule (far > 0 : plus quelques grandes feuilles qui cassent le contour)."""
+    L = g.level
+    clumps = [(Vector(c), r, sq, k) for c, r, sq, k in clumps]
+    tot = sum(r ** 3 for _, r, _, _ in clumps)
+    cc = Vector((0, 0, 0))
+    for c, r, _, _ in clumps:
+        cc += c * (r ** 3 / tot)
+    if L == 2:
+        hull(g, clumps, cc, colors[1])
+        if not far:
+            return cc
+        rx = max(math.hypot(c.x - cc.x, c.y - cc.y) + r for c, r, _, _ in clumps)
+        rz = max(abs(c.z - cc.z) + r * sq for c, r, sq, _ in clumps)
+        clump(g, cc, rx * 0.9, rz / rx, colors, g.seed, rx * 0.4, droop=max(droop, 0.5), lift=lift, core=None, core_k=0.84,
+              mix=0.0, wide=wide, count=far, low=-0.6, roll=0.5)
+        return cc
+    use = clumps if L == 0 else [(c, r * 1.2, sq, k) for c, r, sq, k in clumps if k == 0]
+    for i, (c, r, sq, kind) in enumerate(use):
+        others = [(oc, orr, osq) for j, (oc, orr, osq, _) in enumerate(use) if j != i]
+        if L == 0:
+            clump(g, c, r, sq, colors, g.seed * 100 + i, leaf_len, cover, others, cc, droop, lift, core, core_k,
+                  2 if kind == 0 else 1, mix, wide)
+        else:
+            clump(g, c, r, sq, colors, g.seed * 100 + i, leaf_len * 1.9, cover * 0.85, others, cc, droop, lift, core,
+                  core_k + 0.06, 1, mix, wide)
+    return cc
+
+
+def strand(g, top, length, n, leaf_len, colors, out, seed, wide=0.36, sway=0.2):
+    """Rameau retombant : guirlande de n feuilles étroites, pointes en bas, de part et d'autre d'un fil."""
+    rs = random.Random(seed)
+    top = Vector(top)
+    out = Vector((out[0], out[1], 0.0))
+    out = out.normalized() if out.length > 1e-4 else Vector((1, 0, 0))
+    side = Vector((-out.y, out.x, 0.0))
+    g.np += 1
+    part = g.np
+    nrm = (out + Vector((0, 0, 0.35))).normalized()
+    ph = rs.uniform(0, 6.2832)
+    for k in range(n):
+        t = k / n
+        p = top + Vector((0, 0, -length * t)) + out * (sway * length * 0.3 * math.sin(t * 2.2)) \
+            + side * (0.03 * length * math.sin(ph + t * 5.0))
+        d = (Vector((0, 0, -1.0)) + side * (0.4 if k % 2 else -0.4) + out * rs.uniform(0.0, 0.25)).normalized()
+        L = leaf_len * rs.uniform(0.85, 1.2) * (1.0 - 0.25 * t)
+        leaf(g, p, d, out, L, L * wide, colors[(k + seed) % len(colors)], nrm, part=part)
+
+
+# ----------------------------------------------------------------- feuillus (charpente + houppier en touffes)
+def leafy(g, H, trunk_h, trunk_r, W, colors, bark="bark", R=1.5, n=18, tm=0.42, p=2.0, squash=0.85, marks=None,
+          leaf_k=0.42, cover=0.56, droop=0.6, core="leaf_dark", hang=0, mix=0.4, core_k=0.64, heart=3):
+    """Feuillu générique. Le houppier remplit une enveloppe (hauteur H, demi-largeur W, ventre à tm de sa hauteur,
+    p : 2 = ovale, plus = carré, moins = pointu) : n touffes de rayon R réparties sur son pourtour, « heart » touffes
+    sur l'axe pour le cœur. La structure est tirée une fois, identique aux trois niveaux.
+    colors = (sombre, moyen, clair) ; leaf_k : longueur des feuilles / rayon des touffes ; hang : rameaux retombants
+    sous chaque touffe principale (bouleau)."""
     L = g.level
     rs = random.Random(g.seed * 31 + 7)
     base_top = Vector((rs.uniform(-1, 1) * trunk_r, rs.uniform(-1, 1) * trunk_r, trunk_h))
-    scaff, secs, blobs = [], [], []
-    R = blob_r * H
-    for k in range(n_scaf):
-        az = 6.2832 * (k + rs.uniform(-0.25, 0.25)) / n_scaf
-        el = math.radians(rs.uniform(*elev))
-        Lb = spread * H * rs.uniform(0.78, 1.0)
-        start = base_top * rs.uniform(0.8, 1.0)
-        start.x, start.y = base_top.x * 0.5, base_top.y * 0.5
-        mid = start + sph(az, el * 0.75) * Lb * 0.5
-        end = mid + sph(az + rs.uniform(-0.4, 0.4), min(el * 1.3, 1.4)) * Lb * 0.5
-        scaff.append((start, mid, end))
-        blobs.append((end, R * rs.uniform(0.9, 1.1), 0))
-        if along:
-            blobs.append((mid + Vector((0, 0, R * 0.2)), R * rs.uniform(0.7, 0.85), 1))
-        for s in range(sec):
-            az2 = az + (1 if s == 0 else -1) * rs.uniform(0.6, 1.1)
-            e2 = mid.lerp(end, 0.4) + sph(az2, math.radians(rs.uniform(15, 55))) * Lb * rs.uniform(0.4, 0.55)
-            secs.append((mid.lerp(end, 0.4), e2))
-            blobs.append((e2, R * rs.uniform(0.68, 0.85), 1))
-    lead_r = R * 1.08
-    lead_end = Vector((base_top.x * 0.3, base_top.y * 0.3, H - lead_r * squash * 0.95))
-    blobs.append((lead_end, lead_r, 0))
-    for k in range(fill):                            # remplissage du cœur du houppier
-        a = 6.2832 * k / max(fill, 1) + rs.uniform(-0.4, 0.4)
-        zc = trunk_h + (H - trunk_h) * rs.uniform(0.45, 0.72)
-        blobs.append((pol(a, spread * H * rs.uniform(0.25, 0.45), zc), R * rs.uniform(0.8, 1.0), 0))
-    M = Matrix.Rotation(lean, 4, 'X') @ Matrix.Rotation(g.seed * 1.3, 4, 'Z') if lean else None
+    z0 = trunk_h + 0.2 * R
+    z1 = H - R * squash * 0.95
+    ph1, ph2 = rs.uniform(0, 6.2832), rs.uniform(0, 6.2832)
+
+    def env(t, az):
+        u = (tm - t) / tm if t < tm else (t - tm) / (1.0 - tm)
+        f = max(0.0, 1.0 - u ** p) ** (1.0 / p)
+        return W * f * (1.0 + 0.14 * math.sin(az * 2 + ph1) + 0.09 * math.sin(az * 3 + ph2 + t * 3.0))
+
+    cand = []
+    for i in range(500):
+        t, az = rs.uniform(0.0, 0.96), rs.uniform(0, 6.2832)
+        cand.append(pol(az, max(0.0, env(t, az) - R * 0.8) * rs.uniform(0.88, 1.0), z0 + (z1 - z0) * t))
+    head = Vector((base_top.x * 0.3 + rs.uniform(-0.2, 0.2) * R, base_top.y * 0.3 + rs.uniform(-0.2, 0.2) * R, z1))
+    pts = [head]
+    while len(pts) < n:                              # échantillonnage au plus loin : touffes bien réparties
+        pts.append(max(cand, key=lambda c: min((c - q).length for q in pts)))
+    blobs = [(q, R * rs.uniform(0.85, 1.15), 0 if i < (n + 1) // 2 else 1) for i, q in enumerate(pts)]
+    axis = []
+    for k in range(heart):                           # cœur du houppier, le long de la flèche
+        t = (k + 0.7) / (heart + 0.6)
+        q = base_top.lerp(head, t) + pol(rs.uniform(0, 6.2832), R * 0.25)
+        q.z = z0 + (z1 - z0) * t
+        axis.append(q)
+        blobs.append((q, min(R * 1.2, max(R * 0.7, env(t, 0.0) * 0.62)), 0))
+    outer = sorted(blobs[1:n], key=lambda b: b[0].z)
+    scaff = outer[:max(4, n // 3)]                   # charpentières : vers les touffes basses
+    twigs = outer[len(scaff):]
     mk = g.mark()
     # ---- bois
+
+    def fork(c, k=0.55):
+        """Point de la flèche d'où part la branche d'une touffe (plus bas qu'elle)."""
+        t = min(1.0, max(0.0, (c.z - z0) / max(z1 - z0, 0.1) - 0.28))
+        return base_top.lerp(head, t)
+
     if L == 0:
         bend = Vector((base_top.x * 0.6, base_top.y * 0.6, trunk_h * 0.55))
-        tube(g, [(0, 0, -0.5), (0, 0, 0.12), (0, 0, 0.8), bend, base_top, lead_end],
+        tube(g, [(0, 0, -0.5), (0, 0, 0.12), (0, 0, 0.8), bend, base_top, head],
              [trunk_r * 1.75, trunk_r * 1.3, trunk_r, trunk_r * 0.9, trunk_r * 0.75, trunk_r * 0.2], 9, bark, cap_end=False)
         for k in range(5):
             a = 6.2832 * k / 5 + rs.uniform(-0.3, 0.3)
             tube(g, [pol(a, trunk_r * 0.5, 0.45), pol(a, trunk_r * 1.8, 0.05), pol(a, trunk_r * 3.0, -0.35)],
                  [trunk_r * 0.4, trunk_r * 0.28, trunk_r * 0.08], 5, bark, cap_end=False)
-        for (s, m, e) in scaff:
-            tube(g, [s, m, e], [trunk_r * 0.5, trunk_r * 0.34, trunk_r * 0.14], 6, bark, cap_end=False)
-        for (s, e) in secs:
-            tube(g, [s, s.lerp(e, 0.5) + Vector((0, 0, 0.06 * (e - s).length)), e], [trunk_r * 0.24, trunk_r * 0.16, trunk_r * 0.06],
-                 5, bark, cap_end=False)
+        for c, r, _ in scaff:
+            s = Vector((base_top.x * 0.6, base_top.y * 0.6, trunk_h * rs.uniform(0.82, 0.98)))
+            m = s.lerp(c, 0.5) + Vector((0, 0, -0.14 * (c - s).length))
+            tube(g, [s, m, c], [trunk_r * 0.5, trunk_r * 0.34, trunk_r * 0.14], 6, bark, cap_end=False)
+        for c, r, _ in twigs:
+            s = fork(c)
+            tube(g, [s, s.lerp(c, 0.5) + Vector((0, 0, -0.1 * (c - s).length)), c],
+                 [trunk_r * 0.26, trunk_r * 0.17, trunk_r * 0.06], 5, bark, cap_end=False)
         if marks:                                    # écorce marquée (bouleau) : traits sombres plaqués sur le tronc
             for k in range(18):
                 z = 0.3 + (trunk_h * 1.05) * (k + rs.random()) / 18
@@ -310,58 +476,49 @@ def leafy(g, H, trunk_h, trunk_r, spread, colors, bark="bark", n_scaf=5, blob_r=
                 rr = trunk_r * (1.0 if z > 0.8 else 1.25) * (1.0 - 0.22 * min(1.0, z / max(trunk_h, 0.1))) + 0.008
                 w, hh = rs.uniform(0.25, 0.6), rs.uniform(0.035, 0.08)
                 off = Vector((bend.x, bend.y, 0)) * min(1.0, z / (trunk_h * 0.55)) if z < trunk_h * 0.55 else Vector((base_top.x, base_top.y, 0)) * 0.8
-                p = [pol(a - w, rr, z - hh) + off, pol(a + w, rr, z - hh * 0.4) + off, pol(a + w, rr, z + hh) + off,
+                q = [pol(a - w, rr, z - hh) + off, pol(a + w, rr, z - hh * 0.4) + off, pol(a + w, rr, z + hh) + off,
                      pol(a - w, rr, z + hh * 0.4) + off]
-                g.face(p, marks)
+                g.face(q, marks)
     elif L == 1:
-        tube(g, [(0, 0, -0.5), (0, 0, 0.6), base_top, lead_end], [trunk_r * 1.4, trunk_r, trunk_r * 0.75, trunk_r * 0.2], 5,
+        tube(g, [(0, 0, -0.5), (0, 0, 0.6), base_top, head], [trunk_r * 1.4, trunk_r, trunk_r * 0.75, trunk_r * 0.2], 5,
              bark, cap_end=False)
-        for (s, m, e) in scaff:
-            tube(g, [s, e], [trunk_r * 0.45, trunk_r * 0.14], 4, bark, cap_end=False)
+        for c, r, _ in scaff:
+            tube(g, [Vector((base_top.x * 0.6, base_top.y * 0.6, trunk_h * 0.9)), c], [trunk_r * 0.45, trunk_r * 0.14], 4, bark,
+                 cap_end=False)
     else:
-        tube(g, [(0, 0, -0.5), base_top], [trunk_r * 1.2, trunk_r * 0.7], 3, bark, cap_end=False)
+        tube(g, [(0, 0, -0.5), base_top + Vector((0, 0, R))], [trunk_r * 1.2, trunk_r * 0.6], 3, bark, cap_end=False)
     # ---- houppier
-    if L == 0:
-        cc = Vector((0, 0, sum(c.z for c, r, _ in blobs) / len(blobs)))
-        for i, (c, r, kind) in enumerate(blobs):
-            col = colors[(i * 7 + g.seed) % len(colors)]
-            blob(g, c, r, 2, col, squash, g.seed * 100 + i, amp, top=top if i % 3 == 0 else None)
-            # petites touffes sur le pourtour : cassent l'effet « boule », donnent le grain du feuillage
-            out = (c - cc)
-            out = out.normalized() if out.length > 1e-3 else Vector((0, 0, 1))
-            for j in range((sat if kind == 0 else max(2, sat - 2)) // (2 if CARTOON else 1)):
-                d = Vector((rs.uniform(-1, 1), rs.uniform(-1, 1), rs.uniform(-0.6, 1))) + out * 0.9
-                d.normalize()
-                pc = c + Vector((d.x * r, d.y * r, d.z * r * squash)) * 0.86
-                blob(g, pc, r * rs.uniform(0.3, 0.44), 2 if CARTOON else 1, colors[(i * 7 + j + 1 + g.seed) % len(colors)], squash,
-                     g.seed * 1000 + i * 10 + j, amp * 1.3)
-    elif L == 1:
-        for i, (c, r, kind) in enumerate(blobs):
-            if kind == 0:
-                blob(g, c, r * 1.22, 1, colors[(i * 7 + g.seed) % len(colors)], squash, g.seed * 100 + i, amp * 0.7)
-    else:
-        lo = Vector((min(c.x - r for c, r, _ in blobs), min(c.y - r for c, r, _ in blobs), min(c.z - r * squash for c, r, _ in blobs)))
-        hi = Vector((max(c.x + r for c, r, _ in blobs), max(c.y + r for c, r, _ in blobs), max(c.z + r * squash for c, r, _ in blobs)))
-        f = g.ico((0, 0, 0), 1.0, 1, colors[0], auto=False)
-        ce, ex = (lo + hi) / 2, (hi - lo) / 2
-        for v in {v for q in f for v in q.verts}:
-            v.co = Vector((v.co.x * ex.x * 0.93, v.co.y * ex.y * 0.93, v.co.z * ex.z)) + ce
-    if M:
-        g.transform(g.since(mk), M)
+    rq = random.Random(g.seed * 5 + 2)
+    cc = foliage(g, [(c, r, squash * rq.uniform(0.8, 1.05), kind) for c, r, kind in blobs], colors, R * leaf_k, cover,
+                 droop, 0.0, core, mix, core_k=core_k)
+    if hang and L < 2:                               # rameaux fins qui pendent sous les touffes principales
+        rh = random.Random(g.seed * 13 + 1)
+        for i, (c, r, kind) in enumerate(blobs[:n]):
+            if kind:
+                continue
+            for j in range(hang if L == 0 else 1):
+                a = rh.uniform(0, 6.2832)
+                out = pol(a, 1.0) * 0.6 + Vector((c.x - cc.x, c.y - cc.y, 0.0)) / max(R, 0.1)
+                top = c + pol(a, r * 0.55, -r * squash * 0.45)
+                ln = r * rh.uniform(1.3, 2.3)
+                if L == 0:
+                    strand(g, top, ln, max(3, int(ln / (R * leaf_k * 0.55))), R * leaf_k, colors[1:], out, g.seed + i * 10 + j)
+                else:
+                    strand(g, top, ln, 3, R * leaf_k * 1.9, colors[1:], out, g.seed + i * 10 + j, wide=0.42)
 
 
-GREENS = ("leaf", "leaf_light", "leaf_dark")
-override("deciduous_a", lambda g: leafy(g, 10.0, 3.2, 0.28, 0.34, GREENS, top="leaf_light"))
-override("deciduous_b", lambda g: leafy(g, 14.0, 4.5, 0.36, 0.24, ("leaf_dark", "leaf", "leaf_dark"), n_scaf=5, blob_r=0.14,
-                                        squash=1.15, elev=(50, 72), fill=4, along=True, top="leaf"))
-override("deciduous_c", lambda g: leafy(g, 8.0, 2.4, 0.3, 0.46, ("leaf_light", "leaf", "leaf_yellow"), n_scaf=6,
-                                        blob_r=0.2, squash=0.75, elev=(22, 45), top="leaf_light"))
-override("birch_a", lambda g: leafy(g, 9.0, 4.0, 0.13, 0.2, ("leaf_light", "leaf_yellow", "leaf_light"), bark="birch_bark",
-                                    n_scaf=6, blob_r=0.11, squash=1.3, elev=(45, 75), fill=4, along=True, marks="black",
-                                    amp=0.2, sat=3))
-override("birch_b", lambda g: leafy(g, 12.0, 5.2, 0.16, 0.19, ("leaf_light", "leaf_yellow", "leaf"), bark="birch_bark",
-                                    n_scaf=7, blob_r=0.1, squash=1.3, elev=(45, 75), fill=5, along=True, marks="black",
-                                    amp=0.2, sat=3))
+override("deciduous_a", lambda g: leafy(g, 10.0, 3.2, 0.28, 4.1, ("leaf_dark", "leaf", "leaf_light"), R=1.5, n=18),
+         no_resolve=True)
+override("deciduous_b", lambda g: leafy(g, 14.0, 4.5, 0.36, 3.8, ("leaf_dark", "leaf_dark", "leaf"), R=1.6, n=18, tm=0.38,
+                                        p=2.2, squash=0.95, heart=4), no_resolve=True)
+override("deciduous_c", lambda g: leafy(g, 8.0, 2.4, 0.3, 4.6, ("leaf", "leaf_light", "leaf_yellow"), R=1.45, n=20, tm=0.4,
+                                        p=2.4, squash=0.75, core="leaf"), no_resolve=True)
+override("birch_a", lambda g: leafy(g, 9.0, 3.4, 0.13, 1.95, ("leaf", "leaf_light", "leaf_yellow"), bark="birch_bark",
+                                    R=0.9, n=11, tm=0.36, p=1.7, squash=1.15, marks="black", leaf_k=0.5, cover=0.45,
+                                    droop=1.0, core="leaf", hang=3, core_k=0.58, heart=2), no_resolve=True)
+override("birch_b", lambda g: leafy(g, 12.0, 4.4, 0.16, 2.4, ("leaf", "leaf_light", "leaf_yellow"), bark="birch_bark",
+                                    R=1.05, n=15, tm=0.36, p=1.7, squash=1.15, marks="black", leaf_k=0.5, cover=0.45,
+                                    droop=1.0, core="leaf", hang=3, core_k=0.58, heart=3), no_resolve=True)
 
 
 def swiss_pine(g, H, width, tiers):
@@ -377,71 +534,76 @@ override("swisspine_b", lambda g: swiss_pine(g, 12.0, 2.9, 11))
 
 
 def poplar(g):
-    """Peuplier d'Italie : colonne de feuillage étroite, branches dressées."""
+    """Peuplier d'Italie : fuseau étroit de touffes allongées, feuilles dressées en flammèches."""
     H = 19.0
-    L = g.level
     rs = random.Random(g.seed + 5)
     tube(g, [(0, 0, -0.5), (0, 0, 0.2), (0, 0, 1.0), (0, 0, 4.0), (0, 0, H * 0.9)], [0.55, 0.38, 0.3, 0.24, 0.04],
          lv(g, 9, 5, 3), "bark", cap_end=False)
-    n = 13
-    cols = ("leaf", "leaf_dark", "leaf")
-    if L == 2:
-        f = g.ico((0, 0, 0), 1.0, 1, "leaf", auto=False)
-        for v in {v for q in f for v in q.verts}:
-            v.co = Vector((v.co.x * 1.75, v.co.y * 1.75, v.co.z * 8.0 + 10.8))
-        return
+    n = 9
+    cl = []
     for k in range(n):
         t = k / (n - 1)
-        z = 3.6 + (H - 5.2) * t
-        r = 1.75 * math.sin(math.pi * (0.16 + 0.8 * t)) ** 0.7
-        c = Vector((rs.uniform(-0.25, 0.25), rs.uniform(-0.25, 0.25), z))
-        if L == 0:
-            blob(g, c, r, 2, cols[k % 3], 1.55, g.seed * 50 + k, 0.2, top="leaf_light" if k % 2 else None)
-            a = rs.uniform(0, 6.28)
-            blob(g, c + pol(a, r * 0.75, -r * 0.4), r * 0.55, 2 if k % 2 else 1, cols[(k + 1) % 3], 1.7, g.seed * 50 + 100 + k, 0.2)
-            tube(g, [(0, 0, z - r * 1.4), c + pol(a, r * 0.6, -r * 0.3)], [0.07, 0.02], 4, "bark", cap_end=False)
-        elif k % 2 == 0:
-            blob(g, c, r * 1.1, 1, cols[k % 3], 1.9, g.seed * 50 + k, 0.12)
+        z = 4.3 + (H - 6.9) * t
+        r = 1.7 * math.sin(math.pi * (0.2 + 0.72 * t)) ** 0.8
+        a = k * 2.4 + rs.uniform(-0.3, 0.3)
+        cl.append((pol(a, 0.34 * (1.0 - t), z), r, 1.75, k % 2))
+        if g.level == 0 and k < n - 1:               # branches dressées, visibles entre les touffes
+            tube(g, [(0, 0, z - r * 1.5), pol(a, r * 0.45, z - r * 0.6), pol(a, r * 0.62, z + r * 0.5)], [0.08, 0.05, 0.015], 4,
+                 "bark", cap_end=False)
+    foliage(g, cl, ("leaf_dark", "leaf", "leaf_light"), 0.72, cover=0.5, droop=0.0, lift=1.3, mix=0.5)
 
 
-override("poplar", poplar)
+override("poplar", poplar, no_resolve=True)
 
 
 def willow(g):
-    """Saule pleureur : charpente étalée, dôme de feuillage, rideaux de rameaux retombants."""
+    """Saule pleureur : charpente en parasol, calotte de touffes aplaties, rideaux de rameaux feuillus qui pendent."""
     L = g.level
     rs = random.Random(g.seed + 9)
     tube(g, [(0, 0, -0.5), (0, 0, 0.15), (0.05, 0, 1.2), (0.15, 0.1, 3.0)], [0.75, 0.52, 0.42, 0.34], lv(g, 9, 5, 3), "bark")
-    n_s = 6
-    ends = []
+    if L == 0:
+        for k in range(5):
+            a = 6.2832 * k / 5 + rs.uniform(-0.3, 0.3)
+            tube(g, [pol(a, 0.25, 0.5), pol(a, 0.85, 0.05), pol(a, 1.4, -0.35)], [0.2, 0.14, 0.04], 5, "bark", cap_end=False)
+    n_s = 7
+    cl = [((0.1, 0.05, 6.6), 2.2, 0.72, 0)]
     for k in range(n_s):
         a = 6.2832 * k / n_s + rs.uniform(-0.2, 0.2)
-        m = pol(a, 1.5, 4.6)
-        e = pol(a + rs.uniform(-0.2, 0.2), 2.9, 5.3)
-        ends.append((a, e))
+        top = pol(a + rs.uniform(-0.15, 0.15), 2.45, 5.75 + rs.uniform(-0.2, 0.3))
+        e = pol(a + rs.uniform(-0.2, 0.2), 3.5, 5.15)
         if L < 2:
-            tube(g, [(0.15, 0.1, 2.8), m, e], [0.2, 0.13, 0.05], lv(g, 6, 4), "bark", cap_end=False)
+            tube(g, [(0.15, 0.1, 2.8), pol(a, 1.3, 4.9), top, e], [0.22, 0.15, 0.09, 0.03], lv(g, 6, 4), "bark", cap_end=False)
+        cl.append((top + Vector((0, 0, 0.15)), 1.55, 0.55, k % 2))
+    cols = ("leaf", "leaf_light", "leaf_yellow")
+    foliage(g, cl, cols, 0.62, cover=0.5, droop=1.0, core="leaf", mix=0.55)
+    # rideaux : guirlandes de feuilles étroites qui pendent du pourtour (et quelques-unes sous la calotte)
+    hang = ("leaf", "leaf_light", "leaf_light")
     if L == 2:
-        f = g.ico((0, 0, 0), 1.0, 1, "leaf_light", auto=False)
-        for v in {v for q in f for v in q.verts}:
-            v.co = Vector((v.co.x * 3.9, v.co.y * 3.9, v.co.z * 2.6 + 4.4))
+        for k in range(11):
+            a = 6.2832 * k / 11 + rs.uniform(-0.2, 0.2)
+            out = pol(a, 1.0)
+            leaf(g, pol(a, 3.3, 5.5), (out * 0.12 + Vector((0, 0, -1))).normalized(), out, rs.uniform(3.4, 4.6), 1.5,
+                 hang[k % 3], (out + Vector((0, 0, 0.35))).normalized())
         return
-    blob(g, (0, 0, 5.9), 2.7, lv(g, 3, 1), "leaf_light", 0.62, g.seed, 0.14, top="leaf_yellow" if L == 0 else None)
-    for k, (a, e) in enumerate(ends):
-        blob(g, e + Vector((0, 0, 0.1)), 1.45, lv(g, 2, 1), "leaf" if k % 2 else "leaf_light", 0.7, g.seed + 10 + k, 0.16)
-    # rideaux : rubans effilés qui pendent du pourtour
-    ns = lv(g, 46, 14)
+    ns = lv(g, 64, 24)
     for k in range(ns):
         a = 6.2832 * k / ns + rs.uniform(-0.06, 0.06)
-        r0 = rs.uniform(2.9, 3.9)
-        top = pol(a, r0, 5.0 + rs.uniform(-0.3, 0.3))
-        drop = rs.uniform(2.6, 4.3)
-        w = rs.uniform(0.5, 0.9) if L == 0 else 1.6
-        g.blade(top, (math.cos(a) * 0.12, math.sin(a) * 0.12, -1.0), drop, w, "leaf" if k % 3 else "leaf_light",
-                bend=rs.uniform(-0.05, 0.1), segs=lv(g, 3, 1))
+        r0 = rs.uniform(2.7, 3.95)
+        z0 = 5.45 - (r0 - 2.7) * 0.45 + rs.uniform(-0.25, 0.25)
+        ln = z0 - rs.uniform(0.5, 1.8)
+        if L == 0:
+            strand(g, pol(a, r0, z0), ln, int(ln / 0.4), 0.74, hang, pol(a, 1.0), g.seed + k)
+        else:
+            strand(g, pol(a, r0, z0), ln, 4, 1.9, hang, pol(a, 1.0), g.seed + k, wide=0.4)
+    if L == 0:
+        for k in range(18):
+            a = rs.uniform(0, 6.2832)
+            r0 = rs.uniform(1.3, 2.4)
+            ln = rs.uniform(1.6, 3.2)
+            strand(g, pol(a, r0, 5.3), ln, int(ln / 0.4), 0.7, hang, pol(a, 1.0), g.seed + 200 + k)
 
 
-override("willow", willow)
+override("willow", willow, no_resolve=True)
 
 
 # ----------------------------------------------------------------- buissons

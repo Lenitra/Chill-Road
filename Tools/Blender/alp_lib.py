@@ -744,6 +744,11 @@ def finish(geo, name, col, grad_h=None, base=0.0, resolve=None, sharp=SHARP_ANGL
     me.materials.append(palette_material())
     bm.to_mesh(me)
     bm.free()
+    cn = me.attributes.get("cn")
+    if cn is not None:                               # normales imposées (feuillages) : vecteur nul = normale calculée
+        nors = [tuple(d.vector) for d in cn.data]
+        me.attributes.remove(cn)
+        me.normals_split_custom_set(nors)
     ob = bpy.data.objects.new(name, me)
     col.objects.link(ob)
     return ob, len(me.polygons)
