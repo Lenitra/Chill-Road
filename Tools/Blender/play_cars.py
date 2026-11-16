@@ -1,6 +1,7 @@
 """Voitures jouables construites avec le moteur du pack (pack_lib) : Toyota Supra (A80, 1993), Mazda MX-5 (NA, 1989),
-Ford Mustang fastback 1969 façon John Wick (gris anthracite, bandes noires mates, écope, becquets) et Peel P50
-(1962-1965, tricycle : roue arrière seule dans l'axe, « wheel-back-center »).
+Ford Mustang fastback 1969 façon John Wick (gris anthracite, bandes noires mates, écope, becquets), Peel P50
+(1962-1965, tricycle : roue arrière seule dans l'axe, « wheel-back-center ») ... et Renault Twingo de première
+génération (phase 1, 1993 : monocorps, phares « yeux de grenouille », ouïes de capot, boucliers gris enveloppants).
 
 Même direction artistique que le trafic (sections à facettes, palette de dégradés, peinture sur PK_Paint), un peu
 plus de détails vus de près (aileron, habitacle ouvert de la MX-5). Les phares escamotables de la MX-5 sont deux
@@ -926,4 +927,119 @@ reg(dict(
     details=valkyrie_details,
 ))
 
-PLAYABLE = ["supra", "miata", "mustang", "p50", "ae86", "dmc12", "jesko", "valkyrie"]
+# ================================================================= Renault Twingo (1re génération, phase 1, 1993)
+def bumper(c, x_end, z0, z1, zs=0.40, out=0.035, depth=0.07, color='grey', name="Bumper"):
+    """Bouclier enveloppant (Twingo) : prisme vertical qui suit le contour en plan de la carrosserie à la hauteur zs,
+    décalé de `out` vers l'extérieur, de l'avant du passage de roue gauche (x_end) jusqu'à celui de droite."""
+    s = 1 if x_end > 0 else -1
+    tip = c.car["front"] if s > 0 else c.car["rear"]
+    xc = tip - s * 0.07
+    pts = [(x, c.side(x, zs)) for x in (x_end, (x_end + xc) / 2, xc)]
+    yc = pts[-1][1]
+    for k in range(1, 11):
+        y = yc * math.cos(math.pi / 2 * k / 10)
+        pts.append(((c.front(y, zs) if s > 0 else c.rear(y, zs)), y))
+    ring = pts + [(x, -y) for x, y in reversed(pts[:-1])]
+    # trois étages : corps, chanfrein en haut (bord arrondi du plastique), retour en bas
+    for a0, a1, o in ((z0 + 0.03, z1 - 0.035, out), (z1 - 0.035, z1, out - 0.018), (z0, z0 + 0.03, out - 0.022)):
+        poly = offset(ring, -s * o) + offset(ring, s * depth)[::-1]
+        c.prism(poly, 'z', a0, a1, color, name=name)
+    return ring[len(pts) - 1][0] + s * out              # x de la face avant (arrière) du bouclier dans l'axe
+
+
+def twingo_livery(j, xm):
+    if j == 6 and 0.95 >= xm >= 0.76:
+        return "black"                                           # écusson noir du rétroviseur, devant la vitre
+    if j == 7 and 0.30 >= xm >= -1.28:
+        return "black"                                           # joncs noirs de gouttière le long du pavillon
+    return None
+
+
+def twingo_details(c):
+    # boucliers gris (plastique brut de la phase 1), enveloppants jusqu'aux passages de roue
+    xf = bumper(c, 1.50, 0.215, 0.545, name="FrontBumper")
+    xr = bumper(c, -1.50, 0.235, 0.635, name="RearBumper")
+    # avant : fente de calandre en haut du bouclier, plaque, prise d'air basse ; clignotants orange posés sur le
+    # bouclier sous les phares
+    c.box([((xf + 0.002, 0.0, 0.475), (0.012, 0.58, 0.04), None)], 'dark', name="GrilleSlot")
+    c.box([((xf + 0.004, 0.0, 0.355), (0.012, 0.50, 0.11), None)], 'plate', name="Plate")
+    c.box([((xf + 0.002, 0.0, 0.255), (0.012, 0.84, 0.035), None)], 'dark', name="LowIntake")
+    c.box([((xf - 0.035, 0.56, 0.556), (0.05, 0.19, 0.024), None)], 'amber', mirror=True, name="Indicator")
+    # phares ronds « yeux de grenouille » au coin du nez : paupière couleur caisse qui se fond dans le capot,
+    # cerclage noir, verre, optique
+    zl = 0.665
+    for y in (0.56, -0.56):
+        xs = c.front(y, zl)
+        limb(c, (xs - 0.11, y, zl), (xs - 0.004, y, zl), 0.101, 'paint', n=16, name="LampPod")
+        limb(c, (xs - 0.004, y, zl), (xs + 0.008, y, zl), 0.094, 'black', n=16, name="LampBezel")
+        limb(c, (xs + 0.008, y, zl), (xs + 0.016, y, zl), 0.083, 'lens', n=16, name="Headlight")
+        limb(c, (xs + 0.016, y, zl), (xs + 0.020, y, zl), 0.048, 'led', n=12, name="HeadlightCore")
+    # capot : les quatre ouïes côté droit, juste devant le pare-brise
+    for k in range(4):
+        y = -0.31 - 0.055 * k
+        c.decal([(1.15, y), (1.31, y - 0.02), (1.31, y - 0.045), (1.15, y - 0.025)], 'top', 'dark', mirror=False,
+                offset=0.007, name="HoodGill", min_facing=0.3)
+    # flancs : répétiteur orange derrière la roue avant, joint arrière et poignée de porte, rétroviseurs noirs
+    c.decal(ellipse(0.95, 0.535, 0.032, 0.014, n=8), 'side', 'amber', offset=0.006, name="Repeater")
+    c.decal(rect(-0.447, 0.29, -0.437, 0.855), 'side', 'dark', offset=0.006, name="DoorGap")
+    c.decal(rect(-0.40, 0.765, -0.31, 0.79), 'side', 'black', offset=0.007, name="Handle")
+    mirrors(c, 0.86, 0.86, 0.93, size=(0.10, 0.14, 0.10), color='black')
+    # arrière : feux d'angle rouges au-dessus du bouclier, clignotant rond orange côté intérieur ; plaque sur le hayon
+    c.decal([(0.49, 0.645), (0.75, 0.645), (0.78, 0.70), (0.775, 0.83), (0.72, 0.878), (0.53, 0.868), (0.49, 0.82)],
+            'rear', 'tail', name="Tail", min_facing=0.3)
+    c.decal(ellipse(0.57, 0.735, 0.048, 0.048, n=10), 'rear', 'amber', offset=0.009, name="TailIndicator",
+            min_facing=0.3)
+    c.decal(rect(0.0, 0.665, 0.245, 0.775), 'rear', 'plate', offset=0.012, name="Plate", min_facing=0.3)
+    # essuie-glace de la grande lunette, échappement sous le bouclier arrière (à droite) et son repère
+    p0 = Vector((c.rear(0.03, 0.99) - 0.012, 0.03, 0.99))
+    p1 = Vector((c.rear(0.36, 1.21) - 0.012, 0.36, 1.21))
+    limb(c, p0, p1, 0.009, 'black', n=5, name="RearWiper")
+    limb(c, p0 + Vector((0.006, 0, 0)), p0 + Vector((-0.02, 0, 0)), 0.022, 'black', n=8, name="WiperPivot")
+    limb(c, (xr + 0.18, -0.42, 0.21), (xr - 0.015, -0.42, 0.21), 0.026, 'chrome', n=8, name="Exhaust")
+    c.marker("exhaust-right", (xr - 0.015, -0.42, 0.21))
+
+
+reg(dict(
+    id="twingo", file="Twingo", name="Renault Twingo", color=(0.913, 0.527, 0.010),
+    front=1.70, rear=-1.675, height=1.423, axles=(1.1735, -1.1735),
+    wheel=dict(rt=0.267, rr=0.165, w=0.145, y=0.693, style="hubcap", nseg=20),
+    axle_wheels=[{}, {"y": 0.68}],
+    arch_n=10,
+    pillar_color="paint",
+    livery=twingo_livery,
+    # carrosserie « dragée » : profils lissés, stations tous les 7 cm, sections subdivisées (flancs, épaules, pavillon)
+    smooth=dict(dx=0.07, sub={3: 2, 4: 2, 5: 2, 6: 2, 7: 2, 8: 4}),
+    inset=dict(rail=[(1.10, .09), (0.40, .09), (0.30, .05), (-1.20, .05), (-1.30, .08)]),
+    z=dict(
+        bot=[(1.70, .26), (1.62, .19), (1.45, .15), (-1.45, .15), (-1.60, .21), (-1.675, .28)],
+        lo=[(1.70, .30), (1.62, .23), (1.45, .20), (-1.45, .20), (-1.60, .25), (-1.675, .32)],
+        rk=[(1.70, .38), (1.62, .32), (1.45, .28), (-1.45, .28), (-1.60, .33), (-1.675, .40)],
+        mx=[(1.70, .50), (1.62, .54), (1.17, .56), (-1.17, .58), (-1.63, .60), (-1.675, .58)],
+        sh=[(1.70, .551), (1.69, .60), (1.665, .66), (1.62, .70), (1.54, .73), (1.40, .76), (1.10, .80), (0.76, .80),
+            (-0.35, .83), (-1.00, .88), (-1.30, .92), (-1.45, .92), (-1.57, .88), (-1.63, .82), (-1.675, .67)],
+        belt=[(1.70, .553), (1.69, .63), (1.665, .70), (1.62, .75), (1.54, .79), (1.40, .83), (1.26, .865), (1.10, .915),
+              (0.95, .885), (0.76, .85), (-0.35, .875), (-1.00, .94), (-1.30, .985), (-1.45, .975), (-1.57, .92),
+              (-1.63, .85), (-1.675, .69)],
+        re=[(1.70, .555), (1.69, .635), (1.665, .712), (1.62, .76), (1.54, .80), (1.40, .845), (1.26, .885), (1.10, .94),
+            (0.62, 1.205), (0.44, 1.30), (0.30, 1.35), (0.14, 1.38), (0.00, 1.392), (-0.90, 1.395), (-1.10, 1.38),
+            (-1.243, 1.35), (-1.35, 1.295), (-1.49, 1.145), (-1.57, .935), (-1.63, .86), (-1.675, .695)],
+        top=[(1.70, .56), (1.69, .64), (1.665, .72), (1.62, .77), (1.54, .81), (1.40, .855), (1.26, .895), (1.10, .955),
+             (0.62, 1.225), (0.44, 1.32), (0.30, 1.372), (0.14, 1.402), (0.00, 1.415), (-0.40, 1.423), (-0.90, 1.415),
+             (-1.10, 1.40), (-1.243, 1.375), (-1.35, 1.32), (-1.49, 1.165), (-1.57, .945), (-1.63, .865),
+             (-1.675, .70)],
+    ),
+    w=dict(
+        W=[(1.70, .66), (1.69, .70), (1.665, .74), (1.62, .77), (1.54, .795), (1.40, .81), (1.17, .815), (-1.17, .815),
+           (-1.45, .81), (-1.57, .80), (-1.63, .78), (-1.675, .75)],
+        belt=[(1.70, .60), (1.69, .64), (1.665, .67), (1.62, .70), (1.54, .725), (1.40, .745), (1.10, .755), (0.76, .768),
+              (-0.35, .775), (-1.30, .755), (-1.57, .725), (-1.63, .70), (-1.675, .66)],
+        re=[(1.70, .57), (1.69, .61), (1.665, .64), (1.62, .67), (1.54, .695), (1.40, .715), (1.10, .72), (0.32, .665),
+            (0.00, .66), (-0.90, .655), (-1.21, .645), (-1.35, .64), (-1.49, .635), (-1.57, .64), (-1.63, .62),
+            (-1.675, .60)],
+    ),
+    glass=dict(cowl=1.10, ws_top=0.32, rw_top=-1.30, rw_bot=-1.56, side=[(0.76, -0.33), (-0.45, -1.30)],
+               pillars=[(-0.33, -0.45)]),
+    details=twingo_details,
+))
+
+PLAYABLE = ["supra", "miata", "mustang", "p50", "ae86", "dmc12", "jesko", "valkyrie", "twingo"]

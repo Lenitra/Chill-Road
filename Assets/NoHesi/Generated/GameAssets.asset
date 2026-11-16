@@ -234,6 +234,30 @@ MonoBehaviour:
     hoodCamera: {x: 0, y: 0.92, z: 1.05}
     bumperCamera: {x: 0, y: 0.3, z: 2.55}
     engineVoice: 0
+  - id: twingo
+    displayName: Renault Twingo
+    prefab: {fileID: 919132149155446097, guid: 50188a712d0af7d45804b088c5b92de7, type: 3}
+    modelScale: 1
+    drivetrain: 1
+    mass: 860
+    maxTorque: 90
+    redline: 6000
+    gearRatios:
+    - 3.73
+    - 2.05
+    - 1.32
+    - 0.97
+    - 0.79
+    finalDrive: 4.21
+    wheelRadius: 0.267
+    tireGrip: 1
+    dragArea: 0.69
+    downforceArea: 0
+    steerLock: 38
+    brakeForce: 7740
+    hoodCamera: {x: 0, y: 1.18, z: 1.15}
+    bumperCamera: {x: 0, y: 0.42, z: 1.78}
+    engineVoice: 3
   trafficCars:
   - {fileID: 919132149155446097, guid: ac7755cbef5a46241a35e49a8c1c8aa8, type: 3}
   - {fileID: 919132149155446097, guid: 197741a7d4478e449abdd8c6c24b932b, type: 3}

@@ -8,8 +8,8 @@ namespace NoHesi.EditorTools
     /// Voitures jouables réelles modélisées dans Blender avec le moteur du pack de voitures
     /// (Tools/Blender/play_cars.py → Assets/NoHesi/Models/PlayerCars) : Toyota Supra (A80, 1993), Mazda MX-5 (NA,
     /// 1989), Ford Mustang fastback 1969 (celle de John Wick), Peel P50 (tricycle, roue « wheel-back-center »),
-    /// Toyota AE86 Trueno (Initial D, phares escamotables), DeLorean DMC-12, Koenigsegg Jesko Attack et Aston Martin
-    /// Valkyrie AMR-LMH.
+    /// Toyota AE86 Trueno (Initial D, phares escamotables), DeLorean DMC-12, Koenigsegg Jesko Attack, Aston Martin
+    /// Valkyrie AMR-LMH et Renault Twingo (1re génération, 1993, traction).
     /// Un modèle absent est simplement ignoré.
     /// Les phares escamotables de la MX-5 sont des enfants « popup-left/right » dont le pivot est la charnière :
     /// CarLights les fait basculer. Palette et optiques partagées avec le pack de voitures, peinture propre à chaque
@@ -55,6 +55,7 @@ namespace NoHesi.EditorTools
                 ("DeLorean", new Color(0.70f, 0.71f, 0.72f), DeLorean), // inox brossé
                 ("Jesko", new Color(0.94f, 0.94f, 0.95f), Jesko),     // blanc, carbone et accents vert citron (Attack)
                 ("Valkyrie", new Color(0.05f, 0.56f, 0.53f), Valkyrie), // teal de l'AMR-LMH, accents vert citron
+                ("Twingo", new Color(0.97f, 0.77f, 0.10f), Twingo),   // « Jaune Indien » du lancement, boucliers gris
             };
             // Accents hors palette (matériau « PK_Accent » du modèle) : couleur unie par voiture
             var accents = new Dictionary<string, Color>
@@ -222,6 +223,24 @@ namespace NoHesi.EditorTools
                 brakeForce = mass * 15f,
                 hoodCamera = new Vector3(0f, 0.92f, 1.05f),
                 bumperCamera = new Vector3(0f, 0.30f, 2.55f),
+            };
+        }
+
+        /// <summary>Renault Twingo de première génération (phase 1, 1993) : ≈860 kg avec le conducteur, traction, 4 cylindres
+        /// C3G 1.2 de 55 ch (90 N·m), boîte 5 rapports, pneus de 13" (145/70) très étroits, freins arrière à tambour.</summary>
+        static VehicleSpec Twingo(GameObject model)
+        {
+            const float mass = 860f;
+            return new VehicleSpec
+            {
+                id = "twingo", displayName = "Renault Twingo", prefab = model, modelScale = 1f,
+                drivetrain = Drivetrain.FWD, mass = mass, maxTorque = 90f, redline = 6000f,
+                gearRatios = new[] { 3.73f, 2.05f, 1.32f, 0.97f, 0.79f }, finalDrive = 4.21f,
+                wheelRadius = 0.267f, tireGrip = 1.0f, dragArea = 0.69f, downforceArea = 0f, steerLock = 38f,
+                brakeForce = mass * 9f,
+                hoodCamera = new Vector3(0f, 1.18f, 1.15f),
+                bumperCamera = new Vector3(0f, 0.42f, 1.78f),
+                engineVoice = EngineVoice.Inline4,
             };
         }
 
