@@ -420,6 +420,73 @@ def roads(net):
     l_.route("plage", label="route_lac>plage", **RD).node("plage")
     l_.route("h_rives", label="route_lac>rives", **RD).node("h_rives")
 
+    # --- Chemins de terre : pistes forestières et d'alpage, en boucle quand c'est possible
+    def end_heading(chain):
+        """Cap de la chaîne à son dernier point (pour prolonger tout droit une route en cul-de-sac)."""
+        P = L.catmull(np.array(chain.ctrl, dtype=np.float64), 2.5)
+        dx, dz = P[-1, 0] - P[-8, 0], P[-1, 1] - P[-8, 1]
+        n = math.hypot(dx, dz)
+        return (dx / n, dz / n)
+
+    def overpass_out(name):
+        """Direction de sortie d'un échangeur côté extérieur (du nœud _l vers le nœud _r)."""
+        rx, rz = net.nodes[name + "_r"]
+        lx, lz = net.nodes[name + "_l"]
+        n = math.hypot(rx - lx, rz - lz)
+        return (rx - lx) / n, (rz - lz) / n
+
+    def land(p, node, u, **kw):
+        """Arrivée tout droit sur node par la direction u (vecteur unitaire, du nœud vers l'arrivée du chemin)."""
+        x, z = net.nodes[node]
+        p.route((x + u[0] * 56.0, z + u[1] * 56.0), goal_heading=(-u[0], -u[1]), label="%s>%s" % (p.id, node), **kw)
+        p.to((x + u[0] * 24.0, z + u[1] * 24.0)).node(node)
+        return p
+
+    TR = dict(wiggle=0.3)
+    # Chemin des Bois : de l'échangeur sud, à flanc du versant extérieur, jusqu'aux Rives (boucle par la route du lac)
+    ux, uz = overpass_out("ech_s")
+    sx_, sz_ = net.nodes["ech_s_r"]
+    k_ = net.road("chemin_bois", "track", "ech_s_r", smooth=12.0)
+    k_.to((sx_ + ux * 30.0, sz_ + uz * 30.0))
+    k_._heading = (ux, uz)
+    ex_, ez_ = end_heading(l_)
+    # aux Rives, le chemin arrive d'équerre, par le sud (côté montagne) : la route du lac y fait un coude
+    land(k_, "h_rives", (ez_, -ex_) if ex_ > 0 else (-ez_, ex_), **TR)
+
+    # Chemin de la Gorge : de la route du Villard, sous le viaduc de l'autoroute, puis au pied du versant extérieur
+    # jusqu'à l'échangeur ouest
+    q_ = net.road("chemin_gorge", "track", "r_villard", smooth=12.0)
+    q_.to(*stub("r_villard", -1.0))
+    # par le haut du versant (sinon le chemin longe l'autoroute), arrivée en biais par le sud-ouest
+    q_.route((-2330, -120), label="chemin_gorge>versant", **TR)
+    ux, uz = overpass_out("ech_o")
+    ca, sa = math.cos(math.radians(35.0)), math.sin(math.radians(35.0))
+    land(q_, "ech_o_r", (ux * ca - uz * sa, ux * sa + uz * ca), **TR)
+
+    # Piste du Petit Pas : du col du Petit Pas vers l'alpage du massif nord-est
+    N("alp_pas", *rt.site(1250, 1230, 260, 300, 420))
+    a_ = net.road("chemin_pas", "track", "col_ne", smooth=12.0)
+    a_.to(*stub("col_ne", 1.0, (20.0, 44.0)))
+    a_.route("alp_pas", label="chemin_pas", **TR).node("alp_pas")
+
+    # Chemin des Chalets : prolonge la route des Chalets à flanc, vers l'ouest, au-dessus de l'autoroute
+    N("bois_nord", *rt.site(-450, 2430, 220, 190, 280))
+    hx_, hz_ = end_heading(h_)
+    cx_, cz_ = net.nodes["h_chalets"]
+    c_ = net.road("chemin_chalets", "track", "h_chalets", smooth=12.0)
+    c_.to((cx_ + hx_ * 24.0, cz_ + hz_ * 24.0))
+    c_._heading = (hx_, hz_)
+    c_.route("bois_nord", label="chemin_chalets", **TR).node("bois_nord")
+
+    # Piste du Villard : du hameau vers l'épaulement du massif sud-ouest
+    N("alp_villard", *rt.site(-1330, -880, 220, 220, 340))
+    vx_, vz_ = end_heading(v_)
+    hx_, hz_ = net.nodes["h_villard"]
+    d_ = net.road("chemin_villard", "track", "h_villard", smooth=12.0)
+    d_.to((hx_ + vx_ * 24.0, hz_ + vz_ * 24.0))
+    d_._heading = (vx_, vz_)
+    d_.route("alp_villard", label="chemin_villard", **TR).node("alp_villard")
+
 
 def pois(nodes, edges):
     """Lieux-dits affichés par le jeu (id, noms, position, rayon) ; « depart » : point de départ, r = cap (degrés,
