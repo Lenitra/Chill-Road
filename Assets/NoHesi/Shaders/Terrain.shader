@@ -21,6 +21,10 @@ Shader "NoHesi/Terrain"
         _Paved ("Pavé (places, cours de la ville)", Color) = (0.55, 0.54, 0.52, 1)
         _Snow ("Neige des sommets", Color) = (0.93, 0.95, 0.98, 1)
         _Smoothness ("Lissé", Range(0, 1)) = 0.04
+        _Toon ("Éclairage cartoon (aplats)", Range(0, 1)) = 1
+        _ShadeColor ("Cartoon : teinte de l'ombre", Color) = (0.6, 0.64, 0.8, 1)
+        _ShadeLevel ("Cartoon : clarté de l'ombre", Range(0, 1)) = 0.68
+        _RampSoft ("Cartoon : douceur du bord", Range(0.01, 0.6)) = 0.22
     }
 
     SubShader
@@ -33,7 +37,8 @@ Shader "NoHesi/Terrain"
         TEXTURE2D(_Noise); SAMPLER(sampler_Noise);
 
         CBUFFER_START(UnityPerMaterial)
-            float _NoiseScale, _Facets, _RockSlope, _Smoothness;
+            float _NoiseScale, _Facets, _RockSlope, _Smoothness, _Toon, _ShadeLevel, _RampSoft;
+            half4 _ShadeColor;
             half4 _Grass, _GrassLush, _GrassDry, _Forest, _Dirt, _Rock, _RockDark, _Paved, _Snow;
         CBUFFER_END
 
@@ -72,7 +77,8 @@ Shader "NoHesi/Terrain"
             // Roche sur les facettes en pente et dans les zones rocheuses (deux tons)
             half slope = 1.0 - nFlat.y;
             half rock = Crisp(slope + (n.a - 0.5) * 0.1 + mask.b * 0.35, _RockSlope);
-            col = lerp(col, lerp(_Rock.rgb, _RockDark.rgb, Crisp(n.r, 0.55)), rock);
+            // (deux tons en grandes plaques : un seuil sur le bruit fin crénelait en « pointillés » au loin)
+            col = lerp(col, lerp(_Rock.rgb, _RockDark.rgb, Crisp(huge * 0.75 + n.r * 0.25, 0.52)), rock);
 
             // Neige des sommets : tient sur les facettes peu inclinées, laisse la roche à nu dans les parois
             col = lerp(col, _Snow.rgb, Crisp(extra.y + (n.g - 0.5) * 0.35 - slope * 0.55, 0.42));
@@ -171,7 +177,34 @@ Shader "NoHesi/Terrain"
                 surface.occlusion = lerp(1.0, 0.8, saturate(input.color.r));
                 surface.normalTS = half3(0, 0, 1);
 
-                half4 color = UniversalFragmentPBR(inputData, surface);
+                half4 color;
+                if (_Toon > 0.5)
+                {
+                    // Aplats cartoon (comme NoHesi/Toon) : rampe douce, ombre teintée, ambiance du ciel aplatie
+                    Light main = GetMainLight(inputData.shadowCoord, input.positionWS, half4(1, 1, 1, 1));
+                    half shadow = smoothstep(0.15, 0.85, main.shadowAttenuation * main.distanceAttenuation);
+                    half ao = surface.occlusion;
+                    #if defined(_SCREEN_SPACE_OCCLUSION)
+                        AmbientOcclusionFactor ssao = GetScreenSpaceAmbientOcclusion(inputData.normalizedScreenSpaceUV);
+                        ao *= ssao.indirectAmbientOcclusion;
+                    #endif
+                    half lit = smoothstep(0.05 - _RampSoft, 0.05 + _RampSoft, dot(n, main.direction)) * shadow;
+                    half3 c = surface.albedo * main.color * lerp(_ShadeColor.rgb * _ShadeLevel, 1.0, lit);
+                    c += surface.albedo * lerp(SampleSH(n), SampleSH(half3(0, 1, 0)), 0.5) * (0.85 * ao);
+                    #if defined(_ADDITIONAL_LIGHTS)
+                        uint count = GetAdditionalLightsCount();
+                        LIGHT_LOOP_BEGIN(count)
+                            Light light = GetAdditionalLight(lightIndex, input.positionWS, half4(1, 1, 1, 1));
+                            half l = smoothstep(-0.05, 0.25, dot(n, light.direction));
+                            c += surface.albedo * light.color * (light.distanceAttenuation * light.shadowAttenuation * l);
+                        LIGHT_LOOP_END
+                    #endif
+                    // Sol mouillé : un peu de reflet du ciel
+                    c += GlossyEnvironmentReflection(reflect(-inputData.viewDirectionWS, n), 0.6, 1.0) * (0.12 * _NoHesiWet);
+                    color = half4(c, 1.0);
+                }
+                else
+                    color = UniversalFragmentPBR(inputData, surface);
                 color.rgb = MixFog(color.rgb, inputData.fogCoord);
                 return color;
             }
