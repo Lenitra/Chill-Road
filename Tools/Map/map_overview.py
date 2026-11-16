@@ -114,7 +114,9 @@ def render(g, H, rgba, paved, snow, water, edges, rivers, buildings, out_path, p
     pv = soft(L.blur2d(paved / 255.0, 0.8), 0.4, 0.6)[..., None]
     col = col * (1 - pv) + C["paved"] * pv
     sn = soft(L.blur2d(snow / 255.0, 1.2), 0.35, 0.55)[..., None]
-    col = col * (1 - sn) + C["snow"] * sn
+    # sous la neige la forêt reste visible (sapins enneigés) : les pistes de ski s'y lisent en couloirs blancs
+    snow_col = C["snow"] * (1 - forest) + (C["forest"] * 0.6 + C["snow"] * 0.4) * forest
+    col = col * (1 - sn) + snow_col * sn
     # relief : ombrage doux (en 3 niveaux pour le style toon ; la neige le garde un peu bleuté), courbes de niveau
     shade = L.hillshade(L.blur2d(H, 2.0), g.step, az=315.0, alt=45.0)
     if st["toon"]:
@@ -157,28 +159,6 @@ def render(g, H, rgba, paved, snow, water, edges, rivers, buildings, out_path, p
         w = max(3, int(float(p[0][3]) * 1.4 * k))
         stroke(dr, [px(a[0], a[1]) for a in p], w + max(2, int(3 * k)), tuple(st["shore"]))
         stroke(dr, [px(a[0], a[1]) for a in p], w, tuple(st["water"]))
-    # domaine skiable : pistes en rubans translucides de leur couleur (pas un tracé de route), remontées en trait
-    # fin jalonné de pylônes
-    import map_station as SK
-    over = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    od = ImageDraw.Draw(over)
-    tint = dict(green=(46, 170, 96), blue=(52, 118, 232), red=(226, 58, 50), black=(34, 36, 44))
-    for (pid, pc, width, pts) in SK.PISTES:
-        c = L.catmull(np.array(pts, dtype=np.float64), 6.0)
-        line = [px(q[0], q[1]) for q in c]
-        stroke(od, line, max(5, int(width * 0.9 * k)), tint[pc] + (185,))
-        stroke(od, line, max(3, int(7.0 * k)), tint[pc] + (255,))
-    for (kind, a, b) in SK.LIFTS:
-        pa, pb = px(*a), px(*b)
-        od.line([pa, pb], fill=(40, 42, 52, 255), width=max(2, int(2.6 * k)))
-        n = max(2, int(math.hypot(b[0] - a[0], b[1] - a[1]) / 70.0))
-        r = max(2, int((7.0 if kind == "cablecar" else 4.5) * k))
-        for j in range(n + 1):
-            x, y = pa[0] + (pb[0] - pa[0]) * j / n, pa[1] + (pb[1] - pa[1]) * j / n
-            od.rectangle([x - r, y - r, x + r, y + r], fill=(40, 42, 52, 255) if j in (0, n) else (250, 250, 252, 255),
-                         outline=(40, 42, 52, 255))
-    img = Image.alpha_composite(img.convert("RGBA"), over).convert("RGB")
-    dr = ImageDraw.Draw(img)
     # bâtiments sous les routes : les rues restent lisibles
     for b in buildings:
         dr.polygon([px(q[0], q[1]) for q in b], fill=tuple(st["building"]))
@@ -209,7 +189,10 @@ def render(g, H, rgba, paved, snow, water, edges, rivers, buildings, out_path, p
                     else:
                         stroke(dr, pts, w, fill)
     img = img.resize((SIZE, SIZE), Image.LANCZOS)
-    img = _focus(img, edges, g, st)
+    # le domaine skiable reste éclairé comme les abords des routes (sinon la carte s'y éteint)
+    import map_station as SK
+    ski = [dict(pts=[(float(q[0]), float(q[1])) for q in pts]) for (_, _, _, pts) in SK.PISTES]
+    img = _focus(img, list(edges) + ski, g, st)
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     img.save(out_path, optimize=True)
     # Au bake, la minicarte suit la carte globale
