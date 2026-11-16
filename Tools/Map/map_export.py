@@ -65,8 +65,9 @@ def masks(g, H, info, edge, water, edges, urban_pts=(), blocked=None, pads=()):
             dirt[sz, sx] = np.maximum(dirt[sz, sx], 1.0 - L.smoothstep(w * 0.5 + 1.0, w * 0.5 + 5.0, d))
         stamp_polyline(g, rv["pts"][::2], w + 12.0, fn_r)
     paved = urban * L.smoothstep(34.0, 16.0, street_distance(g, edges, radius=60.0))
+    from map_roads import pad_distance
     for (px, pz, pr, py) in pads:
-        paved = np.maximum(paved, 1.0 - L.smoothstep(pr - 3.0, pr + 1.0, np.hypot(X - px, Z - pz)))
+        paved = np.maximum(paved, 1.0 - L.smoothstep(-3.0, 1.0, pad_distance(X, Z, px, pz, pr)))
     snow = L.smoothstep(690.0, 830.0, H + 70.0 * fn) * (1.0 - L.smoothstep(0.95, 1.35, slope))
     if blocked is not None:
         forest = np.where(blocked, 0.0, forest)

@@ -28,15 +28,18 @@ KIND = {
     "lane": dict(gmax=0.095, rmin=24.0, hair=(9.5, 13.0), hair_cost=50.0, cross=4.0, near_river=0.2, noise=0.2),
     "track": dict(gmax=0.105, rmin=18.0, hair=(8.5, 11.0), hair_cost=32.0, cross=3.0, near_river=0.1, noise=0.25),
 }
+VERSION = 4          # à changer quand la recherche change : les tracés en cache sont alors recalculés
 STEP = 14.0          # longueur d'un tronçon élémentaire (m)
 CELL = 6.0           # finesse de l'ensemble fermé (m)
 NHEAD = 36           # finesse des caps (10°)
 A_GRADE = 1.5        # coût de la pente : 1 + A r² par mètre (r = pente / gmax) : optimum vers r = 0,82
 K_OVER = 14.0        # au-delà de gmax
-R_LIM = 2.0          # pente interdite au-delà de 2 gmax ; au-delà de 1,3 gmax, réservé aux courts passages
-R_SOFT, K_HARD = 1.3, 60.0
+R_MAX = 1.12         # la chaussée ne dépasse jamais 1,12 gmax ; plus raide, le terrain est en déblai ou en remblai
+OFF_MAX = 9.0        # écart maximal chaussée / terrain (m) hors ponts
+EW_LIN, EW_SQ = 0.12, 0.035   # coût des terrassements au mètre de route, par mètre d'écart (et au carré)
+GOAL_ANG = 0.3       # écart de cap toléré à l'arrivée (rad)
+GOAL_DH = 4.0        # écart de hauteur toléré à l'arrivée (m)
 RIVER_IN = 9.0       # coût au mètre dans le lit (pont)
-HAIR_SLACK = 4.5     # dénivelé (m) qu'un lacet peut rattraper au-delà de sa pente propre (terrassement)
 TWO_PI = 2.0 * math.pi
 
 
@@ -107,7 +110,7 @@ class Router:
         with open(self.store, "wb") as f:
             pickle.dump(self.saved, f)
 
-    def site(self, x, z, r=150.0, hmin=-1e9, hmax=1e9, smooth=30.0):
+    def site(self, x, z, r=150.0, hmin=-1e9, hmax=1e9, smooth=30.0, river=45.0):
         """Replat le plus doux à moins de r mètres de (x, z), entre hmin et hmax (hameau, carrefour)."""
         g = self.g
         sz, sx = g.window(x - r, z - r, x + r, z + r)
@@ -117,7 +120,8 @@ class Router:
         slope = np.hypot(gx, gz)
         X, Z = g.X[sz, sx], g.Z[sz, sx]
         d = np.hypot(X - x, Z - z)
-        bad = (d > r) | (Hs < hmin) | (Hs > hmax) | self.water[sz, sx]
+        rd = _local_distance(float(X[0, 0]), float(Z[0, 0]), g.step, X.shape[1], X.shape[0], self.rivers, 60.0)
+        bad = (d > r) | (Hs < hmin) | (Hs > hmax) | self.water[sz, sx] | (rd < river)
         score = np.where(bad, 1e9, slope + d / r * 0.04)
         j, i = np.unravel_index(int(np.argmin(score)), score.shape)
         return float(X[j, i]), float(Z[j, i])
@@ -167,12 +171,14 @@ class Router:
 
     # ------------------------------------------------------------------ recherche
     def route(self, start, heading, goal, kind="mountain", goal_heading=None, roads=(), margin=None, free=70.0,
-              clear=7.0, budget=1500000, weight=1.15, label="", gmax=None, hair_cost=None, log=True, **over):
+              clear=7.0, budget=2500000, weight=1.6, label="", gmax=None, hair_cost=None, log=True, **over):
         """Tracé de start (x, z), cap heading (vecteur), à goal (x, z), arrivée au cap goal_heading (vecteur) si donné.
-        Renvoie (points [(x, z)] après le départ, cap final)."""
+        Renvoie (points [(x, z)] après le départ, cap final).
+        Chaque nœud porte la hauteur de la chaussée (et non celle du terrain) : elle suit le terrain tant que la pente
+        le permet, sinon la route passe en déblai ou en remblai, ce qui coûte et reste borné."""
         import map_roads as R
         import hashlib
-        sig = hashlib.md5(repr((self.digest, [round(float(v), 1) for v in (*start, *heading, *goal)],
+        sig = hashlib.md5(repr((VERSION, self.digest, [round(float(v), 1) for v in (*start, *heading, *goal)],
                                 None if goal_heading is None else [round(float(v), 3) for v in goal_heading], kind,
                                 margin, free, clear, weight, gmax, hair_cost, sorted(over.items()))).encode())
         for (pts_, hw_) in roads:
@@ -272,14 +278,21 @@ class Router:
             d = math.hypot(ex - x, ez - z)
             return max(d, kh * abs(h_goal - h) / gmax)
 
-        th0 = math.atan2(heading[1], heading[0])
+        th0 = math.atan2(heading[1], heading[0]) if heading is not None else 0.0
         if goal_heading is not None:
             thg = math.atan2(goal_heading[1], goal_heading[0])
-        tol = STEP * 0.85
+        tol = STEP * 0.6
         # Nœuds : listes parallèles
         NX, NZ, NT, NG, NH, NP, NM, NS = [sx], [sz], [th0], [0.0], [h_start], [-1], [0], [9]
         best = {}
         openl = [(heur(sx, sz, h_start) * weight, 0)]
+        if heading is None:
+            # pas de cap imposé (route qui part d'un hameau en cul-de-sac) : tous les caps au départ
+            for k in range(1, 16):
+                NX.append(sx); NZ.append(sz); NT.append(k * TWO_PI / 16); NG.append(0.0); NH.append(h_start)
+                NP.append(-1); NM.append(0); NS.append(9)
+                openl.append((heur(sx, sz, h_start) * weight, len(NX) - 1))
+            heapq.heapify(openl)
         found = -1
         expanded = 0
         cell_k = 1.0 / CELL
@@ -294,8 +307,8 @@ class Router:
             dgoal = math.hypot(ex - x, ez - z)
             if dgoal < closest[0]:
                 closest = (dgoal, n)
-            if dgoal < tol:
-                if goal_heading is None or abs((th - thg + math.pi) % TWO_PI - math.pi) < 0.7:
+            if dgoal < tol and abs(h - h_goal) < GOAL_DH:
+                if goal_heading is None or abs((th - thg + math.pi) % TWO_PI - math.pi) < GOAL_ANG:
                     found = n
                     break
             expanded += 1
@@ -315,8 +328,8 @@ class Router:
                     tm = th + k * STEP * 0.5
                     xm = x + (math.sin(tm) - sh) / k
                     zm = z - (math.cos(tm) - ch) / k
-                h2 = height(x2, z2)
-                if h2 is None:
+                ht = height(x2, z2)
+                if ht is None:
                     continue
                 c2 = cell(x2, z2)
                 cm = cell(xm, zm)
@@ -327,18 +340,22 @@ class Router:
                     h2 = h                      # pont : tablier à niveau
                     r = 0.0
                     cross = 0.0
+                    off = 0.0
                 else:
-                    r = abs(h2 - h) / (STEP * gmax)
-                    if r > R_LIM:
+                    lim = gmax * STEP * R_MAX
+                    dh = ht - h
+                    h2 = h + (lim if dh > lim else -lim if dh < -lim else dh)
+                    off = abs(ht - h2)
+                    if off > OFF_MAX:
                         continue
+                    r = abs(h2 - h) / (STEP * gmax)
                     cross = abs(-Gx[cm] * math.sin(tmid) + Gz[cm] * math.cos(tmid))
                     if cross > 1.05:
                         continue
-                cost = STEP * (1.0 + A_GRADE * r * r + Bf[cm] + cw * max(0.0, cross - 0.12) ** 2)
+                cost = STEP * (1.0 + A_GRADE * r * r + Bf[cm] + cw * max(0.0, cross - 0.12) ** 2
+                               + EW_LIN * off + EW_SQ * off * off)
                 if r > 1.0:
                     cost += STEP * K_OVER * (r - 1.0) ** 2
-                    if r > R_SOFT:
-                        cost += STEP * K_HARD * (r - R_SOFT) ** 2
                 cost += kc * STEP / 14.0 + 1.2 * abs(ci - prev_c) if prev_c < 10 else kc
                 g2 = gc + cost
                 key2 = (int(x2 * cell_k), int(z2 * cell_k), int(round(t2 * hbin)) % NHEAD)
@@ -355,22 +372,25 @@ class Router:
                 nxl, nzl = -sh * side, ch * side
                 x2, z2 = x + nxl * 2 * R_, z + nzl * 2 * R_
                 xa, za = x + nxl * R_ + ch * R_, z + nzl * R_ + sh * R_
-                h2 = height(x2, z2)
-                if h2 is None:
+                ht = height(x2, z2)
+                if ht is None:
                     continue
                 c2 = cell(x2, z2)
                 ca = cell(xa, za)
                 if c2 < 0 or ca < 0 or Kf[c2] or Kf[ca] or Rf[c2] or Rf[ca]:
                     continue
                 arc = math.pi * R_
-                dh = abs(h2 - h)
-                if dh > gmax * 1.25 * arc + HAIR_SLACK:
+                lim = gmax * arc
+                dh = ht - h
+                h2 = h + (lim if dh > lim else -lim if dh < -lim else dh)
+                off = abs(ht - h2)
+                if off > OFF_MAX:
                     continue
                 site = math.hypot(Gx[ca], Gz[ca])
                 if site > 0.85:
                     continue
-                excess = max(0.0, dh - gmax * arc)
-                cost = arc * (1.0 + Bf[ca]) + P["hair_cost"] * (1.0 + (site / 0.32) ** 2) + excess / gmax
+                cost = (arc * (1.0 + Bf[ca] + EW_LIN * off + EW_SQ * off * off)
+                        + P["hair_cost"] * (1.0 + (site / 0.32) ** 2))
                 g2 = gc + cost
                 t2 = th + math.pi
                 key2 = (int(x2 * cell_k), int(z2 * cell_k), int(round(t2 * hbin)) % NHEAD)
@@ -388,7 +408,7 @@ class Router:
         # Reconstruction : géométrie exacte de chaque tronçon
         chain = []
         n = found
-        while n > 0:
+        while NP[n] >= 0:
             chain.append(n)
             n = NP[n]
         chain.reverse()
@@ -415,6 +435,15 @@ class Router:
                     else:
                         t2 = th + k * s
                         pts.append((x + (math.sin(t2) - math.sin(th)) / k, z - (math.cos(t2) - math.cos(th)) / k))
+        if goal_heading is not None:
+            ux, uz = goal_heading
+            un = math.hypot(ux, uz) or 1.0
+            ux, uz = ux / un, uz / un
+            while pts and ((pts[-1][0] - ex) * ux + (pts[-1][1] - ez) * uz > -3.0 or math.hypot(pts[-1][0] - ex, pts[-1][1] - ez) < 6.0):
+                pts.pop()
+        else:
+            while pts and math.hypot(pts[-1][0] - ex, pts[-1][1] - ez) < 9.0:
+                pts.pop()
         pts.append((ex, ez))
         length = sum(math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]) for i in range(len(pts) - 1))
         length += math.hypot(pts[0][0] - sx, pts[0][1] - sz)

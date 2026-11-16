@@ -145,7 +145,8 @@ class Path:
         net = self.net
         gx, gz = net.nodes[goal] if isinstance(goal, str) else goal
         roads = net.router.occupied(net, exclude=self)
-        pts, head = net.router.route(self.pos, self.heading(), (gx, gz), kind or self.kind, goal_heading,
+        free_start = len(self.ctrl) < 2 and self._heading is None
+        pts, head = net.router.route(self.pos, None if free_start else self.heading(), (gx, gz), kind or self.kind, goal_heading,
                                      roads=roads, label=kw.pop("label", self.id), **kw)
         for p in pts[:-1]:
             self._add(*p)
@@ -743,6 +744,22 @@ def report(edges):
 
 
 # ----------------------------------------------------------------- terrassement
+
+def pad_distance(X, Z, px, pz, pr):
+    """Distance au bord d'une aire (négative dedans) : disque de rayon pr, ou rectangle pr = (demi-côté x, demi-côté z,
+    rotation en degrés)."""
+    if isinstance(pr, (tuple, list)):
+        hx, hz, rot = pr
+        a = np.radians(rot)
+        u = (X - px) * np.cos(a) + (Z - pz) * np.sin(a)
+        v = -(X - px) * np.sin(a) + (Z - pz) * np.cos(a)
+        return np.maximum(np.abs(u) - hx, np.abs(v) - hz)
+    return np.hypot(X - px, Z - pz) - pr
+
+
+def pad_extent(pr):
+    return float(max(pr[0], pr[1]) * 1.42) if isinstance(pr, (tuple, list)) else float(pr)
+
 def aux_width(e, s):
     """Largeur de la voie d'insertion ou de sortie à l'abscisse s : (gauche, droite). Pleine largeur sur 65 % de sa
     longueur depuis le nœud, puis biseau (même loi que RoadNetwork.AuxWidth)."""
@@ -835,8 +852,9 @@ def carve(g, H, nodes, edges, pads=()):
         edge[sz, sx] = np.minimum(edge[sz, sx], d)
     # Aires aménagées (places, parkings) : (x, z, rayon, altitude)
     for (px, pz, pr, py) in pads:
-        sz, sx = g.window(px - pr - radius, pz - pr - radius, px + pr + radius, pz + pr + radius)
-        d = np.hypot(g.X[sz, sx] - px, g.Z[sz, sx] - pz) - pr
+        ext = pad_extent(pr)
+        sz, sx = g.window(px - ext - radius, pz - ext - radius, px + ext + radius, pz + ext + radius)
+        d = pad_distance(g.X[sz, sx], g.Z[sz, sx], px, pz, pr)
         y = py - UNDER
         lo[sz, sx] = np.maximum(lo[sz, sx], y - FILL_SLOPE * np.maximum(0.0, d))
         hi[sz, sx] = np.minimum(hi[sz, sx], y + CUT_SLOPE * np.maximum(0.0, d))

@@ -42,12 +42,12 @@ def clear_water(g, H, water):
     return H
 
 
-def previews(g, H, nodes, edges, water, rivers):
+def previews(g, H, nodes, edges, water, rivers, buildings=None):
     P.render(g, H, "out/map.png", roads=edges, water=water, rivers=rivers, nodes=list(nodes.values()), size=1600,
-             labels=False)
+             labels=False, buildings=buildings)
     for name, win in D.VIEWS.items():
         P.render(g, H, "out/view_%s.png" % name, roads=edges, water=water, rivers=rivers,
-                 nodes=list(nodes.values()), size=1100, window=win, contours=10)
+                 nodes=list(nodes.values()), size=1100, window=win, contours=10, buildings=buildings)
 
 
 def bake(step=D.STEP, export=True, preview=True, roads_only=False):
@@ -58,28 +58,57 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
         previews(g, H, nodes, edges, water_masks(g, H), info["rivers"])
         print("%.1f s" % (time.time() - t))
         return g, H, info, nodes, edges
-    Hc, edge = R.carve(g, H, nodes, edges)
+    import map_village as VL
+    pads = VL.pads(g, H, edges)
+    Hc, edge = R.carve(g, H, nodes, edges, pads)
     water = water_masks(g, Hc)
     Hc = clear_water(g, Hc, water)
     hole = R.holes(g, Hc, edges, edge)
     print("tetes de tunnel : %d mailles ouvertes" % int(hole.sum()))
+    villages = [(v[2], v[3], v[4]) for v in D.VILLAGES + D.HAMLETS]
     for e in edges:
         e["rail"] = E.rails(g, Hc, e)
+        # dans les villages : ni glissières ni murets de route (bits 0-1), les maisons bordent la chaussée
+        if e["kind"] not in ("highway", "ramp"):
+            P_ = e["pts"]
+            inside = np.zeros(len(P_), dtype=bool)
+            for (vx, vz, vr) in villages:
+                inside |= np.hypot(P_[:, 0] - vx, P_[:, 1] - vz) < vr
+            span = np.zeros(len(P_), dtype=bool)
+            for (s0, s1, kind) in e["spans"]:
+                span |= (e["s"] >= s0 - 4.0) & (e["s"] <= s1 + 4.0)
+            e["rail"][inside & ~span] &= ~np.uint8(3)
+    placer = VL.populate(g, Hc, edge, water, nodes, edges, info["rivers"])
     urban = [(v[2], v[3], v[4]) for v in D.VILLAGES + D.HAMLETS]
-    rgba, paved, snow, forest, urban_m, slope = E.masks(g, Hc, info, edge, water, edges, urban_pts=urban)
+    rgba, paved, snow, forest, urban_m, slope = E.masks(g, Hc, info, edge, water, edges, urban_pts=urban,
+                                                        blocked=placer.blocked, pads=pads)
     import map_signs as SG
-    places = SG.build(g, Hc, nodes, edges)
-    print("signalisation : %d objets" % len(places))
+    signs = SG.build(g, Hc, nodes, edges, villages=urban)
+    print("signalisation : %d objets" % len(signs))
+    places = placer.places + signs
     if export:
-        E.export(g, Hc, info, nodes, edges, water, edge, rgba, paved, snow, places=places, pois=D.pois(nodes, edges),
-                 holes=hole, tunnels=R.tunnel_zone(g, edges))
+        E.export(g, Hc, info, nodes, edges, water, edge, rgba, paved, snow, places=places,
+                 pois=D.pois(nodes, edges) + VL.pois(), blocked=placer.blocked, holes=hole, tunnels=R.tunnel_zone(g, edges))
         import map_overview as OV
         for e in edges:
             tun = np.where(R.tunnel_mask(e))[0]
             e["tunnels"] = [(int(grp[0]), int(grp[-1])) for grp in np.split(tun, np.where(np.diff(tun) > 1)[0] + 1) if len(grp)]
-        OV.render(g, Hc, rgba, paved, snow, water, edges, info["rivers"], [], os.path.join(E.OUT, "map_overview.png"))
+        import map_place as PLC
+        foot = []
+        for p_ in placer.places:
+            it = placer.items[p_["item"]]
+            if it["category"] in ("chalet", "townhouse", "landmark", "farm") and it["footprint"][0] > 3.0:
+                foot.append(PLC.Placer.corners(p_["x"], p_["z"], it["footprint"][0], it["footprint"][1], p_["yaw"]))
+        OV.render(g, Hc, rgba, paved, snow, water, edges, info["rivers"], foot, os.path.join(E.OUT, "map_overview.png"))
     if preview:
-        previews(g, Hc, nodes, edges, water, info["rivers"])
+        import map_place as PLC
+        buildings = []
+        for p_ in placer.places:
+            it = placer.items[p_["item"]]
+            if it["category"] in ("chalet", "townhouse", "landmark", "farm"):
+                col = (190, 90, 60) if it["category"] == "townhouse" else (60, 60, 160) if it["category"] == "landmark" else (120, 70, 40)
+                buildings.append(dict(corners=PLC.Placer.corners(p_["x"], p_["z"], it["footprint"][0], it["footprint"][1], p_["yaw"]), color=col))
+        previews(g, Hc, nodes, edges, water, info["rivers"], buildings)
         from PIL import Image
         Image.fromarray(np.stack([rgba[..., 2], rgba[..., 0], paved], axis=-1)[::-2, ::2]).save("out/masks.png")
     print("%.1f s" % (time.time() - t))

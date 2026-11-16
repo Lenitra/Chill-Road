@@ -88,7 +88,7 @@ FANS = [
 
 # Emplacements de villages (zones plates réservées, sans forêt) : (id, nom, x, z, rayon)
 VILLAGES = [
-    ("plan", "Le Plan", 160, -1840, 230),
+    ("plan", "Le Plan", 300, -1810, 340),
     ("port", "Le Port", 1190, -1470, 130),
     ("granges", "Les Granges", 1790, 120, 200),
     ("praz", "Praz-Dessus", 190, 1810, 200),
@@ -246,15 +246,18 @@ def roads(net):
         ("r_plage", (880, -1695)),       # chemin de la plage
         ("r_port", (1180, -1470)),       # Le Port
         ("r_ech_e", (1730, -150)),       # Les Granges : échangeur est
-        ("r_col_e", (1830, 260)),        # Les Granges : route du col (est)
+        ("r_col_e", (1900, 190)),        # Les Granges : route du col (est), au pied du cône
         ("col_ne", (1820, 1560)),        # Col du Petit Pas
         ("r_ech_n", (310, 1790)),        # Praz-Dessus : échangeur nord
         ("r_col_n", (200, 1820)),        # Praz-Dessus : route du col (nord), rive est du torrent
         ("r_ech_o", (-1810, 400)),       # La Chenal : échangeur ouest
-        ("r_combe", (-1850, 30)),        # La Chenal : chemin de l'alpage, rive sud du torrent
+        ("r_combe", (-1850, 30)),        # La Chenal : route du col de la Combe, rive sud du torrent
+        ("r_villard", (-1880, -480)),    # route du Villard
     ]
     # chaque carrefour sur le replat le plus proche (un cône de déjection penche de 5 à 15 %)
-    ring = [(name, (x, z) if name == "col_ne" else rt.site(x, z, 70.0)) for name, (x, z) in ring]
+    lowest = dict(r_col_e=62.0)               # carrefours à garder au fond de la vallée (pas sur le cône)
+    ring = [(name, (x, z) if name == "col_ne" else rt.site(x, z, 70.0 if name not in lowest else 140.0,
+                                                           hmax=lowest.get(name, 1e9))) for name, (x, z) in ring]
     for name, (x, z) in ring:
         N(name, x, z)
         net.fixed[name] = net.h(x, z) + (0.5 if name == "col_ne" else 0.3)
@@ -300,7 +303,7 @@ def roads(net):
     # Col du Petit Pas : la route de vallée franchit le petit col, en lacets s'il le faut
     through(v, "col_ne", kind="mountain", gmax=0.065, hair_cost=160.0)
     through(v, "r_ech_n", kind="mountain", gmax=0.065, hair_cost=160.0)
-    for name in ("r_col_n", "r_ech_o", "r_combe"):
+    for name in ("r_col_n", "r_ech_o", "r_combe", "r_villard"):
         through(v, name)
     # Gorge du sud-ouest, puis retour au Plan
     v.route((-1890, -1250), label="vallee>gorge")
@@ -316,6 +319,15 @@ def roads(net):
         x, z = net.nodes[node]
         i = int(np.argmin(np.hypot(VP[:, 0] - x, VP[:, 1] - z)))
         nx, nz = -VT[i, 1] * side, VT[i, 0] * side
+        return [(x + nx * d, z + nz * d) for d in dists]
+
+    def branch(chain, node, side, dists=(24.0, 56.0)):
+        """Branche d'équerre sur n'importe quelle route déjà tracée (côté gauche = +1 dans son sens de tracé)."""
+        P = L.catmull(np.array(chain.ctrl, dtype=np.float64), 2.5)
+        T_ = L.tangents(P)
+        x, z = net.nodes[node]
+        i = int(np.argmin(np.hypot(P[:, 0] - x, P[:, 1] - z)))
+        nx, nz = -T_[i, 1] * side, T_[i, 0] * side
         return [(x + nx * d, z + nz * d) for d in dists]
 
     def arrive(p, node, side, **kw):
@@ -345,7 +357,7 @@ def roads(net):
     N("col", 150, 350)
     net.fixed["col"] = net.h(150, 350) + 0.3
     arms = dict(col_sud=((150, 280), (150, 314), (0.0, 1.0)), col_nord=((150, 420), (150, 386), (0.0, -1.0)),
-                col_est=((220, 350), (186, 350), (-1.0, 0.0)))
+                col_est=((220, 350), (186, 350), (-1.0, 0.0)), col_ouest=((80, 350), (114, 350), (1.0, 0.0)))
     for name, start in (("col_sud", "r_col_s"), ("col_nord", "r_col_n"), ("col_est", "r_col_e")):
         c = net.road(name, "mountain", start, smooth=14.0)
         c.to(*stub(start, 1.0))
@@ -360,18 +372,27 @@ def roads(net):
         HAMLETS.append((hid, name, x, z, radius))
         return hid
 
-    # Route des hameaux (balcon du versant sud, au soleil) : du Plan aux Hauts, au Crêt, puis descente sur Le Port
-    hamlet("h_hauts", "Les Hauts", (350, -1450), 220, 90, 260)
-    hamlet("h_cret", "Le Crêt", (750, -1330), 220, 160, 280)
-    b_ = net.road("balcon", "lane", "r_ech_s", smooth=12.0)
+    # Route de balcon (départementale) : du Plan, lacets jusqu'à l'épaulement du versant sud (au soleil), puis à
+    # niveau vers 250-290 m, aux Hauts, au-dessus du cirque, aux Moulins ; descente en lacets sur Les Granges
+    RD = dict(wiggle=0.25, noise=0.3)
+    hamlet("h_hauts", "Les Hauts", (460, -1212), 60, 220, 290)
+    hamlet("h_moulins", "Les Moulins", (1148, -488), 60, 220, 300)
+    b_ = net.road("balcon", "mountain", "r_ech_s", smooth=12.0)
     b_.to(*stub("r_ech_s", 1.0))
-    b_.route("h_hauts", label="balcon>hauts").node("h_hauts")
-    b_.route("h_cret", label="balcon>cret").node("h_cret")
-    arrive(b_, "r_port", 1.0)
-    # Chemin de l'alpage du cirque, au-dessus du Crêt
+    b_.route("h_hauts", label="balcon>hauts", **RD).node("h_hauts")
+    b_.route("h_moulins", label="balcon>moulins", **RD).node("h_moulins")
+    arrive(b_, "r_ech_e", 1.0, **RD)
+    # Chemin de l'alpage du cirque, depuis Les Moulins : part d'équerre de la route de balcon, côté amont
     N("alp_cirque", *rt.site(880, -600, 160, 300, 420))
-    t = net.road("chemin_cirque", "track", "h_cret", smooth=12.0)
+    t = net.road("chemin_cirque", "track", "h_moulins", smooth=12.0)
+    t.to(*branch(b_, "h_moulins", 1.0, (18.0, 40.0)))
     t.route("alp_cirque", label="chemin_cirque").node("alp_cirque")
+
+    # Route de l'alpage (départementale) : de La Chenal par la combe jusqu'à l'alpage, en cul-de-sac
+    N("alpage", -1105, 240)
+    w_ = net.road("route_alpage", "mountain", "r_combe", smooth=14.0)
+    w_.to(*stub("r_combe", 1.0))
+    w_.route("alpage", label="route_alpage", **RD).node("alpage")
 
     # Les Chalets : versant nord, au soleil, au-dessus de l'autoroute (depuis l'échangeur nord)
     hamlet("h_chalets", "Les Chalets", (520, 2470), 180, 190, 330)
@@ -382,44 +403,37 @@ def roads(net):
     h_ = net.road("route_chalets", "lane", "ech_n_r", smooth=12.0)
     h_.to((lx + dx / n * 30.0, lz + dz / n * 30.0))
     h_._heading = (dx / n, dz / n)
-    h_.route("h_chalets", label="route_chalets").node("h_chalets")
+    h_.route("h_chalets", label="route_chalets", **RD).node("h_chalets")
 
-    # Le Villard : épaulement du versant ouest (soleil de l'après-midi), depuis La Chenal
-    hamlet("h_villard", "Le Villard", (-1450, -420), 260, 140, 300)
-    w_ = net.road("route_villard", "lane", "r_ech_o", smooth=12.0)
-    w_.to(*stub("r_ech_o", 1.0))
-    w_.route("h_villard", label="route_villard").node("h_villard")
+    # Le Villard : épaulement du versant ouest (soleil de l'après-midi), depuis la sortie de la gorge
+    hamlet("h_villard", "Le Villard", (-1560, -560), 200, 130, 210)
+    v_ = net.road("route_villard", "lane", "r_villard", smooth=12.0)
+    v_.to(*stub("r_villard", 1.0))
+    v_.route("h_villard", label="route_villard", **RD).node("h_villard")
 
-    # Les Moulins : épaulement du versant est, au-dessus des Granges
-    hamlet("h_moulins", "Les Moulins", (1350, -300), 260, 120, 280)
-    m_ = net.road("route_moulins", "lane", "r_ech_e", smooth=12.0)
-    m_.to(*stub("r_ech_e", 1.0))
-    m_.route("h_moulins", label="route_moulins").node("h_moulins")
-
-    # --- Chemins : plage du lac (goudronné), alpage de l'ouest (terre), tour du lac du col (terre)
+    # Route du lac (départementale) : de la vallée à la plage, puis le long de la rive sud, sous le viaduc de
+    # l'autoroute, jusqu'au hameau des Rives
     N("plage", 1140, -1740)
-    l_ = net.road("chemin_lac", "lane", "r_plage", smooth=12.0)
+    hamlet("h_rives", "Les Rives", (1950, -1900), 250, 4, 60)
+    l_ = net.road("route_lac", "mountain", "r_plage", smooth=12.0)
     l_.to(*stub("r_plage", -1.0))
-    l_.route("plage", label="chemin_lac").node("plage")
-    N("alpage", -1105, 240)
-    t = net.road("chemin_alpage", "track", "r_combe", smooth=12.0)
-    t.to(*stub("r_combe", 1.0))
-    t.route("alpage", label="chemin_alpage").node("alpage")
-    net.road("chemin_col", "track", "col").to((114, 350), (78, 344), (-10, 340), (-85, 400), (-95, 480), (-30, 545))
+    l_.route("plage", label="route_lac>plage", **RD).node("plage")
+    l_.route("h_rives", label="route_lac>rives", **RD).node("h_rives")
 
 
 def pois(nodes, edges):
     """Lieux-dits affichés par le jeu (id, noms, position, rayon) ; « depart » : point de départ, r = cap (degrés,
     0 = nord, 90 = est), sur la route de la vallée, loin de tout carrefour."""
     out = []
-    e = next(e for e in edges if e["id"] == "vallee_2")
-    i = int(np.searchsorted(e["s"], 260.0))
+    e = next(e for e in edges if e["a"] == "r_col_s" and e["b"] == "r_ech_s")
+    i = int(np.searchsorted(e["s"], min(150.0, e["s"][-1] * 0.45)))
     dx, dz = e["pts"][i + 2, 0] - e["pts"][i, 0], e["pts"][i + 2, 1] - e["pts"][i, 1]
     out.append(dict(id="depart", fr="", en="", x=round(float(e["pts"][i, 0]), 1), z=round(float(e["pts"][i, 1]), 1),
                     r=round(math.degrees(math.atan2(dx, dz)) % 360.0, 1)))
+    left = {"plan", "port", "chenal"}
     for (vid, name, x, z, r) in VILLAGES + HAMLETS:
         en = dict(col="Three Valleys Pass", alpage="Combe Pasture").get(vid, name)
-        out.append(dict(id=vid, fr=name, en=en, x=float(x), z=float(z), r=float(r) * 1.6))
+        out.append(dict(id=vid, fr=name, en=en, x=float(x), z=float(z), r=float(r) * 1.6, side=-1 if vid in left else 1))
     out.append(dict(id="lac", fr="Lac de l'Envers", en="Lake Envers", x=1700.0, z=-1500.0, r=520.0))
     out.append(dict(id="col_ne", fr="Col du Petit Pas", en="Petit Pas Pass", x=1820.0, z=1560.0, r=150.0))
     out.append(dict(id="gorge", fr="Gorge du Sud-Ouest", en="South-West Gorge", x=-1900.0, z=-1300.0, r=230.0))
@@ -433,4 +447,5 @@ VIEWS = {
     "se": (400, -2400, 2400, -400),
     "ne": (1000, 800, 2400, 2300),
     "col": (-700, -1900, 1900, 1900),
+    "plan": (-300, -2150, 800, -1450),
 }

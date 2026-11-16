@@ -146,6 +146,10 @@ class Signs:
                 while s < Ltot - 26.0:
                     x, z, h, t, n = self.frame(e, s)
                     item = "snow_pole" if h > 300.0 else "delineator"
+                    if any(math.hypot(x - vx, z - vz) < vr for (vx, vz, vr) in getattr(self, "villages", ())):
+                        k += 1
+                        s += 30.0
+                        continue
                     for side in (1, -1):
                         self.roadside(item, e, s, side, hw + 0.8, flags=INSTANCED | DETAIL)
                     if kind == "main" and k % 20 == 10:
@@ -223,9 +227,10 @@ class Signs:
                     self.roadside("sign_motorway", e, 34.0, -1, hw + 1.3, face="against")
 
 
-def build(g, H, nodes, edges):
-    """Renvoie la liste des objets de signalisation."""
+def build(g, H, nodes, edges, villages=()):
+    """Renvoie la liste des objets de signalisation. villages : [(x, z, rayon)] où l'on ne pose ni balises ni bornes."""
     sg = Signs(g, H, nodes, edges)
+    sg.villages = list(villages)
     sg.junctions()
     sg.motorway()
     sg.along()
