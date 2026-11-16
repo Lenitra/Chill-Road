@@ -9,7 +9,8 @@ namespace NoHesi.EditorTools
     /// (Tools/Blender/play_cars.py → Assets/NoHesi/Models/PlayerCars) : Toyota Supra (A80, 1993), Mazda MX-5 (NA,
     /// 1989), Ford Mustang fastback 1969 (celle de John Wick), Peel P50 (tricycle, roue « wheel-back-center »),
     /// Toyota AE86 Trueno (Initial D, phares escamotables), DeLorean DMC-12, Koenigsegg Jesko Attack, Aston Martin
-    /// Valkyrie AMR-LMH et Renault Twingo (1re génération, 1993, traction).
+    /// Valkyrie AMR-LMH, Renault Twingo (1re génération, 1993, traction) et Citroën Ami (2020, quadricycle électrique
+    /// bridé à 45 km/h, un seul rapport).
     /// Un modèle absent est simplement ignoré.
     /// Les phares escamotables de la MX-5 sont des enfants « popup-left/right » dont le pivot est la charnière :
     /// CarLights les fait basculer. Palette et optiques partagées avec le pack de voitures, peinture propre à chaque
@@ -56,6 +57,7 @@ namespace NoHesi.EditorTools
                 ("Jesko", new Color(0.94f, 0.94f, 0.95f), Jesko),     // blanc, carbone et accents vert citron (Attack)
                 ("Valkyrie", new Color(0.05f, 0.56f, 0.53f), Valkyrie), // teal de l'AMR-LMH, accents vert citron
                 ("Twingo", new Color(0.97f, 0.77f, 0.10f), Twingo),   // « Jaune Indien » du lancement, boucliers gris
+                ("Ami", new Color(0.60f, 0.80f, 0.87f), Ami),         // « Bleu Ciel », boucliers et bas de caisse gris foncé
             };
             // Accents hors palette (matériau « PK_Accent » du modèle) : couleur unie par voiture
             var accents = new Dictionary<string, Color>
@@ -241,6 +243,27 @@ namespace NoHesi.EditorTools
                 hoodCamera = new Vector3(0f, 1.18f, 1.15f),
                 bumperCamera = new Vector3(0f, 0.42f, 1.78f),
                 engineVoice = EngineVoice.Inline4,
+            };
+        }
+
+        /// <summary>Citroën Ami (2020) : quadricycle léger électrique, 485 kg + le conducteur, moteur de 6 kW sur les roues
+        /// avant, réducteur à un seul rapport, bridé à 45 km/h (0-45 km/h en ≈10 s), pneus 155/65 R14, braquage très court
+        /// (7,2 m entre trottoirs). Couple et démultiplication ramenés au régime de la voix de synthèse : ils donnent la
+        /// vitesse de pointe et les accélérations d'origine (le réducteur très court multiplie l'inertie moteur simulée,
+        /// ≈450 kg équivalents, d'où un couple plus élevé que ne le voudraient les 6 kW).</summary>
+        static VehicleSpec Ami(GameObject model)
+        {
+            const float mass = 560f;
+            return new VehicleSpec
+            {
+                id = "ami", displayName = "Citroën Ami", prefab = model, modelScale = 1f,
+                drivetrain = Drivetrain.FWD, mass = mass, maxTorque = 28f, redline = 7000f,
+                gearRatios = new[] { 1f }, finalDrive = 16.36f,      // 7 000 tr/min = 45 km/h
+                wheelRadius = 0.279f, tireGrip = 0.95f, dragArea = 0.85f, downforceArea = 0f, steerLock = 40f,
+                brakeForce = mass * 8.5f,
+                hoodCamera = new Vector3(0f, 1.18f, 1.02f),
+                bumperCamera = new Vector3(0f, 0.42f, 1.30f),
+                engineVoice = EngineVoice.Electric,
             };
         }
 

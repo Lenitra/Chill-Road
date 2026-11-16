@@ -27,6 +27,7 @@ namespace NoHesi
 
         static readonly Color Accent = new Color(1f, 0.76f, 0.2f);
         static readonly Color Info = new Color(0.35f, 0.85f, 1f);
+        static readonly Color Tuning = new Color(1f, 0.42f, 0.82f);
         static readonly Color Plate = new Color(0.03f, 0.04f, 0.06f, 0.92f);
         static readonly Color Dim = new Color(1f, 1f, 1f, 0.72f);
         const float ViewSize = 960f, MinZoom = 1f, MaxZoom = 7f;
@@ -45,6 +46,15 @@ namespace NoHesi
         RouteLine mapRoute;
         int routeVersion = -1;
         float routeZoom;
+        // Courses : parcours de chaque tracé et étiquette de son départ (nom, genre, longueur, record)
+        readonly List<RouteLine> raceLines = new List<RouteLine>();
+        readonly List<Text> raceLabels = new List<Text>(), raceRows = new List<Text>();
+        // Seuls les départs sont affichés ; le tracé (et l'arrivée d'un sprint) n'apparaît qu'au survol du départ
+        readonly List<RectTransform> raceStarts = new List<RectTransform>(), raceFinishes = new List<RectTransform>();
+        int raceHover = -1;
+        float raceZoom = -1f;
+        /// <summary>Distance au départ (unités d'écran) sous laquelle le curseur ou le viseur le survole.</summary>
+        const float RaceHoverRadius = 18f;
         bool pressed;
         float pressMoved;
         float zoom = 1.12f;
@@ -96,6 +106,13 @@ namespace NoHesi
                 routeVersion = -1;
                 markArrows.Clear();
                 markNames.Clear();
+                raceLines.Clear();
+                raceLabels.Clear();
+                raceRows.Clear();
+                raceStarts.Clear();
+                raceFinishes.Clear();
+                raceHover = -1;
+                raceZoom = -1f;
             }
             if (open && !root) Build();
             IsOpen = open;
@@ -110,6 +127,7 @@ namespace NoHesi
                 zoom = 1.12f;
                 follow = false;
                 center = new Vector2(30f, 230f);
+                RefreshRaceLabels();
                 Refresh();
             }
         }
@@ -194,7 +212,16 @@ namespace NoHesi
         void PlaceAt(Vector2 xz)
         {
             var nav = game.Nav;
-            if (!nav || GameManager.DedicatedServer) return;
+            // Pendant une course, le GPS affiche son parcours : pas d'autre destination
+            if (!nav || nav.OnCourse || GameManager.DedicatedServer) return;
+            // Clic sur le départ d'une course : le GPS y mène
+            if (game.Races)
+                foreach (var t in game.Races.All)
+                    if ((Local(t.start.pos.x, t.start.pos.z) - Local(xz.x, xz.y)).magnitude * zoom < 22f)
+                    {
+                        nav.SetDestination(t.start.pos, t.fr, t.en);
+                        return;
+                    }
             string fr = null, en = null;
             float best = float.MaxValue;
             if (game.Map.Json.pois != null)
@@ -214,9 +241,12 @@ namespace NoHesi
             if (game.Nav) game.Nav.ClearDestination();
         }
 
-        /// <summary>Nom d'un lieu-dit de la carte (déjà écrit à côté de son point).</summary>
+        /// <summary>Nom d'un lieu-dit ou d'une course de la carte (déjà écrit à côté de son repère).</summary>
         bool IsPlaceName(string name)
         {
+            if (game.Races)
+                foreach (var t in game.Races.All)
+                    if (t.Name == name) return true;
             if (game.Map.Json.pois != null)
                 foreach (var poi in game.Map.Json.pois)
                     if (!string.IsNullOrEmpty(poi.fr) && Loc.T(poi.fr, poi.en) == name) return true;
@@ -268,7 +298,8 @@ namespace NoHesi
             else
             {
                 destName.text = nav.DestinationName;
-                destDetail.text = !nav.HasRoute ? Loc.T("Pas d'itinéraire", "No route")
+                destDetail.text = nav.OnCourse ? Loc.T("Course en cours : suivre le parcours", "Race in progress: follow the course")
+                    : !nav.HasRoute ? Loc.T("Pas d'itinéraire", "No route")
                     : Loc.F($"{nav.Remaining / 1000f:0.0} km  ·  ≈ {Mathf.Max(1, Mathf.RoundToInt(nav.RemainingTime / 60f))} min");
             }
         }
@@ -311,7 +342,19 @@ namespace NoHesi
                 playerMarks[i].localScale = Vector3.one * (pulse / zoom);
             }
             placeText.text = string.IsNullOrEmpty(game.Place) ? Loc.T("Sur la route", "On the road") : game.Place;
+            // Tracés des courses : épaisseur constante à l'écran
+            if (!Mathf.Approximately(zoom, raceZoom))
+            {
+                raceZoom = zoom;
+                foreach (var line in raceLines)
+                {
+                    line.width = 4.5f / zoom;
+                    line.edgeWidth = 1.5f / zoom;
+                    line.SetVerticesDirty();
+                }
+            }
             RefreshRoute();
+            UpdateRaceHover();
             bool pad = GameInput.UsingGamepad;
             hintText.text = pad
                 ? Loc.T("Joystick : déplacer   ·   LT / RT : zoom   ·   A : destination   ·   Y : l'effacer   ·   X : ma position   ·   Select / B : fermer",
@@ -358,18 +401,20 @@ namespace NoHesi
                 {
                     if (poi.id == "depart" || string.IsNullOrEmpty(poi.fr)) continue;
                     var mark = Box(content, "Poi_" + poi.id, new Vector2(0.5f, 0.5f), Local(poi.x, poi.z), new Vector2(10f, 10f));
-                    // La concession (achat de voitures) : repère plus grand, cyan, bien visible
-                    bool dealer = poi.id == "dealer";
-                    float size = dealer ? 18f : 12f;
+                    // La concession (achat de voitures, cyan) et le garage de tuning (magenta) : repères plus grands,
+                    // bien visibles
+                    bool dealer = poi.id == "dealer", tuning = poi.id == "tuning";
+                    Color tint = dealer ? Info : tuning ? Tuning : Color.white;
+                    float size = dealer || tuning ? 18f : 12f;
                     var dot = Box(mark, "Dot", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size, size)).gameObject.AddComponent<Image>();
                     dot.sprite = HudArt.Disc;
                     dot.color = Plate;
                     var core = Box(mark, "Core", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size - 5f, size - 5f)).gameObject.AddComponent<Image>();
                     core.sprite = HudArt.Disc;
-                    core.color = dealer ? Info : Accent;
+                    core.color = dealer || tuning ? tint : Accent;
                     // étiquette à droite du repère, ou à gauche (side = -1) quand deux lieux sont voisins
                     bool left = poi.side < 0;
-                    var label = Label(mark, "", 21, left ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, dealer ? Info : Color.white,
+                    var label = Label(mark, "", 21, left ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, tint,
                         new Vector2(left ? -size * 0.5f - 8f : size * 0.5f + 8f, 0f), new Vector2(420f, 30f), FontStyle.BoldAndItalic);
                     label.rectTransform.pivot = new Vector2(left ? 1f : 0f, 0.5f);
                     Loc.Bind(label, poi.fr, poi.en);
@@ -384,6 +429,41 @@ namespace NoHesi
             mapRoute.core = Info;
             mapRoute.edge = new Color(0.02f, 0.03f, 0.05f, 0.9f);
             mapRoute.transform.SetSiblingIndex(0);
+
+            // Courses : le départ de chaque tracé ; son parcours (un tour pour une boucle, au-dessus de l'itinéraire du
+            // GPS) et, pour un sprint, son arrivée, masqués tant que le départ n'est pas survolé
+            if (game.Races)
+                foreach (var t in game.Races.All)
+                {
+                    var line = Box(content, "Race_" + t.id, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(ViewSize, ViewSize)).gameObject.AddComponent<RouteLine>();
+                    line.core = t.Tint;
+                    line.edge = new Color(0.02f, 0.03f, 0.05f, 0.9f);
+                    var strip = new List<Vector2>();
+                    foreach (var p in t.path)
+                    {
+                        Vector2 q = Local(p.x, p.z);
+                        if (strip.Count == 0 || (q - strip[strip.Count - 1]).sqrMagnitude > 0.25f) strip.Add(q);
+                    }
+                    strip.Add(Local(t.Finish.x, t.Finish.z));
+                    line.strips.Add(strip);
+                    line.transform.SetSiblingIndex(0);
+                    line.gameObject.SetActive(false);
+                    raceLines.Add(line);
+                    var label = RaceMark(t, t.start.pos, true, t.side);
+                    raceLabels.Add(label);
+                    raceStarts.Add((RectTransform)label.transform.parent);
+                    RectTransform finish = null;
+                    if (!t.Loop)
+                    {
+                        var end = RaceMark(t, t.Finish, false, 0);
+                        Loc.Bind(end, "Arrivée", "Finish");
+                        finish = (RectTransform)end.transform.parent;
+                        finish.gameObject.SetActive(false);
+                    }
+                    raceFinishes.Add(finish);
+                }
+            mapRoute.transform.SetSiblingIndex(0);
+
             pin = Box(content, "Destination", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(10f, 10f));
             var pinEdge = Box(pin, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(26f, 26f)).gameObject.AddComponent<Image>();
             pinEdge.color = new Color(0.02f, 0.03f, 0.05f, 0.95f);
@@ -431,7 +511,9 @@ namespace NoHesi
             placeText = Label(side, "", 30, TextAnchor.UpperLeft, Color.white, new Vector2(42f, -222f), new Vector2(textWidth, 80f), FontStyle.Bold, new Vector2(0f, 1f));
             placeText.horizontalOverflow = HorizontalWrapMode.Wrap;
 
-            var legend = Label(side, "", 26, TextAnchor.UpperLeft, Info, new Vector2(42f, -330f), new Vector2(textWidth, 36f), FontStyle.BoldAndItalic, new Vector2(0f, 1f));
+            // Légende : lignes resserrées, la dernière (votre voiture) reste au-dessus de la destination
+            const float rowTop = -366f, rowStep = 29f;
+            var legend = Label(side, "", 26, TextAnchor.UpperLeft, Info, new Vector2(42f, -318f), new Vector2(textWidth, 36f), FontStyle.BoldAndItalic, new Vector2(0f, 1f));
             Loc.Bind(legend, "LÉGENDE", "LEGEND");
             var rows = new (Color color, float width, string fr, string en)[]
             {
@@ -446,15 +528,32 @@ namespace NoHesi
             };
             for (int i = 0; i < rows.Length; i++)
             {
-                float y = -384f - i * 34f;
+                float y = rowTop - i * rowStep;
                 var bar = Box(side, "Key" + i, new Vector2(0f, 1f), new Vector2(72f, y - 15f), new Vector2(56f, rows[i].width)).gameObject.AddComponent<Image>();
                 bar.color = rows[i].color;
                 var text = Label(side, "", 23, TextAnchor.UpperLeft, Color.white, new Vector2(122f, y), new Vector2(400f, 32f), FontStyle.Normal, new Vector2(0f, 1f));
                 Loc.Bind(text, rows[i].fr, rows[i].en);
             }
-            var you = Label(side, "▲", 26, TextAnchor.UpperLeft, Accent, new Vector2(58f, -384f - rows.Length * 34f + 4f), new Vector2(40f, 36f), FontStyle.Normal, new Vector2(0f, 1f));
+            // Courses : une ligne par tracé, de sa couleur (nom, puis record personnel ou longueur : RefreshRaceLabels)
+            int row = rows.Length;
+            if (game.Races)
+                foreach (var t in game.Races.All)
+                {
+                    float y = rowTop - row++ * rowStep;
+                    var bar = Box(side, "Race_" + t.id, new Vector2(0f, 1f), new Vector2(72f, y - 15f), new Vector2(56f, 6f)).gameObject.AddComponent<Image>();
+                    bar.color = t.Tint;
+                    var text = Label(side, "", 23, TextAnchor.UpperLeft, Color.white, new Vector2(122f, y), new Vector2(sideWidth - 140f, 30f), FontStyle.Normal, new Vector2(0f, 1f));
+                    // La ligne rétrécit plutôt que de déborder (colonne étroite sur un écran 4:3)
+                    text.horizontalOverflow = HorizontalWrapMode.Wrap;
+                    text.verticalOverflow = VerticalWrapMode.Truncate;
+                    text.resizeTextForBestFit = true;
+                    text.resizeTextMinSize = 13;
+                    text.resizeTextMaxSize = 23;
+                    raceRows.Add(text);
+                }
+            var you = Label(side, "▲", 26, TextAnchor.UpperLeft, Accent, new Vector2(58f, rowTop - row * rowStep + 4f), new Vector2(40f, 36f), FontStyle.Normal, new Vector2(0f, 1f));
             you.raycastTarget = false;
-            var youText = Label(side, "", 23, TextAnchor.UpperLeft, Color.white, new Vector2(122f, -384f - rows.Length * 34f), new Vector2(400f, 32f), FontStyle.Normal, new Vector2(0f, 1f));
+            var youText = Label(side, "", 23, TextAnchor.UpperLeft, Color.white, new Vector2(122f, rowTop - row * rowStep), new Vector2(400f, 32f), FontStyle.Normal, new Vector2(0f, 1f));
             Loc.Bind(youText, "Votre voiture", "Your car");
 
             // GPS : destination choisie, distance et temps estimé
@@ -467,6 +566,105 @@ namespace NoHesi
             hintText = Label(side, "", 19, TextAnchor.LowerLeft, Dim, new Vector2(42f, 34f), new Vector2(textWidth, 150f), FontStyle.Normal, new Vector2(0f, 0f));
             hintText.horizontalOverflow = HorizontalWrapMode.Wrap;
             root.SetActive(false);
+        }
+
+        /// <summary>
+        /// Repère d'une course, de la couleur de son tracé : pastille au départ (étiquette à gauche, au-dessus ou à
+        /// droite selon <paramref name="side"/>, là où la carte est dégagée), carré à l'arrivée d'un sprint (étiquette
+        /// dessous). Renvoie l'étiquette.
+        /// </summary>
+        Text RaceMark(Races.Track t, Vector3 at, bool start, int side)
+        {
+            var mark = Box(content, (start ? "RaceStart_" : "RaceFinish_") + t.id, new Vector2(0.5f, 0.5f), Local(at.x, at.z), new Vector2(10f, 10f));
+            var layers = new (float size, Color color)[] { (start ? 22f : 18f, Plate), (start ? 17f : 13f, t.Tint), (start ? 7f : 5f, Color.white) };
+            foreach (var (size, color) in layers)
+            {
+                var img = Box(mark, "Layer", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size, size)).gameObject.AddComponent<Image>();
+                if (start) img.sprite = HudArt.Disc;
+                img.color = color;
+                img.raycastTarget = false;
+            }
+            Text label;
+            if (start && side != 0)
+            {
+                label = Label(mark, "", 21, side < 0 ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, t.Tint, new Vector2(side * 19f, 0f), new Vector2(520f, 30f), FontStyle.BoldAndItalic);
+                label.rectTransform.pivot = new Vector2(side < 0 ? 1f : 0f, 0.5f);
+            }
+            else
+            {
+                label = Label(mark, "", start ? 21 : 18, start ? TextAnchor.LowerCenter : TextAnchor.UpperCenter, t.Tint,
+                    new Vector2(0f, start ? 15f : -13f), new Vector2(520f, 30f), FontStyle.BoldAndItalic);
+                label.rectTransform.pivot = new Vector2(0.5f, start ? 0f : 1f);
+            }
+            var outline = label.gameObject.AddComponent<Outline>();
+            outline.effectColor = new Color(0f, 0f, 0f, 0.85f);
+            outline.effectDistance = new Vector2(1.6f, -1.6f);
+            fixedSize.Add(mark);
+            return label;
+        }
+
+        /// <summary>
+        /// Départ survolé par le curseur (ou par le viseur, à la manette et aux flèches) : son tracé et l'arrivée d'un
+        /// sprint s'affichent, le repère grossit et son étiquette se détaille. Les autres tracés restent masqués.
+        /// </summary>
+        void UpdateRaceHover()
+        {
+            if (raceStarts.Count == 0) return;
+            bool has = false;
+            Vector2 local = Vector2.zero;
+            if (cross.gameObject.activeSelf)
+            {
+                local = Local(center.x, center.y);
+                has = true;
+            }
+            else if (Mouse.current != null)
+            {
+                Vector2 screen = Mouse.current.position.ReadValue();
+                has = RectTransformUtility.RectangleContainsScreenPoint(view, screen, null)
+                    && RectTransformUtility.ScreenPointToLocalPointInRectangle(content, screen, null, out local);
+            }
+            int hover = -1;
+            if (has)
+            {
+                float best = RaceHoverRadius;
+                for (int i = 0; i < raceStarts.Count; i++)
+                {
+                    float d = (local - raceStarts[i].anchoredPosition).magnitude * zoom;
+                    if (d < best) { best = d; hover = i; }
+                }
+            }
+            if (hover != raceHover)
+            {
+                raceHover = hover;
+                for (int i = 0; i < raceLines.Count; i++)
+                {
+                    bool on = i == hover;
+                    raceLines[i].gameObject.SetActive(on);
+                    if (raceFinishes[i]) raceFinishes[i].gameObject.SetActive(on);
+                }
+                // Au premier plan : l'étiquette détaillée passe au-dessus des lieux-dits voisins
+                if (hover >= 0) raceStarts[hover].SetAsLastSibling();
+                RefreshRaceLabels();
+            }
+            if (hover >= 0) raceStarts[hover].localScale = Vector3.one * (1.3f / zoom);
+        }
+
+        /// <summary>
+        /// Courses : étiquette de chaque départ (le nom du tracé ; au survol : aussi son genre, sa longueur et le
+        /// record personnel) et sa ligne dans la légende (nom, puis record ou longueur).
+        /// </summary>
+        void RefreshRaceLabels()
+        {
+            if (!game.Races) return;
+            var races = game.Races.All;
+            for (int i = 0; i < raceLabels.Count && i < races.Count; i++)
+            {
+                var t = races[i];
+                string best = t.best > 0f ? Loc.T("record ", "best ") + Races.Clock(t.best) : Loc.T("pas encore de record", "no best time yet");
+                raceLabels[i].text = i == raceHover ? t.Name + "\n<size=17>" + t.Summary + "  ·  " + best + "</size>" : t.Name;
+                if (i < raceRows.Count)
+                    raceRows[i].text = t.Name + "  ·  " + (t.best > 0f ? Races.Clock(t.best) : t.Summary);
+            }
         }
 
         /// <summary>Repère d'un joueur : flèche orientée dans un disque (or : soi ; couleur et pseudo du joueur : les autres).</summary>

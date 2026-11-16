@@ -204,6 +204,16 @@ namespace NoHesi
             return key;
         }
 
+        /// <summary>Entrer (concession) : A sur n'importe quelle manette, E ou Entrée.</summary>
+        public static bool InteractPressed
+        {
+            get
+            {
+                foreach (var p in Gamepad.all) if (p.buttonSouth.wasPressedThisFrame) return true;
+                return Kb != null && (Kb.eKey.wasPressedThisFrame || Kb.enterKey.wasPressedThisFrame || Kb.numpadEnterKey.wasPressedThisFrame);
+            }
+        }
+
         /// <summary>Retour : B sur n'importe quelle manette, ou Échap.</summary>
         public static bool CancelPressed
         {

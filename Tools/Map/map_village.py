@@ -15,6 +15,32 @@ LOT = (48.0, 40.0, 0.0)
 SHOWROOM = (434.0, -1870.0, -90.0)          # origine du modèle (centre du hall), cap : façade vers l'ouest
 VILLAGE = "r_ech_s"                         # la place du village : le carrefour central du Plan
 
+# Garage de tuning : à la sortie d'autoroute Est, au sud de la route d'accès (acces_e) avant la rivière de l'Est.
+# Parking rectangulaire tourné comme la route : (centre x, z), (demi-longueur le long de la route, demi-profondeur,
+# rotation en degrés). Repère local du parking : u le long de la route (vers l'échangeur), v vers la route.
+TUNING = (1862.3, -156.2)
+TUNING_LOT = (34.0, 20.0, 19.5)
+
+
+def tuning_at(u, v):
+    """Point (x, z) du parking du garage de tuning, en coordonnées locales (u le long de la route, v vers elle)."""
+    a = math.radians(TUNING_LOT[2])
+    x, z = TUNING
+    return x + u * math.cos(a) - v * math.sin(a), z + u * math.sin(a) + v * math.cos(a)
+
+
+def _road_height(edges, x, z, y, reach=30.0):
+    """Altitude du point de route le plus proche de (x, z), à moins de reach mètres ; sinon y."""
+    import numpy as np
+    best = 1e9
+    for e in edges:
+        P = e["pts"]
+        d = np.hypot(P[:, 0] - x, P[:, 1] - z)
+        i = int(np.argmin(d))
+        if d[i] < best and d[i] < reach:
+            best, y = d[i], float(P[i, 2])
+    return y
+
 
 def pads(g, H, edges=()):
     """Aires aplanies et goudronnées : (x, z, forme, altitude). Le parking est à la hauteur de la route qui le borde
@@ -29,12 +55,19 @@ def pads(g, H, edges=()):
         i = int(np.argmin(d))
         if d[i] < best and d[i] < 30.0:
             best, y = d[i], float(P[i, 2])
-    return [(x, z, LOT, y)]
+    pads = [(x, z, LOT, y)]
+    # garage de tuning : à la hauteur de la route qui le borde, comme la concession
+    tx, tz = TUNING
+    ex, ez = tuning_at(0.0, TUNING_LOT[1])
+    pads.append((tx, tz, TUNING_LOT, _road_height(edges, ex, ez, float(g.sample(H, tx, tz)))))
+    return pads
 
 
 def pois():
     x, z, r = DEALER
-    return [dict(id="dealer", fr="Concession", en="Car dealer", x=x + 30.0, z=z, r=r + 20.0, side=1)]
+    tx, tz = tuning_at(4.0, -11.0)
+    return [dict(id="dealer", fr="Concession", en="Car dealer", x=x + 30.0, z=z, r=r + 20.0, side=1),
+            dict(id="tuning", fr="Garage de tuning", en="Tuning garage", x=round(tx, 1), z=round(tz, 1), r=45.0, side=1)]
 
 
 def _edge(edges, a, b):
@@ -53,6 +86,8 @@ def populate(g, H, edge_map, water, nodes, edges, rivers, seed=23):
     # ---------------- Concession (posée la première : sa place est réservée)
     x, z, r = DEALER
     P.claim(Placer.corners(x, z, LOT[0] * 2, LOT[1] * 2, 0.0), x, z, 0.0)
+    tx, tz = TUNING
+    P.claim(Placer.corners(tx, tz, TUNING_LOT[0] * 2, TUNING_LOT[1] * 2, -TUNING_LOT[2]), tx, tz, 0.0)
     P.boxes.clear()                          # la réserve ne bloque que la végétation ; les objets se posent dessus
     sx, sz, yaw = SHOWROOM
     y = float(g.sample(H, sx, sz))
@@ -63,6 +98,22 @@ def populate(g, H, edge_map, water, nodes, edges, rivers, seed=23):
     P.add("dealer_sign", x - 36.0, z + 34.0, -90.0, y=float(g.sample(H, x - 36.0, z + 34.0)))
     for k in range(4):
         P.add("lamp_road", x + 2.0, z - 30.0 + k * 20.0, 90.0, y=y)
+
+    # ---------------- Garage de tuning (sortie Est) : façade et auvent tournés vers la route, podium et totem
+    # sur le parking, lampadaires le long de la route
+    face = (-TUNING_LOT[2]) % 360.0          # cap de la façade : vers la route (+v)
+    gx, gz = tuning_at(4.0, -11.0)
+    ty = float(g.sample(H, gx, gz))
+    P.add("tuning_garage", gx, gz, face, y=ty)
+    cx, cz = tuning_at(4.0, -10.0)          # emprise : du mur du fond au bout de l'auvent du bureau
+    P.claim(Placer.corners(cx, cz, 31.0, 21.0, face), cx, cz, 1.0)
+    px, pz = tuning_at(-22.0, -2.0)
+    P.add("car_podium", px, pz, face + 30.0, y=ty)
+    sx2, sz2 = tuning_at(-29.0, 15.5)
+    P.add("tuning_sign", sx2, sz2, face + 25.0, y=float(g.sample(H, sx2, sz2)))
+    for k in range(4):
+        lx, lz = tuning_at(-18.0 + k * 16.0, 17.5)
+        P.add("lamp_road", lx, lz, face, y=ty)
 
     # ---------------- Place du village : église, mairie, fontaine, café, arrêt de car
     sq = nodes[VILLAGE]

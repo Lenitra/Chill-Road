@@ -117,6 +117,20 @@ namespace NoHesi
                     }
                     break;
                 }
+                case "mesh_low":
+                {
+                    // Tremplins : collision sur le niveau lointain (volume plein, lisse) : les roues n'accrochent pas
+                    // les bordures et les décors du maillage détaillé
+                    var group = go.GetComponentInChildren<LODGroup>();
+                    if (!group) goto case "mesh";
+                    var lods = group.GetLODs();
+                    foreach (var r in lods[lods.Length - 1].renderers)
+                    {
+                        var mf = r ? r.GetComponent<MeshFilter>() : null;
+                        if (mf && mf.sharedMesh) r.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+                    }
+                    break;
+                }
             }
         }
     }

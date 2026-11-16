@@ -9,6 +9,20 @@ namespace NoHesi
     /// Cycle jour/nuit : course du soleil et de la lune, ciel (lueur du couchant, étoiles), brume, lumière ambiante,
     /// reflets et post-traitement. La nuit, les lampadaires et les phares (joueur et trafic proche) éclairent la route.
     /// </summary>
+    /// <summary>
+    /// Éclairage de studio (<see cref="ShopStage"/> : hall de la concession, atelier de tuning) : lumière principale,
+    /// ambiance et brume fixes, quelles que soient l'heure et la météo du monde.
+    /// </summary>
+    public struct StudioLighting
+    {
+        public Quaternion keyRotation;
+        public Color keyColor;
+        public float keyIntensity;
+        public Color sky, equator, ground, fog;
+        /// <summary>Densité de brume ; négative : on garde la brume du monde (paysage vu par les vitres).</summary>
+        public float fogDensity, bloomBoost;
+    }
+
     public class DayNightCycle : MonoBehaviour
     {
         [Tooltip("Durée d'une journée complète, en minutes réelles")] public float dayLengthMinutes = 18f;
@@ -296,6 +310,47 @@ namespace NoHesi
                 traffic.LightsLevel = lights;
                 traffic.TimeDensity = TrafficFactor(timeOfDay);
             }
+            if (studio.HasValue) ApplyStudio(studio.Value);
+        }
+
+        StudioLighting? studio;
+
+        /// <summary>
+        /// Éclairage de studio (décor intérieur filmé à la place du monde) ; null : retour à l'heure et à la météo
+        /// du monde. Appliqué tout de suite : aucune image rendue avec l'ancien éclairage.
+        /// </summary>
+        public void SetStudio(StudioLighting? lighting)
+        {
+            studio = lighting;
+            Apply();
+        }
+
+        /// <summary>Remplace ce que l'heure et la météo viennent de régler : lumière, ambiance, brume, post-traitement.</summary>
+        void ApplyStudio(StudioLighting s)
+        {
+            if (sun)
+            {
+                sun.transform.rotation = s.keyRotation;
+                sun.color = s.keyColor;
+                sun.intensity = s.keyIntensity;
+                sun.shadowStrength = 0.85f;
+                sun.enabled = true;
+            }
+            if (s.fogDensity >= 0f)
+            {
+                RenderSettings.fogColor = s.fog;
+                RenderSettings.fogDensity = s.fogDensity;
+            }
+            RenderSettings.ambientSkyColor = s.sky;
+            RenderSettings.ambientEquatorColor = s.equator;
+            RenderSettings.ambientGroundColor = s.ground;
+            if (colorAdjust)
+            {
+                colorAdjust.postExposure.value = baseExposure;
+                colorAdjust.saturation.value = baseSaturation;
+            }
+            if (whiteBalance) whiteBalance.temperature.value = baseTemperature;
+            if (bloom) bloom.intensity.value = baseBloom + s.bloomBoost;
         }
 
         Color Mix(Color day, Color dusk, Color night, float twilight) => Color.Lerp(Color.Lerp(day, dusk, twilight * 0.8f), night, Night);

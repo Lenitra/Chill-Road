@@ -15,7 +15,7 @@ namespace NoHesi
     /// </summary>
     public static class NetProtocol
     {
-        public const byte Version = 1;
+        public const byte Version = 2;
         /// <summary>Port du serveur ; s'il est pris, les suivants sont essayés (et interrogés par la recherche locale).</summary>
         public const int DefaultPort = 47777;
         public const int PortTries = 4;
@@ -73,13 +73,15 @@ namespace NoHesi
         public const byte Full = 1, Version = 2;
     }
 
-    /// <summary>État d'une voiture de joueur, tel qu'il voyage sur le réseau (36 octets).</summary>
+    /// <summary>État d'une voiture de joueur, tel qu'il voyage sur le réseau (37 octets).</summary>
     public struct NetCarState
     {
         public Vector3 pos, vel;
         public Quaternion rot;
         public float steer, rpm01, throttle, skid, skidFront, skidRear, dirt;
         public int gear, carIndex;
+        /// <summary>Couleur choisie au garage de tuning (indice du nuancier de <see cref="CarPaint"/>).</summary>
+        public byte paint;
         /// <summary>Compteur de téléportations (replacement, départ) : quand il change, la voiture saute sans glisser.</summary>
         public byte teleport;
         public bool lights, braking, handbrake, onRoad, grounded;
@@ -100,6 +102,7 @@ namespace NoHesi
             w.Unit(dirt);
             w.Byte((byte)Mathf.Clamp(carIndex, 0, 255));
             w.Byte(teleport);
+            w.Byte(paint);
         }
 
         public static NetCarState Read(NetReader r)
@@ -124,6 +127,7 @@ namespace NoHesi
             s.dirt = r.Unit();
             s.carIndex = r.Byte();
             s.teleport = r.Byte();
+            s.paint = r.Byte();
             return s;
         }
     }

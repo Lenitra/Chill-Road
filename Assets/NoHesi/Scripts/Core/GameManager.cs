@@ -67,6 +67,14 @@ namespace NoHesi
         public string LoadStep { get; private set; } = "";
         /// <summary>Lieu-dit où se trouve le joueur (vide hors des lieux nommés).</summary>
         public string Place { get; private set; } = "";
+        /// <summary>Concession (lieu « dealer » de la carte) : on y achète les voitures. Nulle si la carte n'en a pas.</summary>
+        public MapData.PoiJson DealerPoi { get; private set; }
+        /// <summary>Écran de la concession.</summary>
+        public Dealership Dealer { get; private set; }
+        /// <summary>Cascades uniques : tremplins de la carte, distance à parcourir en l'air.</summary>
+        public StuntJumps Stunts { get; private set; }
+        /// <summary>Courses chronométrées sur la carte (sprints, tours) et records personnels.</summary>
+        public Races Races { get; private set; }
 
         readonly PlayerSlot local = new PlayerSlot();
         /// <summary>Position de la voiture locale (terrain fin, décor) et positions de tous les joueurs (trafic).</summary>
@@ -102,8 +110,12 @@ namespace NoHesi
             playerGo.AddComponent<Rigidbody>();
             Player = playerGo.AddComponent<VehicleController>();
             local.Car = Player;
-            local.CarIndex = Mathf.Clamp(PlayerPrefs.GetInt(CarKey, 0), 0, assets.playerCars.Length - 1);
-            Player.Setup(assets.playerCars[local.CarIndex]);
+            // Voiture gardée de la dernière partie, si elle a été achetée ; sinon la voiture de départ (Ami)
+            int saved = PlayerPrefs.GetInt(CarKey, -1);
+            local.CarIndex = saved >= 0 && saved < assets.playerCars.Length && Wallet.Owns(assets.playerCars[saved])
+                ? saved : Wallet.StarterIndex(assets.playerCars);
+            Player.Setup(CarTuning.Apply(assets.playerCars[local.CarIndex]));
+            CarPaint.Apply(Player.Model, CarPaint.Selected(assets.playerCars[local.CarIndex]));
             Player.assist = 0.6f; // assistance fixe (non réglable)
             // Immobile tant que le monde n'est pas chargé
             Player.Body.isKinematic = true;
@@ -122,7 +134,7 @@ namespace NoHesi
             }
 
             Score = gameObject.AddComponent<ScoreSystem>();
-            Score.Init(Player);
+            Score.Init(Player, Traffic);
             local.Score = Score;
 
             cameraRig.target = Player;
@@ -204,6 +216,13 @@ namespace NoHesi
             Nav = gameObject.AddComponent<RouteGuide>();
             Nav.Init(this);
             gameObject.AddComponent<WorldMap>().Init(this);
+            Dealer = gameObject.AddComponent<Dealership>();
+            Dealer.Init(this);
+            gameObject.AddComponent<TuningGarage>().Init(this);
+            Stunts = gameObject.AddComponent<StuntJumps>();
+            Stunts.Init(this);
+            Races = gameObject.AddComponent<Races>();
+            Races.Init(this);
             menus = gameObject.AddComponent<MenuScreens>();
             menus.Init(this);
             if (DedicatedServer) AudioListener.volume = 0f;
@@ -226,6 +245,9 @@ namespace NoHesi
             if (Map == null) yield break;
             Road.Init(assets, Map);
             Terrain.Init(assets, Map);
+            if (Map.Json.pois != null)
+                foreach (var poi in Map.Json.pois)
+                    if (poi.id == "dealer") DealerPoi = poi;
             Traffic.Prepare();
 
             LoadStep = Loc.T("Routes et ponts", "Roads and bridges");
@@ -428,7 +450,7 @@ namespace NoHesi
 
             // Surface sous la voiture (goudron, terre, hors route), pluie
             Vector3 pos = Player.transform.position;
-            var surface = Road.SurfaceAt(pos, out _);
+            var surface = Road.SurfaceAt(pos, out var roadHit);
             Player.OnRoad = surface.onRoad;
             Player.RoadGrip = surface.grip;
             Player.SurfaceDirt = surface.onRoad ? surface.dirt : 0f;
@@ -458,6 +480,7 @@ namespace NoHesi
             if (!menu)
             {
                 Score.Tick(dt);
+                Stunts.Tick(dt);
                 UpdateResetButton();
                 if (GameInput.CameraPressed) cameraRig.NextView();
                 if (GameInput.NextTrackPressed) Music.Next();
@@ -473,7 +496,16 @@ namespace NoHesi
             // Retournée, tombée sous la carte, au fond de l'eau ou sortie des limites : on la replace sur la route
             float limit = Map.Half - 120f;
             if (Vector3.Dot(Player.transform.up, Vector3.up) < 0.3f) local.UpsideDown += dt; else local.UpsideDown = 0f;
-            bool lost = pos.y < Map.Height(pos.x, pos.z) - 30f || Mathf.Abs(pos.x) > limit || Mathf.Abs(pos.z) > limit;
+            bool lost;
+            if (Map.UnderRelief(pos))
+            {
+                // Sous la montagne, au-dessus d'un tunnel : perdue seulement si elle n'est pas dans le tube (enterrée à
+                // côté, au-dessus de la voûte ou sous la chaussée)
+                lost = !roadHit.Found || Mathf.Abs(roadHit.lateral) > roadHit.edge.HalfWidthAt(roadHit.s, roadHit.lateral) + 4f
+                    || pos.y < roadHit.point.y - 6f || pos.y > roadHit.point.y + RoadNetwork.TunnelHeightHighway + 3f;
+            }
+            else lost = pos.y < Map.Height(pos.x, pos.z) - 30f;
+            lost |= Mathf.Abs(pos.x) > limit || Mathf.Abs(pos.z) > limit;
             int water = Map.Water(pos.x, pos.z);
             if (water > 0 && water <= Map.Json.waters.Length && pos.y < Map.Json.waters[water - 1].level - 1.6f) lost = true;
             if (local.UpsideDown > 2.5f || lost) ResetPlayer();
@@ -514,8 +546,10 @@ namespace NoHesi
                 if (!p.ResetConsumed && p.ResetHeld >= HoldToChangeCar)
                 {
                     p.ResetConsumed = true;
-                    CycleCar(1, true);
-                    hud.Banner(Loc.T("VOITURE : ", "CAR: ") + Player.Spec.displayName, new Color(1f, 0.76f, 0.2f));
+                    if (CycleCar(1, true))
+                        hud.Banner(Loc.T("VOITURE : ", "CAR: ") + Player.Spec.displayName, new Color(1f, 0.76f, 0.2f));
+                    else
+                        hud.Banner(Loc.T("ACHÈTE D'AUTRES VOITURES À LA CONCESSION", "BUY MORE CARS AT THE CAR DEALER"), new Color(0.35f, 0.85f, 1f));
                 }
             }
             else
@@ -557,16 +591,53 @@ namespace NoHesi
             local.UpsideDown = 0f;
         }
 
-        /// <summary>Change de voiture sans s'arrêter : même position, même vitesse (glisse comprise).</summary>
-        public void CycleCar(int delta, bool remember = true)
+        /// <summary>
+        /// Voiture possédée suivante (ou précédente) du garage, sans s'arrêter : même position, même vitesse (glisse
+        /// comprise). Faux si le joueur n'a qu'une voiture.
+        /// </summary>
+        public bool CycleCar(int delta, bool remember = true)
+        {
+            var cars = assets.playerCars;
+            int step = delta >= 0 ? 1 : -1;
+            for (int n = 1; n < cars.Length; n++)
+            {
+                int i = ((local.CarIndex + step * n) % cars.Length + cars.Length) % cars.Length;
+                if (!Wallet.Owns(cars[i])) continue;
+                SelectCar(i, remember);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Prend le volant d'une voiture du garage (achetée).</summary>
+        public void SelectCar(int index, bool remember = true)
         {
             var p = local;
-            p.CarIndex = (p.CarIndex + delta + assets.playerCars.Length) % assets.playerCars.Length;
+            p.CarIndex = Mathf.Clamp(index, 0, assets.playerCars.Length - 1);
             if (remember) PlayerPrefs.SetInt(CarKey, p.CarIndex);
+            ShowCar(p.CarIndex);
+        }
+
+        /// <summary>
+        /// Met une voiture du garage à la place de celle du joueur sans la lui attribuer (vitrine de la concession) ;
+        /// <see cref="SelectCar"/> ou <c>ShowCar(Local.CarIndex)</c> pour revenir à la sienne.
+        /// </summary>
+        public void ShowCar(int index)
+        {
+            // Fiche avec les améliorations du garage de tuning (la même tant qu'elles ne changent pas), et sa peinture
+            var basic = assets.playerCars[Mathf.Clamp(index, 0, assets.playerCars.Length - 1)];
+            var spec = CarTuning.Apply(basic);
             var car = Player;
+            if (car.Spec != spec) Swap(car, spec);
+            CarPaint.Apply(car.Model, CarPaint.Selected(basic));
+        }
+
+        /// <summary>Change le modèle et la fiche de la voiture sans l'arrêter (même position, même vitesse).</summary>
+        void Swap(VehicleController car, VehicleSpec spec)
+        {
             var t = car.transform;
             Vector3 v = car.Velocity;
-            car.Setup(assets.playerCars[p.CarIndex]);
+            car.Setup(spec);
             car.Teleport(t.position + Vector3.up * 0.3f, t.rotation, v.magnitude);
             // Une voiture plus lente repart à sa vitesse de pointe au plus
             float top = car.Spec.TopSpeed;
@@ -575,8 +646,31 @@ namespace NoHesi
             carLights.Rebuild();
         }
 
-        /// <summary>Voiture suivante du garage.</summary>
-        public string NextCarName => assets.playerCars[(local.CarIndex + 1) % assets.playerCars.Length].displayName;
+        /// <summary>Nombre de voitures achetées (Ami comprise).</summary>
+        public int OwnedCars
+        {
+            get
+            {
+                int n = 0;
+                foreach (var c in assets.playerCars) if (Wallet.Owns(c)) n++;
+                return n;
+            }
+        }
+
+        /// <summary>Voiture possédée suivante du garage.</summary>
+        public string NextCarName
+        {
+            get
+            {
+                var cars = assets.playerCars;
+                for (int n = 1; n <= cars.Length; n++)
+                {
+                    var c = cars[(local.CarIndex + n) % cars.Length];
+                    if (Wallet.Owns(c)) return c.displayName;
+                }
+                return Player.Spec.displayName;
+            }
+        }
 
         /// <summary>Retour au menu principal : rechargement et écran d'accueil (la partie en réseau est quittée).</summary>
         public void ReturnToTitle()

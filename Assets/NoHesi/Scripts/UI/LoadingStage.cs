@@ -171,6 +171,7 @@ namespace NoHesi
             if (spec == null || !spec.prefab) return;
             var go = Place(spec.prefab, new Vector3(RoadNetwork.LaneWidth * 0.5f, 0f, 0f), 0f, spec.modelScale);
             if (!go) return;
+            CarPaint.Apply(go.transform, CarPaint.Selected(spec));
             var b = BoundsOf(go);
             carCenter = b.center;
             carRadius = Mathf.Max(b.extents.x, b.extents.z);

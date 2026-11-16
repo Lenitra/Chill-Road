@@ -675,6 +675,7 @@ namespace NoHesi
                 pos = t.position, rot = t.rotation, vel = car.Velocity,
                 steer = car.SteerAngle, rpm01 = car.Rpm01, throttle = car.Throttle, gear = car.Gear,
                 carIndex = game.Local.CarIndex, teleport = (byte)car.TeleportCount,
+                paint = (byte)CarPaint.Selected(game.assets.playerCars[Mathf.Clamp(game.Local.CarIndex, 0, game.assets.playerCars.Length - 1)]),
                 lights = game.Lights && game.Lights.On, braking = car.BrakeInput > 0.1f, handbrake = car.HandbrakeOn,
                 onRoad = car.OnRoad, grounded = car.GroundedWheels > 0, dirt = car.SurfaceDirt,
                 skid = car.SkidAmount, skidFront = car.SkidFront, skidRear = car.SkidRear,

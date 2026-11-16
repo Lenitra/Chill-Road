@@ -2160,6 +2160,46 @@ MonoBehaviour:
     module: 0
     ymin: -0.15
     lights: []
+  - id: tuning_garage
+    category: landmark
+    tags:
+    - service
+    - shop
+    - car
+    prefab: {fileID: 919132149155446097, guid: d8e59b0bdaecf1b4591121d167627a3c, type: 3}
+    size: {x: 31.06, y: 8.92, z: 19.29}
+    footprint: {x: 30, y: 16}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: -0.9
+    lights: []
+  - id: tuning_sign
+    category: street
+    tags:
+    - car
+    - sign
+    prefab: {fileID: 919132149155446097, guid: d41da52956d0a434b9bbf42b8a511f53, type: 3}
+    size: {x: 2.52, y: 7.06, z: 0.9}
+    footprint: {x: 2.4, y: 0.9}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: -0.4
+    lights: []
+  - id: stunt_ramp
+    category: stunt
+    tags:
+    - stunt
+    - ramp
+    prefab: {fileID: 919132149155446097, guid: 25ffb62ecb2619a409fc9d87e793d86c, type: 3}
+    size: {x: 7.82, y: 5.59, z: 19.86}
+    footprint: {x: 5.6, y: 17}
+    collider: mesh_low
+    radius: 0
+    module: 0
+    ymin: -1
+    lights: []
   - id: reeds
     category: lake
     tags:
@@ -2364,5 +2404,70 @@ MonoBehaviour:
     radius: 0
     module: 0
     ymin: -0.01
+    lights: []
+  - id: showroom_bay_a
+    category: interior
+    tags:
+    - shop
+    - interior
+    prefab: {fileID: 919132149155446097, guid: f92afda097e679946b845a5dfa18d11e, type: 3}
+    size: {x: 7.04, y: 6.9, z: 23.3}
+    footprint: {x: 7, y: 23}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: -0.3
+    lights: []
+  - id: showroom_bay_b
+    category: interior
+    tags:
+    - shop
+    - interior
+    prefab: {fileID: 919132149155446097, guid: 316e323bffad98340aee7c81ada5cabb, type: 3}
+    size: {x: 7.04, y: 6.9, z: 23.3}
+    footprint: {x: 7, y: 23}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: -0.3
+    lights: []
+  - id: showroom_bay_c
+    category: interior
+    tags:
+    - shop
+    - interior
+    prefab: {fileID: 919132149155446097, guid: eb4208e0373b4144ebc7172449337d21, type: 3}
+    size: {x: 7.04, y: 6.9, z: 23.3}
+    footprint: {x: 7, y: 23}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: -0.3
+    lights: []
+  - id: showroom_end
+    category: interior
+    tags:
+    - shop
+    - interior
+    prefab: {fileID: 919132149155446097, guid: 937e4615c50be504aa1a649f9dc96843, type: 3}
+    size: {x: 2.56, y: 6.9, z: 23.56}
+    footprint: {x: 1.2, y: 23}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: -0.3
+    lights: []
+  - id: tuning_workshop
+    category: interior
+    tags:
+    - shop
+    - interior
+    prefab: {fileID: 919132149155446097, guid: dc337e45d9caa2044a7ddefd250f0852, type: 3}
+    size: {x: 13.6, y: 5.9, z: 16.6}
+    footprint: {x: 13, y: 16}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: -0.3
     lights: []
   material: {fileID: 2100000, guid: 3eed8be611f581147be1494ad190aaba, type: 2}

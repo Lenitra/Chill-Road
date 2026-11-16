@@ -45,6 +45,11 @@ namespace NoHesi
         [Serializable] public class PlaceJson { public string item; public float x, y, z, yaw, scale = 1f; public int flags; }
         /// <summary>Lieu-dit : side = côté de l'étiquette sur la carte globale (-1 : à gauche du repère, sinon à droite).</summary>
         [Serializable] public class PoiJson { public string id, fr, en; public float x, z, r; public int side; }
+        /// <summary>
+        /// Cascade : tremplin au bord d'une route. (x, y, z) = pied du nez du tremplin (au sol), yaw = sens de la
+        /// course (degrés), length / width = tablier ; target = distance à parcourir en l'air (m), reward = prime.
+        /// </summary>
+        [Serializable] public class StuntJson { public string id, fr, en; public float x, y, z, yaw, length, width, target; public int reward; }
         [Serializable]
         public class MapJson
         {
@@ -57,6 +62,7 @@ namespace NoHesi
             public RiverJson[] rivers;
             public PlaceJson[] places;
             public PoiJson[] pois;
+            public StuntJson[] stunts;
         }
 
         public MapJson Json { get; private set; }
@@ -141,6 +147,16 @@ namespace NoHesi
             for (int dx = -reach; dx <= reach; dx++)
                 if ((Info[Index(ix + dx, iz + dz) * 4 + 1] & TunnelFlag) != 0) return true;
             return false;
+        }
+
+        /// <summary>
+        /// Point sous le relief, au-dessus duquel passe un tunnel (dans le tube, ou enterré à côté) : la hauteur du
+        /// terrain n'y est pas celle du sol, c'est celle de la montagne au-dessus.
+        /// </summary>
+        public bool UnderRelief(Vector3 p)
+        {
+            if (p.y > Height(p.x, p.z) - 1f) return false;
+            return OverTunnel(Mathf.RoundToInt((p.x + Half) / Step), Mathf.RoundToInt((p.z + Half) / Step), 1);
         }
 
         /// <summary>

@@ -1,7 +1,9 @@
 """Voitures jouables construites avec le moteur du pack (pack_lib) : Toyota Supra (A80, 1993), Mazda MX-5 (NA, 1989),
 Ford Mustang fastback 1969 façon John Wick (gris anthracite, bandes noires mates, écope, becquets), Peel P50
 (1962-1965, tricycle : roue arrière seule dans l'axe, « wheel-back-center ») ... et Renault Twingo de première
-génération (phase 1, 1993 : monocorps, phares « yeux de grenouille », ouïes de capot, boucliers gris enveloppants).
+génération (phase 1, 1993 : monocorps, phares « yeux de grenouille », ouïes de capot, boucliers gris enveloppants)
+et Citroën Ami (2020 : cube aux faces avant et arrière identiques, optiques rondes, toit vitré, vitres à compas, porte
+conducteur à contresens).
 
 Même direction artistique que le trafic (sections à facettes, palette de dégradés, peinture sur PK_Paint), un peu
 plus de détails vus de près (aileron, habitacle ouvert de la MX-5). Les phares escamotables de la MX-5 sont deux
@@ -1042,4 +1044,156 @@ reg(dict(
     details=twingo_details,
 ))
 
-PLAYABLE = ["supra", "miata", "mustang", "p50", "ae86", "dmc12", "jesko", "valkyrie", "twingo"]
+# ================================================================= Citroën Ami (2020-) : quadricycle électrique 2 places
+def _sym(pts):
+    """Profil symétrique avant/arrière : points (x >= 0, valeur) recopiés en -x (l'Ami a les mêmes pièces aux deux
+    bouts)."""
+    return list(pts) + [(-x, v) for x, v in pts if x > 0]
+
+
+def ami_bumper(c, s, z0, z1, out=0.03, depth=0.045, wrap=0.045, name="Bumper"):
+    """Bouclier gris foncé de l'Ami, le même à l'avant (s = 1) et à l'arrière (s = -1) : plaque qui suit le contour en
+    plan du nez (largeur max de la caisse) et ne s'enroule que de quelques centimètres sur les coins, les roues étant
+    tout au bout. Renvoie le x de la face extérieure dans l'axe."""
+    car = c.car
+    tip = car["front"] if s > 0 else car["rear"]
+    W = car["_w"]["W"]
+    pts = [(tip - s * wrap * (1 - k / 5), None) for k in range(6)]
+    pts = [(x, W(x)) for x, _ in pts]
+    y0 = pts[-1][1]
+    pts += [(tip, y0 * f) for f in (0.7, 0.35, 0.0)]
+    ring = pts + [(x, -y) for x, y in reversed(pts[:-1])]
+    for a0, a1, o in ((z0 + 0.03, z1 - 0.035, out), (z1 - 0.035, z1, out - 0.016), (z0, z0 + 0.03, out - 0.02)):
+        poly = offset(ring, -s * o) + offset(ring, s * depth)[::-1]
+        c.prism(poly, 'z', a0, a1, 'grey', name=name)
+    return tip + s * out
+
+
+def _capsule(yc, zc, w, h, n=6):
+    """Contour en gélule (y, z) : largeur w, hauteur h, bouts en demi-cercle."""
+    r, d = h / 2, w / 2 - h / 2
+    pts = [(yc + d + r * math.cos(a), zc + r * math.sin(a))
+           for a in (-math.pi / 2 + math.pi * k / n for k in range(n + 1))]
+    pts += [(yc - d + r * math.cos(a), zc + r * math.sin(a))
+            for a in (math.pi / 2 + math.pi * k / n for k in range(n + 1))]
+    return pts
+
+
+def ami_face(c, s):
+    """Face avant ou arrière (la même pièce) : bouclier et plaque en bas, optiques sur deux étages aux coins — gros
+    feu rond en bas, petite gélule (feu de jour à l'avant, clignotant à l'arrière) juste sous le vitrage."""
+    tip = c.car["front"] if s > 0 else c.car["rear"]
+    view = 'front' if s > 0 else 'rear'
+    xb = ami_bumper(c, s, 0.20, 0.49, name="FrontBumper" if s > 0 else "RearBumper")
+    c.box([((xb + s * 0.004, 0.0, 0.335), (0.012, 0.52, 0.11), None)], 'plate', name="Plate")
+    c.box([((xb + s * 0.002, 0.0, 0.44), (0.012, 0.86, 0.02), None)], 'dark', name="BumperGroove")
+    c.box([((xb + s * 0.002, 0.0, 0.235), (0.012, 0.62, 0.028), None)], 'dark', name="BumperSlot")
+    if s > 0:                                                    # prises d'air aux coins du bouclier avant
+        c.box([((xb + 0.002, 0.44, 0.335), (0.012, 0.13, 0.085), None)], 'dark', mirror=True, name="BumperVent")
+    else:                                                        # catadioptres rouges aux coins du bouclier arrière
+        c.box([((xb - 0.002, 0.45, 0.335), (0.012, 0.11, 0.04), None)], 'red', mirror=True, name="Reflector")
+    zl, yl, zp = 0.652, 0.435, 0.80
+    for y in (yl, -yl):
+        limb(c, (tip - s * 0.02, y, zl), (tip + s * 0.014, y, zl), 0.094, 'black', n=18, name="LampBezel")
+        if s > 0:
+            limb(c, (tip + 0.014, y, zl), (tip + 0.022, y, zl), 0.080, 'lens', n=18, name="Headlight")
+            limb(c, (tip + 0.022, y, zl), (tip + 0.027, y, zl), 0.046, 'led', n=12, name="HeadlightCore")
+        else:
+            limb(c, (tip - 0.014, y, zl), (tip - 0.022, y, zl), 0.080, 'tail', n=18, name="Tail")
+            limb(c, (tip - 0.022, y, zl), (tip - 0.027, y, zl), 0.030, 'lens', n=10, name="Reverse")
+    # étage du haut : gélule sombre et son feu
+    c.decal(_capsule(yl, zp, 0.20, 0.062), view, 'black', offset=0.006, name="PillBezel")
+    c.decal(_capsule(yl, zp, 0.165, 0.034), view, 'led' if s > 0 else 'amber', offset=0.011, name="Pill")
+    if s > 0:
+        for yy in (yl, -yl):
+            c.marker("headlight-left" if yy > 0 else "headlight-right", (tip + 0.027, yy, zl), flow=(1.0, 0.0, 0.0))
+        # double chevron au milieu de la face
+        for zc in (0.655, 0.705):
+            c.decal([(0.0, zc + 0.032), (0.0, zc + 0.006), (0.105, zc - 0.03), (0.105, zc - 0.004)], 'front',
+                    'chrome', offset=0.008, name="Chevron")
+    else:                                                        # troisième feu stop en haut de la lunette
+        c.decal(rect(0.0, 1.31, 0.10, 1.327), 'rear', 'red', offset=0.007, name="StopLight")
+
+
+def ami_arches(c, width=0.055):
+    """Habillage gris foncé autour des passages de roue : il relie les boucliers au bas de caisse (ceinture de
+    plastique continue tout autour de la voiture)."""
+    car = c.car
+    Wd = car["wheel"]
+    R0 = Wd["rt"] + car.get("arch_gap", 0.05)
+    lim = car["front"] - 0.04
+    n = 14
+    angs = [-0.12 + (math.pi + 0.24) * k / n for k in range(n + 1)]
+    for xa in car["axles"]:
+        def arc(r):
+            return [(max(-lim, min(lim, xa + r * math.cos(a))), Wd["rt"] + r * math.sin(a)) for a in angs]
+        c.decal(arc(R0 + width) + arc(R0 - 0.004)[::-1], 'side', 'grey', offset=0.007, name="ArchTrim",
+                min_facing=0.12)
+
+
+def ami_livery(j, xm):
+    if j == 2:
+        return "grey"                                            # bas de caisse en plastique gris foncé
+    return None
+
+
+def ami_details(c):
+    ami_face(c, 1)
+    ami_face(c, -1)
+    ami_arches(c)
+    # grille d'auvent au pied du pare-brise, un seul grand essuie-glace
+    c.decal([(1.0, -0.52), (1.045, -0.52), (1.045, 0.52), (1.0, 0.52)], 'top', 'dark', mirror=False, offset=0.006,
+            name="Cowl", min_facing=0.2)
+    xw = 0.975
+    za, zb = c.top(xw, -0.40), c.top(xw, 0.34)
+    P._bar(c, (xw, -0.40, za + 0.016), (xw, 0.34, zb + 0.016), 0.024, 0.016, 'black', "Wiper")
+    limb(c, (xw + 0.01, -0.40, za - 0.01), (xw + 0.01, -0.40, za + 0.03), 0.022, 'black', n=8, name="WiperPivot")
+    # rétroviseurs noirs, barre des vitres à compas (la moitié basse se relève), poignées de portes : la porte
+    # conducteur (gauche) s'ouvre à contresens, charnière à l'arrière, poignée à l'avant ; l'inverse à droite
+    mirrors(c, 0.89, 0.70, 0.99, size=(0.08, 0.11, 0.10), color='black')
+    c.decal(rect(-0.40, 1.146, 0.85, 1.164), 'side', 'black', offset=0.006, name="WindowBar", min_facing=0.1)
+    c.decal(rect(0.79, 0.835, 0.90, 0.862), 'side', 'black', mirror=False, offset=0.007, name="Handle",
+            min_facing=0.15)
+    c.decal(rect(-0.39, 0.835, -0.28, 0.862), 'rside', 'black', mirror=False, offset=0.007, name="Handle",
+            min_facing=0.15)
+    # nervure horizontale des portes (la même pièce des deux côtés) et joint au-dessus du bas de caisse gris
+    c.decal(rect(-0.40, 0.612, 0.92, 0.622), 'side', 'trim', offset=0.004, name="DoorRib", min_facing=0.15)
+    c.decal(rect(-0.45, 0.335, 0.97, 0.347), 'side', 'trim', offset=0.004, name="DoorSill", min_facing=0.15)
+
+
+reg(dict(
+    id="ami", file="Ami", name="Citroën Ami", color=(0.30, 0.55, 0.69),
+    front=1.205, rear=-1.205, height=1.525, axles=(0.864, -0.864),
+    wheel=dict(rt=0.279, rr=0.178, w=0.155, y=0.607, style="alloy6", rim="grey"),
+    arch_n=10, arch_gap=0.035,
+    pillar_color="paint",
+    roof="glass",
+    livery=ami_livery,
+    smooth=dict(dx=0.06, sub={2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 7: 2, 8: 3}),
+    z=dict(
+        bot=_sym([(1.205, .30), (1.18, .235), (1.12, .20), (0.90, .19), (0.0, .19)]),
+        lo=_sym([(1.205, .33), (1.18, .27), (1.12, .235), (0.90, .23), (0.0, .23)]),
+        rk=_sym([(1.205, .38), (1.18, .335), (1.12, .335), (0.90, .34), (0.0, .34)]),
+        mx=_sym([(1.205, .50), (0.0, .50)]),
+        sh=_sym([(1.205, .84), (1.195, .85), (1.175, .86), (1.14, .868), (1.08, .875), (1.0, .88), (0.90, .885),
+                 (0.0, .885)]),
+        belt=_sym([(1.205, .85), (1.195, .862), (1.175, .875), (1.14, .887), (1.08, .90), (1.0, .915), (0.90, .93),
+                   (0.0, .93)]),
+        # pavillon : le bord (re) reste 14 cm sous le sommet, pour un cadre de toit visible de profil
+        re=_sym([(1.205, .855), (1.195, .87), (1.175, .885), (1.14, .90), (1.08, .92), (1.0, .94), (0.74, 1.355),
+                 (0.66, 1.378), (0.50, 1.386), (0.0, 1.388)]),
+        top=_sym([(1.205, .86), (1.195, .877), (1.175, .893), (1.14, .91), (1.08, .932), (1.0, .955), (0.72, 1.47),
+                  (0.66, 1.50), (0.50, 1.517), (0.0, 1.525)]),
+    ),
+    w=dict(
+        W=_sym([(1.205, .56), (1.195, .615), (1.175, .652), (1.14, .677), (1.08, .69), (1.0, .695), (0.0, .695)]),
+        belt=_sym([(1.205, .545), (1.195, .60), (1.175, .636), (1.14, .66), (1.08, .672), (1.0, .677), (0.0, .677)]),
+        re=_sym([(1.205, .53), (1.195, .585), (1.175, .62), (1.14, .643), (1.08, .655), (1.0, .66), (0.72, .625),
+                 (0.0, .615)]),
+    ),
+    glass=dict(cowl=1.0, ws_top=0.72, rw_top=-0.72, rw_bot=-1.0, side=[(0.95, -0.40), (-0.50, -0.95)],
+               pillars=[(-0.40, -0.50)], roof_bars=[(0.66, 0.58), (-0.58, -0.66)]),
+    details=ami_details,
+))
+
+PLAYABLE = ["supra", "miata", "mustang", "p50", "ae86", "dmc12", "jesko", "valkyrie", "twingo", "ami"]

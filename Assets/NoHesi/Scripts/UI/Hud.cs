@@ -9,10 +9,11 @@ namespace NoHesi
     /// <summary>
     /// HUD de jeu (construit en code), discret et lisible : plaques inclinées aux bords fondus plutôt que des cadres,
     /// police de tableau de bord, chiffres en italique.
-    /// - haut centre : score, badge du multiplicateur, jauge du combo, record ;
+    /// - haut centre : argent du joueur ; pendant un combo, badge du multiplicateur, jauge du combo et cagnotte en jeu ;
     /// - haut gauche : heure ; haut droite : épreuve en cours ;
     /// - bas droite : compte-tours circulaire, vitesse, rapport, phares, distance ;
-    /// - centre : frôlements et bonus, bannières, compteur de drift, maintien du bouton de replacement ;
+    /// - centre : gains (frôlements, drifts, vitesse, encaissement), bannières, compteur de drift, maintien du bouton
+    ///   de replacement, invite de la concession ;
     /// - bas gauche : minicarte (pendant du compte-tours), à sa droite le morceau en cours et l'aide des commandes
     ///   (quelques secondes seulement) ;
     /// - menu pause avec le panneau des contrôles (manette ou clavier selon le dernier appareil utilisé).
@@ -27,7 +28,9 @@ namespace NoHesi
         static readonly Color Dim = new Color(1f, 1f, 1f, 0.55f);
         static readonly Color Plate = new Color(0.02f, 0.03f, 0.05f, 0.6f);
         static readonly Color DriftColor = new Color(1f, 0.55f, 0.2f);
+        static readonly Color JumpColor = new Color(0.55f, 0.78f, 1f);
         static readonly Color MusicColor = new Color(1f, 0.45f, 0.78f);
+        static readonly Color Money = new Color(0.5f, 1f, 0.6f);
 
         // Contrôles affichés dans la pause : action (fr, en), manette, clavier (fr, en), tactile (fr, en)
         static readonly string[][] Controls =
@@ -54,11 +57,15 @@ namespace NoHesi
         Image flash;
         float flashAlpha;
 
-        // Score
+        // Argent et combo
         Text scoreText, multText, bestText, oncomingText;
         RectTransform multBadge, comboFill;
         HudShape multShape;
-        float displayedScore, multPunch;
+        float displayedScore = -1f, multPunch, comboAlpha;
+        CanvasGroup comboGroup;
+        int walletSlide = -1;
+        static readonly Vector2 WalletHome = new Vector2(26f, -84f);        // sous l'heure
+        static readonly Vector2 WalletTouchHome = new Vector2(338f, -30f);  // à droite du bouton pause tactile
 
         // Heure, épreuve
         Text clockText, eventText, eventDetail;
@@ -78,11 +85,16 @@ namespace NoHesi
         HudShape bannerStripe;
         float bannerTimer;
         CanvasGroup driftGroup;
-        Text driftText, driftChain;
+        Text driftText, driftChain, driftTitle;
+        Outline driftOutline;
+        Image driftBarImage;
         RectTransform driftBar;
         float driftAlpha;
         CanvasGroup holdGroup;
         Image holdRing;
+        CanvasGroup dealerGroup;
+        Text dealerText;
+        HudShape dealerStripe;
 
         // Bas gauche
         CanvasGroup hintGroup, musicGroup;
@@ -121,7 +133,7 @@ namespace NoHesi
         /// Menu pause (ou options ouvertes depuis la pause), carte : le joueur ne conduit pas. Seul, le monde est arrêté ;
         /// en réseau, il continue.
         /// </summary>
-        public bool Paused => WorldMap.IsOpen || inPause;
+        public bool Paused => WorldMap.IsOpen || inPause || Dealership.IsOpen || TuningGarage.IsOpen;
 
         /// <summary>Masque le HUD (chargement, écran d'accueil).</summary>
         public void SetVisible(bool visible)
@@ -162,9 +174,7 @@ namespace NoHesi
             BuildCenter();
             BuildBottomLeft();
             BuildPause();
-            // Balade libre : pas de score à l'écran (le bloc reste construit pour le jour où le jeu retrouvera des épreuves)
-            var scoreRoot = canvas.Find("Score");
-            if (scoreRoot) scoreRoot.gameObject.SetActive(false);
+            gameObject.AddComponent<CheatCodes>().Init(gm);
 
             slot.Score.NearMiss += (pts, gap, onc) =>
             {
@@ -172,12 +182,19 @@ namespace NoHesi
                 Pop(label + (onc ? Loc.T(" · CONTRESENS", " · ONCOMING") : ""), pts, gap < 0.6f ? Accent : White);
                 multPunch = 0.35f;
             };
-            slot.Score.Bonus += (pts, label) => Pop(label, pts, new Color(0.5f, 1f, 0.6f));
+            slot.Score.Bonus += (pts, label) => Pop(label, pts, Info);
             slot.Score.DriftScored += pts => { Pop("DRIFT", pts, DriftColor); multPunch = 0.35f; };
+            slot.Score.JumpScored += (pts, air, dist) =>
+            {
+                string label = air >= 2.5f ? Loc.T("MÉGA SAUT", "MEGA JUMP") : air >= 1.5f ? Loc.T("GROS SAUT", "BIG JUMP") : Loc.T("SAUT", "JUMP");
+                Pop(Loc.F($"{label} · {air:0.0} s · {dist:0} m"), pts, JumpColor);
+                multPunch = 0.35f;
+            };
             slot.Score.DriftLost += pts => Pop(Loc.T("DRIFT PERDU", "DRIFT LOST"), -pts, Danger);
+            slot.Score.Banked += cash => Pop(Loc.T("ENCAISSÉ", "BANKED"), cash, Money);
             slot.Score.Lost += (pts, why) =>
             {
-                Banner($"{why}  ·  -{Loc.Num(pts)}", Danger);
+                Banner($"{why}  ·  {Loc.T("CAGNOTTE PERDUE", "COMBO LOST")}  -{Wallet.Format(pts)}", Danger);
                 Flash(new Color(1f, 0.1f, 0.05f), 0.35f);
             };
             if (game.Music) game.Music.TrackChanged += name => { musicText.text = "♪  " + name; musicTimer = 5f; };
@@ -185,32 +202,46 @@ namespace NoHesi
 
         // ------------------------------------------------------------------ construction
 
-        /// <summary>Haut centre : score sur une plaque aux bords fondus, badge du multiplicateur, jauge du combo, record.</summary>
+        /// <summary>
+        /// Haut gauche, sous l'heure : argent du joueur, sur une petite plaque. Haut centre, seulement pendant un combo :
+        /// badge du multiplicateur, cagnotte en jeu (perdue en cas d'accident) et fine jauge du combo, sans plaque.
+        /// </summary>
         void BuildScore()
         {
-            var root = Rect(canvas, "Score", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-280, -150), new Vector2(280, -22));
-            Shape(root, "Plate", new Vector2(0.5f, 1f), new Vector2(0f, 0f), new Vector2(560f, 82f), Plate).Set(18f, 90f, 90f, 1f, 0.7f);
-            scoreText = Label(root, "0", 60, TextAnchor.MiddleCenter, White, new Vector2(0.5f, 1f), new Vector2(0f, -41f), new Vector2(500f, 80f), FontStyle.BoldAndItalic);
-            scoreText.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            Outline(scoreText, new Color(0f, 0f, 0f, 0.35f), 2f);
+            // Argent : à côté du bouton pause quand les commandes tactiles sont affichées (voir UpdateTouchLayout)
+            var wallet = Rect(canvas, "Wallet", new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, Vector2.zero);
+            wallet.pivot = new Vector2(0f, 1f);
+            wallet.sizeDelta = new Vector2(230f, 40f);
+            wallet.anchoredPosition = WalletHome;
+            Shape(wallet, "Plate", new Vector2(0f, 0.5f), Vector2.zero, new Vector2(230f, 40f), Plate).Set(12f, 0f, 70f);
+            scoreText = Label(wallet, "", 26, TextAnchor.MiddleLeft, White, new Vector2(0f, 0.5f), new Vector2(18f, 0f), new Vector2(206f, 38f), FontStyle.Bold);
+            walletSlide = slides.Count;
+            AddSlide(wallet, new Vector2(-300f, 0f));
 
-            // Badge du multiplicateur, accroché à droite du score
-            multBadge = Rect(root, "Mult", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
-            multBadge.sizeDelta = new Vector2(108f, 46f);
-            multBadge.anchoredPosition = new Vector2(258f, -41f);
-            multShape = Shape(multBadge, "Fill", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(108f, 46f), Accent);
-            multShape.Set(16f, 0f, 0f);
-            multText = Label(multBadge, "x1.0", 30, TextAnchor.MiddleCenter, new Color(0.06f, 0.06f, 0.08f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(108f, 46f), FontStyle.BoldAndItalic);
+            // Combo : n'apparaît que pendant un combo
+            var combo = Rect(canvas, "Combo", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-220f, -96f), new Vector2(220f, -24f));
+            comboGroup = combo.gameObject.AddComponent<CanvasGroup>();
+            comboGroup.alpha = 0f;
+            comboGroup.blocksRaycasts = false;
+            // Badge du multiplicateur, à gauche de la cagnotte en jeu
+            multBadge = Rect(combo, "Mult", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
+            multBadge.sizeDelta = new Vector2(74f, 32f);
+            multBadge.anchoredPosition = new Vector2(-84f, -20f);
+            multShape = Shape(multBadge, "Fill", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(74f, 32f), Accent);
+            multShape.Set(12f, 0f, 0f);
+            multText = Label(multBadge, "x1.0", 21, TextAnchor.MiddleCenter, new Color(0.06f, 0.06f, 0.08f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(74f, 32f), FontStyle.BoldAndItalic);
             multText.GetComponent<Shadow>().enabled = false;
-            oncomingText = Label(root, "", 18, TextAnchor.UpperCenter, Danger, new Vector2(0.5f, 1f), new Vector2(258f, -68f), new Vector2(200f, 24f), FontStyle.Bold);
+            bestText = Label(combo, "", 24, TextAnchor.MiddleLeft, Accent, new Vector2(0.5f, 1f), new Vector2(-38f, -20f), new Vector2(260f, 32f), FontStyle.BoldAndItalic);
+            bestText.rectTransform.pivot = new Vector2(0f, 0.5f);
+            Outline(bestText, new Color(0f, 0f, 0f, 0.35f), 1.5f);
 
-            // Jauge du combo : fine ligne qui se vide depuis les bords
-            var comboBg = Rect(root, "Combo", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-150f, -91f), new Vector2(150f, -87f));
-            comboBg.gameObject.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.12f);
-            comboFill = Rect(comboBg, "Fill", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            // Jauge du combo : fine ligne qui se vide ; en dessous, le contresens
+            var comboBar = Rect(combo, "Timer", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-120f, -45f), new Vector2(120f, -42f));
+            comboBar.gameObject.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.12f);
+            comboFill = Rect(comboBar, "Fill", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             comboFill.gameObject.AddComponent<Image>().color = Accent;
-            bestText = Label(root, "", 19, TextAnchor.UpperCenter, Dim, new Vector2(0.5f, 1f), new Vector2(0f, -98f), new Vector2(500f, 26f), FontStyle.Bold);
-            AddSlide(root, new Vector2(0f, 220f));
+            oncomingText = Label(combo, "", 16, TextAnchor.UpperCenter, Danger, new Vector2(0.5f, 1f), new Vector2(0f, -50f), new Vector2(240f, 22f), FontStyle.Bold);
+            AddSlide(combo, new Vector2(0f, 220f));
         }
 
         void BuildTopCorners()
@@ -296,15 +327,17 @@ namespace NoHesi
             driftGroup = drift.gameObject.AddComponent<CanvasGroup>();
             driftGroup.alpha = 0f;
             Shape(drift, "Plate", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600f, 100f), new Color(0.02f, 0.03f, 0.05f, 0.45f)).Set(20f, 160f, 160f);
-            Label(drift, "DRIFT", 20, TextAnchor.MiddleCenter, DriftColor, new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(200f, 24f), FontStyle.BoldAndItalic);
+            driftTitle = Label(drift, "DRIFT", 20, TextAnchor.MiddleCenter, DriftColor, new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(200f, 24f), FontStyle.BoldAndItalic);
             driftText = Label(drift, "", 50, TextAnchor.MiddleCenter, White, new Vector2(0.5f, 0.5f), new Vector2(0f, -4f), new Vector2(500f, 60f), FontStyle.BoldAndItalic);
             Outline(driftText, new Color(DriftColor.r, DriftColor.g, DriftColor.b, 0.45f), 2f);
+            driftOutline = driftText.GetComponent<Outline>();
             driftChain = Label(drift, "", 24, TextAnchor.MiddleLeft, DriftColor, new Vector2(0.5f, 0.5f), new Vector2(150f, -4f), new Vector2(120f, 30f), FontStyle.BoldAndItalic);
             driftChain.rectTransform.pivot = new Vector2(0f, 0.5f);
             var barBg = Rect(drift, "AngleBg", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(-120f, 10f), new Vector2(120f, 14f));
             barBg.gameObject.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.12f);
             driftBar = Rect(barBg, "Angle", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            driftBar.gameObject.AddComponent<Image>().color = DriftColor;
+            driftBarImage = driftBar.gameObject.AddComponent<Image>();
+            driftBarImage.color = DriftColor;
 
             // Maintien du bouton de replacement : anneau qui se remplit avant le changement de voiture
             var hold = Rect(canvas, "Hold", new Vector2(0.5f, 0.15f), new Vector2(0.5f, 0.15f), new Vector2(-220f, -40f), new Vector2(220f, 40f));
@@ -319,6 +352,29 @@ namespace NoHesi
             var holdLabel = Label(hold, "", 24, TextAnchor.MiddleLeft, White, new Vector2(0.5f, 0.5f), new Vector2(-112f, 0f), new Vector2(340f, 30f), FontStyle.BoldAndItalic);
             holdLabel.rectTransform.pivot = new Vector2(0f, 0.5f);
             Loc.Bind(holdLabel, "CHANGER DE VOITURE", "CHANGE CAR");
+
+            // Concession : invite à entrer, à l'arrêt dans la zone (bouton : clic ou doigt)
+            var dealer = Rect(canvas, "DealerPrompt", new Vector2(0.5f, 0.24f), new Vector2(0.5f, 0.24f), new Vector2(-330f, -32f), new Vector2(330f, 32f));
+            dealerGroup = dealer.gameObject.AddComponent<CanvasGroup>();
+            dealerGroup.alpha = 0f;
+            dealerGroup.blocksRaycasts = dealerGroup.interactable = false;
+            var plate = Shape(dealer, "Plate", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(660f, 64f), new Color(0.02f, 0.03f, 0.05f, 0.75f));
+            plate.Set(18f, 0f, 0f);
+            plate.raycastTarget = true;
+            dealerStripe = Shape(dealer, "Stripe", new Vector2(0.5f, 1f), Vector2.zero, new Vector2(420f, 3f), Info);
+            dealerStripe.Set(0f, 120f, 120f);
+            var enter = dealer.gameObject.AddComponent<Button>();
+            enter.targetGraphic = plate;
+            enter.transition = Selectable.Transition.None;
+            enter.navigation = new Navigation { mode = Navigation.Mode.None };
+            enter.onClick.AddListener(() =>
+            {
+                // Même invite pour le garage de tuning
+                if (TuningGarage.Current && TuningGarage.Current.CanEnter) TuningGarage.Current.Open();
+                else if (game.Dealer) game.Dealer.Open();
+            });
+            dealerText = Label(dealer, "", 28, TextAnchor.MiddleCenter, White, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(640f, 56f), FontStyle.BoldAndItalic);
+            dealerText.supportRichText = true;
         }
 
         void BuildBottomLeft()
@@ -374,17 +430,28 @@ namespace NoHesi
             float lampOn = assistLampT > 0f && Mathf.Repeat(Time.unscaledTime * 6f, 1f) < 0.6f ? 1f : 0f;
             assistLamp.color = new Color(Accent.r, Accent.g, Accent.b, lampOn * 0.95f);
 
-            // Score
-            displayedScore = Mathf.Lerp(displayedScore, score.RunScore, 1f - Mathf.Exp(-dt * 10f));
-            if (Mathf.Abs(displayedScore - score.RunScore) < 1f) displayedScore = score.RunScore;
-            scoreText.text = Loc.Num(displayedScore);
+            // Argent : le compteur monte jusqu'à la somme encaissée
+            float cash = Wallet.Cash;
+            if (displayedScore < 0f) displayedScore = cash;
+            displayedScore = Mathf.Lerp(displayedScore, cash, 1f - Mathf.Exp(-dt * 6f));
+            if (Mathf.Abs(displayedScore - cash) < 1f) displayedScore = cash;
+            scoreText.text = Wallet.Format(displayedScore);
+            scoreText.color = Mathf.Abs(displayedScore - cash) > 0.5f ? Money : White;
+            // Combo : multiplicateur, temps restant, cagnotte en jeu
+            bool combo = score.ComboActive;
+            comboAlpha = Mathf.MoveTowards(comboAlpha, combo ? 1f : 0f, dt * (combo ? 6f : 2.5f));
+            comboGroup.alpha = comboAlpha;
             multPunch = Mathf.MoveTowards(multPunch, 0f, dt * 1.5f);
-            multText.text = Loc.F($"x{score.Multiplier:0.0}");
+            if (combo)
+            {
+                multText.text = Loc.F($"x{score.Multiplier:0.0}");
+                multShape.color = score.Oncoming ? Danger : Accent;
+                oncomingText.text = score.Oncoming ? Loc.T("CONTRESENS x2", "ONCOMING x2") : "";
+                bool kept = score.Drifting || score.Speeding || score.Jumping;
+                comboFill.localScale = new Vector3(kept ? 1f : Mathf.Clamp01(score.ComboTimer / score.comboWindow), 1f, 1f);
+                bestText.text = "+" + Wallet.Format(score.AtStake) + Loc.T("  en jeu", "  at stake");
+            }
             multBadge.localScale = Vector3.one * (1f + multPunch);
-            multShape.color = score.Oncoming ? Danger : Accent;
-            oncomingText.text = score.Oncoming ? Loc.T("CONTRESENS x2", "ONCOMING x2") : "";
-            comboFill.localScale = new Vector3(Mathf.Clamp01(score.ComboTimer / score.comboWindow), 1f, 1f);
-            bestText.text = Loc.T("RECORD  ", "BEST  ") + Loc.Num(Mathf.Max(score.Best, score.RunScore));
 
             // Heure (icône soleil ou lune), épreuve
             if (clockText && game.DayNight)
@@ -398,21 +465,66 @@ namespace NoHesi
             }
 
             // Drift : ce que rapportera le drift (multiplicateur compris) ; le compteur grossit avec l'angle
-            bool showDrift = score.Drifting && score.DriftPoints >= 30f && !Paused;
-            if (showDrift)
+            // En l'air, le même cadre suit le saut : gain à la réception, distance, temps en l'air
+            bool showJump = score.Jumping && !Paused;
+            bool showDrift = !showJump && score.Drifting && score.DriftPoints * score.Multiplier >= 8f && !Paused;
+            if (showJump || showDrift)   // pendant le fondu de sortie, le cadre garde l'allure du dernier affiché
             {
-                driftText.text = "+" + Loc.Num(score.DriftPoints * score.Multiplier);
+                Color tint = showJump ? JumpColor : DriftColor;
+                driftTitle.text = showJump ? Loc.T("SAUT", "JUMP") : "DRIFT";
+                driftTitle.color = driftChain.color = driftBarImage.color = tint;
+                driftOutline.effectColor = new Color(tint.r, tint.g, tint.b, 0.45f);
+            }
+            if (showJump)
+            {
+                driftText.text = "+" + Wallet.Format(score.JumpPoints * score.Multiplier);
+                driftChain.text = Loc.F($"{score.JumpDistance:0} m");
+                driftBar.localScale = new Vector3(Mathf.Clamp01(score.JumpTime / 3f), 1f, 1f);
+                driftText.rectTransform.localScale = Vector3.one * (1f + Mathf.Clamp01(score.JumpTime / 3f) * 0.18f);
+                // Cascade (saut depuis un tremplin) : distance parcourue sur la distance à franchir, vert une fois atteinte
+                var stunt = game.Stunts ? game.Stunts.Active : null;
+                if (stunt != null)
+                {
+                    float reach = Mathf.Clamp01(score.JumpDistance / stunt.Target);
+                    Color tint = reach >= 1f ? StuntJumps.DoneTint : StuntJumps.Tint;
+                    driftTitle.text = stunt.done ? Loc.T("TREMPLIN", "RAMP") : Loc.T("CASCADE", "STUNT");
+                    driftTitle.color = driftChain.color = driftBarImage.color = tint;
+                    driftOutline.effectColor = new Color(tint.r, tint.g, tint.b, 0.45f);
+                    driftChain.text = Loc.F($"{Mathf.Floor(score.JumpDistance):0} / {stunt.Target:0} m");
+                    driftBar.localScale = new Vector3(reach, 1f, 1f);
+                }
+            }
+            else if (showDrift)
+            {
+                driftText.text = "+" + Wallet.Format(score.DriftPoints * score.Multiplier);
                 driftChain.text = Loc.F($"x{score.DriftChain:0.0}");
                 driftBar.localScale = new Vector3(Mathf.Clamp01((score.DriftAngle - 12f) / 48f), 1f, 1f);
                 driftText.rectTransform.localScale = Vector3.one * (1f + Mathf.Clamp01((score.DriftAngle - 12f) / 48f) * 0.18f);
             }
-            driftAlpha = Mathf.MoveTowards(driftAlpha, showDrift ? 1f : 0f, dt * (showDrift ? 8f : 3f));
+            bool showPanel = showDrift || showJump;
+            driftAlpha = Mathf.MoveTowards(driftAlpha, showPanel ? 1f : 0f, dt * (showPanel ? 8f : 3f));
             driftGroup.alpha = driftAlpha;
 
             // Maintien du bouton de replacement
             float hold = slot.ResetHold;
             holdRing.fillAmount = hold;
             holdGroup.alpha = Mathf.MoveTowards(holdGroup.alpha, hold > 0.01f ? 1f : 0f, dt * 8f);
+
+            // Concession ou garage de tuning : invite à entrer
+            bool tuning = TuningGarage.Current && TuningGarage.Current.CanEnter && !Paused;
+            bool dealer = tuning || (game.Dealer && game.Dealer.CanEnter && !Paused);
+            if (dealer)
+            {
+                Color tint = tuning ? new Color(1f, 0.42f, 0.82f) : Info;
+                dealerStripe.color = tint;
+                string hex = ColorUtility.ToHtmlStringRGB(tint);
+                string key = TouchInput.Showing ? Loc.T("touche ici", "tap here") : GameInput.UsingGamepad ? "A" : Loc.T("E ou Entrée", "E or Enter");
+                dealerText.text = tuning
+                    ? Loc.T($"<color=#{hex}>GARAGE DE TUNING</color>   ·   {key} : entrer", $"<color=#{hex}>TUNING GARAGE</color>   ·   {key}: enter")
+                    : Loc.T($"<color=#{hex}>CONCESSION</color>   ·   {key} : entrer", $"<color=#{hex}>CAR DEALER</color>   ·   {key}: enter");
+            }
+            dealerGroup.alpha = Mathf.MoveTowards(dealerGroup.alpha, dealer ? 1f : 0f, dt * 5f);
+            dealerGroup.blocksRaycasts = dealerGroup.interactable = dealer;
 
             // Bannière : entre en glissant, reste, puis s'efface
             if (bannerTimer > 0f)
@@ -478,6 +590,13 @@ namespace NoHesi
             slides[gaugeSlide] = s;
             s.rt.localScale = Vector3.one * (touch ? GaugeTouchScale : 1f);
             if (slideT < 0f) s.rt.anchoredPosition = s.home;
+            if (walletSlide >= 0)
+            {
+                var w = slides[walletSlide];
+                w.home = touch ? WalletTouchHome : WalletHome;
+                slides[walletSlide] = w;
+                if (slideT < 0f) w.rt.anchoredPosition = w.home;
+            }
             if (miniSlide < 0) return;
             var m = slides[miniSlide];
             m.rt.anchorMin = m.rt.anchorMax = touch ? new Vector2(0f, 1f) : Vector2.zero;
@@ -530,12 +649,12 @@ namespace NoHesi
             flashAlpha = alpha;
         }
 
-        /// <summary>Gain de points au centre : libellé et points, qui montent en s'effaçant (empilés).</summary>
+        /// <summary>Gain au centre : libellé et montant, qui montent en s'effaçant (empilés).</summary>
         void Pop(string label, float pts, Color color)
         {
             string sign = pts < 0f ? "-" : "+";
             string hex = ColorUtility.ToHtmlStringRGB(pts < 0f ? Danger : Accent);
-            var t = Label(canvas, $"{label}   <color=#{hex}>{sign}{Loc.Num(Mathf.Abs(pts))}</color>", 32, TextAnchor.MiddleCenter, color,
+            var t = Label(canvas, $"{label}   <color=#{hex}>{sign}{Wallet.Format(Mathf.Abs(pts))}</color>", 32, TextAnchor.MiddleCenter, color,
                 new Vector2(0.5f, 0.74f), Vector2.zero, new Vector2(1100f, 50f), FontStyle.BoldAndItalic);
             t.supportRichText = true;
             Outline(t, new Color(0f, 0f, 0f, 0.4f), 1.5f);
@@ -584,8 +703,6 @@ namespace NoHesi
             Loc.Bind(resume.text, "Reprendre", "Resume");
             firstButton = resume.button;
             carLabel = Button(box, "", () => { game.CycleCar(1); RefreshPause(); }).text;
-            // Une seule voiture jouable : pas de bouton de choix
-            if (game.assets.playerCars.Length <= 1) carLabel.transform.parent.gameObject.SetActive(false);
             // L'heure d'une partie rejointe est celle du serveur
             timeLabel = Button(box, "", () => { if (!(game.Net && game.Net.IsClient)) game.DayNight.Advance(3f); RefreshPause(); }).text;
             Button(box, "Options", OpenOptions);
@@ -647,6 +764,8 @@ namespace NoHesi
         void RefreshPause()
         {
             RefreshControls();
+            // Une seule voiture achetée : pas de bouton de choix
+            carLabel.transform.parent.gameObject.SetActive(game.OwnedCars > 1);
             carLabel.text = Loc.T($"Voiture : {game.Player.Spec.displayName}  >", $"Car: {game.Player.Spec.displayName}  >");
             var net = game.Net;
             bool online = game.Online;
@@ -692,9 +811,10 @@ namespace NoHesi
 
         void UpdatePause()
         {
-            if (OptionsMenu.IsOpen || game.Demo || GameManager.DedicatedServer) return;
+            if (OptionsMenu.IsOpen || Dealership.IsOpen || TuningGarage.IsOpen || game.Demo || GameManager.DedicatedServer) return;
             // Carte globale ouverte (ou tout juste fermée par Échap) : la pause attend
-            if (WorldMap.IsOpen || Time.frameCount == WorldMap.ChangedFrame) return;
+            if (WorldMap.IsOpen || Time.frameCount == WorldMap.ChangedFrame || Time.frameCount == Dealership.ChangedFrame
+                || Time.frameCount == TuningGarage.ChangedFrame) return;
             if (Time.frameCount == openedFrame || game.State != GameManager.Phase.Playing) return;
             if (!Paused && GameInput.PausePressed) SetPaused(true);
             else if (Paused && (GameInput.PausePressed || GameInput.CancelPressed)) SetPaused(false);

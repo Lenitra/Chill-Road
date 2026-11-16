@@ -59,8 +59,10 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
         print("%.1f s" % (time.time() - t))
         return g, H, info, nodes, edges
     import map_village as VL
+    import map_stunts as ST
     pads = VL.pads(g, H, edges)
-    Hc, edge = R.carve(g, H, nodes, edges, pads)
+    stunts = ST.resolve(edges)
+    Hc, edge = R.carve(g, H, nodes, edges, pads, ST.strips(stunts))
     water = water_masks(g, Hc)
     Hc = clear_water(g, Hc, water)
     hole = R.holes(g, Hc, edges, edge)
@@ -79,16 +81,20 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
                 span |= (e["s"] >= s0 - 4.0) & (e["s"] <= s1 + 4.0)
             e["rail"][inside & ~span] &= ~np.uint8(3)
     placer = VL.populate(g, Hc, edge, water, nodes, edges, info["rivers"])
+    ST.populate(placer, stunts)
+    pads = pads + ST.paved(stunts)             # bandes d'élan goudronnées (le relief, lui, est déjà terrassé)
     urban = [(v[2], v[3], v[4]) for v in D.VILLAGES + D.HAMLETS]
     rgba, paved, snow, forest, urban_m, slope = E.masks(g, Hc, info, edge, water, edges, urban_pts=urban,
                                                         blocked=placer.blocked, pads=pads)
     import map_signs as SG
     signs = SG.build(g, Hc, nodes, edges, villages=urban)
     print("signalisation : %d objets" % len(signs))
-    places = placer.places + signs
+    places, removed = ST.clear(placer.places + signs, stunts)
+    print("cascades : %d tremplins, %d objets retires des bandes" % (len(stunts), removed))
     if export:
         E.export(g, Hc, info, nodes, edges, water, edge, rgba, paved, snow, places=places,
-                 pois=D.pois(nodes, edges) + VL.pois(), blocked=placer.blocked, holes=hole, tunnels=R.tunnel_zone(g, edges))
+                 pois=D.pois(nodes, edges) + VL.pois(), blocked=placer.blocked, holes=hole, tunnels=R.tunnel_zone(g, edges),
+                 stunts=ST.export(stunts))
         import map_overview as OV
         for e in edges:
             tun = np.where(R.tunnel_mask(e))[0]

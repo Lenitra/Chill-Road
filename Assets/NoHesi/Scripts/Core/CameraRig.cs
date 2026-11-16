@@ -66,9 +66,11 @@ namespace NoHesi
             clearFraction = target < clearFraction ? Mathf.Lerp(clearFraction, target, 1f - Mathf.Exp(-dt * 30f))
                 : Mathf.MoveTowards(clearFraction, target, dt * 1.4f);
             Vector3 p = pivot + dir * (dist * clearFraction);
-            // Jamais sous le terrain (là où il n'a pas encore de collision)
+            // Jamais sous le terrain (là où il n'a pas encore de collision)… sauf dans un tunnel, où le terrain est la
+            // montagne au-dessus : la voûte, elle, arrête déjà la caméra
             var road = RoadNetwork.Instance;
-            if (road && road.Map != null) p.y = Mathf.Max(p.y, road.Map.Height(p.x, p.z) + 0.55f);
+            if (road && road.Map != null && !road.Map.UnderRelief(pivot) && !road.Map.UnderRelief(p))
+                p.y = Mathf.Max(p.y, road.Map.Height(p.x, p.z) + 0.55f);
             return p;
         }
         // Regard libre (joystick droit / souris) : angles actuels et visés, en degrés

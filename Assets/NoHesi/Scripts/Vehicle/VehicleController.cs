@@ -52,6 +52,7 @@ namespace NoHesi
         [Header("Châssis")]
         public Vector3 centerOfMassOffset = new Vector3(0f, -0.3f, 0.05f);
         [Tooltip("Inertie en lacet relative : plus élevée = la caisse met plus de temps à pivoter (sensation de poids)")] public float yawInertia = 1.35f;
+        [Tooltip("Stabilisation en l'air (0 = aucune) : la caisse reste à plat et suit sa trajectoire pendant un saut")] public float airStability = 1f;
 
         [Header("Direction")]
         [Tooltip("Temps de réponse du volant (s) à basse et à haute vitesse : l'inertie de la direction")]
@@ -162,6 +163,8 @@ namespace NoHesi
 
         Rigidbody rb;
         Transform model;
+        /// <summary>Modèle affiché (peinture : <see cref="CarPaint.Apply"/>).</summary>
+        public Transform Model => model;
         readonly List<Wheel> wheels = new List<Wheel>();
         readonly List<Transform> wheelVisuals = new List<Transform>();
         readonly List<Transform> exhausts = new List<Transform>();
@@ -175,6 +178,7 @@ namespace NoHesi
         // Pneus : glissement au pic et adhérence en glisse de la surface courante
         float sPeak = 0.13f, slideMu = 0.8f;
         float lastSlipAngle, slipRate;
+        float airTime;
 
         void Awake()
         {
@@ -741,6 +745,26 @@ namespace NoHesi
             // --- Caisse à plat : couple de rappel contre le roulis et le tangage excessifs
             Vector3 tilt = Vector3.Cross(up, Vector3.up);
             if (GroundedWheels >= 2) rb.AddTorque(tilt * uprightAssist * rb.mass - Vector3.ProjectOnPlane(rb.angularVelocity, Vector3.up) * rb.mass * 0.4f);
+
+            // --- En l'air (saut, tremplin) : la caisse suit sa trajectoire, à plat en roulis, le nez dans le sens de
+            // la vitesse (montée puis descente, plongée limitée) ; le lacet reste libre. Sans cela, la vitesse de
+            // tangage prise sur un tremplin fait retomber la voiture sur le nez ou sur le toit.
+            airTime = GroundedWheels == 0 ? airTime + dt : 0f;
+            if (airStability > 0f && airTime > 0.12f && Speed > 6f)
+            {
+                Vector3 flat = new Vector3(v.x, 0f, v.z);
+                Vector3 wantUp = Vector3.up;
+                if (flat.sqrMagnitude > 9f)
+                {
+                    float climb = Mathf.Clamp(Mathf.Atan2(v.y, flat.magnitude), -20f * Mathf.Deg2Rad, 25f * Mathf.Deg2Rad);
+                    Vector3 path = flat.normalized * Mathf.Cos(climb) + Vector3.up * Mathf.Sin(climb);
+                    wantUp = Vector3.ProjectOnPlane(Vector3.up, path).normalized;
+                }
+                Vector3 w = rb.angularVelocity;
+                Vector3 spin = w - up * Vector3.Dot(w, up);          // roulis et tangage, sans le lacet
+                float k = Mathf.Clamp01((airTime - 0.12f) / 0.25f) * airStability;
+                rb.AddTorque((Vector3.Cross(up, wantUp) * 7f - spin * 3f) * k, ForceMode.Acceleration);
+            }
 
             // --- Aérodynamique et roulement
             float v2 = Speed * Speed;

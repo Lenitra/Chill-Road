@@ -36,7 +36,7 @@ namespace NoHesi
         NetCarState state;
         bool hasState;
         uint lastMs;
-        int carIndex = -1;
+        int carIndex = -1, paint = -1;
         // Chevauchement avec la voiture locale : collisions coupées jusqu'à ce qu'elles soient séparées
         bool ghost = true, ghostApplied;
         int localTeleports = -1;
@@ -73,6 +73,7 @@ namespace NoHesi
                 if (game.assets.particle && game.assets.spark) gameObject.AddComponent<VehicleEffects>().Init(Car, game.assets);
             }
             else lights.Rebuild();
+            paint = -1;
             box = null;
             ghost = true;
         }
@@ -93,6 +94,7 @@ namespace NoHesi
                 ghost = true;
             }
             if (s.carIndex != carIndex) SetCar(s.carIndex);
+            if (s.paint != paint) { paint = s.paint; CarPaint.Apply(Car.Model, paint); }
             buffer.Push(t, s.pos, s.rot, s.vel);
             state = s;
             hasState = true;

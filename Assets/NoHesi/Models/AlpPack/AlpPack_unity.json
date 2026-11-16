@@ -3363,6 +3363,67 @@
    "material": ""
   },
   {
+   "id": "tuning_garage",
+   "file": "Tuning_Garage",
+   "category": "landmark",
+   "tags": [
+    "service",
+    "shop",
+    "car"
+   ],
+   "sx": 31.06,
+   "sy": 8.92,
+   "sz": 19.29,
+   "fw": 30.0,
+   "fd": 16.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.9,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "tuning_sign",
+   "file": "Tuning_Sign",
+   "category": "street",
+   "tags": [
+    "car",
+    "sign"
+   ],
+   "sx": 2.52,
+   "sy": 7.06,
+   "sz": 0.9,
+   "fw": 2.4,
+   "fd": 0.9,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.4,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "stunt_ramp",
+   "file": "Stunt_Ramp",
+   "category": "stunt",
+   "tags": [
+    "stunt",
+    "ramp"
+   ],
+   "sx": 7.82,
+   "sy": 5.59,
+   "sz": 19.86,
+   "fw": 5.6,
+   "fd": 17.0,
+   "collider": "mesh_low",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -1.0,
+   "lights": [],
+   "material": ""
+  },
+  {
    "id": "reeds",
    "file": "Reeds",
    "category": "lake",
@@ -3678,6 +3739,106 @@
    "ymin": -0.01,
    "lights": [],
    "material": "AP_Flora"
+  },
+  {
+   "id": "showroom_bay_a",
+   "file": "Showroom_Bay_A",
+   "category": "interior",
+   "tags": [
+    "shop",
+    "interior"
+   ],
+   "sx": 7.04,
+   "sy": 6.9,
+   "sz": 23.3,
+   "fw": 7.0,
+   "fd": 23.0,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.3,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "showroom_bay_b",
+   "file": "Showroom_Bay_B",
+   "category": "interior",
+   "tags": [
+    "shop",
+    "interior"
+   ],
+   "sx": 7.04,
+   "sy": 6.9,
+   "sz": 23.3,
+   "fw": 7.0,
+   "fd": 23.0,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.3,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "showroom_bay_c",
+   "file": "Showroom_Bay_C",
+   "category": "interior",
+   "tags": [
+    "shop",
+    "interior"
+   ],
+   "sx": 7.04,
+   "sy": 6.9,
+   "sz": 23.3,
+   "fw": 7.0,
+   "fd": 23.0,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.3,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "showroom_end",
+   "file": "Showroom_End",
+   "category": "interior",
+   "tags": [
+    "shop",
+    "interior"
+   ],
+   "sx": 2.56,
+   "sy": 6.9,
+   "sz": 23.56,
+   "fw": 1.2,
+   "fd": 23.0,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.3,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "tuning_workshop",
+   "file": "Tuning_Workshop",
+   "category": "interior",
+   "tags": [
+    "shop",
+    "interior"
+   ],
+   "sx": 13.6,
+   "sy": 5.9,
+   "sz": 16.6,
+   "fw": 13.0,
+   "fd": 16.0,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.3,
+   "lights": [],
+   "material": ""
   }
  ]
 }

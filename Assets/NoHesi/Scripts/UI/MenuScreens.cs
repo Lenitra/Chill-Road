@@ -6,7 +6,7 @@ namespace NoHesi
 {
     /// <summary>
     /// Écrans hors partie (construits en code) : chargement avec barre de progression, écran d'accueil
-    /// (Jouer / Multijoueur / Options / Langue / Quitter, crédits) par-dessus la vue tournante de la voiture,
+    /// (Jouer / Multijoueur / Options / Langue / Quitter) par-dessus la vue tournante de la voiture,
     /// et mise en scène du départ :
     /// l'accueil s'éjecte, bandes néon et flash, bandes cinéma, compte à rebours néon, « GO ! ».
     /// </summary>
@@ -18,9 +18,6 @@ namespace NoHesi
         static readonly Color NeonPink = new Color(1f, 0.18f, 0.55f);
         static readonly Color NeonCyan = new Color(0.1f, 0.9f, 1f);
         static readonly Color Info = new Color(0.35f, 0.85f, 1f);
-
-        const string Developer = "TauMah";
-        static readonly string[] Supporters = { "modlinger", "pheonixelg10", "Survivor_TDAH", "Dev_Para" };
 
         static readonly (string fr, string en)[] Tips =
         {
@@ -40,10 +37,12 @@ namespace NoHesi
              "At night, headlights and street lamps light the road: advance the time from the pause menu."),
             ("Sous la pluie, la route glisse : freine plus tôt et garde les roues droites.",
              "In the rain the road gets slippery: brake earlier and keep the wheels straight."),
-            ("Maintiens Y (ou R) pour changer de voiture sans t'arrêter.",
-             "Hold Y (or R) to switch cars without stopping."),
-            ("Tous les 2 km, un relais te fait passer à la voiture suivante du garage.",
-             "Every 2 km, a car relay swaps you into the next car in the garage."),
+            ("Maintiens Y (ou R) pour passer d'une de tes voitures à l'autre sans t'arrêter.",
+             "Hold Y (or R) to switch between your cars without stopping."),
+            ("Frôlements, drifts, sauts et vitesse rapportent de l'argent : il est encaissé quand le combo retombe, perdu en cas d'accident.",
+             "Near misses, drifts, jumps and speed earn money: it's banked when the combo ends, lost if you crash."),
+            ("La concession, à l'est du départ, vend toute la gamme : arrête-toi devant pour entrer.",
+             "The car dealer, east of the start, sells the whole range: stop in front of it to enter."),
             ("Drift : un coup de frein à main en gardant les gaz, puis dose l'accélérateur.",
              "Drift: tap the handbrake while keeping the throttle on, then feather it."),
             ("À plusieurs : « Multijoueur » sur l'accueil, pour héberger une partie ou en rejoindre une sur le réseau local.",
@@ -270,48 +269,6 @@ namespace NoHesi
             if (Application.isMobilePlatform) Loc.Bind(hint, "Touche un bouton pour valider", "Tap a button to select");
             else Loc.Bind(hint, "Manette : A pour valider  ·  Clavier : Entrée", "Gamepad: A to select  ·  Keyboard: Enter");
             hint.rectTransform.pivot = new Vector2(0f, 0.5f);
-
-            BuildCredits(panel);
-        }
-
-        /// <summary>
-        /// Crédits, sur le côté droit de l'écran d'accueil : plaque inclinée du HUD collée au bord de l'écran, qui se fond
-        /// vers la voiture ; titre cyan, développeur en or, soutiens en blanc.
-        /// </summary>
-        void BuildCredits(RectTransform panel)
-        {
-            var box = Rect(panel, "Credits", new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-520f, -200f), new Vector2(30f, 170f));
-            box.gameObject.AddComponent<CanvasRenderer>();
-            var plate = box.gameObject.AddComponent<HudShape>();
-            plate.color = new Color(0.03f, 0.04f, 0.06f, 0.78f);
-            plate.raycastTarget = false;
-            plate.Set(24f, 150f, 0f);
-
-            float y = -30f;
-            Text Line(string fr, string en, int size, Color color, FontStyle style, float height)
-            {
-                var t = Label(box, "", size, TextAnchor.UpperRight, color, new Vector2(1f, 1f), new Vector2(-86f, y), new Vector2(460f, height), false);
-                t.rectTransform.pivot = new Vector2(1f, 1f);
-                t.font = HudArt.Font;
-                t.fontStyle = style;
-                if (en == null) t.text = fr;
-                else Loc.Bind(t, fr, en);
-                y -= height;
-                return t;
-            }
-
-            Line("CRÉDITS", "CREDITS", 30, Info, FontStyle.BoldAndItalic, 44f);
-            // Filet doré sous le titre
-            var rule = Rect(box, "Rule", new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-86f - 170f, y - 2f), new Vector2(-86f, y));
-            var ruleImage = rule.gameObject.AddComponent<Image>();
-            ruleImage.color = Accent;
-            ruleImage.raycastTarget = false;
-            y -= 18f;
-            Line("DÉVELOPPEUR", "DEVELOPER", 18, Dim, FontStyle.Bold, 26f);
-            Line(Developer, null, 38, Accent, FontStyle.BoldAndItalic, 52f);
-            y -= 12f;
-            Line("SOUTIENS", "SUPPORTERS", 18, Dim, FontStyle.Bold, 26f);
-            foreach (var name in Supporters) Line(name, null, 26, White, FontStyle.Bold, 34f);
         }
 
         /// <summary>Éléments de la mise en scène du départ (cachés au repos).</summary>

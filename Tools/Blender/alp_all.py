@@ -1,7 +1,7 @@
 """Charge (ou recharge) tout le pack alpin : `import alp_all; A = alp_all.load()`."""
 import importlib, os, sys
 
-MODULES = ["alp_buildings", "alp_landmarks", "alp_services", "alp_props", "alp_props2", "alp_signs", "alp_infra", "alp_nature", "alp_nature2", "alp_nature_hd", "alp_props_hd", "alp_landmarks_hd", "alp_rural_hd", "alp_animals_hd", "alp_dealer"]
+MODULES = ["alp_buildings", "alp_landmarks", "alp_services", "alp_props", "alp_props2", "alp_signs", "alp_infra", "alp_nature", "alp_nature2", "alp_nature_hd", "alp_props_hd", "alp_landmarks_hd", "alp_rural_hd", "alp_animals_hd", "alp_dealer", "alp_tuning", "alp_stunt", "alp_shops"]
 
 
 def load():

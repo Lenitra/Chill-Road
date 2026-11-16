@@ -784,8 +784,9 @@ def tunnel_mask(e):
     return m
 
 
-def carve(g, H, nodes, edges, pads=()):
+def carve(g, H, nodes, edges, pads=(), strips=()):
     """Adapte le relief aux routes : plate-forme sous la chaussée, talus de déblai et de remblai à pente fixe.
+    strips : bandes aplanies le long d'un axe (points [x, z, altitude du sol], demi-largeur), talus comme les routes.
     Renvoie (H modifié, distance au bord de chaussée la plus proche [m, plafonnée à 80])."""
     H = H.copy()
     edge = np.full(H.shape, 80.0, dtype=np.float32)
@@ -859,6 +860,15 @@ def carve(g, H, nodes, edges, pads=()):
         lo[sz, sx] = np.maximum(lo[sz, sx], y - FILL_SLOPE * np.maximum(0.0, d))
         hi[sz, sx] = np.minimum(hi[sz, sx], y + CUT_SLOPE * np.maximum(0.0, d))
         edge[sz, sx] = np.minimum(edge[sz, sx], np.maximum(d, 0.0) + 1.0)
+    # Bandes (élan et réception des tremplins) : le sol suit l'altitude de l'axe sur toute la largeur
+    for (Q, half) in strips:
+        def fn(sz, sx, d, t, i, Q=Q, half=half):
+            ed = d - half
+            y = Q[i, 2] + t * (Q[i + 1, 2] - Q[i, 2])
+            lo[sz, sx] = np.maximum(lo[sz, sx], y - FILL_SLOPE * np.maximum(0.0, ed))
+            hi[sz, sx] = np.minimum(hi[sz, sx], y + CUT_SLOPE * np.maximum(0.0, ed))
+            edge[sz, sx] = np.minimum(edge[sz, sx], np.maximum(ed, 0.0) + 1.0)
+        stamp_polyline(g, Q, half + radius, fn)
     # Le remblai d'abord, le déblai ensuite : la chaussée la plus basse n'est jamais enterrée
     H = np.maximum(H, lo)
     H = np.minimum(H, hi)

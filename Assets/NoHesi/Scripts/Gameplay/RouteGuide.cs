@@ -79,7 +79,7 @@ namespace NoHesi
         public bool SetDestination(Vector3 point, string fr, string en)
         {
             road = game.Road;
-            if (!road || game.Map == null) return false;
+            if (OnCourse || !road || game.Map == null) return false;
             point.y = game.Map.Height(point.x, point.z);
             var hit = road.Nearest(point, 4000f);
             if (!hit.Found) return false;
@@ -94,6 +94,7 @@ namespace NoHesi
 
         public void ClearDestination()
         {
+            if (OnCourse) return;       // parcours imposé : il se retire avec ClearCourse
             HasDestination = false;
             route.Clear();
             routeDist.Clear();
@@ -101,10 +102,64 @@ namespace NoHesi
             Version++;
         }
 
+        // ------------------------------------------------------------------ parcours imposé (course)
+
+        /// <summary>
+        /// Un parcours imposé (course chronométrée, <see cref="Races"/>) remplace l'itinéraire : pas de recalcul, pas
+        /// d'arrivée annoncée, et la destination ne se change plus sur la carte tant qu'il est affiché.
+        /// </summary>
+        public bool OnCourse { get; private set; }
+        bool savedHas;
+        Vector3 savedPoint;
+        string savedFr, savedEn;
+
+        /// <summary>
+        /// Affiche un parcours imposé à la place de l'itinéraire : les points de <paramref name="points"/> à partir de
+        /// l'indice <paramref name="first"/> (ce qu'il reste à parcourir), le dernier étant l'arrivée. La destination
+        /// que le joueur avait choisie est rendue par <see cref="ClearCourse"/>.
+        /// </summary>
+        public void SetCourse(IReadOnlyList<Vector3> points, int first, string fr, string en)
+        {
+            if (GameManager.DedicatedServer || points == null || points.Count - first < 2) return;
+            if (!OnCourse)
+            {
+                savedHas = HasDestination;
+                savedPoint = Destination;
+                savedFr = nameFr;
+                savedEn = nameEn;
+            }
+            OnCourse = true;
+            route.Clear();
+            routeDist.Clear();
+            for (int i = Mathf.Max(0, first); i < points.Count; i++) Add(route, routeDist, points[i]);
+            nearIndex = 0;
+            along = 0f;
+            Destination = route[route.Count - 1];
+            nameFr = fr;
+            nameEn = en;
+            HasDestination = true;
+            Remaining = routeDist[routeDist.Count - 1];
+            RemainingTime = Remaining / 25f;
+            Version++;
+        }
+
+        /// <summary>Retire le parcours imposé et rend au joueur la destination qu'il avait choisie.</summary>
+        public void ClearCourse()
+        {
+            if (!OnCourse) return;
+            OnCourse = false;
+            ClearDestination();
+            if (savedHas) SetDestination(savedPoint, savedFr, savedEn);
+        }
+
         void Update()
         {
             if (!game || GameManager.DedicatedServer) return;
-            if (HasDestination && game.State == GameManager.Phase.Playing && game.Road)
+            if (OnCourse)
+            {
+                if (game.State == GameManager.Phase.Playing) Track();
+            }
+            else if (HasDestination && game.State == GameManager.Phase.Playing && game.Road)
             {
                 // Recalcul régulier (on peut quitter l'itinéraire), et tout de suite après un replacement sur la route
                 timer -= Time.unscaledDeltaTime;
@@ -249,7 +304,7 @@ namespace NoHesi
             if (next.Count == 0 && !a.e.oneway) next.Add((new Arc { e = a.e, dir = -a.dir }, DeadEndPenalty));
         }
 
-        /// <summary>Itinéraire le plus rapide de la voiture à la destination ; faux si la destination est injoignable.</summary>
+        /// <summary>Itinéraire le plus rapide de la voiture à la destination (vide si elle est injoignable).</summary>
         void Compute()
         {
             Version++;
@@ -257,18 +312,61 @@ namespace NoHesi
             routeDist.Clear();
             nearIndex = 0;
             along = 0f;
-            road = game.Road;
-            if (!HasDestination || !road || road.Edges.Count == 0) return;
-            PrepareTimes();
+            if (!HasDestination) return;
             var car = game.Player.transform;
-            var start = road.Nearest(car.position, 4000f);
-            var goal = road.Nearest(Destination, 50f);
-            if (!start.Found || !goal.Found) return;
+            float time = Solve(car.position, car.forward, Destination);
+            if (time < 0f) return;
+            RemainingTime = time;
+            BuildPolyline(route, routeDist);
+            Remaining = routeDist.Count > 0 ? routeDist[routeDist.Count - 1] : 0f;
+        }
+
+        readonly List<Vector3> planPoints = new List<Vector3>();
+        readonly List<float> planDist = new List<float>();
+
+        /// <summary>
+        /// Itinéraire le plus rapide entre deux points de la carte (posés sur la route la plus proche), en partant dans
+        /// le sens de <paramref name="heading"/> : ses points (dans la voie, carrefours arrondis) sont ajoutés à
+        /// <paramref name="points"/>. Sert à tracer les parcours des courses, tronçon après tronçon : le cap d'arrivée
+        /// (<paramref name="endHeading"/>) est le cap de départ du tronçon suivant. Faux si l'arrivée est injoignable.
+        /// </summary>
+        public bool Plan(Vector3 from, Vector3 heading, Vector3 to, List<Vector3> points, out Vector3 endHeading)
+        {
+            endHeading = heading;
+            if (!game.Road || game.Map == null) return false;
+            from.y = game.Map.Height(from.x, from.z);
+            to.y = game.Map.Height(to.x, to.z);
+            var hit = game.Road.Nearest(to, 4000f);
+            if (!hit.Found || Solve(from, heading, hit.point) < 0f) return false;
+            planPoints.Clear();
+            planDist.Clear();
+            BuildPolyline(planPoints, planDist);
+            foreach (var p in planPoints)
+                if (points.Count == 0 || Vector3.Distance(points[points.Count - 1], p) >= 0.5f) points.Add(p);
+            var last = steps[steps.Count - 1];
+            endHeading = Heading(last.arc.e, last.to, last.arc.dir);
+            return true;
+        }
+
+        /// <summary>
+        /// Plus court chemin en temps de <paramref name="from"/> (en partant de préférence dans le sens de
+        /// <paramref name="heading"/>) à <paramref name="to"/> : remplit les étapes (<see cref="steps"/>) et renvoie le
+        /// temps estimé (s), ou -1 si l'arrivée est injoignable.
+        /// </summary>
+        float Solve(Vector3 from, Vector3 heading, Vector3 to)
+        {
+            steps.Clear();
+            road = game.Road;
+            if (!road || road.Edges.Count == 0) return -1f;
+            PrepareTimes();
+            var start = road.Nearest(from, 4000f);
+            var goal = road.Nearest(to, 50f);
+            if (!start.Found || !goal.Found) return -1f;
 
             for (int i = 0; i < cost.Length; i++) { cost[i] = float.MaxValue; prev[i] = -1; closed[i] = false; }
             var e0 = start.edge;
             var g = goal.edge;
-            Vector3 carFwd = car.forward;
+            Vector3 carFwd = heading;
             carFwd.y = 0f;
             int ahead = e0.oneway || Vector3.Dot(Heading(e0, start.s, 1), carFwd) >= 0f ? 1 : -1;
 
@@ -323,10 +421,9 @@ namespace NoHesi
                     }
                 }
             }
-            if (bestArc == -2) return;
+            if (bestArc == -2) return -1f;
 
             // Étapes de l'itinéraire, du départ à la destination
-            steps.Clear();
             if (bestArc == -1) steps.Add(new Step { arc = new Arc { e = e0, dir = bestDir }, from = start.s, to = goal.s });
             else
             {
@@ -341,8 +438,7 @@ namespace NoHesi
                 var last = new Arc { e = g, dir = bestDir };
                 steps.Add(new Step { arc = last, from = StartOf(last), to = goal.s });
             }
-            RemainingTime = best;
-            BuildPolyline();
+            return best;
         }
 
         /// <summary>Hors autoroute, l'itinéraire suit la voie de droite ; sur l'autoroute, le milieu de la chaussée.</summary>
@@ -352,7 +448,7 @@ namespace NoHesi
             return e.LanePosition(Mathf.Clamp(s, 0f, e.Length), dir, out _, extra);
         }
 
-        void Add(Vector3 p)
+        static void Add(List<Vector3> route, List<float> routeDist, Vector3 p)
         {
             if (route.Count > 0)
             {
@@ -364,9 +460,10 @@ namespace NoHesi
             route.Add(p);
         }
 
-        /// <summary>Points de l'itinéraire (carrefours arrondis).</summary>
-        void BuildPolyline()
+        /// <summary>Points de l'itinéraire (carrefours arrondis), d'après les étapes de <see cref="Solve"/>.</summary>
+        void BuildPolyline(List<Vector3> route, List<float> routeDist)
         {
+            void Add(Vector3 p) => RouteGuide.Add(route, routeDist, p);
             for (int i = 0; i < steps.Count; i++)
             {
                 var st = steps[i];
@@ -398,7 +495,6 @@ namespace NoHesi
                 else { for (int j = e.pts.Length - 1; j >= 0; j--) if (e.dist[j] < from - 0.5f && e.dist[j] > to + 0.5f) Add(OnLane(e, e.dist[j], -1)); }
                 Add(OnLane(e, to, dir));
             }
-            Remaining = routeDist.Count > 0 ? routeDist[routeDist.Count - 1] : 0f;
         }
 
         /// <summary>Position de la voiture le long de l'itinéraire (projection sur le tronçon le plus proche, près du dernier connu).</summary>
@@ -408,12 +504,21 @@ namespace NoHesi
             Vector3 p = game.Player.transform.position;
             float bestD = float.MaxValue;
             int lo = Mathf.Max(0, nearIndex - 10), hi = Mathf.Min(route.Count - 2, nearIndex + 80);
-            for (int i = lo; i <= hi; i++)
+            for (int pass = 0; pass < 2; pass++)
             {
-                Vector3 a = route[i], ab = route[i + 1] - a;
-                float t = Mathf.Clamp01(Vector3.Dot(p - a, ab) / Mathf.Max(ab.sqrMagnitude, 1e-4f));
-                float d = (p - (a + ab * t)).sqrMagnitude;
-                if (d < bestD) { bestD = d; nearIndex = i; along = Mathf.Lerp(routeDist[i], routeDist[i + 1], t); }
+                for (int i = lo; i <= hi; i++)
+                {
+                    Vector3 a = route[i], ab = route[i + 1] - a;
+                    float t = Mathf.Clamp01(Vector3.Dot(p - a, ab) / Mathf.Max(ab.sqrMagnitude, 1e-4f));
+                    float d = (p - (a + ab * t)).sqrMagnitude;
+                    if (d < bestD) { bestD = d; nearIndex = i; along = Mathf.Lerp(routeDist[i], routeDist[i + 1], t); }
+                }
+                // Parcours imposé (pas de recalcul) : la voiture a pu le quitter et le reprendre plus loin
+                // (replacement, raccourci) ; à égalité, le point le plus tôt dans le parcours (tours suivants)
+                if (!OnCourse || bestD < 60f * 60f) break;
+                lo = 0;
+                hi = route.Count - 2;
+                bestD = float.MaxValue;
             }
         }
 
