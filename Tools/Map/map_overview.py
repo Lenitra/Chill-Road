@@ -157,6 +157,28 @@ def render(g, H, rgba, paved, snow, water, edges, rivers, buildings, out_path, p
         w = max(3, int(float(p[0][3]) * 1.4 * k))
         stroke(dr, [px(a[0], a[1]) for a in p], w + max(2, int(3 * k)), tuple(st["shore"]))
         stroke(dr, [px(a[0], a[1]) for a in p], w, tuple(st["water"]))
+    # domaine skiable : pistes en rubans translucides de leur couleur (pas un tracé de route), remontées en trait
+    # fin jalonné de pylônes
+    import map_station as SK
+    over = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    od = ImageDraw.Draw(over)
+    tint = dict(green=(46, 170, 96), blue=(52, 118, 232), red=(226, 58, 50), black=(34, 36, 44))
+    for (pid, pc, width, pts) in SK.PISTES:
+        c = L.catmull(np.array(pts, dtype=np.float64), 6.0)
+        line = [px(q[0], q[1]) for q in c]
+        stroke(od, line, max(5, int(width * 0.9 * k)), tint[pc] + (185,))
+        stroke(od, line, max(3, int(7.0 * k)), tint[pc] + (255,))
+    for (kind, a, b) in SK.LIFTS:
+        pa, pb = px(*a), px(*b)
+        od.line([pa, pb], fill=(40, 42, 52, 255), width=max(2, int(2.6 * k)))
+        n = max(2, int(math.hypot(b[0] - a[0], b[1] - a[1]) / 70.0))
+        r = max(2, int((7.0 if kind == "cablecar" else 4.5) * k))
+        for j in range(n + 1):
+            x, y = pa[0] + (pb[0] - pa[0]) * j / n, pa[1] + (pb[1] - pa[1]) * j / n
+            od.rectangle([x - r, y - r, x + r, y + r], fill=(40, 42, 52, 255) if j in (0, n) else (250, 250, 252, 255),
+                         outline=(40, 42, 52, 255))
+    img = Image.alpha_composite(img.convert("RGBA"), over).convert("RGB")
+    dr = ImageDraw.Draw(img)
     # bâtiments sous les routes : les rues restent lisibles
     for b in buildings:
         dr.polygon([px(q[0], q[1]) for q in b], fill=tuple(st["building"]))
