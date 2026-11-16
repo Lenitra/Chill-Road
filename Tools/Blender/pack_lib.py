@@ -49,6 +49,46 @@ EMISSIVE = {
 }
 CARS = {}
 
+# Style cartoon (2026-11-15) : carrosserie arrondie par défaut (fiche smooth=False : ancien rendu facetté),
+# normales lisses avec arêtes vives au-delà de SHARP_ANGLE, pièces rapportées (boîtes, prismes) chanfreinées,
+# roues plus rondes (WHEEL_RES × le nombre de secteurs des rayons). Fiche flat=True : facettes à plat.
+DEFAULT_SMOOTH = dict(dx=0.08, sub={2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 7: 2, 8: 3})
+SHARP_ANGLE = 42.0
+BEVEL = True
+WHEEL_RES = 2
+
+
+DETAILS = True          # passe de détails automatique (2026-11-16) : joints de portes, poignées, joint de vitres,
+                        # essuie-glaces, écrous de roue ; fiche no_auto_details=True pour l'éviter
+
+
+def smooth_opts(car):
+    sm = car.get("smooth", True)
+    if not sm:
+        return None
+    return DEFAULT_SMOOTH if sm is True else sm
+
+
+def bevel_bm(bm, offset, segments=2, min_angle=30.0):
+    """Chanfreine les arêtes vives d'un petit solide (pièce rapportée) : bords adoucis, façon jouet."""
+    if not BEVEL or offset <= 0.002:
+        return
+    edges = [e for e in bm.edges if e.is_manifold and e.calc_face_angle(0) > math.radians(min_angle)]
+    if not edges:
+        return
+    verts = list({v for e in edges for v in e.verts})
+    bmesh.ops.bevel(bm, geom=verts + edges, offset=offset, offset_type='OFFSET', segments=segments,
+                    profile=0.5, affect='EDGES', clamp_overlap=True)
+
+
+def merge_bm(dst, src):
+    """Ajoute le contenu de src (libéré) à dst."""
+    me = bpy.data.meshes.new("_pk_tmp")
+    src.to_mesh(me)
+    src.free()
+    dst.from_mesh(me)
+    bpy.data.meshes.remove(me)
+
 
 # ----------------------------------------------------------------- scène / collections
 def use_scene():
@@ -172,13 +212,52 @@ def curve(val):
     return f
 
 
+def smooth_curve(val):
+    """Comme curve(), mais interpolation cubique monotone (Fritsch-Carlson) : profil arrondi sans dépassement entre
+    les points clés (option « smooth » d'une fiche)."""
+    if isinstance(val, (int, float)):
+        return curve(val)
+    ks = sorted((float(a), float(b)) for a, b in val)
+    xs = [k[0] for k in ks]
+    ys = [k[1] for k in ks]
+    n = len(ks)
+    if n < 3:
+        return curve(val)
+    d = [(ys[i + 1] - ys[i]) / (xs[i + 1] - xs[i]) if xs[i + 1] > xs[i] else 0.0 for i in range(n - 1)]
+    m = [d[0]] + [0.0 if d[i - 1] * d[i] <= 0 else (d[i - 1] + d[i]) / 2 for i in range(1, n - 1)] + [d[-1]]
+    for i in range(n - 1):
+        if d[i] == 0.0:
+            m[i] = m[i + 1] = 0.0
+            continue
+        a, b = m[i] / d[i], m[i + 1] / d[i]
+        h = a * a + b * b
+        if h > 9.0:
+            t = 3.0 / math.sqrt(h)
+            m[i], m[i + 1] = t * a * d[i], t * b * d[i]
+
+    def f(x):
+        if x <= xs[0]:
+            return ys[0]
+        if x >= xs[-1]:
+            return ys[-1]
+        i = min(bisect.bisect_right(xs, x) - 1, n - 2)
+        h = xs[i + 1] - xs[i]
+        if h <= 0:
+            return ys[i + 1]
+        t = (x - xs[i]) / h
+        h00, h10, h01, h11 = 2 * t ** 3 - 3 * t ** 2 + 1, t ** 3 - 2 * t ** 2 + t, -2 * t ** 3 + 3 * t ** 2, t ** 3 - t ** 2
+        return h00 * ys[i] + h10 * h * m[i] + h01 * ys[i + 1] + h11 * h * m[i + 1]
+    return f
+
+
 ZK = ("bot", "lo", "rk", "mx", "sh", "belt", "re", "top")
 INSETS = dict(fl=0.10, lo=0.035, rk=0.012, sh=0.03, rail=0.10)
 
 
 def prepare(car):
-    car["_z"] = {k: curve(car["z"][k]) for k in ZK}
-    car["_w"] = {k: curve(car["w"][k]) for k in ("W", "belt", "re")}
+    cv = smooth_curve if smooth_opts(car) else curve
+    car["_z"] = {k: cv(car["z"][k]) for k in ZK}
+    car["_w"] = {k: cv(car["w"][k]) for k in ("W", "belt", "re")}
     ins = dict(INSETS)
     ins.update(car.get("inset", {}))
     car["_i"] = {k: curve(v) for k, v in ins.items()}
@@ -220,6 +299,11 @@ def station_list(car):
     for j, x0, x1, c in car.get("bands", []):
         xs |= {float(x0), float(x1)}
     xs |= {float(x) for x in car.get("stations", [])}
+    sm = smooth_opts(car)
+    if sm and sm.get("dx"):          # stations régulières en plus des points clés (profil arrondi)
+        # pas plus de ~56 stations régulières (véhicules longs : bus, semi, car)
+        n = int((car["front"] - car["rear"]) / max(sm["dx"], (car["front"] - car["rear"]) / 56.0))
+        xs |= {car["rear"] + (car["front"] - car["rear"]) * k / n for k in range(1, n)}
     xs |= {car["front"], car["rear"]}
     xs = sorted((x for x in xs if car["rear"] - 1e-6 <= x <= car["front"] + 1e-6), reverse=True)
     out = []
@@ -266,9 +350,49 @@ def band_color(car, j, xm):
     return "paint"
 
 
+def _cr(p0, p1, p2, p3, t):
+    """Catmull-Rom centripète (2D) entre p1 et p2 ; segment trop court : interpolation linéaire."""
+    def tj(ti, a, b):
+        return ti + max(math.hypot(b[0] - a[0], b[1] - a[1]), 1e-9) ** 0.5
+    if math.hypot(p2[0] - p1[0], p2[1] - p1[1]) < 1e-3:
+        return (p1[0] + (p2[0] - p1[0]) * t, p1[1] + (p2[1] - p1[1]) * t)
+    t0 = 0.0
+    t1 = tj(t0, p0, p1)
+    t2 = tj(t1, p1, p2)
+    t3 = tj(t2, p2, p3)
+    u = t1 + (t2 - t1) * t
+
+    def lerp(a, b, ta, tb):
+        k = (u - ta) / (tb - ta)
+        return (a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k)
+    A1, A2, A3 = lerp(p0, p1, t0, t1), lerp(p1, p2, t1, t2), lerp(p2, p3, t2, t3)
+    B1, B2 = lerp(A1, A2, t0, t2), lerp(A2, A3, t1, t3)
+    return lerp(B1, B2, t1, t2)
+
+
+def refine_section(sec, sub):
+    """Subdivise la demi-section (spline passant par les 10 points) : sub[j] morceaux pour la bande j. Renvoie les
+    points et, pour chaque morceau, la bande d'origine (couleurs inchangées). Points fantômes symétriques aux
+    extrémités : tangente horizontale au centre du pavillon et du plancher."""
+    ext = [(-sec[1][0], sec[1][1])] + list(sec) + [(-sec[-2][0], sec[-2][1])]
+    pts, bands = [sec[0]], []
+    for j in range(len(sec) - 1):
+        k = sub.get(j, 1)
+        for i in range(1, k + 1):
+            pts.append(sec[j + 1] if i == k else _cr(ext[j], ext[j + 1], ext[j + 2], ext[j + 3], i / k))
+            bands.append(j)
+    return pts, bands
+
+
 def build_body(car, M, col):
     xs = station_list(car)
     secs = [section(car, x) for x in xs]
+    bands = list(range(len(secs[0]) - 1))
+    sub = (smooth_opts(car) or {}).get("sub")
+    if sub:
+        ref = [refine_section(s, sub) for s in secs]
+        secs = [r[0] for r in ref]
+        bands = ref[0][1]
     P = len(secs[0])
     bm = bmesh.new()
     V = [[bm.verts.new((x, y, z)) for (y, z) in sec] for x, sec in zip(xs, secs)]
@@ -276,7 +400,7 @@ def build_body(car, M, col):
         xm = (xs[s] + xs[s + 1]) / 2
         for j in range(P - 1):
             f = bm.faces.new((V[s][j], V[s][j + 1], V[s + 1][j + 1], V[s + 1][j]))
-            f.material_index = CI[band_color(car, j, xm)]
+            f.material_index = CI[band_color(car, bands[j], xm)]
     bm.faces.new(V[0]).material_index = CI[car.get("front_cap", "paint")]
     bm.faces.new(list(reversed(V[-1]))).material_index = CI[car.get("rear_cap", "paint")]
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
@@ -483,7 +607,11 @@ class Ctx:
         """boxes : liste de (centre, taille, rotation 3x3 ou None)."""
         bm = bmesh.new()
         for c, s, r in boxes:
-            H.box(bm, Vector(c), s, r)
+            tmp = bmesh.new()
+            H.box(tmp, Vector(c), s, r)
+            m = min(s)
+            bevel_bm(tmp, min(0.035, 0.2 * m), 2 if m > 0.05 else 1)
+            merge_bm(bm, tmp)
         if mirror:
             mirror_bm(bm)
         return self.obj(bm, name, color, export_name)
@@ -504,6 +632,10 @@ class Ctx:
         bm = bmesh.new()
         H.extrude(bm, poly, axis, a0, a1)
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        xs = [p[0] for p in poly]
+        ys = [p[1] for p in poly]
+        m = min(abs(a1 - a0), max(xs) - min(xs), max(ys) - min(ys))
+        bevel_bm(bm, min(0.025, 0.2 * m), 2 if m > 0.05 else 1)
         if mirror:
             mirror_bm(bm)
         return self.obj(bm, name, color, export_name)
@@ -523,6 +655,87 @@ class Ctx:
             poly = outer + list(reversed(inner))
             y0 = self.side(xa, zc + R0 * sq + width / 2) or car["_w"]["W"](xa)
             self.prism(poly, 'y', y0 - 0.06, y0 + out, color, mirror=True, name="Flare")
+
+
+# ----------------------------------------------------------------- détails automatiques
+def _bar(ctx, p0, p1, w, h, color, name):
+    """Barre fine orientée de p0 à p1 (essuie-glace, baguette)."""
+    p0, p1 = Vector(p0), Vector(p1)
+    d = p1 - p0
+    X = d.normalized()
+    Z = Vector((0, 0, 1))
+    Y = Z.cross(X).normalized()
+    Z = X.cross(Y).normalized()
+    ctx.box([((p0 + p1) / 2, (d.length, w, h), Matrix((X, Y, Z)).transposed())], color, name=name)
+
+
+def door_seams(car):
+    """Abscisses des joints de portes : avant de la première vitre latérale, puis milieu de chaque montant."""
+    g = car["glass"]
+    side = g.get("side") or []
+    if not side:
+        return []
+    xs = [side[0][0] + 0.02]
+    for x0, x1 in g.get("pillars", []):
+        xm = (x0 + x1) / 2
+        if side[-1][1] - 0.05 < xm < side[0][0]:
+            xs.append(xm)
+    if len(xs) == 1:
+        xs.append(side[0][1] - 0.02)
+    return sorted(set(round(x, 3) for x in xs), reverse=True)
+
+
+def auto_details(ctx):
+    """Détails ajoutés à toutes les voitures à carrosserie : ce que la fiche fait déjà (poignées, essuie-glaces)
+    n'est pas doublé."""
+    car = ctx.car
+    names = " ".join(o.name for o in ctx.col.objects)
+    z, w = car["_z"], car["_w"]
+    g = car["glass"]
+    Wd = car.get("wheel")
+    # véhicules longs (bus, car, poids lourds) : pas de joints ni de poignées déduits des vitres
+    seams = door_seams(car) if car["front"] - car["rear"] < 6.0 else []
+    # Joints de portes : traits sombres du bas de caisse à la ceinture, en évitant les passages de roue
+    for x in seams:
+        lo = z["rk"](x) + 0.035
+        if Wd:
+            R0 = Wd["rt"] + car.get("arch_gap", 0.05)
+            for xa in car["axles"]:
+                if abs(x - xa) < R0 + 0.02:
+                    lo = max(lo, Wd["rt"] + math.sqrt(max(R0 * R0 - (x - xa) ** 2, 0.0)) + 0.05)
+        hi = z["belt"](x) - 0.015
+        if hi - lo > 0.12:
+            ctx.decal([(x - 0.007, lo), (x + 0.007, lo), (x + 0.007, hi), (x - 0.007, hi)], 'side', 'trim',
+                      offset=0.004, name="DoorSeam", min_facing=0.15)
+    # Poignées : à l'arrière de chaque porte, sous la ceinture
+    if "Handle" not in names:
+        for i in range(len(seams) - 1):
+            xb = seams[i + 1]
+            if seams[i] - xb < 0.5:
+                continue
+            xh = xb + 0.2
+            zh = z["belt"](xh) - 0.075
+            ctx.decal([(xh - 0.13, zh - 0.014), (xh, zh - 0.014), (xh, zh + 0.014), (xh - 0.13, zh + 0.014)], 'side',
+                      'chrome' if car.get("chrome_handles") else 'trim', offset=0.007, name="AutoHandle", min_facing=0.15)
+    # Joint sous les vitres latérales (baguette sombre le long de la ceinture)
+    side = g.get("side") or []
+    if side:
+        x0, x1 = side[0][0], side[-1][1]
+        n = max(2, int((x0 - x1) / 0.15))
+        xs = [x0 + (x1 - x0) * k / n for k in range(n + 1)]
+        top = [(x, z["belt"](x) + 0.006) for x in xs]
+        bot = [(x, z["belt"](x) - 0.016) for x in reversed(xs)]
+        ctx.decal(top + bot, 'side', 'trim', offset=0.004, name="BeltSeal", min_facing=0.1)
+    # Essuie-glaces au pied du pare-brise
+    if "Wiper" not in names and g.get("cowl") is not None:
+        xc = g["cowl"] - 0.03
+        Wc = w["W"](xc)
+        for y0, y1 in ((-0.62, -0.06), (0.02, 0.58)):
+            ya, yb = y0 * Wc, y1 * Wc
+            za, zb = ctx.top(xc + 0.02, ya), ctx.top(xc - 0.06, yb)
+            if za is None or zb is None:
+                continue
+            _bar(ctx, (xc + 0.02, ya, za + 0.018), (xc - 0.06, yb, zb + 0.018), 0.022, 0.016, 'black', "AutoWiper")
 
 
 # ----------------------------------------------------------------- roues
@@ -548,15 +761,19 @@ def build_wheel(car, xa, side, M, col, export_name, Wd=None):
     Wd = Wd or car["wheel"]
     rt, rr, w, yc = Wd["rt"], Wd["rr"], Wd["w"], Wd["y"]
     style = Wd.get("style", "alloy5")
-    nseg = SPOKES.get(style, 12)
+    res = 1 if Wd.get("nseg") else WHEEL_RES
+    nseg = Wd.get("nseg") or SPOKES.get(style, 12) * res     # nseg : roue plus ronde (option)
     names = ["tire", Wd.get("rim", "rim"), "dark", "chrome", "grey"]      # rim : couleur des rayons (option)
     bm = bmesh.new()
     s0 = len(bm.faces)
-    H.revolve(bm, [(rr, w / 2 - 0.01), (rt - 0.03, w / 2), (rt, w / 2 - 0.04), (rt, -(w / 2 - 0.04)),
-                   (rr, -(w / 2 - 0.01))], (0, 0, 0), side or 1, nseg=nseg)
+    # pneu à flancs bombés (épaules arrondies, style cartoon)
+    sh = min(0.05, w * 0.22)
+    tire_prof = [(rr, w / 2 - 0.01), (rt - 0.06, w / 2), (rt - sh * 0.3, w / 2 - sh * 0.3), (rt, w / 2 - sh),
+                 (rt, -(w / 2 - sh)), (rt - sh * 0.3, -(w / 2 - sh * 0.3)), (rt - 0.06, -w / 2),
+                 (rr, -(w / 2 - 0.01))]
+    H.revolve(bm, tire_prof, (0, 0, 0), side or 1, nseg=nseg)
     if Wd.get("twin"):          # roue jumelée : second pneu côté intérieur
-        H.revolve(bm, [(rr, w / 2 - 0.01), (rt - 0.03, w / 2), (rt, w / 2 - 0.04), (rt, -(w / 2 - 0.04)),
-                       (rr, -(w / 2 - 0.01))], (0, -side * (w + 0.03), 0), side, nseg=nseg)
+        H.revolve(bm, tire_prof, (0, -side * (w + 0.03), 0), side, nseg=nseg)
         H.revolve(bm, [(rr * 0.98, w / 2), (rr * 0.98, -(w / 2 + 0.03)), (rr * 0.6, -(w / 2 + 0.03)),
                        (rr * 0.6, w / 2)], (0, -side * (w + 0.03) / 2, 0), side, nseg=nseg)
     bm.faces.ensure_lookup_table()
@@ -599,22 +816,34 @@ def build_wheel(car, xa, side, M, col, export_name, Wd=None):
         for k in range(nseg):
             k2 = (k + 1) % nseg
             f = bm.faces.new((ring_in[k], ring_out[k], ring_out[k2], ring_in[k2]))
+            kk = k // res           # secteur d'origine (le motif des rayons ne change pas avec la résolution)
             if style == "alloy5":
-                f.material_index = 1 if k % 3 == 0 else 2
+                f.material_index = 1 if kk % 3 == 0 else 2
             elif style in ("alloy6", "multi"):
-                f.material_index = 1 if k % 2 == 0 else 2
+                f.material_index = 1 if kk % 2 == 0 else 2
             elif style == "steel":
                 f.material_index = 4
             elif style == "truck":
-                f.material_index = 4 if k % 2 == 0 else 2
+                f.material_index = 4 if kk % 2 == 0 else 2
             elif style == "tractor":
-                f.material_index = 4 if k % 4 else 2
+                f.material_index = 4 if kk % 4 else 2
             else:
                 f.material_index = 1
             disc.append((f, sd))
             g = bm.faces.new((hub, ring_in[k2], ring_in[k]))
             g.material_index = 3 if style in ("hubcap", "steel", "truck") else 2
             disc.append((g, sd))
+        if DETAILS and style != "tractor":       # écrous de roue (détail, 2026-11-16)
+            nn = 6 if style == "truck" else 5
+            before = set(bm.faces)
+            for k in range(nn):
+                th = 2 * math.pi * (k + 0.25) / nn
+                rn = rh * 0.62
+                H.box(bm, Vector((rn * math.cos(th), a + sd * 0.014, rn * math.sin(th))),
+                      (rh * 0.16, 0.022, rh * 0.16), Matrix.Rotation(th, 3, 'Y'))
+            for f in bm.faces:
+                if f not in before:
+                    f.material_index = 3
     bm.normal_update()
     for f, sd in disc:
         if f.normal.y * sd < 0:
@@ -634,6 +863,7 @@ def bake(car, col):
     pal = bpy.data.materials["PK_Palette"]
     paint = bpy.data.materials["PK_Paint"]
     paint_as = car.get("paint_as")
+    flat = bool(car.get("flat"))
     for ob in list(col.all_objects):
         if ob.type != 'MESH' or ob.hide_render or ob.get("prebaked"):
             continue
@@ -667,13 +897,17 @@ def bake(car, col):
             else:
                 f.material_index = slot(pal)
                 u = CI[key]
-            f.smooth = False
+            f.smooth = not flat
             for lp in f.loops:
                 if u is None:
                     lp[uv].uv = (0.5, 0.5)
                 else:
                     v = min(0.99, max(0.01, (lp.vert.co.z + zoff) / zmax))
                     lp[uv].uv = ((u + 0.5) / NCOL, v)
+        if not flat:            # normales lisses, arêtes vives au-delà de SHARP_ANGLE
+            lim = math.radians(SHARP_ANGLE)
+            for e in bm.edges:
+                e.smooth = not (e.is_manifold and e.calc_face_angle(0) > lim) and len(e.link_faces) == 2
         me.materials.clear()
         for m in slots:
             me.materials.append(m)
@@ -730,6 +964,8 @@ def build(cid):
     ctx = Ctx(car, M, col, body)
     for fn in car["detail_fns"]:
         fn(ctx)
+    if DETAILS and body is not None and not car.get("no_auto_details"):
+        auto_details(ctx)
     ctx.bm.free()
     if "wheel" in car:
         for i, xa in enumerate(car["axles"]):

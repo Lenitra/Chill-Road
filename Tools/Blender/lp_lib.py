@@ -20,6 +20,7 @@ PALETTE = [
     ("amber", (0.93, 0.72, 0.42), (1.0, 0.90, 0.70)),
 ]
 CI = {p[0]: i for i, p in enumerate(PALETTE)}
+SHARP_ANGLE = 35.0     # cartoon style (2026-11-15): smooth normals, the wedge creases stay sharp
 NCOL = len(PALETTE)
 
 
@@ -298,13 +299,16 @@ def bake(col, pal, keep=("led", "tail")):
         for f in bm.faces:
             slot, ci = remap.get(f.material_index, (0, names.index("body")))
             f.material_index = slot
-            f.smooth = False
+            f.smooth = True             # style cartoon : normales lisses, arêtes vives au-delà de SHARP_ANGLE
             for lp in f.loops:
                 if ci is None:
                     lp[uv].uv = (0.5, 0.5)
                 else:
                     v = min(0.99, max(0.01, (lp.vert.co.z + zoff) / ZMAX))
                     lp[uv].uv = ((ci + 0.5) / NCOL, v)
+        lim = math.radians(SHARP_ANGLE)
+        for e in bm.edges:
+            e.smooth = len(e.link_faces) == 2 and e.calc_face_angle(0) <= lim
         # set the material slots first: clearing them afterwards would reset the face indices
         me.materials.clear()
         for m in new_mats:

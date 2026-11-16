@@ -22,7 +22,14 @@ def rect(y0, z0, y1, z1):
 
 
 def mirrors(c, x, y, z, size=(0.13, 0.17, 0.10), color='paint'):
+    # Carrosserie arrondie (2026-11-16) : le rétroviseur est recollé au flanc (bras de 6 cm), où qu'il soit
+    ys = c.side(x + 0.04, z - 0.045)
+    if ys is not None:
+        y = ys + size[1] / 2 + 0.06
     c.box([((x, y, z), size, None)], color, mirror=True, name="Mirror")
+    # glace du rétroviseur (face arrière, sombre)
+    c.box([((x - size[0] / 2 - 0.004, y + 0.005, z), (0.012, size[1] * 0.82, size[2] * 0.72), None)], 'glass', mirror=True,
+          name="MirrorGlass")
     c.box([((x + 0.05, y - size[1] / 2 - 0.02, z - 0.045), (0.08, 0.08, 0.04), None)], 'trim', mirror=True,
           name="MirrorArm")
 
