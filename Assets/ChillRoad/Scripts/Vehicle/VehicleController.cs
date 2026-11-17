@@ -147,6 +147,7 @@ namespace ChillRoad
             public float nominalLoad;      // charge statique (sensibilité à la charge)
             public Wheel mate;             // roue opposée du même essieu (barre antiroulis), aucune pour une roue centrale
             public Transform visual;
+            public Transform caliper;      // étrier de frein du modèle (« caliper-* ») : suit la roue sans tourner avec elle
             public float radius = 0.34f;
             public float compression, prevCompression;
             public bool grounded;
@@ -272,6 +273,14 @@ namespace ChillRoad
                 foreach (var t in wheelVisuals)
                     AddWheel(transform.InverseTransformPoint(t.position), t.name.Contains("front"), t.name.Contains("left"),
                              t.name.Contains("center"), t);
+                // Étriers de frein (« caliper-front-left »... : même nom que leur roue, même pivot)
+                foreach (var t in go.GetComponentsInChildren<Transform>())
+                {
+                    if (!t.name.StartsWith("caliper")) continue;
+                    string wheelName = "wheel" + t.name.Substring("caliper".Length);
+                    foreach (var w in wheels)
+                        if (w.visual && w.visual.name == wheelName) { w.caliper = t; break; }
+                }
             }
             else
             {
@@ -883,6 +892,11 @@ namespace ChillRoad
                 // Rotation réelle de la roue : patine, bloque au frein à main
                 w.spin += w.omegaR / w.radius * Mathf.Rad2Deg * dt;
                 w.visual.localRotation = Quaternion.Euler(w.spin, w.front ? steerAngle : 0f, 0f);
+                if (w.caliper)
+                {
+                    w.caliper.position = w.visual.position;
+                    w.caliper.localRotation = Quaternion.Euler(0f, w.front ? steerAngle : 0f, 0f);
+                }
             }
         }
 
