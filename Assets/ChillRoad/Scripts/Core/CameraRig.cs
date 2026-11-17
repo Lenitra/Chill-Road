@@ -3,8 +3,8 @@ using UnityEngine;
 namespace ChillRoad
 {
     /// <summary>
-    /// Caméra de poursuite : suit la voiture avec un léger retard, s'élargit avec la vitesse, secouée par les chocs et
-    /// la vitesse (option « Secousses de caméra »).
+    /// Caméra de poursuite : suit la voiture avec un léger retard, s'élargit avec la vitesse, secouée par les chocs
+    /// (option « Secousses de caméra »).
     /// Vues : poursuite proche, poursuite loin, capot, pare-chocs. Vue arrière maintenue.
     /// </summary>
     public class CameraRig : MonoBehaviour
@@ -275,21 +275,17 @@ namespace ChillRoad
                 look = pos + smoothedRot * (orbit * (v.lookOffset - offset));
             }
 
-            // Secousses (option GameSettings.CameraShake) : chocs (trauma, retombe en moins d'une seconde) et vibration
-            // de vitesse, nulle sous 90 km/h, franche vers 270 km/h. Déplacement et petite rotation de la caméra.
+            // Secousses (option GameSettings.CameraShake) : chocs seulement (trauma, retombe en moins d'une seconde),
+            // déplacement et petite rotation de la caméra. Pas de vibration liée à la vitesse (retirée à la demande).
             Vector3 jitter = Vector3.zero;
             Quaternion tilt = Quaternion.identity;
-            if (GameSettings.CameraShake)
+            if (GameSettings.CameraShake && trauma > 0f)
             {
                 // Choc (GameManager : impact / 20 au-delà de 3 m/s) : linéaire, un accrochage se sent déjà
                 float hit = trauma;
-                float rumble = Time.timeScale > 0.01f ? Mathf.Pow(Mathf.InverseLerp(25f, 75f, speed), 1.6f) : 0f;
-                float tn = Time.time;
-                Vector3 slow = Noise3(tn * 16f, 0f), fast = Noise3(tn * 34f, 7.3f);
-                jitter = new Vector3(slow.x, slow.y, 0f) * (hit * 0.25f) + new Vector3(fast.x, fast.y, 0f) * (rumble * 0.035f);
-                tilt = Quaternion.Euler(slow.y * hit * 2f + fast.z * rumble * 0.3f,
-                                        slow.z * hit * 1.2f + fast.x * rumble * 0.15f,
-                                        slow.x * hit * 2.5f + fast.y * rumble * 0.25f);
+                Vector3 n = Noise3(Time.time * 16f, 0f);
+                jitter = new Vector3(n.x, n.y, 0f) * (hit * 0.25f);
+                tilt = Quaternion.Euler(n.y * hit * 2f, n.z * hit * 1.2f, n.x * hit * 2.5f);
             }
             trauma = GameSettings.CameraShake ? Mathf.MoveTowards(trauma, 0f, dt * 1.5f) : 0f;
 

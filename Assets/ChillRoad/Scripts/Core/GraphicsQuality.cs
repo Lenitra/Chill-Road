@@ -96,7 +96,7 @@ namespace ChillRoad
         // ------------------------------------------------------------------ flou de mouvement
 
         /// <summary>Force du flou de mouvement une fois activé (léger : le décor file, l'image reste lisible).</summary>
-        const float MotionBlurIntensity = 0.25f;
+        const float MotionBlurIntensity = 0.18f;
 
         static Volume volume;
         static MotionBlur motionBlur;
