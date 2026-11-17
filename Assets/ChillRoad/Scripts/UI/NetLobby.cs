@@ -122,9 +122,8 @@ namespace ChillRoad
         InputField serverField;
         MenuStepper maxStepper, collisionsStepper, inviteStepper;
         Button openButton;
-        Text helpTitle, helpText, wayCode, wayLocal, wayAddress;
+        Text wayCode, wayLocal, wayAddress;
         readonly List<Action> refreshers = new List<Action>();
-        readonly Dictionary<GameObject, (string titleFr, string titleEn, string fr, string en)> help = new Dictionary<GameObject, (string, string, string, string)>();
 
         // Lignes qui s'éclairent une fois choisies (champ, réglage, partie) : trait or à gauche
         readonly List<(GameObject target, Graphic mark)> marks = new List<(GameObject, Graphic)>();
@@ -310,10 +309,11 @@ namespace ChillRoad
         /// <summary>Onglet « Héberger » : réglages de la partie à gauche, accès des amis et ouverture à droite.</summary>
         void BuildHost(RectTransform page)
         {
-            var left = Column(page, "Settings", 1.25f);
-            var right = Column(page, "Open", 1f);
+            // Mêmes colonnes que l'onglet « Rejoindre » : la gauche s'arrête au bord de l'onglet
+            var left = Column(page, "Settings", 726f);
+            var right = Column(page, "Open", 696f);
 
-            Section(left, "RÉGLAGES DE LA PARTIE", "GAME SETTINGS", "fixés pour toute la partie", "fixed for the whole game");
+            Section(left, "RÉGLAGES DE LA PARTIE", "GAME SETTINGS", "", "");
             var nameRow = Rect(left, "ServerName", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             Fixed(nameRow, 60);
             var nameLabel = Loc.Bind(Label(nameRow, "", 25, TextAnchor.MiddleLeft, White, FontStyle.Normal), "Nom de la partie", "Game name");
@@ -322,43 +322,15 @@ namespace ChillRoad
             Place((RectTransform)serverField.transform, new Vector2(0.42f, 0f), Vector2.one, 0f, 0f, 3f);
             serverField.onEndEdit.AddListener(_ => SaveFields());
             AddMark(serverField.gameObject, nameRow);
-            help[serverField.gameObject] = ("NOM DE LA PARTIE", "GAME NAME",
-                "Le nom que voient les joueurs dans la liste du réseau local. Laissé vide : « Partie de » suivi de ton pseudo.",
-                "The name players see in the local network list. Left empty: your name followed by “'s game”.");
-
             maxStepper = AddStepper(left, "Joueurs au plus", "Max players",
                 d => HostMaxPlayers = Mathf.Clamp(HostMaxPlayers + d, MinPlayers, NetProtocol.MaxPlayersLimit),
-                () => HostMaxPlayers.ToString(),
-                "JOUEURS AU PLUS", "MAX PLAYERS",
-                $"Toi compris, de {MinPlayers} à {NetProtocol.MaxPlayersLimit}. Une fois la partie pleine, les joueurs qui arrivent sont prévenus qu'elle est complète.",
-                $"Including you, from {MinPlayers} to {NetProtocol.MaxPlayersLimit}. Once the game is full, newcomers are told it is full.");
+                () => HostMaxPlayers.ToString());
             collisionsStepper = AddStepper(left, "Collisions entre joueurs", "Player collisions",
                 d => HostCollisions = !HostCollisions,
-                () => HostCollisions ? Loc.T("Activées", "On") : Loc.T("Désactivées", "Off"),
-                "COLLISIONS ENTRE JOUEURS", "PLAYER COLLISIONS",
-                "Activées : les voitures des joueurs se percutent. Désactivées : elles se traversent, pour rouler en groupe sans accrochage.",
-                "On: players' cars hit each other. Off: they pass through each other, to drive as a group without crashes.");
+                () => HostCollisions ? Loc.T("Activées", "On") : Loc.T("Désactivées", "Off"));
             inviteStepper = AddStepper(left, "Code d'invitation", "Invite code",
                 d => HostInvite = !HostInvite,
-                () => HostInvite ? Loc.T("Activé", "On") : Loc.T("Désactivé", "Off"),
-                "CODE D'INVITATION", "INVITE CODE",
-                "Un code à donner à tes amis pour entrer par Internet, sans rien régler sur la box (services Unity, compte anonyme). Désactivé : réseau local et adresse IP seulement.",
-                "A code to give your friends to join over the Internet, with no router setup (Unity services, anonymous account). Off: local network and IP address only.");
-
-            // Aide du réglage choisi
-            Gap(left, 10);
-            var helpBox = Rect(left, "Help", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            Fixed(helpBox, 150);
-            var helpPlate = Shape(helpBox, "Plate", Card).Set(18f, 0f, 0f);
-            Fill(helpPlate.rectTransform, Vector2.zero, Vector2.zero);
-            var helpBar = Shape(helpBox, "Bar", new Color(Info.r, Info.g, Info.b, 0.7f)).Set(6f, 0f, 0f);
-            Place(helpBar.rectTransform, Vector2.zero, new Vector2(0f, 1f), 14f, -20f, 16f);
-            helpTitle = Label(helpBox, "", 21, TextAnchor.UpperLeft, Info, FontStyle.BoldAndItalic);
-            Place(helpTitle.rectTransform, new Vector2(0f, 0.68f), Vector2.one, 36f, 24f, 0f, 14f);
-            helpText = Label(helpBox, "", 21, TextAnchor.UpperLeft, Dim, FontStyle.Normal);
-            helpText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            helpText.lineSpacing = 1.1f;
-            Place(helpText.rectTransform, Vector2.zero, new Vector2(1f, 0.7f), 36f, 24f, 10f, 0f);
+                () => HostInvite ? Loc.T("Activé", "On") : Loc.T("Désactivé", "Off"));
 
             // Comment les amis entrent
             Section(right, "TES AMIS TE REJOIGNENT", "YOUR FRIENDS JOIN YOU", "", "");
@@ -707,20 +679,10 @@ namespace ChillRoad
 
             TabTexts();
 
-            // Ligne choisie : trait or ; aide du réglage choisi
+            // Ligne choisie : trait or
             var selected = EventSystem.current ? EventSystem.current.currentSelectedGameObject : null;
             foreach (var m in marks) m.mark.enabled = m.target == selected && modal == Modal.None;
             foreach (var r in rows) r.name.color = r.button.gameObject == selected ? Accent : White;
-            if (tab == 1)
-            {
-                var h = selected && help.TryGetValue(selected, out var entry) ? entry
-                    : ("OUVRIR UNE PARTIE", "OPEN A GAME",
-                       "Tu joues, les autres te rejoignent. Ta partie reste ouverte tant que tu ne la quittes pas ; ces réglages ne changent plus ensuite.",
-                       "You play, the others join you. Your game stays open until you leave it; these settings can't change afterwards.");
-                helpTitle.text = Loc.T(h.Item1, h.Item2);
-                helpText.text = Loc.T(h.Item3, h.Item4);
-            }
-
             // Manette : garder un élément choisi
             if (EventSystem.current && GameInput.UsingGamepad)
             {
@@ -981,9 +943,8 @@ namespace ChillRoad
             return body;
         }
 
-        /// <summary>Réglage à valeurs « ‹ valeur › » (voir <see cref="MenuStepper"/>), avec son aide.</summary>
-        MenuStepper AddStepper(RectTransform parent, string fr, string en, Action<int> step, Func<string> value,
-            string helpTitleFr, string helpTitleEn, string helpFr, string helpEn)
+        /// <summary>Réglage à valeurs « ‹ valeur › » (voir <see cref="MenuStepper"/>).</summary>
+        MenuStepper AddStepper(RectTransform parent, string fr, string en, Action<int> step, Func<string> value)
         {
             var go = new GameObject(en, typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape), typeof(MenuStepper), typeof(LayoutElement));
             go.transform.SetParent(parent, false);
@@ -1013,7 +974,6 @@ namespace ChillRoad
             };
             refreshers.Add(() => text.text = value());
             AddMark(go, rt);
-            help[go] = (helpTitleFr, helpTitleEn, helpFr, helpEn);
             return stepper;
         }
 
