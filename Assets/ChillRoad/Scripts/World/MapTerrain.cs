@@ -472,6 +472,54 @@ namespace ChillRoad
         /// <summary>Profondeur au-delà de laquelle l'eau d'un lac garde la même couleur (m), profondeur au fil d'une rivière (m).</summary>
         const float WaterDeep = 24f, RiverDepth = 3f;
 
+        // Surface des rivières, pour savoir si une voiture roule dans l'eau (éclaboussures, lavage) : tronçons du fil de
+        // l'eau avec leur demi-largeur jusqu'à la berge, rangés par case de 64 m
+        struct RiverSpan { public Vector3 a, b; public float half; }
+        const float RiverCell = 64f;
+        readonly List<RiverSpan> riverSpans = new List<RiverSpan>();
+        readonly Dictionary<long, List<int>> riverCells = new Dictionary<long, List<int>>();
+
+        static long RiverKey(int x, int z) => ((long)x << 32) ^ (uint)z;
+
+        void AddRiverSpan(Vector3 a, Vector3 b, float half)
+        {
+            int id = riverSpans.Count;
+            riverSpans.Add(new RiverSpan { a = a, b = b, half = half });
+            int x0 = Mathf.FloorToInt((Mathf.Min(a.x, b.x) - half) / RiverCell), x1 = Mathf.FloorToInt((Mathf.Max(a.x, b.x) + half) / RiverCell);
+            int z0 = Mathf.FloorToInt((Mathf.Min(a.z, b.z) - half) / RiverCell), z1 = Mathf.FloorToInt((Mathf.Max(a.z, b.z) + half) / RiverCell);
+            for (int x = x0; x <= x1; x++)
+            for (int z = z0; z <= z1; z++)
+            {
+                long key = RiverKey(x, z);
+                if (!riverCells.TryGetValue(key, out var list)) riverCells[key] = list = new List<int>();
+                list.Add(id);
+            }
+        }
+
+        /// <summary>
+        /// Niveau de l'eau (lac ou rivière) à la verticale d'un point, ou -∞ s'il n'y en a pas. Le sol peut être au-dessus
+        /// (berge) : comparer avec la hauteur de ce qu'on veut mouiller.
+        /// </summary>
+        public float WaterLevelAt(Vector3 p)
+        {
+            float level = float.NegativeInfinity;
+            if (map == null) return level;
+            int w = map.Water(p.x, p.z);
+            if (w > 0 && map.Json.waters != null && w <= map.Json.waters.Length) level = map.Json.waters[w - 1].level;
+            if (riverCells.TryGetValue(RiverKey(Mathf.FloorToInt(p.x / RiverCell), Mathf.FloorToInt(p.z / RiverCell)), out var list))
+            {
+                foreach (int i in list)
+                {
+                    var s = riverSpans[i];
+                    Vector2 a = new Vector2(s.a.x, s.a.z), ab = new Vector2(s.b.x, s.b.z) - a, ap = new Vector2(p.x, p.z) - a;
+                    float t = Mathf.Clamp01(Vector2.Dot(ap, ab) / Mathf.Max(ab.sqrMagnitude, 1e-4f));
+                    if ((ap - ab * t).sqrMagnitude > s.half * s.half) continue;
+                    level = Mathf.Max(level, Mathf.Lerp(s.a.y, s.b.y, t));
+                }
+            }
+            return level;
+        }
+
         /// <summary>Plans d'eau : une nappe par lac, découpée en bandes sur les cellules marquées dans la carte.</summary>
         void BuildWater()
         {
@@ -551,6 +599,8 @@ namespace ChillRoad
         /// </summary>
         void BuildRivers()
         {
+            riverSpans.Clear();
+            riverCells.Clear();
             if (!assets.water || map.Json.rivers == null) return;
             var courses = new List<List<Vector3>>();
             var widths = new List<float>();
@@ -705,6 +755,8 @@ namespace ChillRoad
             for (int i = 0; i < count; i++)
             for (int s = 0; s < 2; s++)
                 reach[i, s] = Mathf.Max(bank[i, s], Mathf.Max(bank[Mathf.Max(i - 1, 0), s], bank[Mathf.Min(i + 1, count - 1), s]));
+            for (int i = 0; i + 1 < count; i++)
+                AddRiverSpan(p[i], p[i + 1], Mathf.Max(Mathf.Max(reach[i, 0], reach[i, 1]), Mathf.Max(reach[i + 1, 0], reach[i + 1, 1])));
             // Sept sommets par section : dessous de berge, berge, mi-pente, fil de l'eau (et symétriques).
             // UV0 = (profondeur : nulle à la berge, d'où l'écume ; 1 + rapide : 1 = eau calme, 2 = cascade)
             // UV1 = (travers, longueur le long du cours) en mètres : le motif suit le courant.

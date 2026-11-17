@@ -85,6 +85,7 @@ namespace ChillRoad
                 lights.Brightness = LightBrightness;
                 lights.Init(Car, game.assets);
                 if (game.assets.particle) gameObject.AddComponent<VehicleDust>().Init(Car, game.assets.particle);
+                if (game.assets.particle) gameObject.AddComponent<VehicleSplash>().Init(Car, game.assets.particle, game.WaterLevelAt);
                 if (game.assets.particle && game.assets.spark)
                 {
                     effects = gameObject.AddComponent<VehicleEffects>();

@@ -137,6 +137,13 @@ namespace ChillRoad
             carLights.Init(Player, assets);
             local.Lights = carLights;
             if (assets.particle) playerGo.AddComponent<VehicleDust>().Init(Player, assets.particle);
+            if (assets.particle)
+            {
+                // Eau sous les roues (gerbes, sillage, gouttes) et salissure de la caisse (boue, neige, lavée dans l'eau)
+                var splash = playerGo.AddComponent<VehicleSplash>();
+                splash.Init(Player, assets.particle, WaterLevelAt);
+                playerGo.AddComponent<VehicleGrime>().Init(Player, splash);
+            }
             VehicleEffects effects = null;
             if (assets.particle && assets.spark)
             {
@@ -501,6 +508,9 @@ namespace ChillRoad
             }
             Music.Set(GameSettings.MusicVolume * 0.75f, musicMuffle);
         }
+
+        /// <summary>Niveau de l'eau (lac, rivière) à la verticale d'un point, -∞ s'il n'y en a pas ou si la carte n'est pas chargée.</summary>
+        public float WaterLevelAt(Vector3 p) => Terrain ? Terrain.WaterLevelAt(p) : float.NegativeInfinity;
 
         /// <summary>Quitte le jeu (arrête la lecture dans l'éditeur).</summary>
         public void Quit()

@@ -39,6 +39,14 @@ Shader "ChillRoad/Toon"
         // recolorée en _GlassTint (a = 0 : désactivé), réglées par bloc de propriétés
         [HideInInspector] _GlassTint ("Teinte des vitres", Vector) = (1, 1, 1, 0)
         [HideInInspector] _GlassBand ("Colonne du verre (u min, u max)", Vector) = (0, 0, 0, 0)
+        // Salissure de la voiture du joueur (VehicleGrime), par bloc de propriétés : boue/poussière et neige projetées
+        // par les roues. _Grime = (boue 0-1, neige 0-1, ligne lavée de la boue, ligne lavée de la neige ; -1 : rien de lavé) ;
+        // _GrimeAxis : hauteur relative sur la voiture (0 bas de caisse, 1 toit) = dot(xyz, position objet) + w ;
+        // _GrimeScale = mètres par unité objet (motif d'éclaboussures)
+        [HideInInspector] _Grime ("Salissure", Vector) = (0, 0, 0, 0)
+        [HideInInspector] _GrimeColor ("Couleur de la boue", Color) = (0.35, 0.27, 0.17, 1)
+        [HideInInspector] _GrimeAxis ("Hauteur sur la voiture", Vector) = (0, 1, 0, 0)
+        [HideInInspector] _GrimeScale ("Échelle du motif", Float) = 1
     }
 
     SubShader
@@ -61,6 +69,9 @@ Shader "ChillRoad/Toon"
             float _TreeWind, _TreeFlutter;
             half4 _GlassTint;
             float4 _GlassBand;
+            half4 _Grime, _GrimeColor;
+            float4 _GrimeAxis;
+            float _GrimeScale;
         CBUFFER_END
 
         // Neige (carte de la station de ski) : enneigement du sol lu dans la carte (MapTerrain), 0-1
@@ -177,8 +188,8 @@ Shader "ChillRoad/Toon"
                 half3 normalWS : TEXCOORD1;
                 float2 uv : TEXCOORD2;
                 half fog : TEXCOORD3;
+                float3 positionOS : TEXCOORD4;
                 #if defined(_DETAIL_LINES)
-                    float3 positionOS : TEXCOORD4;
                     half3 normalOS : TEXCOORD5;
                 #endif
                 UNITY_VERTEX_INPUT_INSTANCE_ID
@@ -194,8 +205,8 @@ Shader "ChillRoad/Toon"
                 o.normalWS = TransformObjectToWorldNormal(input.normalOS);
                 o.uv = TRANSFORM_TEX(input.uv, _BaseMap);
                 o.fog = ComputeFogFactor(o.positionCS.z);
+                o.positionOS = input.positionOS.xyz;
                 #if defined(_DETAIL_LINES)
-                    o.positionOS = input.positionOS.xyz;
                     o.normalOS = input.normalOS;
                 #endif
                 return o;
@@ -243,6 +254,37 @@ Shader "ChillRoad/Toon"
                 return Line(s + 0.35 * sin(p.y * 1.7 + floor(s) * 2.3), 0.08) * 0.8;
             }
 
+            // Bruit de valeur 3D (0-1), pour des contours d'éclaboussures irréguliers
+            float Hash31(float3 p) { p = frac(p * 0.1031); p += dot(p, p.yzx + 33.33); return frac((p.x + p.y) * p.z); }
+            float Noise3(float3 p)
+            {
+                float3 i = floor(p), f = frac(p);
+                f = f * f * (3.0 - 2.0 * f);
+                float a = lerp(lerp(Hash31(i), Hash31(i + float3(1, 0, 0)), f.x), lerp(Hash31(i + float3(0, 1, 0)), Hash31(i + float3(1, 1, 0)), f.x), f.y);
+                float b = lerp(lerp(Hash31(i + float3(0, 0, 1)), Hash31(i + float3(1, 0, 1)), f.x), lerp(Hash31(i + float3(0, 1, 1)), Hash31(i + float3(1, 1, 1)), f.x), f.y);
+                return lerp(a, b, f.z);
+            }
+
+            // Aplat net (bord anti-crénelé) là où x > 0
+            half Above(float x) { return saturate(x / max(fwidth(x), 1e-4) + 0.5); }
+
+            // Couche de salissure (boue ou neige) qui monte du bas de caisse avec la quantité : bord déchiqueté, gouttes
+            // projetées au-dessus, et partie basse lavée (gué : l'eau rince d'abord le bas et les roues)
+            half GrimeMask(float h, float3 q, half amount, half washed, float seed)
+            {
+                if (amount <= 0.001) return 0.0;
+                float n = Noise3(q * 1.7 + seed) * 0.65 + Noise3(q * 4.3 + seed * 2.0) * 0.35;
+                float top = amount * 0.6 - 0.07 + (n - 0.5) * 0.3;
+                half layer = Above(top - h);
+                // Gouttes éparses au-dessus de la ligne, plus rares en montant
+                float drops = Noise3(q * 7.5 + seed * 3.0);
+                half spots = Above(drops - 1.0 + amount * 0.5 * saturate(1.0 - (h - top) * 2.2)) * Above(h - top);
+                half mask = max(layer, spots);
+                // Lavé sous la ligne d'eau (bord lui aussi irrégulier)
+                if (washed > -0.5) mask *= Above(h - (washed + (n - 0.5) * 0.12));
+                return mask;
+            }
+
             // Passage lumière → ombre en aplat, bord légèrement adouci
             half Ramp(half ndl)
             {
@@ -267,6 +309,20 @@ Shader "ChillRoad/Toon"
 
                 half3 n = normalize(input.normalWS);
                 n = frontFace ? n : -n;
+                half gloss = _Smoothness;
+                // Salissure de la voiture : boue (deux tons, terne) puis neige par-dessus
+                UNITY_BRANCH
+                if (_Grime.x + _Grime.y > 0.001)
+                {
+                    float h = dot(_GrimeAxis.xyz, input.positionOS) + _GrimeAxis.w;
+                    float3 q = input.positionOS * _GrimeScale;
+                    half mud = GrimeMask(h, q, _Grime.x, _Grime.z, 0.0);
+                    half dark = Above(Noise3(q * 2.6 + 11.0) - 0.55) * 0.18 + saturate(0.25 - h) * 0.4;
+                    albedo = lerp(albedo, _GrimeColor.rgb * (1.0 - dark), mud);
+                    half snowy = GrimeMask(h + 0.04, q, _Grime.y, _Grime.w, 17.0);
+                    albedo = lerp(albedo, half3(0.9, 0.93, 0.98), snowy * 0.95);
+                    gloss *= 1.0 - max(mud, snowy) * 0.85;
+                }
                 // Décors des zones enneigées : la neige tient sur ce qui regarde le ciel (toits, branches, murets)
                 UNITY_BRANCH
                 if (_SnowCap > 0.5 && _ChillRoadSnowOn > 0.5)
@@ -303,8 +359,8 @@ Shader "ChillRoad/Toon"
                 half detail = _ChillRoadToonDetail > 0.5 ? 1.0 : 0.0;
                 half3 h = SafeNormalize(main.direction + v);
                 half ndh = saturate(dot(n, h));
-                half size = exp2(10.0 * _Smoothness + 1.0);
-                half spec = smoothstep(0.42, 0.5, pow(ndh, size)) * _Smoothness * _SpecStrength;
+                half size = exp2(10.0 * gloss + 1.0);
+                half spec = smoothstep(0.42, 0.5, pow(ndh, size)) * gloss * _SpecStrength;
                 color += main.color * spec * lit * detail;
                 half rim = smoothstep(1.0 - _RimWidth, 1.0 - _RimWidth + 0.08, 1.0 - saturate(dot(n, v)));
                 color += albedo * main.color * rim * _RimStrength * lerp(0.35, 1.0, lit) * detail;
