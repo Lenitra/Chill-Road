@@ -171,7 +171,31 @@ namespace NoHesi
         static RoadKind KindOf(string k) => k == "main" ? RoadKind.Main : k == "mountain" ? RoadKind.Mountain : k == "street" ? RoadKind.Street
             : k == "lane" ? RoadKind.Lane : k == "highway" ? RoadKind.Highway : k == "ramp" ? RoadKind.Ramp : RoadKind.Track;
 
-        Material tunnelGlow;
+        Material tunnelGlow, tunnelAmber, tunnelGreen, tunnelBlue, tunnelVault, tunnelTile, tunnelKerb, tunnelTrim, tunnelFan, tunnelOrange, tunnelPipe, tunnelPortal;
+
+        /// <summary>Copie teintée ; selfLit &gt; 0 : part de la couleur toujours éclairée (l'intérieur d'un tunnel est
+        /// à l'ombre de sa coque, seule l'ambiante l'atteindrait — or un tunnel est éclairé jour et nuit).</summary>
+        static Material Tint(Material source, string name, Color color, float selfLit = 0f)
+        {
+            var m = new Material(source) { name = name + " (runtime)" };
+            m.SetColor("_BaseColor", color);
+            if (selfLit > 0f)
+            {
+                m.EnableKeyword("_EMISSION");
+                m.SetColor("_EmissionColor", color * selfLit);
+                m.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+            }
+            return m;
+        }
+
+        static Material Glow(GameAssets a, string name, Color color, float intensity)
+        {
+            var m = new Material(a.emissiveWhite) { name = name + " (runtime)" };
+            m.SetColor("_BaseColor", color);
+            m.EnableKeyword("_EMISSION");
+            m.SetColor("_EmissionColor", color * intensity);
+            return m;
+        }
 
         /// <summary>Lit le réseau (sans construire les maillages : voir <see cref="Build"/>).</summary>
         public void Init(GameAssets a, MapData map)
@@ -187,7 +211,19 @@ namespace NoHesi
             if (a.roadMarking && a.roadMarking.HasProperty("_DepthOffset")) a.roadMarking.SetFloat("_DepthOffset", -1.5f);
 
             // Éclairage des tunnels : toujours allumé (les lampadaires, eux, suivent le cycle jour/nuit)
-            tunnelGlow = new Material(a.emissiveWhite) { name = "TunnelGlow (runtime)" };
+            // (émission modérée : le blanc émissif de base, fait pour les phares, saturait le bloom sous la voûte)
+            tunnelGlow = Glow(a, "TunnelGlow", new Color(1f, 0.94f, 0.82f), 1.6f);
+            tunnelAmber = Glow(a, "TunnelAmber", new Color(1f, 0.55f, 0.12f), 2.2f);
+            tunnelGreen = Glow(a, "TunnelGreen", new Color(0.15f, 1f, 0.4f), 2f);
+            tunnelBlue = Glow(a, "TunnelBlue", new Color(0.15f, 0.42f, 1f), 1.8f);
+            tunnelVault = Tint(a.concrete, "TunnelVault", new Color(0.46f, 0.48f, 0.52f), 0.32f);
+            tunnelTile = Tint(a.concrete, "TunnelTile", new Color(0.84f, 0.82f, 0.76f), 0.4f);
+            tunnelKerb = Tint(a.concrete, "TunnelKerb", new Color(0.64f, 0.64f, 0.62f), 0.32f);
+            tunnelTrim = Tint(a.concrete, "TunnelTrim", new Color(0.17f, 0.18f, 0.2f), 0.3f);
+            tunnelFan = Tint(a.metal, "TunnelFan", new Color(0.62f, 0.64f, 0.67f), 0.4f);
+            tunnelOrange = Tint(a.concrete, "TunnelOrange", new Color(0.95f, 0.48f, 0.1f), 0.5f);
+            tunnelPipe = Tint(a.concrete, "TunnelPipe", new Color(0.72f, 0.12f, 0.1f), 0.5f);
+            tunnelPortal = Tint(a.concrete, "TunnelPortal", new Color(0.66f, 0.66f, 0.64f));
 
             foreach (var n in map.Json.nodes) Nodes[n.id] = new Node { id = n.id, pos = new Vector3(n.x, n.y, n.z), merge = n.merge != 0 };
             foreach (var j in map.Json.edges)
@@ -459,6 +495,9 @@ namespace NoHesi
             /// <summary>Couleurs par sommet (facultatives : utilisées si chaque sommet a la sienne).</summary>
             public readonly List<Color32> colors = new List<Color32>();
             public readonly List<int> t = new List<int>();
+            /// <summary>Normales imposées (voûtes lisses) : utilisées si <see cref="smooth"/> et une par sommet.</summary>
+            public readonly List<Vector3> n = new List<Vector3>();
+            public bool smooth;
             /// <summary>
             /// Données du shader de route (UV2) de la section courante (a, b) et de la suivante (c, d) :
             /// autoroute 0-1, chemin 0-1, demi-largeur de chaussée (m), 1 = voies connues.
@@ -479,6 +518,43 @@ namespace NoHesi
             }
 
             public void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d) => Quad(a, b, c, d, Vector2.zero, Vector2.right, Vector2.up, Vector2.one);
+
+            /// <summary>Quadrilatère aux normales données (a, b : section courante ; c, d : suivante).</summary>
+            public void QuadN(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 na, Vector3 nb, Vector3 nc, Vector3 nd)
+            {
+                Quad(a, b, c, d);
+                n.Add(na); n.Add(nb); n.Add(nc); n.Add(nd);
+            }
+
+            /// <summary>Quadrilatère plan tourné vers « facing » (une seule face : pas de doublon qui scintille).</summary>
+            public void QuadFacing(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 facing)
+            {
+                Vector3 nn = Vector3.Cross(c - a, b - a);
+                if (Vector3.Dot(nn, facing) < 0f) { (a, b) = (b, a); (c, d) = (d, c); nn = -nn; }
+                if (smooth) { nn.Normalize(); QuadN(a, b, c, d, nn, nn, nn, nn); }
+                else Quad(a, b, c, d);
+            }
+
+            /// <summary>Triangle plan tourné vers « facing ».</summary>
+            public void TriFacing(Vector3 a, Vector3 b, Vector3 c, Vector3 facing)
+            {
+                if (Vector3.Dot(Vector3.Cross(b - a, c - a), facing) < 0f) (b, c) = (c, b);
+                Tri(a, b, c, Vector2.zero, Vector2.right, Vector2.up);
+            }
+
+            /// <summary>Cylindre à facettes (ventilateurs, conduites) d'axe « axis » (demi-longueur comprise), fermé.</summary>
+            public void Prism(Vector3 center, Vector3 axis, Vector3 u, Vector3 w, float radius, int sides)
+            {
+                for (int k = 0; k < sides; k++)
+                {
+                    float t0 = k * Mathf.PI * 2f / sides, t1 = (k + 1) * Mathf.PI * 2f / sides;
+                    Vector3 o0 = (u * Mathf.Cos(t0) + w * Mathf.Sin(t0)) * radius, o1 = (u * Mathf.Cos(t1) + w * Mathf.Sin(t1)) * radius;
+                    Vector3 mid = (o0 + o1) * 0.5f;
+                    QuadFacing(center - axis + o0, center - axis + o1, center + axis + o0, center + axis + o1, mid);
+                    TriFacing(center + axis, center + axis + o0, center + axis + o1, axis);
+                    TriFacing(center - axis, center - axis + o0, center - axis + o1, -axis);
+                }
+            }
 
             public void Tri(Vector3 a, Vector3 b, Vector3 c, Vector2 ua, Vector2 ub, Vector2 uc)
             {
@@ -536,7 +612,8 @@ namespace NoHesi
                     m.SetColors(colors);
                 }
                 m.SetTriangles(t, 0);
-                m.RecalculateNormals();
+                if (smooth && n.Count == v.Count) m.SetNormals(n);
+                else m.RecalculateNormals();
                 m.RecalculateBounds();
                 return m;
             }
@@ -699,12 +776,85 @@ namespace NoHesi
             // Aux abords d'un carrefour, pas de glissière : elle barrerait la vue et les branches voisines
             float railFrom = IsJunction(e.a) ? e.trimA + JunctionClear : -1f;
             float railTo = IsJunction(e.b) ? e.Length - e.trimB - JunctionClear : float.MaxValue;
-            // Tunnel : gabarit intérieur (1 m de trottoir de service de chaque côté) et coque extérieure
+            // Tunnel : gabarit (1 m de trottoir de service de chaque côté) et coque extérieure. L'autoroute passe dans
+            // deux tubes séparés par un pied-droit central ; chaque tube a une voûte cintrée qui culmine à la hauteur libre.
             float win = tot + 1f, hin = highway ? TunnelHeightHighway : TunnelHeight;
-            Vector2[] tubeInside = { new Vector2(win, 0f), new Vector2(win, hin), new Vector2(-win, hin), new Vector2(-win, 0f) };
+            float pier = Mathf.Max(e.median - 1.2f, 0.5f);
+            var bores = highway
+                ? new List<Bore> { new Bore(-win, -pier, hin), new Bore(pier, win, hin) }
+                : new List<Bore> { new Bore(-win, win, hin) };
             Vector2[] tubeOutside = { new Vector2(-win - TunnelShell, -1.5f), new Vector2(-win - TunnelShell, hin + TunnelRoof), new Vector2(win + TunnelShell, hin + TunnelRoof), new Vector2(win + TunnelShell, -1.5f) };
             Vector2[] curbRight = { new Vector2(tot, 0f), new Vector2(tot, 0.12f), new Vector2(win, 0.12f) };
             Vector2[] curbLeft = { new Vector2(-win, 0.12f), new Vector2(-tot, 0.12f), new Vector2(-tot, 0f) };
+            Vector2[] curbPierRight = { new Vector2(pier, 0.12f), new Vector2(pier + 1f, 0.12f), new Vector2(pier + 1f, 0f) };
+            Vector2[] curbPierLeft = { new Vector2(-pier - 1f, 0f), new Vector2(-pier - 1f, 0.12f), new Vector2(-pier, 0.12f) };
+            var vault = new MeshBuilder { smooth = true };
+            var tile = new MeshBuilder { smooth = true };
+            var portal = new MeshBuilder { smooth = true };
+            var trim = new MeshBuilder();
+            var kerb = new MeshBuilder();
+            var fans = new MeshBuilder();
+            var pipe = new MeshBuilder();
+            var orange = new MeshBuilder();
+            var amber = new MeshBuilder();
+            var green = new MeshBuilder();
+            var blue = new MeshBuilder();
+            // Têtes réelles de tunnel sur cette arête (pas les bouts d'arête où le tube continue sur la suivante)
+            var portals = new List<float>();
+            if (e.spans != null)
+                foreach (var sp in e.spans)
+                {
+                    if (sp.kind != "tunnel") continue;
+                    if (sp.s0 > e.trimA + 0.5f) portals.Add(sp.s0);
+                    if (sp.s1 < e.Length - e.trimB - 0.5f) portals.Add(sp.s1);
+                }
+            float PortalDistance(float s)
+            {
+                float d = float.MaxValue;
+                foreach (float q in portals) d = Mathf.Min(d, Mathf.Abs(s - q));
+                return d;
+            }
+            float TunnelLength(float s)
+            {
+                if (e.spans != null)
+                    foreach (var sp in e.spans)
+                        if (sp.kind == "tunnel" && s >= sp.s0 && s <= sp.s1) return sp.s1 - sp.s0;
+                return 0f;
+            }
+            // Parois d'un tube entre deux sections : parement clair en bas, voûte, chemin de câbles, conduite
+            // d'incendie côté extérieur, trottoirs de service
+            void BoreRun(Vector3 a, Vector3 ra, Vector3 b, Vector3 rb)
+            {
+                for (int k = 0; k < bores.Count; k++)
+                {
+                    var bo = bores[k];
+                    foreach (var sg in bo.Segments(0f, 0.12f)) ExtrudeSegment(sg.clad ? tile : vault, a, ra, b, rb, sg, false);
+                    Vector2[] tray = { new Vector2(0f, bo.clad - 0.02f), new Vector2(-0.2f, bo.clad - 0.02f), new Vector2(-0.2f, bo.clad + 0.16f), new Vector2(0f, bo.clad + 0.16f) };
+                    Extrude(trim, a, ra, b, rb, bo.x1, tray);
+                    Extrude(trim, a, -ra, b, -rb, -bo.x0, Mirror(tray));
+                    // Conduite rouge sur la paroi extérieure (à droite du sens de circulation du tube)
+                    var ring = new Vector2[9];
+                    for (int q = 0; q <= 8; q++)
+                    {
+                        float t = Mathf.PI * 0.5f - q * Mathf.PI * 2f / 8f;
+                        ring[q] = new Vector2(-0.24f + Mathf.Cos(t) * 0.11f, bo.clad + 0.55f + Mathf.Sin(t) * 0.11f);
+                    }
+                    if (!highway || k == 1) Extrude(pipe, a, ra, b, rb, bo.x1, ring);
+                    else Extrude(pipe, a, -ra, b, -rb, -bo.x0, Mirror(ring));
+                }
+                Extrude(kerb, a, ra, b, rb, 0f, curbRight);
+                Extrude(kerb, a, ra, b, rb, 0f, curbLeft);
+                if (highway)
+                {
+                    Extrude(kerb, a, ra, b, rb, 0f, curbPierRight);
+                    Extrude(kerb, a, ra, b, rb, 0f, curbPierLeft);
+                }
+            }
+            // Équipements posés tous les « step » mètres (abscisses step × k + phase comprises dans ]sa, sb])
+            IEnumerable<float> Every(float sa, float sb, float step, float phase)
+            {
+                for (float s = (Mathf.Floor((sa - phase) / step) + 1f) * step + phase; s <= sb; s += step) yield return s;
+            }
 
             for (int i = i0; i < i1; i++)
             {
@@ -806,32 +956,21 @@ namespace NoHesi
                     // Tube : parois et voûte vues de l'intérieur, trottoirs de service, coque vue de l'extérieur (dalle
                     // mince sous une route en remblai : passage inférieur)
                     tubeOutside[1].y = tubeOutside[2].y = hin + A.roof;
-                    Extrude(tube, a, ra, b, rb, 0f, tubeInside);
+                    BoreRun(a, ra, b, rb);
                     Extrude(tube, a, ra, b, rb, 0f, tubeOutside);
-                    Extrude(tube, a, ra, b, rb, 0f, curbRight);
-                    Extrude(tube, a, ra, b, rb, 0f, curbLeft);
                     // Têtes de tunnel : une façade à chaque extrémité de la travée (une seule fois, même à cheval sur deux
                     // tronçons) ; une travée qui touche le bout de l'arête se poursuit sur l'arête suivante, sans façade
                     Vector3 along = (b - a).normalized;
-                    if (i > 0 && sec[i - 1].span != "tunnel") Portal(tube, a, ra, -along, win, hin);
-                    if (i + 2 < sec.Count && sec[i + 2].span != "tunnel") Portal(tube, b, rb, along, win, hin);
-                    // Rampes lumineuses au plafond, tous les 12 m, au-dessus de chaque chaussée
-                    if (Mathf.Floor(sa / 12f) != Mathf.Floor(sb / 12f))
-                    {
-                        Vector3 f = new Vector3(along.x, 0f, along.z).normalized;
-                        float off = highway ? e.median + e.lanes * LaneWidth * 0.5f : 0f;
-                        foreach (float side in highway ? new[] { -1f, 1f } : new[] { 0f })
-                        {
-                            Vector3 c = b + rb * off * side + up * (hin - 0.06f);
-                            glow.Quad(c + rb * 0.3f - f * 1.1f, c - rb * 0.3f - f * 1.1f, c + rb * 0.3f + f * 1.1f, c - rb * 0.3f + f * 1.1f);
-                        }
-                    }
+                    if (i > 0 && sec[i - 1].span != "tunnel") Portal(tube, portal, trim, a, ra, -along, bores, hin, true, BoreRun);
+                    if (i + 2 < sec.Count && sec[i + 2].span != "tunnel") Portal(tube, portal, trim, b, rb, along, bores, hin, false, BoreRun);
+                    TunnelFittings(e, sa, sb, bores, highway, hin, PortalDistance, TunnelLength(mid), Every,
+                        glow, trim, fans, orange, amber, green, blue);
                 }
 
                 // Autoroute : glissière en béton sur le terre-plein, lignes de rive de chaque chaussée, voies en pointillés
                 if (highway)
                 {
-                    Extrude(barrier, a, ra, b, rb, 0f, JerseyProfile);
+                    if (!tunnel) Extrude(barrier, a, ra, b, rb, 0f, JerseyProfile);     // dans le tunnel : pied-droit central
                     Vector3 lift = up * 0.025f;
                     bool dash = Mathf.Repeat(mid, 13f) < 4f;
                     foreach (float side in new[] { -1f, 1f })
@@ -900,8 +1039,246 @@ namespace NoHesi
             if (barrier.v.Count > 0) AddMesh(go, "Barrier", barrier.Build("Barrier"), assets.concrete, true);
             if (deck.v.Count > 0) AddMesh(go, "Deck", deck.Build("Deck"), assets.concrete, true);
             if (tube.v.Count > 0) AddMesh(go, "Tunnel", tube.Build("Tunnel"), assets.concrete, true);
-            if (glow.v.Count > 0)
-                AddMesh(go, "TunnelLights", glow.Build("TunnelLights"), tunnelGlow, false).GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            if (vault.v.Count > 0) AddMesh(go, "TunnelVault", vault.Build("TunnelVault"), tunnelVault, true);
+            if (tile.v.Count > 0) AddMesh(go, "TunnelTiles", tile.Build("TunnelTiles"), tunnelTile, true);
+            if (portal.v.Count > 0) AddMesh(go, "TunnelPortal", portal.Build("TunnelPortal"), tunnelPortal, true);
+            if (kerb.v.Count > 0) AddMesh(go, "TunnelKerb", kerb.Build("TunnelKerb"), tunnelKerb, true);
+            void Detail(MeshBuilder mb, string name, Material mat)
+            {
+                if (mb.v.Count == 0) return;
+                AddMesh(go, name, mb.Build(name), mat, false).GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            Detail(glow, "TunnelLights", tunnelGlow);
+            Detail(trim, "TunnelTrim", tunnelTrim);
+            Detail(fans, "TunnelFans", tunnelFan);
+            Detail(pipe, "TunnelPipe", tunnelPipe);
+            Detail(orange, "TunnelSos", tunnelOrange);
+            Detail(amber, "TunnelGuide", tunnelAmber);
+            Detail(green, "TunnelExit", tunnelGreen);
+            Detail(blue, "TunnelSosSign", tunnelBlue);
+        }
+
+        /// <summary>
+        /// Tube de tunnel : paroi verticale jusqu'à la naissance de la voûte, puis arc de cercle jusqu'à la clé
+        /// (hauteur libre du gabarit, que le générateur de carte perce). Abscisses par rapport à l'axe de la route.
+        /// </summary>
+        struct Bore
+        {
+            public float x0, x1, wall, crown, clad;
+            float radius, cy;
+            public float Mid => (x0 + x1) * 0.5f;
+            public float Width => x1 - x0;
+
+            public Bore(float x0, float x1, float crown)
+            {
+                this.x0 = x0; this.x1 = x1; this.crown = crown;
+                float w = x1 - x0, rise = Mathf.Clamp(0.15f * w, 1f, 2f);
+                wall = crown - rise;
+                clad = Mathf.Min(2.8f, wall - 1.1f);
+                radius = (w * w * 0.25f + rise * rise) / (2f * rise);
+                cy = crown - radius;
+            }
+
+            /// <summary>Hauteur de l'intrados à l'abscisse x (paroi : naissance de la voûte).</summary>
+            public float Y(float x)
+            {
+                float d = Mathf.Clamp(x, x0, x1) - Mid;
+                return cy + Mathf.Sqrt(Mathf.Max(radius * radius - d * d, 0f));
+            }
+
+            public struct Segment { public Vector2 p0, p1, n0, n1; public bool clad; }
+
+            /// <summary>
+            /// Contour de la droite vers la gauche en passant par la clé, normales vers l'intérieur du tube ; « grow »
+            /// l'élargit vers l'extérieur (casquette des têtes), « bottom » = pied des parois.
+            /// </summary>
+            public List<Segment> Segments(float grow, float bottom)
+            {
+                var list = new List<Segment>();
+                float r = radius + grow, xr = x1 + grow, xl = x0 - grow;
+                Vector2 inR = new Vector2(-1f, 0f), inL = new Vector2(1f, 0f);
+                list.Add(new Segment { p0 = new Vector2(xr, bottom), p1 = new Vector2(xr, clad), n0 = inR, n1 = inR, clad = grow == 0f });
+                list.Add(new Segment { p0 = new Vector2(xr, clad), p1 = new Vector2(xr, wall), n0 = inR, n1 = inR });
+                float t1 = Mathf.Atan2(wall - cy, x1 - Mid), t0 = Mathf.PI - t1;
+                int count = Mathf.Max(8, Mathf.CeilToInt(Width / 1.1f));
+                for (int k = 0; k < count; k++)
+                {
+                    float ta = Mathf.Lerp(t1, t0, k / (float)count), tb = Mathf.Lerp(t1, t0, (k + 1f) / count);
+                    Vector2 ua = new Vector2(Mathf.Cos(ta), Mathf.Sin(ta)), ub = new Vector2(Mathf.Cos(tb), Mathf.Sin(tb));
+                    var pa = new Vector2(Mid, cy) + ua * r;
+                    var pb = new Vector2(Mid, cy) + ub * r;
+                    // la paroi élargie reste verticale jusqu'à la naissance : on raccorde l'arc à ses bouts
+                    if (k == 0) pa = new Vector2(xr, wall);
+                    if (k == count - 1) pb = new Vector2(xl, wall);
+                    list.Add(new Segment { p0 = pa, p1 = pb, n0 = -ua, n1 = -ub });
+                }
+                list.Add(new Segment { p0 = new Vector2(xl, wall), p1 = new Vector2(xl, clad), n0 = inL, n1 = inL });
+                list.Add(new Segment { p0 = new Vector2(xl, clad), p1 = new Vector2(xl, bottom), n0 = inL, n1 = inL, clad = grow == 0f });
+                return list;
+            }
+        }
+
+        /// <summary>Un segment de contour extrudé entre deux sections (flip : faces et normales retournées).</summary>
+        static void ExtrudeSegment(MeshBuilder mb, Vector3 a, Vector3 ra, Vector3 b, Vector3 rb, Bore.Segment sg, bool flip)
+        {
+            Vector2 p0 = sg.p0, p1 = sg.p1, n0 = sg.n0, n1 = sg.n1;
+            if (flip) { (p0, p1) = (p1, p0); (n0, n1) = (-n1, -n0); }
+            Vector3 up = Vector3.up;
+            mb.QuadN(a + ra * p0.x + up * p0.y, a + ra * p1.x + up * p1.y, b + rb * p0.x + up * p0.y, b + rb * p1.x + up * p1.y,
+                ra * n0.x + up * n0.y, ra * n1.x + up * n1.y, rb * n0.x + up * n0.y, rb * n1.x + up * n1.y);
+        }
+
+        /// <summary>
+        /// Équipements d'un tronçon de tunnel ]sa, sb] : luminaires sous la voûte (resserrés près des têtes), balises
+        /// orange le long des parois, joints du parement ; dans les vrais tunnels (pas les passages inférieurs) :
+        /// accélérateurs de ventilation, niches SOS, issues de secours et signaux d'affectation de voie.
+        /// </summary>
+        /// <summary>Hauteur libre minimale sous les équipements suspendus au-dessus des voies (m).</summary>
+        const float MinOverhead = 4.3f;
+
+        void TunnelFittings(Edge e, float sa, float sb, List<Bore> bores, bool highway, float hin,
+            System.Func<float, float> portalDistance, float tunnelLength, System.Func<float, float, float, float, IEnumerable<float>> every,
+            MeshBuilder glow, MeshBuilder trim, MeshBuilder fans, MeshBuilder orange, MeshBuilder amber, MeshBuilder green, MeshBuilder blue)
+        {
+            Vector3 up = Vector3.up;
+            bool full = tunnelLength > 120f && !e.dirt;
+            Vector3 At(float s, out Vector3 f, out Vector3 r)
+            {
+                Vector3 p = e.Evaluate(s, out var tangent, out r);
+                f = new Vector3(tangent.x, 0f, tangent.z).normalized;
+                return p;
+            }
+            // Parois d'un tube : (abscisse, sens vers l'extérieur du tube)
+            IEnumerable<(float x, float sgn)> Walls(Bore bo) { yield return (bo.x1, 1f); yield return (bo.x0, -1f); }
+
+            // Luminaires : un boîtier sombre et une vitre éclairée, sur deux files dans les tubes larges
+            float step = portalDistance((sa + sb) * 0.5f) < 60f ? 3.5f : 7f;
+            foreach (float s in every(sa, sb, step, 0f))
+            {
+                Vector3 p = At(s, out var f, out var r);
+                foreach (var bo in bores)
+                {
+                    float dx = bo.Width >= 9f ? bo.Width * 0.2f : 0f;
+                    foreach (float x in dx > 0f ? new[] { bo.Mid - dx, bo.Mid + dx } : new[] { bo.Mid })
+                    {
+                        Vector3 c = p + r * x + up * (bo.Y(x) - 0.12f);
+                        trim.Box(c, r * 0.22f, up * 0.07f, f * 1.6f);
+                        Vector3 l = c - up * 0.075f;
+                        glow.QuadFacing(l - r * 0.16f - f * 1.5f, l + r * 0.16f - f * 1.5f, l - r * 0.16f + f * 1.5f, l + r * 0.16f + f * 1.5f, -up);
+                    }
+                }
+            }
+            // Balises de guidage orange à 0,95 m, et joints verticaux du parement
+            foreach (float s in every(sa, sb, 24f, 6f))
+            {
+                Vector3 p = At(s, out var f, out var r);
+                foreach (var bo in bores)
+                    foreach (var (x, sgn) in Walls(bo))
+                        amber.Box(p + r * (x - sgn * 0.03f) + up * 0.95f, r * 0.04f, up * 0.06f, f * 0.1f);
+            }
+            foreach (float s in every(sa, sb, 6f, 3f))
+            {
+                Vector3 p = At(s, out var f, out var r);
+                foreach (var bo in bores)
+                    foreach (var (x, sgn) in Walls(bo))
+                    {
+                        Vector3 c = p + r * (x - sgn * 0.012f);
+                        trim.QuadFacing(c - f * 0.04f + up * 0.12f, c + f * 0.04f + up * 0.12f, c - f * 0.04f + up * bo.clad, c + f * 0.04f + up * bo.clad, -r * sgn);
+                    }
+            }
+            if (!full) return;
+
+            // Accélérateurs (ventilateurs) suspendus sous la clé, par paires dans les tubes larges
+            foreach (float s in every(sa, sb, 200f, 80f))
+            {
+                Vector3 p = At(s, out var f, out var r);
+                foreach (var bo in bores)
+                {
+                    if (bo.Width < 9f) continue;
+                    foreach (float x in bo.Width >= 12f ? new[] { bo.Mid - 2f, bo.Mid + 2f } : new[] { bo.Mid })
+                    {
+                        float top = bo.Y(x), y = top - 1.05f;
+                        if (y - 0.62f < MinOverhead) continue;      // jamais à portée d'un camion
+                        Vector3 c = p + r * x + up * y;
+                        fans.Prism(c, f * 2.1f, r, up, 0.55f, 12);
+                        trim.Prism(c + f * 2.1f, f * 0.1f, r, up, 0.62f, 12);
+                        trim.Prism(c - f * 2.1f, f * 0.1f, r, up, 0.62f, 12);
+                        float h = (top - y - 0.5f) * 0.5f;
+                        foreach (float k in new[] { -1.2f, 1.2f })
+                            trim.Box(p + r * x + f * k + up * (top - h), r * 0.06f, up * h, f * 0.06f);
+                    }
+                }
+            }
+            // Niches SOS sur la paroi de droite (sens de circulation) : armoire à porte orange, panneau bleu éclairé
+            // en drapeau ; issues de secours sur le pied-droit central (vers l'autre tube) ou la paroi de gauche
+            foreach (float s in every(sa, sb, 200f, 180f))
+            {
+                Vector3 p = At(s, out var f, out var r);
+                int n = Mathf.RoundToInt(s / 200f);
+                for (int k = 0; k < bores.Count; k++)
+                {
+                    var bo = bores[k];
+                    float sgn = highway ? (k == 1 ? 1f : -1f) : (n % 2 == 0 ? 1f : -1f);
+                    float x = sgn > 0f ? bo.x1 : bo.x0;
+                    Vector3 w = p + r * x, inward = -r * sgn;
+                    trim.Box(w + inward * 0.12f + up * 1.25f, inward * 0.12f, up * 1.05f, f * 0.75f);
+                    Vector3 face = w + inward * 0.245f;
+                    orange.QuadFacing(face - f * 0.6f + up * 0.35f, face + f * 0.6f + up * 0.35f, face - f * 0.6f + up * 2.1f, face + f * 0.6f + up * 2.1f, inward);
+                    Vector3 sign = w + inward * 0.5f + up * (bo.clad + 0.5f);
+                    blue.Box(sign, inward * 0.42f, up * 0.28f, f * 0.05f);
+                    foreach (float side in new[] { -1f, 1f })
+                    {
+                        Vector3 q = sign + f * side * 0.052f;
+                        glow.QuadFacing(q - inward * 0.1f - up * 0.1f, q + inward * 0.1f - up * 0.1f, q - inward * 0.1f + up * 0.1f, q + inward * 0.1f + up * 0.1f, f * side);
+                    }
+                }
+            }
+            foreach (float s in every(sa, sb, 400f, 330f))
+            {
+                Vector3 p = At(s, out var f, out var r);
+                for (int k = 0; k < bores.Count; k++)
+                {
+                    var bo = bores[k];
+                    float sgn = highway ? (k == 1 ? -1f : 1f) : -1f;
+                    float x = sgn > 0f ? bo.x1 : bo.x0;
+                    Vector3 w = p + r * x, inward = -r * sgn;
+                    trim.Box(w + inward * 0.05f + up * 1.2f, inward * 0.05f, up * 1.1f, f * 0.65f);
+                    Vector3 face = w + inward * 0.105f;
+                    green.QuadFacing(face - f * 0.75f + up * 2.32f, face + f * 0.75f + up * 2.32f, face - f * 0.75f + up * 2.42f, face + f * 0.75f + up * 2.42f, inward);
+                    green.QuadFacing(face - f * 0.75f + up * 0.1f, face - f * 0.65f + up * 0.1f, face - f * 0.75f + up * 2.32f, face - f * 0.65f + up * 2.32f, inward);
+                    green.QuadFacing(face + f * 0.65f + up * 0.1f, face + f * 0.75f + up * 0.1f, face + f * 0.65f + up * 2.32f, face + f * 0.75f + up * 2.32f, inward);
+                    green.Box(w + inward * 0.45f + up * (bo.clad + 0.5f), inward * 0.38f, up * 0.2f, f * 0.05f);
+                }
+            }
+            // Signaux d'affectation de voie (flèche verte) au-dessus de chaque voie, face aux conducteurs
+            foreach (float s in every(sa, sb, 250f, 40f))
+            {
+                Vector3 p = At(s, out var f, out var r);
+                var lanes = new List<(float x, Vector3 face, Bore bo)>();
+                if (highway)
+                    for (int k = 0; k < e.lanes; k++)
+                    {
+                        float x = e.median + (k + 0.5f) * LaneWidth;
+                        lanes.Add((x, -f, bores[1]));
+                        lanes.Add((-x, f, bores[0]));
+                    }
+                else
+                {
+                    lanes.Add((e.hw * 0.45f, -f, bores[0]));
+                    lanes.Add((-e.hw * 0.45f, f, bores[0]));
+                }
+                foreach (var (x, face, bo) in lanes)
+                {
+                    float top = bo.Y(x);
+                    if (top - 1.25f < MinOverhead) continue;
+                    Vector3 c = p + r * x + up * (top - 0.85f);
+                    trim.Box(c, r * 0.4f, up * 0.4f, f * 0.14f);
+                    trim.Box(p + r * x + up * (top - 0.22f), r * 0.04f, up * 0.22f, f * 0.04f);
+                    Vector3 q = c + face * 0.15f;
+                    green.TriFacing(q - r * 0.24f + up * 0.04f, q + r * 0.24f + up * 0.04f, q - up * 0.26f, face);
+                    green.QuadFacing(q - r * 0.07f + up * 0.04f, q + r * 0.07f + up * 0.04f, q - r * 0.07f + up * 0.28f, q + r * 0.07f + up * 0.28f, face);
+                }
+            }
         }
 
         // Accotement : largeur et dénivelé de la pente douce qui raccorde la chaussée au terrain (0,3 m sous la route)
@@ -934,15 +1311,18 @@ namespace NoHesi
         /// Tête de tunnel : mur de façade dans le plan de la section, percé du gabarit (visible des deux côtés), et
         /// radier de béton devant l'entrée (outward : direction horizontale vers l'extérieur du tunnel, pente comprise).
         /// </summary>
-        void Portal(MeshBuilder mb, Vector3 p, Vector3 right, Vector3 outward, float win, float hin)
+        void Portal(MeshBuilder mb, MeshBuilder hood, MeshBuilder trim, Vector3 p, Vector3 right, Vector3 outward, List<Bore> bores, float hin,
+            bool start, System.Action<Vector3, Vector3, Vector3, Vector3> boreRun)
         {
+            float win = Mathf.Max(-bores[0].x0, bores[bores.Count - 1].x1);
             float wo = win + TunnelShell + 2f, bottom = -3f;
+            Vector3 up = Vector3.up;
             Vector3 inward = -new Vector3(outward.x, 0f, outward.z).normalized;
             // Le haut du mur suit le terrain qui se trouve derrière lui (là où le relief est percé, c'est la hauteur
             // qu'il aurait) : vu de la route, aucun jour entre la façade et le versant
             float Top(float x)
             {
-                float h = hin + 1.5f;
+                float h = hin + 2.6f;
                 for (float d = 0f; d <= 24f; d += 2f)
                 {
                     Vector3 q = p + right * x + inward * d;
@@ -950,33 +1330,60 @@ namespace NoHesi
                 }
                 return Mathf.Min(h, hin + 18f);
             }
+            // Façade percée de l'ouverture cintrée de chaque tube ; une seule face, tournée vers l'extérieur (deux
+            // faces confondues se disputaient la profondeur et scintillaient)
             var xs = new List<float>();
             for (float x = -wo; x < -win - 0.5f; x += 3f) xs.Add(x);
-            xs.Add(-win);
-            for (float x = -win + 3f; x < win - 0.5f; x += 3f) xs.Add(x);
-            xs.Add(win);
+            foreach (var bo in bores)
+            {
+                int n = Mathf.Max(8, Mathf.CeilToInt(bo.Width / 1.1f));
+                for (int k = 0; k <= n; k++) xs.Add(Mathf.Lerp(bo.x0, bo.x1, k / (float)n));
+            }
             for (float x = win + 3f; x < wo - 0.5f; x += 3f) xs.Add(x);
             xs.Add(wo);
             for (int k = 0; k + 1 < xs.Count; k++)
             {
-                float x0 = xs[k], x1 = xs[k + 1];
-                bool opening = x0 > -win - 0.01f && x1 < win + 0.01f;
-                float y0 = opening ? hin : bottom;
-                Vector3 a = p + right * x0 + Vector3.up * y0, b = p + right * x1 + Vector3.up * y0;
-                Vector3 c = p + right * x0 + Vector3.up * Top(x0), d = p + right * x1 + Vector3.up * Top(x1);
-                mb.Quad(a, b, c, d);
-                mb.Quad(b, a, d, c);
+                float x0 = xs[k], x1 = xs[k + 1], xm = (x0 + x1) * 0.5f;
+                if (x1 - x0 < 0.01f) continue;
+                Bore? open = null;
+                foreach (var bo in bores) if (xm > bo.x0 && xm < bo.x1) open = bo;
+                float y0 = open.HasValue ? open.Value.Y(x0) : bottom, y1 = open.HasValue ? open.Value.Y(x1) : bottom;
+                Vector3 a = p + right * x0 + up * y0, b = p + right * x1 + up * y1;
+                Vector3 c = p + right * x0 + up * Top(x0), d = p + right * x1 + up * Top(x1);
+                mb.QuadFacing(a, b, c, d, outward);
             }
-            // Sous la chaussée
-            Vector3 u0 = p - right * win + Vector3.up * bottom, u1 = p + right * win + Vector3.up * bottom;
-            Vector3 u2 = p - right * win - Vector3.up * 0.02f, u3 = p + right * win - Vector3.up * 0.02f;
-            mb.Quad(u0, u1, u2, u3);
-            mb.Quad(u1, u0, u3, u2);
+            // Sous la chaussée, dans chaque ouverture
+            foreach (var bo in bores)
+                mb.QuadFacing(p + right * bo.x0 + up * bottom, p + right * bo.x1 + up * bottom, p + right * bo.x0 - up * 0.02f, p + right * bo.x1 - up * 0.02f, outward);
             // Radier : dalle juste sous la chaussée, devant la façade (cache le bord dentelé du relief percé)
             Vector3 r = Vector3.Cross(Vector3.up, outward).normalized;
             Vector3 n0 = p - Vector3.up * 0.2f, n1 = n0 + outward * 6f;
             float wr = win + TunnelShell;
             mb.Quad(n0 - r * wr, n0 + r * wr, n1 - r * wr, n1 + r * wr);
+
+            // Casquette : chaque tube dépasse de la façade, cerclé d'un bandeau de béton épais
+            const float Hood = 1.6f, Rim = 0.7f;
+            Vector3 q0 = p + outward * Hood;
+            if (start) boreRun(q0, right, p, right); else boreRun(p, right, q0, right);
+            foreach (var bo in bores)
+            {
+                var inner = bo.Segments(0f, 0.12f);
+                var outer = bo.Segments(Rim, 0.12f);
+                foreach (var sg in bo.Segments(Rim, -0.4f))
+                {
+                    if (start) ExtrudeSegment(hood, q0, right, p, right, sg, true);
+                    else ExtrudeSegment(hood, p, right, q0, right, sg, true);
+                }
+                for (int k = 0; k < inner.Count; k++)
+                {
+                    Vector3 Pt(Vector2 v) => q0 + right * v.x + up * v.y;
+                    hood.QuadFacing(Pt(inner[k].p0), Pt(inner[k].p1), Pt(outer[k].p0), Pt(outer[k].p1), outward);
+                }
+            }
+            // Bandeau sombre au-dessus des ouvertures (où l'on écrirait le nom du tunnel)
+            Vector3 f = p + outward * 0.05f;
+            float bx0 = bores[0].x0 - 1f, bx1 = bores[bores.Count - 1].x1 + 1f;
+            trim.QuadFacing(f + right * bx0 + up * (hin + 1.15f), f + right * bx1 + up * (hin + 1.15f), f + right * bx0 + up * (hin + 1.9f), f + right * bx1 + up * (hin + 1.9f), outward);
         }
 
         /// <summary>Une autre route passe-t-elle sous ce point (à moins de « radius » mètres à plat, au moins 3 m plus bas) ?</summary>
