@@ -3,7 +3,8 @@ using UnityEngine;
 namespace ChillRoad
 {
     /// <summary>
-    /// Caméra de poursuite : suit la voiture avec un léger retard, s'élargit avec la vitesse, tremble à très haute vitesse.
+    /// Caméra de poursuite : suit la voiture avec un léger retard, s'élargit avec la vitesse, secouée par les chocs et
+    /// la vitesse (option « Secousses de caméra »).
     /// Vues : poursuite proche, poursuite loin, capot, pare-chocs. Vue arrière maintenue.
     /// </summary>
     public class CameraRig : MonoBehaviour
@@ -90,6 +91,10 @@ namespace ChillRoad
         public void NextView() { ViewIndex = (ViewIndex + 1) % Views.Length; initialized = false; }
         public void SetView(int i) { ViewIndex = Mathf.Clamp(i, 0, Views.Length - 1); initialized = false; }
         public void Shake(float amount) => trauma = Mathf.Clamp01(trauma + amount);
+
+        /// <summary>Bruit lisse sur trois axes, entre -1 et 1.</summary>
+        static Vector3 Noise3(float t, float seed) => new Vector3(
+            Mathf.PerlinNoise(t, seed + 0.1f) * 2f - 1f, Mathf.PerlinNoise(seed + 3.7f, t) * 2f - 1f, Mathf.PerlinNoise(t + 11.3f, seed + 5.9f) * 2f - 1f);
 
         /// <summary>Coup de focale (degrés), qui retombe en une fraction de seconde.</summary>
         public void Kick(float degrees) => fovKick = Mathf.Max(fovKick, degrees);
@@ -270,14 +275,26 @@ namespace ChillRoad
                 look = pos + smoothedRot * (orbit * (v.lookOffset - offset));
             }
 
-            // Tremblement : léger à très haute vitesse + chocs
-            float shake = trauma * trauma + Mathf.Clamp01((speed - 55f) / 30f) * 0.04f;
-            trauma = Mathf.MoveTowards(trauma, 0f, dt * 1.5f);
-            float n = Time.time * 22f;
-            Vector3 jitter = new Vector3(Mathf.PerlinNoise(n, 0.1f) - 0.5f, Mathf.PerlinNoise(0.4f, n) - 0.5f, 0f) * shake * 0.6f;
+            // Secousses (option GameSettings.CameraShake) : chocs (trauma, retombe en moins d'une seconde) et vibration
+            // de vitesse, nulle sous 90 km/h, franche vers 270 km/h. Déplacement et petite rotation de la caméra.
+            Vector3 jitter = Vector3.zero;
+            Quaternion tilt = Quaternion.identity;
+            if (GameSettings.CameraShake)
+            {
+                // Choc (GameManager : impact / 20 au-delà de 3 m/s) : linéaire, un accrochage se sent déjà
+                float hit = trauma;
+                float rumble = Time.timeScale > 0.01f ? Mathf.Pow(Mathf.InverseLerp(25f, 75f, speed), 1.6f) : 0f;
+                float tn = Time.time;
+                Vector3 slow = Noise3(tn * 16f, 0f), fast = Noise3(tn * 34f, 7.3f);
+                jitter = new Vector3(slow.x, slow.y, 0f) * (hit * 0.25f) + new Vector3(fast.x, fast.y, 0f) * (rumble * 0.035f);
+                tilt = Quaternion.Euler(slow.y * hit * 2f + fast.z * rumble * 0.3f,
+                                        slow.z * hit * 1.2f + fast.x * rumble * 0.15f,
+                                        slow.x * hit * 2.5f + fast.y * rumble * 0.25f);
+            }
+            trauma = GameSettings.CameraShake ? Mathf.MoveTowards(trauma, 0f, dt * 1.5f) : 0f;
 
             transform.position = pos + smoothedRot * jitter;
-            transform.rotation = Quaternion.LookRotation(look - pos, Vector3.up);
+            transform.rotation = Quaternion.LookRotation(look - pos, Vector3.up) * tilt;
             fovKick = Mathf.MoveTowards(fovKick, 0f, dt * 22f);
             fovBase = Mathf.Lerp(fovBase, v.baseFov + speedFactor * 18f, 1f - Mathf.Exp(-dt * 4f));
             SetFov(fovBase + fovKick);
