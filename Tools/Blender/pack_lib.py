@@ -968,10 +968,11 @@ def build(cid):
         auto_details(ctx)
     ctx.bm.free()
     if "wheel" in car:
+        wheel_fn = car.get("wheel_fn") or build_wheel      # wheel_fn : roue sur mesure d'une fiche (jante ajourée...)
         for i, xa in enumerate(car["axles"]):
             Wd = axle_wheel(car, i)
             for side in ((0,) if Wd.get("single") else (1, -1)):      # single : roue seule dans l'axe (tricycle)
-                build_wheel(car, xa, side, M, col, wheel_name(i, side), Wd)
+                wheel_fn(car, xa, side, M, col, wheel_name(i, side), Wd)
     for o in col.all_objects:
         o.color = lin_color(car.get("color", (0.6, 0.6, 0.6)))
     bake(car, col)

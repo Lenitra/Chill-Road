@@ -1219,44 +1219,216 @@ def gryaris_dlo(c, m=0.0):
     return tip + top + end + bot
 
 
+def gryaris_wheel(car, xa, side, M, col, export_name, Wd=None):
+    """Roue de la GR Yaris (fiche wheel_fn) : jante forgée noire ajourée à dix branches en Y, creusée vers le moyeu,
+    lèvre usinée, pneu aux épaules rondes ; derrière les branches, disque de frein et fond de jante. L'étrier rouge
+    est un objet à part (« caliper-front-left »..., même pivot que la roue) : il ne tourne pas avec elle."""
+    Wd = Wd or car["wheel"]
+    rt, rr, w, yc = Wd["rt"], Wd["rr"], Wd["w"], Wd["y"]
+    rd = Wd.get("disc", 0.17)
+    n = 40
+    names = ["tire", "black", "dark", "chrome", "grey", "rim"]
+    hwd = w / 2
+    bm = bmesh.new()
+    prof = [(rr, hwd - 0.012), (rr + 0.014, hwd - 0.003), (rt - 0.07, hwd), (rt - 0.035, hwd - 0.005),
+            (rt - 0.014, hwd - 0.02), (rt - 0.003, hwd - 0.04), (rt, hwd - 0.062)]
+    prof += [(r, -a) for r, a in reversed(prof)]
+    H.revolve(bm, prof, (0, 0, 0), side, nseg=n)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+
+    def P3(r, th, a):
+        return Vector((r * math.cos(th), side * a, r * math.sin(th)))
+
+    def ring(r, a):
+        return [bm.verts.new(P3(r, 2 * math.pi * k / n, a)) for k in range(n)]
+
+    def face(vs, mat, want):
+        f = bm.faces.new(vs)
+        f.normal_update()
+        if f.normal.dot(want(f.calc_center_median())) < 0:
+            f.normal_flip()
+        f.material_index = mat
+
+    def strip(A, B, mat, want):
+        for k in range(n):
+            face((A[k], A[(k + 1) % n], B[(k + 1) % n], B[k]), mat, want)
+
+    out = lambda p: Vector((0.0, side, 0.0))                 # noqa: E731
+    inward = lambda p: Vector((-p.x, 0.0, -p.z))             # noqa: E731
+    radial = lambda p: Vector((p.x, 0.0, p.z))               # noqa: E731
+    # lèvre usinée, fût et fond de jante
+    lip0, lip1 = ring(rr + 0.003, hwd - 0.008), ring(rr - 0.02, hwd - 0.008)
+    strip(lip0, lip1, 4, out)
+    back = ring(rr - 0.03, -hwd + 0.02)
+    strip(lip1, back, 2, inward)
+    cen = bm.verts.new((0.0, side * (-hwd + 0.02), 0.0))
+    for k in range(n):
+        face((cen, back[k], back[(k + 1) % n]), 2, out)
+    # disque de frein et bol
+    d0, d1, d2 = ring(rd, 0.036), ring(0.078, 0.036), ring(0.078, 0.056)
+    strip(d0, d1, 3, out)
+    strip(d1, d2, 4, radial)
+    edge = ring(rd, 0.02)
+    strip(d0, edge, 4, radial)
+    # branches et moyeu (solides fermés)
+    sb = bmesh.new()
+    a_h, a_r, t = hwd - 0.045, hwd - 0.014, 0.02
+    r0, r1 = 0.05, rr - 0.012
+    for i in range(5):
+        ph = math.pi / 2 + 2 * math.pi * i / 5
+        for sg in (-1, 1):
+            vs = []
+            for r, th, a, hw_ in ((r0, ph + sg * math.radians(9), a_h, 0.0125),
+                                  (r1, ph + sg * math.radians(16), a_r, 0.0085)):
+                tan = Vector((-math.sin(th), 0.0, math.cos(th)))
+                for da in (0.0, -t):
+                    for sw in (-1, 1):
+                        vs.append(sb.verts.new(P3(r, th, a + da) + tan * sw * hw_))
+            for q in ((0, 1, 3, 2), (4, 5, 7, 6), (0, 1, 5, 4), (2, 3, 7, 6), (0, 2, 6, 4), (1, 3, 7, 5)):
+                sb.faces.new([vs[j] for j in q])
+
+    def drum(r, a0, a1, m):
+        A = [sb.verts.new(P3(r, 2 * math.pi * k / m, a0)) for k in range(m)]
+        B = [sb.verts.new(P3(r, 2 * math.pi * k / m, a1)) for k in range(m)]
+        for k in range(m):
+            sb.faces.new((A[k], A[(k + 1) % m], B[(k + 1) % m], B[k]))
+        sb.faces.new(A)
+        sb.faces.new(list(reversed(B)))
+
+    drum(0.06, a_h - 0.026, a_h + 0.004, 20)
+    for f in sb.faces:
+        f.material_index = 1
+    black = set(sb.faces)
+    drum(0.026, a_h + 0.002, a_h + 0.010, 12)                # cache central
+    for k in range(5):                                       # écrous
+        th = 2 * math.pi * (k + 0.5) / 5
+        drum_c = P3(0.043, th, a_h + 0.006)
+        H.box(sb, drum_c, (0.014, 0.012, 0.014), Matrix.Rotation(-th, 3, 'Y'))
+    for f in sb.faces:
+        if f not in black:
+            f.material_index = 3
+    bmesh.ops.recalc_face_normals(sb, faces=sb.faces[:])
+    P.merge_bm(bm, sb)
+    ob = H.bm_to_obj(bm, "PK_%s_%s" % (car["id"], export_name), col, [M[x] for x in names])
+    ob.location = (xa, side * yc, rt)
+    ob["export_name"] = export_name
+    # étrier : arc de couronne à cheval sur le disque, devant l'essieu à l'avant, derrière à l'arrière
+    cb = bmesh.new()
+    thc = math.pi if xa < 0 else 0.0
+    span = math.radians(27 if xa < 0 else 34)
+    rc0, rc1, ca0, ca1, m = 0.10, rd + 0.012, -0.004, 0.052, 6
+    secs = []
+    for k in range(m + 1):
+        th = thc - span + 2 * span * k / m
+        secs.append([cb.verts.new(P3(r, th, a)) for r, a in ((rc0, ca0), (rc1, ca0), (rc1, ca1), (rc0, ca1))])
+    for k in range(m):
+        for j in range(4):
+            cb.faces.new((secs[k][j], secs[k][(j + 1) % 4], secs[k + 1][(j + 1) % 4], secs[k + 1][j]))
+    cb.faces.new(secs[0])
+    cb.faces.new(list(reversed(secs[-1])))
+    bmesh.ops.recalc_face_normals(cb, faces=cb.faces[:])
+    P.bevel_bm(cb, 0.006, 1)
+    cname = export_name.replace("wheel", "caliper")
+    cal = H.bm_to_obj(cb, "PK_%s_%s" % (car["id"], cname), col, [M["red"]])
+    cal.location = (xa, side * yc, rt)
+    cal["export_name"] = cname
+    return ob
+
+
 def gryaris_details(c):
-    z = c.car["_z"]
-    # ---- avant : grande calandre basse noire (barre de plaque, blocs latéraux), fin bandeau noir entre les phares
-    # avec l'écusson, écopes d'angle noires à ailette couleur caisse et antibrouillard rond
+    car = c.car
+    z = car["_z"]
+    xf, xr = car["front"], car["rear"]
+
+    def y8(x):                                              # bord latéral des vitrages avant et arrière
+        return car["_w"]["re"](x) - car["_i"]["rail"](x)
+
+    # ---- avant : grande calandre basse noire en nid d'abeille (lames et entretoises en quinconce), barre porte-
+    # plaque, blocs noirs aux coins, lame de bouclier ; fin bandeau noir entre les phares avec l'écusson
     c.decal([(0.0, 0.235), (0.50, 0.235), (0.58, 0.33), (0.58, 0.52), (0.50, 0.615), (0.0, 0.615)], 'front', 'dark',
             name="Grille")
-    c.decal(rect(0.0, 0.42, 0.53, 0.51), 'front', 'trim', offset=0.008, name="GrilleBar")
-    c.decal([(0.47, 0.25), (0.57, 0.335), (0.57, 0.45), (0.47, 0.45)], 'front', 'black', offset=0.008,
-            name="GrilleBlock")
-    c.decal(rect(0.0, 0.41, 0.26, 0.52), 'front', 'plate', offset=0.012, name="Plate")
+
+    def hw(zz):                                             # demi-largeur de la calandre à la hauteur zz
+        if zz < 0.33:
+            return 0.50 + (zz - 0.235) / 0.095 * 0.08
+        if zz > 0.52:
+            return 0.58 - (zz - 0.52) / 0.095 * 0.08
+        return 0.58
+
+    mesh = []
+    for rows in ((0.262, 0.297, 0.332, 0.367, 0.402), (0.530, 0.562, 0.594)):
+        for i, zz in enumerate(rows):
+            mesh.append(((xf + 0.007, 0.0, zz), (0.008, 2 * hw(zz) - 0.03, 0.007), None))
+            if i + 1 < len(rows):
+                zn = rows[i + 1]
+                lim = min(hw(zz), hw(zn)) - 0.03
+                k = 0
+                while True:
+                    y = 0.07 * (k + (0.5 if i % 2 else 0.0))
+                    if y > lim:
+                        break
+                    for s in ((1, -1) if y > 1e-6 else (1,)):
+                        mesh.append(((xf + 0.007, s * y, (zz + zn) / 2), (0.008, 0.007, zn - zz), None))
+                    k += 1
+    c.box(mesh, 'trim', name="GrilleMesh")
+    c.box([((xf + 0.012, 0.0, 0.465), (0.03, 1.0, 0.075), None)], 'trim', name="GrilleBar")
+    c.box([((xf + 0.03, 0.0, 0.465), (0.008, 0.52, 0.11), None)], 'plate', name="Plate")
+    c.prism([(0.47, 0.25), (0.505, 0.25), (0.572, 0.335), (0.572, 0.42), (0.47, 0.42)], 'x', xf - 0.005, xf + 0.03,
+            'black', mirror=True, name="GrilleBlock")
+    bumper(c, 1.66, 0.175, 0.255, zs=0.27, out=0.022, depth=0.05, color='paint', name="FrontLip")
     c.decal([(0.0, 0.703), (0.36, 0.706), (0.45, 0.724), (0.36, 0.744), (0.0, 0.747)], 'front', 'black',
             name="UpperGrille", min_facing=0.2)
     c.decal(ellipse(0.0, 0.708, 0.062, 0.04, n=14), 'front', 'chrome', mirror=False, offset=0.010, name="Emblem",
             min_facing=0.2)
     c.decal(ellipse(0.0, 0.708, 0.044, 0.026, n=12), 'front', 'black', mirror=False, offset=0.013, name="EmblemCore",
             min_facing=0.2)
+    # écopes d'angle noires : ailette couleur caisse en relief, antibrouillard rond cerclé
     c.decal([(0.63, 0.61), (0.845, 0.60), (0.85, 0.52), (0.835, 0.27), (0.68, 0.27), (0.68, 0.565)], 'front',
             'dark', name="CornerVent", min_facing=0.12)
-    c.decal([(0.68, 0.44), (0.815, 0.45), (0.815, 0.474), (0.68, 0.464)], 'front', 'paint', offset=0.010,
-            name="VentBlade", min_facing=0.12)
-    c.decal(ellipse(0.755, 0.34, 0.04, 0.04, n=12), 'front', 'lens', offset=0.010, name="FogLight", min_facing=0.12)
-    # phares effilés (boîtier noir, lame de feux de jour, deux projecteurs) : pointe intérieure contre le bandeau,
+    for s in (1, -1):
+        x1, x2 = c.front(s * 0.685, 0.455), c.front(s * 0.81, 0.455)
+        psi = math.atan2(-(x2 - x1), s * 0.125)
+        c.box([(((x1 + x2) / 2 + 0.004, s * 0.7475, 0.455), (0.034, 0.15, 0.02), Matrix.Rotation(psi, 3, 'Z'))],
+              'paint', name="VentBlade")
+        loc, nrm = c.hit((P.FAR, s * 0.755, 0.34), (-1, 0, 0))
+        nrm = Vector((nrm.x, nrm.y, 0.0)).normalized()
+        limb(c, loc - nrm * 0.03, loc + nrm * 0.003, 0.05, 'black', n=16, name="FogBezel")
+        limb(c, loc + nrm * 0.003, loc + nrm * 0.008, 0.04, 'lens', n=16, name="FogLight")
+        limb(c, loc + nrm * 0.008, loc + nrm * 0.011, 0.02, 'led', n=10, name="FogCore")
+    # phares effilés (boîtier noir, lame de feux de jour, trois projecteurs) : pointe intérieure contre le bandeau,
     # ils s'élargissent vers le coin puis filent sur l'aile
     c.decal([(0.42, 0.724), (0.56, 0.712), (0.72, 0.722), (0.86, 0.75), (0.875, 0.80), (0.82, 0.83), (0.64, 0.80),
              (0.50, 0.76)], 'front', 'black', name="Headlight", min_facing=0.12)
     c.decal([(0.45, 0.722), (0.56, 0.716), (0.72, 0.727), (0.855, 0.755), (0.855, 0.768), (0.72, 0.741),
              (0.56, 0.730), (0.45, 0.733)], 'front', 'led', offset=0.009, name="DRL", min_facing=0.12)
-    for yc, zc in ((0.61, 0.764), (0.735, 0.785)):
-        c.decal(ellipse(yc, zc, 0.036, 0.024, n=10), 'front', 'led', offset=0.009, name="Projector", min_facing=0.12)
+    for yc, zc, ry in ((0.525, 0.748, 0.026), (0.615, 0.765, 0.034), (0.735, 0.786, 0.034)):
+        c.decal(ellipse(yc, zc, ry + 0.008, ry * 0.68 + 0.006, n=12), 'front', 'chrome', offset=0.008,
+                name="ProjectorRing", min_facing=0.12)
+        c.decal(ellipse(yc, zc, ry, ry * 0.68, n=12), 'front', 'led', offset=0.011, name="Projector", min_facing=0.12)
     c.decal([(2.04, 0.735), (2.02, 0.82), (1.90, 0.855), (1.72, 0.885), (1.62, 0.89), (1.74, 0.845), (1.90, 0.79)],
             'side', 'black', name="HeadlightTail", min_facing=0.2)
     c.decal([(2.03, 0.745), (1.90, 0.80), (1.74, 0.855), (1.64, 0.885), (1.74, 0.868), (1.90, 0.815), (2.025, 0.76)],
             'side', 'led', offset=0.009, name="DRLTail", min_facing=0.2)
-    # capot : joints le long des ailes, de la baie de pare-brise à la pointe des phares
+    # capot : joints le long des ailes, gicleurs ; grille d'auvent noire au pied du pare-brise
     seam = [(0.99, 0.745), (1.45, 0.73), (1.80, 0.69), (1.98, 0.60), (2.06, 0.47)]
     c.decal(band(seam, -0.004, 0.004), 'top', 'trim', offset=0.004, name="HoodSeam", min_facing=0.3)
-    # ---- flancs : vitrage en goutte cerclé de noir, montant central noir, joints et poignée de la grande porte,
-    # écusson rouge et noir derrière la roue avant, rétroviseurs noirs
+    for y in (0.27, -0.27):
+        c.box([((1.13, y, c.top(1.13, y) + 0.004), (0.035, 0.055, 0.012), None)], 'black', name="Washer")
+    c.decal([(0.94, 0.0), (0.94, 0.69), (1.035, 0.715), (1.035, 0.0)], 'top', 'black', offset=0.005, name="Cowl",
+            min_facing=0.2)
+    # vitrages avant et arrière : sérigraphie noire sur le pourtour
+    xs = (0.94, 0.80, 0.62, 0.44, 0.262)
+    c.decal([(x, y8(x) + 0.006) for x in xs] + [(x, y8(x) - 0.035) for x in reversed(xs)], 'top', 'black',
+            offset=0.006, name="ScreenEdge", min_facing=0.2)
+    c.decal([(0.262, 0.0), (0.262, y8(0.262)), (0.315, y8(0.315)), (0.315, 0.0)], 'top', 'black', offset=0.006,
+            name="ScreenTop", min_facing=0.2)
+    xs = (-1.452, -1.55, -1.65, -1.758)
+    c.decal([(x, y8(x) + 0.006) for x in xs] + [(x, y8(x) - 0.04) for x in reversed(xs)], 'top', 'black',
+            offset=0.006, name="RearScreenEdge", min_facing=0.2)
+    c.decal([(-1.715, 0.0), (-1.715, y8(-1.715)), (-1.758, y8(-1.758)), (-1.758, 0.0)], 'top', 'black', offset=0.006,
+            name="RearScreenBottom", min_facing=0.2)
+    # ---- flancs : vitrage en goutte cerclé de noir, montant central noir, joints (porte, boucliers, trappe à
+    # essence à gauche), poignée, écusson rouge et noir derrière la roue avant, bas de caisse rapportés
     c.decal(gryaris_dlo(c, 0.018), 'side', 'black', offset=0.004, name="WindowFrame", min_facing=0.2)
     c.decal(gryaris_dlo(c), 'side', 'glass', offset=0.008, name="SideGlass", min_facing=0.2)
     c.decal(rect(-0.41, z["belt"](-0.38) + 0.02, -0.34, z["re"](-0.38) - 0.03), 'side', 'black', offset=0.011,
@@ -1266,12 +1438,34 @@ def gryaris_details(c):
                 name="DoorSeam", min_facing=0.15)
     c.decal(rect(-0.41, z["rk"](0.0) + 0.045, 0.80, z["rk"](0.0) + 0.057), 'side', 'trim', offset=0.004,
             name="DoorSill", min_facing=0.15)
+    c.decal(band([(1.685, 0.83), (1.655, 0.70), (1.638, 0.52), (1.632, 0.43)], -0.004, 0.004), 'side', 'trim',
+            offset=0.004, name="BumperSeam", min_facing=0.15)
+    c.decal(band([(-1.862, 0.815), (-1.75, 0.70), (-1.66, 0.585), (-1.628, 0.50)], -0.004, 0.004), 'side', 'trim',
+            offset=0.004, name="BumperSeam", min_facing=0.15)
+    flap = ellipse(-0.93, 0.80, 0.072, 0.066, n=14)
+    c.decal(band(flap + flap[:1], -0.004, 0.004), 'side', 'trim', mirror=False, offset=0.004, name="FuelFlap",
+            min_facing=0.15)
     xh, zh = -0.24, z["belt"](-0.24) - 0.085
     yh = c.side(xh, zh)
     c.box([((xh, yh + 0.008, zh), (0.15, 0.03, 0.034), None)], 'paint', mirror=True, name="Handle")
     c.decal(rect(0.865, 0.745, 0.895, 0.77), 'side', 'red', offset=0.006, name="Badge")
     c.decal(rect(0.835, 0.745, 0.865, 0.77), 'side', 'black', offset=0.006, name="Badge")
-    mirrors(c, 0.80, 0.90, 1.045, size=(0.10, 0.16, 0.095), color='black')
+    xs = [0.905 - 1.81 * k / 12 for k in range(13)]
+    ys = [c.side(x, 0.25) for x in xs]
+    c.prism([(x, y + 0.022) for x, y in zip(xs, ys)] + [(x, y - 0.04) for x, y in reversed(list(zip(xs, ys)))], 'z',
+            0.152, 0.262, 'paint', mirror=True, name="SideSkirt")
+    c.prism([(x, y + 0.014) for x, y in zip(xs, ys)] + [(x, y - 0.04) for x, y in reversed(list(zip(xs, ys)))], 'z',
+            0.132, 0.152, 'black', mirror=True, name="SkirtLip")
+    # rétroviseurs noirs profilés : coque, glace, pied sur la porte, répétiteur orange
+    xm, zm = 0.80, 1.04
+    ysm = c.side(xm, 0.975)
+    y0 = ysm + 0.03
+    c.prism([(xm + 0.055, y0 + 0.01), (xm + 0.045, y0 + 0.15), (xm - 0.01, y0 + 0.185), (xm - 0.05, y0 + 0.175),
+             (xm - 0.055, y0 + 0.02)], 'z', zm - 0.05, zm + 0.05, 'black', mirror=True, name="Mirror")
+    c.box([((xm - 0.056, y0 + 0.097, zm), (0.008, 0.13, 0.066), None)], 'glass', mirror=True, name="MirrorGlass")
+    c.box([((xm + 0.005, ysm + 0.012, zm - 0.03), (0.075, 0.08, 0.034), None)], 'black', mirror=True,
+          name="MirrorFoot")
+    c.box([((xm + 0.05, y0 + 0.105, zm), (0.012, 0.065, 0.012), None)], 'amber', mirror=True, name="MirrorRepeater")
     # ---- toit : aileron noir dans le prolongement du pavillon carbone, troisième feu stop, antenne requin
     zt = z["top"](-1.45)
     c.prism([(-1.39, zt + 0.012), (-1.66, zt - 0.02), (-1.695, zt - 0.032), (-1.69, zt - 0.052), (-1.49, zt - 0.055),
@@ -1284,14 +1478,16 @@ def gryaris_details(c):
     c.prism([(-1.13, zr - 0.01), (-1.26, zr + 0.06), (-1.30, zr + 0.055), (-1.31, zr - 0.01)], 'y', -0.02, 0.02,
             'black', name="Antenna")
     # ---- arrière : bandeau noir d'un feu à l'autre sous la lunette (crocs vers le bas côté intérieur des feux),
-    # feux rouges en C qui tournent sur les ailes, écusson, plaque sur le hayon, diffuseur noir, catadioptres,
-    # deux sorties d'échappement et leurs repères
+    # feux rouges en C qui tournent sur les ailes, écusson et monogrammes, plaque sur le hayon, diffuseur noir à
+    # ailettes, catadioptres, deux sorties d'échappement et leurs repères
     c.decal([(0.0, 0.875), (0.40, 0.875), (0.47, 0.82), (0.545, 0.815), (0.60, 0.84), (0.82, 0.83), (0.855, 0.91),
              (0.82, 0.985), (0.0, 0.997)], 'rear', 'black', name="TailBand", min_facing=0.15)
     c.decal([(0.565, 0.85), (0.81, 0.84), (0.845, 0.91), (0.81, 0.975), (0.565, 0.97)], 'rear', 'tail',
             offset=0.009, name="Tail", min_facing=0.15)
     c.decal([(0.565, 0.885), (0.77, 0.88), (0.795, 0.91), (0.77, 0.94), (0.565, 0.938)], 'rear', 'dark',
             offset=0.012, name="TailCore", min_facing=0.15)
+    c.decal(rect(0.58, 0.897, 0.655, 0.925), 'rear', 'lens', offset=0.014, name="Reverse", min_facing=0.15)
+    c.decal(rect(0.675, 0.897, 0.75, 0.925), 'rear', 'amber', offset=0.014, name="TailIndicator", min_facing=0.15)
     c.decal([(-1.878, 0.825), (-1.76, 0.85), (-1.64, 0.91), (-1.76, 0.965), (-1.85, 0.99)], 'side', 'black',
             name="TailBandSide", min_facing=0.3)
     c.decal([(-1.873, 0.84), (-1.78, 0.865), (-1.70, 0.91), (-1.78, 0.955), (-1.86, 0.975)], 'side', 'tail',
@@ -1300,28 +1496,38 @@ def gryaris_details(c):
             min_facing=0.15)
     c.decal(ellipse(0.0, 0.93, 0.041, 0.025, n=12), 'rear', 'black', mirror=False, offset=0.013, name="EmblemCore",
             min_facing=0.15)
+    c.decal(rect(-0.305, 0.915, -0.265, 0.945), 'rear', 'red', mirror=False, offset=0.010, name="BadgeRed",
+            min_facing=0.15)
+    c.decal(rect(-0.45, 0.918, -0.315, 0.942), 'rear', 'chrome', mirror=False, offset=0.010, name="BadgeChrome",
+            min_facing=0.15)
+    c.decal(rect(-0.43, 0.598, -0.32, 0.614), 'rear', 'chrome', mirror=False, offset=0.008, name="BadgeLow")
     c.decal(rect(0.0, 0.60, 0.26, 0.71), 'rear', 'plate', offset=0.012, name="Plate")
     c.decal(band([(0.50, 0.812), (0.475, 0.63), (0.43, 0.572), (0.0, 0.565)], -0.004, 0.004), 'rear', 'trim',
             offset=0.004, name="HatchSeam")
     c.decal([(0.0, 0.255), (0.72, 0.255), (0.735, 0.34), (0.58, 0.43), (0.0, 0.43)], 'rear', 'black',
             name="Diffuser")
+    c.decal([(-1.878, 0.262), (-1.665, 0.25), (-1.655, 0.335), (-1.878, 0.35)], 'side', 'black', name="DiffuserSide",
+            min_facing=0.3)
     c.decal(rect(0.0, 0.33, 0.11, 0.365), 'rear', 'red', offset=0.009, name="RearFog")
     c.decal(rect(0.60, 0.46, 0.72, 0.485), 'rear', 'red', offset=0.008, name="Reflector")
-    xr = c.car["rear"]
+    for y in (0.17, 0.31, -0.17, -0.31):
+        c.prism([(xr + 0.08, 0.218), (xr - 0.014, 0.258), (xr - 0.014, 0.40), (xr + 0.01, 0.40)], 'y', y - 0.008,
+                y + 0.008, 'black', name="DiffuserFin")
     for y, tag in ((0.47, "left"), (-0.47, "right")):
-        limb(c, (xr + 0.12, y, 0.262), (xr - 0.03, y, 0.262), 0.047, 'chrome', n=12, name="Exhaust")
-        limb(c, (xr - 0.03, y, 0.262), (xr - 0.034, y, 0.262), 0.036, 'dark', n=12, name="ExhaustBore")
-        c.marker("exhaust-" + tag, (xr - 0.034, y, 0.262))
+        limb(c, (xr + 0.12, y, 0.262), (xr - 0.035, y, 0.262), 0.052, 'chrome', n=16, name="Exhaust")
+        limb(c, (xr - 0.035, y, 0.262), (xr - 0.039, y, 0.262), 0.042, 'dark', n=16, name="ExhaustBore")
+        c.marker("exhaust-" + tag, (xr - 0.039, y, 0.262))
 
 
 reg(dict(
     id="gryaris", file="GRYaris", name="Toyota GR Yaris", color=(0.87, 0.87, 0.86),
     front=2.115, rear=-1.88, height=1.455, axles=(1.28, -1.28),
-    wheel=dict(rt=0.319, rr=0.232, w=0.225, y=0.7675, style="multi", rim="grey"),
-    axle_wheels=[{}, {"y": 0.7825}],
-    arch_n=10, arch_gap=0.04,
+    wheel=dict(rt=0.319, rr=0.232, w=0.225, y=0.7675, disc=0.178),
+    axle_wheels=[{}, {"y": 0.7825, "disc": 0.152}],
+    wheel_fn=gryaris_wheel,                                           # jantes ajourées, disques, étriers rouges
+    arch_n=16, arch_gap=0.04,
     roof="black",                                                     # pavillon en carbone
-    smooth=dict(dx=0.07, sub={2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 7: 2, 8: 3}),
+    smooth=dict(dx=0.07, sub={2: 2, 3: 2, 4: 3, 5: 3, 6: 3, 7: 2, 8: 4}),
     inset=dict(sh=[(2.115, .03), (-0.60, .03), (-1.28, .045), (-1.88, .035)],
                rail=[(2.115, .10), (0.98, .07), (0.26, .06), (-1.45, .05), (-1.76, .05), (-1.88, .10)]),
     z=dict(
