@@ -16,6 +16,7 @@ namespace ChillRoad
         const float WallZ = 9f;
         const float SpotOn = 42f, SpotOff = 15f;
         static readonly Vector3 Origin = new Vector3(3000f, 2500f, -6000f);
+        static readonly Vector3 GarageOrigin = new Vector3(6000f, 2500f, -6000f);
         static readonly Color Cyan = new Color(0.35f, 0.85f, 1f), Amber = new Color(1f, 0.76f, 0.2f);
 
         class Slot
@@ -30,8 +31,17 @@ namespace ChillRoad
         int selected;
         float camX, camVel, dist = 9f, distVel, lookY = 0.4f, lookVel, camHeight = 1.5f;
 
-        /// <summary>Construit le hall : order[k] = indice (dans le garage) de la voiture exposée à la place k.</summary>
-        public void Build(GameManager g, int[] order)
+        /// <summary>
+        /// Abaissement du point visé (fraction de la distance) : plus il est grand, plus la voiture monte dans l'image
+        /// (l'interface du bas est plus haute).
+        /// </summary>
+        public float lookDrop = 0.07f;
+
+        /// <summary>
+        /// Construit le hall : order[k] = indice (dans le garage) de la voiture exposée à la place k. garage : le garage
+        /// privé du joueur (hall sombre aux filets cyan et ambre, à l'écart du hall de la concession).
+        /// </summary>
+        public void Build(GameManager g, int[] order, bool garage = false)
         {
             lighting = new StudioLighting
             {
@@ -46,7 +56,7 @@ namespace ChillRoad
                 bloomBoost = 0.25f,
             };
             // Hall du pack alpin (Tools/Blender/alp_shops.py) : clair, à la marque rouge de la concession
-            bool pack = g.assets.alp && g.assets.alp.Prefab("showroom_bay_a");
+            bool pack = !garage && g.assets.alp && g.assets.alp.Prefab("showroom_bay_a");
             if (pack)
                 lighting = new StudioLighting
                 {
@@ -60,7 +70,7 @@ namespace ChillRoad
                     fogDensity = -1f,
                     bloomBoost = 0.1f,
                 };
-            Create(g, "Showroom", Origin, lighting.fog);
+            Create(g, garage ? "Garage" : "Showroom", garage ? GarageOrigin : Origin, lighting.fog);
             if (pack && BuildPack(order))
             {
                 // Vitrines : le vrai paysage, vu depuis l'emplacement de la concession sur la carte
@@ -194,7 +204,40 @@ namespace ChillRoad
         }
 
         /// <summary>Point visé : sous la voiture, qui se retrouve ainsi dans la moitié haute de l'image (le bas porte l'interface).</summary>
-        static float LookY(Slot s) => PodiumTop + s.height * 0.5f - s.dist * 0.07f;
+        float LookY(Slot s) => PodiumTop + s.height * 0.5f - s.dist * lookDrop;
+
+        /// <summary>
+        /// Vignette d'une voiture de la rangée, de trois quarts avant, rendue une fois dans une texture. Le décor doit
+        /// être affiché (<see cref="ShopStage.Show"/>) depuis au moins une image : son éclairage de studio est en place.
+        /// </summary>
+        public void RenderThumb(int slot, RenderTexture target)
+        {
+            if (slot < 0 || slot >= slots.Count || !target || !cam) return;
+            var s = slots[slot];
+            float spot = s.spot.intensity;
+            s.spot.intensity = SpotOn;
+            s.table.localRotation = Quaternion.Euler(0f, RestYaw, 0f);
+            var t = cam.transform;
+            Vector3 pos = t.position;
+            Quaternion rot = t.rotation;
+            float fov = cam.fieldOfView;
+            var rt = cam.targetTexture;
+            float radius = (s.dist - 3.4f) / 2.6f;
+            float d = radius * 2f + 1.6f;
+            Vector3 eye = root.position + new Vector3(s.x - 0.2f, PodiumTop + 1.35f, -d);
+            Vector3 look = root.position + new Vector3(s.x, PodiumTop + s.height * 0.42f, 0f);
+            t.SetPositionAndRotation(eye, Quaternion.LookRotation(look - eye, Vector3.up));
+            cam.fieldOfView = 26f;
+            cam.targetTexture = target;
+            cam.ResetAspect();
+            cam.Render();
+            cam.targetTexture = rt;
+            cam.ResetAspect();
+            cam.fieldOfView = fov;
+            t.SetPositionAndRotation(pos, rot);
+            s.table.localRotation = Quaternion.Euler(0f, s.yaw, 0f);
+            s.spot.intensity = spot;
+        }
 
         protected override void Tick(float dt)
         {
