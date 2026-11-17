@@ -7,8 +7,8 @@ using UnityEngine.UI;
 namespace ChillRoad
 {
     /// <summary>
-    /// Garage du joueur, ouvert depuis le menu pause (tuile « Voiture ») : ses voitures alignées sur leurs podiums dans
-    /// un hall sombre (<see cref="ShowroomStage"/>, variante garage), la voiture regardée tourne au centre de l'écran.
+    /// Garage du joueur, ouvert depuis le menu pause (tuile « Voiture ») : ses voitures alignées sur leurs plateaux tournants
+    /// dans son garage-chalet à baie vitrée (<see cref="ShowroomStage"/>, variante garage), la voiture regardée tourne au centre de l'écran.
     /// En bas, une rangée de tuiles (vignette rendue de chaque voiture, nom, « au volant ») ; au-dessus, le nom, la
     /// transmission et la fiche technique de la voiture regardée.
     /// ← → (ou molette, flèches à l'écran) pour passer d'une voiture à l'autre, Entrée / A (ou un deuxième clic sur la

@@ -119,6 +119,12 @@ namespace ChillRoad
 
         /// <summary>Point de la carte (emplacement réel de la boutique) d'où l'on voit le paysage par les vitres ; nul : pas de vue.</summary>
         protected Vector3? viewPoint;
+        /// <summary>Cap imposé de la vue (degrés) ; nul : tourné vers le relief le plus haut à l'horizon.</summary>
+        protected float? viewHeading;
+        /// <summary>Hauteur de l'œil au-dessus du sol (m).</summary>
+        protected float viewLift = 18f;
+        /// <summary>Relevé de la vue (degrés) : la caméra du décor plonge vers la voiture, le paysage peut garder son horizon.</summary>
+        protected float viewTilt;
         bool viewPicked, backdropOn, mainPost;
         Vector3 viewEye;
         Quaternion viewYaw = Quaternion.identity;
@@ -127,7 +133,7 @@ namespace ChillRoad
         Material backdropMaterial;
 
         /// <summary>
-        /// Œil et cap de la vue : au-dessus des toits voisins (18 m au-dessus du sol), tourné vers le relief le plus haut
+        /// Œil et cap de la vue : au-dessus des toits voisins (<see cref="viewLift"/> au-dessus du sol), tourné vers le relief le plus haut
         /// à l'horizon, sans bâtiment ni talus dans les 150 premiers mètres.
         /// </summary>
         void PickView()
@@ -135,7 +141,12 @@ namespace ChillRoad
             viewPicked = true;
             var map = game.Map;
             Vector3 p = viewPoint.Value;
-            viewEye = new Vector3(p.x, map.Height(p.x, p.z) + 18f, p.z);
+            viewEye = new Vector3(p.x, map.Height(p.x, p.z) + viewLift, p.z);
+            if (viewHeading.HasValue)
+            {
+                viewYaw = Quaternion.Euler(0f, viewHeading.Value, 0f);
+                return;
+            }
             float best = float.MinValue, bestYaw = 0f, limit = map.Half - 50f;
             int mask = ~((1 << 2) | (1 << Layer));
             for (int k = 0; k < 24; k++)
@@ -227,7 +238,7 @@ namespace ChillRoad
             // Un peu de parallaxe : la caméra du décor glisse le long du hall, celle du monde bouge dix fois moins
             Vector3 local = cam.transform.position - root.position;
             mainCam.transform.SetPositionAndRotation(viewEye + viewYaw * new Vector3(local.x * 0.1f, 0f, local.z * 0.1f),
-                viewYaw * cam.transform.rotation);
+                viewYaw * Quaternion.Euler(-viewTilt, 0f, 0f) * cam.transform.rotation);
             mainCam.fieldOfView = cam.fieldOfView;
             float d = cam.farClipPlane * 0.9f;
             float hh = 2f * d * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
