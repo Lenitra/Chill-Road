@@ -170,6 +170,15 @@ namespace NoHesi
             }
         }
 
+        /// <summary>Appel de phares au clavier : F maintenue.</summary>
+        public static bool FlashKeyHeld => Kb != null && Kb.fKey.isPressed;
+
+        /// <summary>
+        /// Appel de phares à la manette : croix ↓ maintenue. Elle sert aussi à refuser une invitation de course
+        /// (<see cref="DeclinePressed"/>) : tant qu'une invitation attend, c'est le refus qui passe (voir <see cref="GameManager"/>).
+        /// </summary>
+        public static bool FlashPadHeld => Pad != null && Pad.dpad.down.isPressed;
+
         public static bool LookBack
         {
             get
@@ -239,6 +248,16 @@ namespace NoHesi
             {
                 foreach (var p in Gamepad.all) if (p.buttonSouth.wasPressedThisFrame) return true;
                 return Kb != null && (Kb.eKey.wasPressedThisFrame || Kb.enterKey.wasPressedThisFrame || Kb.numpadEnterKey.wasPressedThisFrame);
+            }
+        }
+
+        /// <summary>Refuser (invitation à une course à plusieurs) : croix ↓ sur n'importe quelle manette, ou N.</summary>
+        public static bool DeclinePressed
+        {
+            get
+            {
+                foreach (var p in Gamepad.all) if (p.dpad.down.wasPressedThisFrame) return true;
+                return Kb != null && Kb.nKey.wasPressedThisFrame;
             }
         }
 

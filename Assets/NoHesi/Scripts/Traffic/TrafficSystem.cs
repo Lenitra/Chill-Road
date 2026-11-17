@@ -7,8 +7,12 @@ namespace NoHesi
     /// Trafic d'ambiance sur le réseau de la carte : véhicules cinématiques qui suivent leur voie (à droite), ralentissent
     /// dans les virages, gardent leurs distances, s'arrêtent derrière un obstacle, et choisissent une route à chaque
     /// carrefour (un seul véhicule engagé à la fois). Sur l'autoroute, ils entrent et sortent par les bretelles à sens
-    /// unique (voies d'insertion et de décélération), sans s'arrêter. Ils apparaissent hors de vue autour du joueur
+    /// unique (voies d'insertion et de décélération), sans s'arrêter. Ils apparaissent hors de vue autour des joueurs
     /// et disparaissent au loin. Percutés, ils deviennent physiques.
+    /// En réseau, le serveur simule le trafic autour de tous les joueurs (chaque groupe de joueurs éloignés des autres
+    /// a le sien, aussi dense que celui d'un joueur seul) ; chez un joueur qui a rejoint la partie
+    /// (<see cref="Replica"/>), les véhicules ne sont que la copie de ceux du serveur. Un véhicule percuté est simulé
+    /// par le joueur qui l'a heurté, qui en transmet la position.
     /// </summary>
     public class TrafficSystem : MonoBehaviour
     {
@@ -50,14 +54,43 @@ namespace NoHesi
             public RoadNetwork.Edge exitRamp;
             public RoadNetwork.Node exitChecked;
             public float exitFrom, exitShift;
+            // Partie en réseau
+            public ushort id;               // numéro donné par le serveur
+            public byte kind, model;        // famille (voiture, poids lourd, deux-roues, agricole) et rang du modèle
+            public Color32 paint;
+            public byte owner = NetProtocol.NoOwner;   // joueur qui simule le véhicule accidenté
+            public bool remote;             // position reçue du réseau (copie du serveur, ou accidenté simulé par un autre joueur)
+            public bool mine, confirmed;    // accidenté simulé ici (partie rejointe), puis confirmé par le serveur
+            public float claim;             // délai laissé au serveur pour confirmer
+            public float hidden;            // caché un instant (le joueur vient d'être replacé à cet endroit)
+            public bool veiled;             // masqué et traversable pour le joueur local (course en réseau, trafic réduit)
+            public int netFrame;
+            public float netSeen;
+            public NetBuffer net;
         }
 
         public readonly List<Car> Cars = new List<Car>();
         public float density = 1f;
-        [Tooltip("Nombre de véhicules autour du joueur pour une densité de 1")] public int baseCount = 26;
+        [Tooltip("Nombre de véhicules autour des joueurs pour une densité de 1")] public int baseCount = 26;
         public float spawnMin = 260f, spawnMax = 800f, despawnDistance = 980f;
-        /// <summary>Voitures pilotées (celle du joueur) : le trafic freine derrière elles.</summary>
+        /// <summary>Joueurs à moins de cette distance (m) l'un de l'autre, de proche en proche : un seul groupe, qui partage son trafic.</summary>
+        public const float GroupDistance = 400f;
+        /// <summary>Plafond du trafic de toute la carte : ce qu'un envoi complet du serveur peut contenir.</summary>
+        public const int MaxCars = NetProtocol.TrafficPackets * NetProtocol.TrafficPerPacket;
+        /// <summary>Nombre de véhicules visé sur toute la carte : celui d'un joueur seul, multiplié par le nombre de groupes de joueurs.</summary>
+        public int Target { get; private set; }
+        /// <summary>
+        /// Rayon (m) autour d'un joueur dans lequel le serveur lui envoie le trafic : la distance au-delà de laquelle un
+        /// véhicule disparaît faute de joueur, donc tout ce qu'il aurait autour de lui en solo (les véhicules
+        /// apparaissent plus près, entre <see cref="spawnMin"/> et <see cref="spawnMax"/>).
+        /// </summary>
+        public float NetRadius => despawnDistance;
+        /// <summary>Voitures des joueurs (la locale et, en réseau, celles des autres) : le trafic freine derrière elles.</summary>
         public readonly List<VehicleController> Drivers = new List<VehicleController>();
+        /// <summary>Partie rejointe : le trafic est la copie de celui du serveur (rien n'est créé ni conduit ici).</summary>
+        public bool Replica { get; private set; }
+        /// <summary>Notre numéro de joueur en réseau (0 en solo et pour l'hôte).</summary>
+        public byte LocalId { get; set; }
         /// <summary>Allumage des feux (0 = jour, 1 = nuit), fourni par le cycle jour/nuit.</summary>
         public float LightsLevel { get; set; }
         /// <summary>Densité selon l'heure (fournie par le cycle jour/nuit) : faible la nuit, forte aux heures de pointe.</summary>
@@ -66,6 +99,12 @@ namespace NoHesi
         public float WeatherSpeed { get; set; } = 1f;
         /// <summary>Trafic pendant une course chronométrée (menu d'avant-course) : 1 normal, moins léger, 0 aucun véhicule.</summary>
         public float RaceFactor { get; set; } = 1f;
+        /// <summary>
+        /// Course en partie réseau, chez le coureur seulement : part du trafic qu'il garde (1 tout, 0 rien). Le monde
+        /// est partagé, <see cref="RaceFactor"/> n'y touche pas : le reste du trafic, choisi d'après le numéro de chaque
+        /// véhicule, est seulement masqué pour ce joueur, qui le traverse ; les autres le voient et le percutent toujours.
+        /// </summary>
+        public float LocalFactor { get; set; } = 1f;
 
         GameAssets assets;
         RoadNetwork road;
@@ -74,6 +113,10 @@ namespace NoHesi
         MaterialPropertyBlock mpb;
         readonly List<(RoadNetwork.Edge edge, float s)> spawnPoints = new List<(RoadNetwork.Edge, float)>();
         readonly List<Vector3> players = new List<Vector3>();
+        // Groupe de chaque joueur, et nombre de véhicules autour de chaque groupe (partie à plusieurs)
+        readonly List<int> groupOf = new List<int>(), groupCars = new List<int>();
+        readonly Dictionary<ushort, Car> byId = new Dictionary<ushort, Car>();
+        ushort nextId;
 
         public void Init(GameAssets a, RoadNetwork r)
         {
@@ -105,7 +148,16 @@ namespace NoHesi
             {
                 var car = Find(c.collider.gameObject);
                 if (car == null || car.crashed) return;
+                // En réseau : celui qui percute un véhicule le simule ensuite (le serveur l'apprend avec notre état)
+                car.owner = LocalId;
                 MakeCrashed(car, -c.impulse * 0.5f);
+                if (Replica)
+                {
+                    car.mine = true;
+                    car.confirmed = false;
+                    car.remote = false;
+                    car.claim = 1.5f;
+                }
             };
         }
 
@@ -113,12 +165,27 @@ namespace NoHesi
         {
             players.Clear();
             players.AddRange(playerPositions);
+            UpdateVeil();
+            if (Replica) { TickReplica(dt); return; }
             spawnTimer -= dt;
-            int target = RaceFactor <= 0f ? 0 : Mathf.Clamp(Mathf.RoundToInt(baseCount * density * TimeDensity * RaceFactor), 2, 60);
-            if (spawnTimer <= 0f && Cars.Count < target)
+            // Ce qu'un joueur a autour de lui ; à plusieurs, chaque groupe de joueurs éloignés des autres en a autant
+            int perGroup = RaceFactor <= 0f ? 0 : Mathf.Clamp(Mathf.RoundToInt(baseCount * density * TimeDensity * RaceFactor), 2, 60);
+            int groups = players.Count > 1 ? FindGroups() : 1;
+            Target = Mathf.Min(perGroup * groups, MaxCars);
+            if (groups == 1)
             {
-                spawnTimer = 0.12f;
-                TrySpawn();
+                if (spawnTimer <= 0f && Cars.Count < Target)
+                {
+                    spawnTimer = 0.12f;
+                    TrySpawn();
+                }
+            }
+            else if (spawnTimer <= 0f)
+            {
+                // Le groupe le moins bien servi d'abord, au même rythme pour chacun qu'en solo
+                spawnTimer = 0.12f / groups;
+                int group = NeediestGroup(groups, out int around);
+                if (around < perGroup && Cars.Count < MaxCars) TrySpawn(group);
             }
             for (int i = Cars.Count - 1; i >= 0; i--)
             {
@@ -128,9 +195,57 @@ namespace NoHesi
                 // Bloqué trop longtemps (carrefour encombré) : retiré s'il est loin des regards
                 if (c.stuck > 25f && PlayerDistance(c.go.transform.position) > 150f) gone = true;
                 if (gone) { Remove(c); Cars.RemoveAt(i); continue; }
-                // Accidenté : sa vitesse réelle (le trafic s'arrête derrière lui)
-                if (c.crashed) c.velocity = c.rb.linearVelocity;
+                // Accidenté simulé ici : sa vitesse réelle (le trafic s'arrête derrière lui, le réseau la transmet)
+                if (c.crashed && !c.remote) c.velocity = c.rb.linearVelocity;
                 UpdateLamps(c);
+            }
+        }
+
+        /// <summary>Partie rejointe : rien n'apparaît ni ne disparaît ici, sauf ce que le serveur n'envoie plus.</summary>
+        void TickReplica(float dt)
+        {
+            for (int i = Cars.Count - 1; i >= 0; i--)
+            {
+                var c = Cars[i];
+                if (!c.go || Time.unscaledTime - c.netSeen > 3f) { Remove(c); Cars.RemoveAt(i); continue; }
+                if (c.mine && !c.confirmed)
+                {
+                    // Le serveur n'a pas confirmé notre accrochage (un autre joueur a été plus rapide, paquet perdu)
+                    c.claim -= dt;
+                    if (c.claim <= 0f) Release(c, false);
+                }
+                if (c.mine) c.velocity = c.rb.linearVelocity;
+                if (c.hidden > 0f)
+                {
+                    c.hidden -= dt;
+                    if (c.hidden <= 0f) c.go.SetActive(true);
+                }
+                UpdateLamps(c);
+            }
+        }
+
+        bool anyVeiled;
+
+        /// <summary>
+        /// Trafic réduit pour le joueur local (<see cref="LocalFactor"/>) : les véhicules en trop ne sont ni affichés ni
+        /// solides chez lui, mais ils continuent de rouler (le serveur les simule pour tous). Un véhicule accidenté que
+        /// cette machine simule reste tel quel : sans collisionneur, il passerait à travers le sol.
+        /// </summary>
+        void UpdateVeil()
+        {
+            if (LocalFactor >= 1f && !anyVeiled) return;
+            anyVeiled = false;
+            foreach (var c in Cars)
+            {
+                if (!c.go) continue;
+                bool veil = LocalFactor < 1f && c.rb.isKinematic && (LocalFactor <= 0f || (c.id * 0.618f) % 1f >= LocalFactor);
+                if (veil != c.veiled)
+                {
+                    c.veiled = veil;
+                    foreach (var r in c.go.GetComponentsInChildren<Renderer>(true)) r.enabled = !veil;
+                    foreach (var col in c.go.GetComponentsInChildren<Collider>(true)) col.enabled = !veil;
+                }
+                anyVeiled |= veil;
             }
         }
 
@@ -141,9 +256,74 @@ namespace NoHesi
             return best;
         }
 
+        /// <summary>Rang du joueur le plus proche d'un point.</summary>
+        int NearestPlayer(Vector3 p)
+        {
+            int nearest = 0;
+            float best = float.MaxValue;
+            for (int i = 0; i < players.Count; i++)
+            {
+                float d = (players[i] - p).sqrMagnitude;
+                if (d < best) { best = d; nearest = i; }
+            }
+            return nearest;
+        }
+
+        /// <summary>
+        /// Range les joueurs en groupes (<see cref="groupOf"/>) : deux joueurs à moins de <see cref="GroupDistance"/>
+        /// l'un de l'autre sont du même groupe, de proche en proche. Rend le nombre de groupes.
+        /// </summary>
+        int FindGroups()
+        {
+            groupOf.Clear();
+            for (int i = 0; i < players.Count; i++) groupOf.Add(-1);
+            int groups = 0;
+            for (int i = 0; i < players.Count; i++)
+            {
+                if (groupOf[i] >= 0) continue;
+                groupOf[i] = groups;
+                // Le groupe s'étend tant qu'un joueur sans groupe est proche de l'un des siens
+                bool grown;
+                do
+                {
+                    grown = false;
+                    for (int a = 0; a < players.Count; a++)
+                    {
+                        if (groupOf[a] != groups) continue;
+                        for (int b = 0; b < players.Count; b++)
+                        {
+                            if (groupOf[b] >= 0 || (players[a] - players[b]).sqrMagnitude > GroupDistance * GroupDistance) continue;
+                            groupOf[b] = groups;
+                            grown = true;
+                        }
+                    }
+                } while (grown);
+                groups++;
+            }
+            return groups;
+        }
+
+        /// <summary>
+        /// Groupe de joueurs qui a le moins de véhicules autour de lui, et combien il en a (un véhicule compte pour le
+        /// groupe du joueur le plus proche). À appeler après <see cref="FindGroups"/>.
+        /// </summary>
+        int NeediestGroup(int groups, out int count)
+        {
+            groupCars.Clear();
+            for (int g = 0; g < groups; g++) groupCars.Add(0);
+            foreach (var c in Cars)
+                if (c.go) groupCars[groupOf[NearestPlayer(c.go.transform.position)]]++;
+            int neediest = 0;
+            for (int g = 1; g < groups; g++)
+                if (groupCars[g] < groupCars[neediest]) neediest = g;
+            count = groupCars[neediest];
+            return neediest;
+        }
+
         void Remove(Car c)
         {
             if (c.node != null && c.node.occupant == c) c.node.occupant = null;
+            if (byId.TryGetValue(c.id, out var known) && known == c) byId.Remove(c.id);
             if (c.go) Destroy(c.go);
         }
 
@@ -165,7 +345,11 @@ namespace NoHesi
 
         // ------------------------------------------------------------------ apparition
 
-        void TrySpawn()
+        /// <summary>
+        /// Fait apparaître un véhicule hors de vue des joueurs. <paramref name="group"/> (partie à plusieurs) : seulement
+        /// autour de ce groupe de joueurs ; -1 : n'importe où autour des joueurs.
+        /// </summary>
+        void TrySpawn(int group = -1)
         {
             if (spawnPoints.Count == 0 || players.Count == 0) return;
             for (int attempt = 0; attempt < 8; attempt++)
@@ -176,6 +360,7 @@ namespace NoHesi
                 Vector3 p = e.LanePosition(s, direction, out _, LaneExtra(e, lane));
                 float d = PlayerDistance(p);
                 if (d < spawnMin || d > spawnMax) continue;
+                if (group >= 0 && groupOf[NearestPlayer(p)] != group) continue;
                 bool free = true;
                 foreach (var o in Cars)
                     if (o.go && (o.go.transform.position - p).sqrMagnitude < 40f * 40f) { free = false; break; }
@@ -190,6 +375,9 @@ namespace NoHesi
                 int kind = farm ? 3 : truck ? 1 : bike ? 2 : 0;
                 Color32 paint = PickPaint(farm ? FarmColors : truck ? TruckColors : PaintColors);
                 var car = CreateVehicle(kind, Random.Range(0, Models(kind).Length), paint);
+                do nextId++; while (nextId == 0 || byId.ContainsKey(nextId));
+                car.id = nextId;
+                byId[car.id] = car;
                 car.edge = e;
                 car.s = s;
                 car.direction = direction;
@@ -212,7 +400,7 @@ namespace NoHesi
         /// <summary>Modèles d'une famille : 0 voitures, 1 poids lourds, 2 deux-roues, 3 engins agricoles.</summary>
         GameObject[] Models(int kind) => kind == 3 ? assets.trafficFarm : kind == 1 ? assets.trafficTrucks : kind == 2 ? assets.trafficBikes : assets.trafficCars;
 
-        /// <summary>Crée un véhicule d'une famille, d'un modèle et d'une teinte donnés.</summary>
+        /// <summary>Crée un véhicule d'une famille, d'un modèle et d'une teinte donnés (tirés au sort ici, ou reçus du serveur).</summary>
         Car CreateVehicle(int kind, int model, Color32 paint)
         {
             var list = Models(kind);
@@ -240,6 +428,7 @@ namespace NoHesi
             var car = new Car
             {
                 go = go, rb = rb, length = b.size.z, halfWidth = b.size.x * 0.5f, truck = truck || farm, farm = farm,
+                kind = (byte)kind, model = (byte)model, paint = paint,
             };
             // Les modèles du pack ont leurs propres optiques émissives
             car.lights = HasEmissive(renderers) ? null : CreateLights(go, box);
@@ -387,14 +576,15 @@ namespace NoHesi
                 c.cachedPos = t.position;
                 c.cachedFwd = t.forward;
             }
-            // Véhicules lointains (plus de FarSim m du joueur) : simulés un pas sur deux avec un pas double
+            // Véhicules lointains (plus de FarSim m de tout joueur) : simulés un pas sur deux avec un pas double
             // (optimisation ; leur mouvement reste lissé par l'interpolation des corps rigides)
             step++;
             for (int i = 0; i < Cars.Count; i++)
             {
                 var c = Cars[i];
                 if (!c.go) continue;
-                if (c.crashed) continue;
+                if (c.remote) { FollowNet(c); continue; }
+                if (c.crashed || Replica) continue;
                 float cdt = dt;
                 if (FarFromDrivers(c.cachedPos))
                 {
@@ -415,6 +605,17 @@ namespace NoHesi
             foreach (var d in Drivers)
                 if (d && (d.transform.position - p).sqrMagnitude < FarSim * FarSim) return false;
             return true;
+        }
+
+        /// <summary>Véhicule piloté par le réseau : montré entre deux états reçus, avec un léger retard.</summary>
+        void FollowNet(Car c)
+        {
+            if (c.net == null || !c.go.activeSelf) return;
+            if (!c.net.Sample(Time.fixedTimeAsDouble - NetProtocol.TrafficDelay, out var p, out var r, out var v)) return;
+            c.velocity = v;
+            c.speed = v.magnitude;
+            c.rb.MovePosition(p);
+            c.rb.MoveRotation(r);
         }
 
         /// <summary>Distance restante jusqu'au bout de la chaussée (entrée du carrefour) dans le sens de marche.</summary>
@@ -597,7 +798,7 @@ namespace NoHesi
         {
             foreach (var o in Cars)
             {
-                if (o == c || o.crossing || o.edge != c.edge || o.direction != c.direction || o.lane != lane) continue;
+                if (o == c || o.remote || o.crossing || o.edge != c.edge || o.direction != c.direction || o.lane != lane) continue;
                 float d = (o.s - c.s) * c.direction;
                 if (d > -28f && d < 45f) return false;
             }
@@ -845,8 +1046,102 @@ namespace NoHesi
             {
                 var c = Cars[i];
                 if (!c.go || (c.go.transform.position - p).sqrMagnitude >= radius * radius) continue;
-                Despawn(c);
+                // Copie du trafic du serveur : cachée un instant, le temps que le serveur la retire de son côté
+                if (Replica) { c.hidden = 1.2f; c.go.SetActive(false); }
+                else Despawn(c);
             }
+        }
+
+        // ------------------------------------------------------------------ partie en réseau
+
+        /// <summary>Partie rejointe (vrai) : le trafic local laisse la place à la copie de celui du serveur. Faux : retour au trafic local.</summary>
+        public void SetReplica(bool replica)
+        {
+            ClearAll();
+            Replica = replica;
+        }
+
+        /// <summary>Partie rejointe : état d'un véhicule reçu du serveur (créé à sa première apparition).</summary>
+        public void ApplyNet(ushort id, int kind, int model, Color32 paint, bool crashed, byte owner, Vector3 pos, Quaternion rot, Vector3 vel, double time, int frame)
+        {
+            if (!Replica) return;
+            if (!byId.TryGetValue(id, out var c) || !c.go)
+            {
+                c = CreateVehicle(kind, model, paint);
+                c.id = id;
+                c.remote = true;
+                c.net = new NetBuffer();
+                c.go.transform.SetPositionAndRotation(pos, rot);
+                c.rb.position = pos;
+                c.rb.rotation = rot;
+                byId[id] = c;
+                Cars.Add(c);
+            }
+            c.netFrame = frame;
+            c.netSeen = Time.unscaledTime;
+            if (c.mine)
+            {
+                if (crashed && owner == LocalId) c.confirmed = true;
+                // Un autre joueur l'a percuté avant nous, ou le serveur l'a repris : on redevient spectateur
+                else if (crashed || c.confirmed) Release(c, crashed);
+                if (c.mine) return;
+            }
+            c.crashed = crashed;
+            c.owner = owner;
+            c.net.Push(time, pos, rot, vel);
+        }
+
+        /// <summary>Partie rejointe : un envoi complet du trafic est arrivé ; ce qui n'y figure plus a disparu chez le serveur.</summary>
+        public void EndNetFrame(int frame)
+        {
+            for (int i = Cars.Count - 1; i >= 0; i--)
+            {
+                var c = Cars[i];
+                if (c.netFrame == frame || c.mine && !c.confirmed) continue;
+                Remove(c);
+                Cars.RemoveAt(i);
+            }
+        }
+
+        /// <summary>Partie rejointe : le véhicule que l'on simulait redevient la copie de celui du serveur.</summary>
+        void Release(Car c, bool crashed)
+        {
+            c.mine = c.confirmed = false;
+            c.remote = true;
+            c.crashed = crashed;
+            c.rb.isKinematic = true;
+            c.net.Clear();
+        }
+
+        /// <summary>Serveur : un joueur a percuté ce véhicule et le simule chez lui ; il nous en transmet la position.</summary>
+        public void Claim(byte player, ushort id, Vector3 pos, Quaternion rot, Vector3 vel, double time)
+        {
+            if (Replica || !byId.TryGetValue(id, out var c) || !c.go) return;
+            if (!c.crashed)
+            {
+                c.crashed = true;
+                c.owner = player;
+                c.remote = true;
+                c.crashTimer = 0f;
+                c.net = new NetBuffer();
+                if (c.node != null && c.node.occupant == c) c.node.occupant = null;
+            }
+            else if (!c.remote || c.owner != player) return;
+            c.net.Push(time, pos, rot, vel);
+        }
+
+        /// <summary>Serveur : un joueur est parti ; les véhicules accidentés qu'il simulait disparaissent avec lui.</summary>
+        public void DropOwner(byte player)
+        {
+            for (int i = Cars.Count - 1; i >= 0; i--)
+                if (Cars[i].crashed && Cars[i].remote && Cars[i].owner == player) Despawn(Cars[i]);
+        }
+
+        public void ClearAll()
+        {
+            foreach (var c in Cars) Remove(c);
+            Cars.Clear();
+            byId.Clear();
         }
     }
 }

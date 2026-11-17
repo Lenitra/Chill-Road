@@ -9,12 +9,20 @@ namespace NoHesi
     /// Les phares escamotables du modèle (enfants « popup-* », pivot sur la charnière) se lèvent avec les phares.
     /// Les faisceaux partent des repères « headlight* » du modèle s'il en a (un seul pour la Peel P50), sinon de deux
     /// points calculés d'après l'encombrement.
+    /// Appel de phares (croix ↓ / F) : plein phares le temps de l'appui, phares allumés ou éteints, de jour comme de
+    /// nuit ; les optiques brillent plus fort et un halo se pose devant chaque phare, visible de face et de loin.
     /// </summary>
     public class CarLights : MonoBehaviour
     {
         /// <summary>Bascule des phares escamotables, avant vers le haut (même valeur que POPUP_ANGLE dans play_cars.py).</summary>
         const float PopupAngle = 60f;
         const float PopupTime = 0.6f;
+        /// <summary>Durée minimale d'un appel de phares (s) : un appui bref se voit quand même, ici et chez les autres joueurs.</summary>
+        const float FlashMin = 0.2f;
+        /// <summary>Appel de phares : intensité ajoutée aux faisceaux, éclat ajouté aux optiques (1 = phares allumés).</summary>
+        const float FlashBeam = 800f, FlashGlow = 2.5f;
+        /// <summary>Halo de l'appel de phares : taille de près (m), agrandissement par mètre de distance, distance où il disparaît.</summary>
+        const float FlareSize = 0.8f, FlareGrowth = 0.018f, FlareRange = 600f;
 
         VehicleController car;
         GameAssets assets;
@@ -27,6 +35,19 @@ namespace NoHesi
         Transform[] popups;
         Quaternion[] popupClosed;
         float popupOpen;
+        // Appel de phares : niveau (0-1), reste de la durée minimale, halos devant les phares
+        float flash, flashHold;
+        bool flashWas;
+        Renderer[] flares;
+        static Material flareMaterial;
+
+        /// <summary>
+        /// Appel de phares demandé : touche tenue (voiture du joueur, réglé par <see cref="GameManager"/>) ou état reçu
+        /// du réseau (voiture d'un autre joueur).
+        /// </summary>
+        public bool Flash;
+        /// <summary>Appel de phares en cours (demandé, ou encore dans sa durée minimale) : c'est lui qui part sur le réseau.</summary>
+        public bool Flashing => Flash || flashHold > 0f;
 
         /// <summary>Phares allumés (choix du joueur, gardé aux changements de voiture).</summary>
         public bool On { get; private set; }
@@ -121,6 +142,23 @@ namespace NoHesi
             heads = TailLights.Find(car.gameObject, false);
             glow = headGlow = -1f;
 
+            // Halo de l'appel de phares : un disque lumineux devant chaque phare, tourné vers la caméra (UpdateFlares).
+            // Créé après la recherche des optiques : ce n'en est pas une
+            if (!flareMaterial && assets.spark)
+            {
+                flareMaterial = new Material(assets.spark) { name = "Headlight flare (runtime)" };
+                flareMaterial.SetColor("_BaseColor", new Color(1.5f, 1.42f, 1.22f, 1f));
+            }
+            flares = new Renderer[flareMaterial ? count : 0];
+            for (int i = 0; i < flares.Length; i++)
+            {
+                var flare = Cube(beams[i].transform.localPosition, Vector3.one, flareMaterial, PrimitiveType.Quad);
+                flare.name = "HeadlightFlare";
+                flare.receiveShadows = false;
+                flare.enabled = false;
+                flares[i] = flare;
+            }
+
             // Phares escamotables : déjà dans la bonne position au changement de voiture
             var found = new List<Transform>();
             foreach (var t in car.GetComponentsInChildren<Transform>())
@@ -139,9 +177,9 @@ namespace NoHesi
                 if (popups[i]) popups[i].localRotation = popupClosed[i] * Quaternion.AngleAxis(-PopupAngle * k, Vector3.right);
         }
 
-        Renderer Cube(Vector3 pos, Vector3 size, Material mat)
+        Renderer Cube(Vector3 pos, Vector3 size, Material mat, PrimitiveType shape = PrimitiveType.Cube)
         {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var go = GameObject.CreatePrimitive(shape);
             Destroy(go.GetComponent<Collider>());
             go.transform.SetParent(root, false);
             go.transform.localPosition = pos;
@@ -170,12 +208,19 @@ namespace NoHesi
             if (car.InputEnabled && GameInput.LightsPressed) Toggle();
             // Allumage bref et progressif (pas d'allumage automatique à la tombée de la nuit)
             level = Mathf.MoveTowards(level, On ? 1f : 0f, Time.deltaTime * 6f);
+            // Appel de phares : plein phares aussitôt, retombée rapide ; un appui bref dure quand même un instant
+            if (Flash && !flashWas) flashHold = FlashMin;
+            flashWas = Flash;
+            flashHold = Mathf.Max(0f, flashHold - Time.deltaTime);
+            flash = Mathf.MoveTowards(flash, Flashing ? 1f : 0f, Time.deltaTime * (Flashing ? 20f : 9f));
+            float beam = level * 450f + flash * FlashBeam;
             foreach (var l in beams)
             {
                 if (!l) continue;
-                l.intensity = level * 450f * beamScale;
-                l.enabled = level > 0.02f;
+                l.intensity = beam * beamScale;
+                l.enabled = beam > 9f;
             }
+            UpdateFlares();
             // Feux stop : optiques et lumière projetée bien plus fortes au freinage
             bool braking = car.BrakeInput > 0.1f && car.ForwardSpeed > 0.5f;
             // Phares éteints : seuls les feux stop s'allument, plus discrètement
@@ -185,9 +230,10 @@ namespace NoHesi
                 glow = target;
                 TailLights.Apply(tails, glow, mpb);
             }
-            if (Mathf.Abs(level - headGlow) > 0.01f)
+            float head = level + flash * FlashGlow;
+            if (Mathf.Abs(head - headGlow) > 0.01f)
             {
-                headGlow = level;
+                headGlow = head;
                 TailLights.Apply(heads, headGlow, mpb);
             }
             float popupTarget = level > 0.02f ? 1f : 0f;
@@ -202,6 +248,36 @@ namespace NoHesi
                 if (!l) continue;
                 l.intensity = rearIntensity;
                 l.enabled = rearIntensity > 0.05f;
+            }
+        }
+
+        /// <summary>
+        /// Halos de l'appel de phares : face à la caméra, un peu en avant du phare (la carrosserie ne les coupe pas),
+        /// visibles seulement de face, et agrandis avec la distance pour se voir de loin en plein jour.
+        /// </summary>
+        void UpdateFlares()
+        {
+            var cam = flash > 0.02f ? Camera.main : null;
+            for (int i = 0; i < flares.Length; i++)
+            {
+                var flare = flares[i];
+                if (!flare || !beams[i]) continue;
+                float size = 0f;
+                if (cam)
+                {
+                    var lamp = beams[i].transform;
+                    Vector3 to = cam.transform.position - lamp.position;
+                    float d = to.magnitude;
+                    if (d > 0.5f && d < FlareRange)
+                    {
+                        float facing = Mathf.Clamp01(Vector3.Dot(lamp.forward, to / d) * 3f);
+                        size = (FlareSize + d * FlareGrowth) * beamScale * flash * facing;
+                        flare.transform.SetPositionAndRotation(lamp.position + to / d * 0.35f, cam.transform.rotation);
+                        flare.transform.localScale = Vector3.one * size;
+                    }
+                }
+                bool show = size > 0.02f;
+                if (flare.enabled != show) flare.enabled = show;
             }
         }
     }

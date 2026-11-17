@@ -13,6 +13,9 @@ namespace NoHesi
     /// (affiché ou masqué), le trafic pendant la course (normal, léger, aucun), la météo (actuelle, beau temps, orage)
     /// et l'heure. Météo et heure s'appliquent tout de suite (on les voit sur la voiture) et tiennent toute la course ;
     /// « Annuler » les remet comme avant. « Lancer la course » démarre le décompte ; Échap / B rend la main sur la ligne.
+    /// En partie réseau, « Lancer la course » propose la course à tous les joueurs (<see cref="Races.Launch"/>) : la
+    /// météo et l'heure, qui sont celles du serveur, ne se règlent pas, et une ligne de plus choisit la voiture (libre,
+    /// ou la voiture du lanceur imposée à tous).
     /// </summary>
     public class RaceSetup : MonoBehaviour
     {
@@ -23,7 +26,7 @@ namespace NoHesi
         static readonly Color Good = new Color(0.45f, 0.95f, 0.5f);
 
         const string GhostKey = "nohesi_race_ghost", TrafficKey = "nohesi_race_traffic";
-        const string WeatherKey = "nohesi_race_weather", TimeKey = "nohesi_race_time";
+        const string WeatherKey = "nohesi_race_weather", TimeKey = "nohesi_race_time", ImposeKey = "nohesi_race_impose";
 
         /// <summary>Heures proposées (-1 : l'heure du moment) et leurs noms.</summary>
         static readonly float[] Hours = { -1f, 8f, 13f, 17.5f, 19.2f, 23f };
@@ -68,8 +71,21 @@ namespace NoHesi
             set { PlayerPrefs.SetInt(TimeKey, Mathf.Clamp(value, 0, Hours.Length - 1)); PlayerPrefs.Save(); }
         }
 
+        /// <summary>
+        /// Course à plusieurs : la voiture du lanceur est imposée à tous les coureurs (prêtée, avec sa fiche d'origine) ;
+        /// sinon chacun court avec la sienne.
+        /// </summary>
+        public static bool ImposeCar
+        {
+            get => PlayerPrefs.GetInt(ImposeKey, 0) == 1;
+            set { PlayerPrefs.SetInt(ImposeKey, value ? 1 : 0); PlayerPrefs.Save(); }
+        }
+
         /// <summary>Facteur de densité du trafic choisi pour la course.</summary>
         public static float TrafficFactor => TrafficFactors[TrafficLevel];
+
+        /// <summary>Facteur de densité d'un réglage du trafic (0 normal, 1 léger, 2 aucun).</summary>
+        public static float FactorOf(int level) => TrafficFactors[Mathf.Clamp(level, 0, TrafficFactors.Length - 1)];
 
         class Row
         {
@@ -92,8 +108,10 @@ namespace NoHesi
         // Temps et heure trouvés à l'ouverture (rendus si l'on annule)
         bool startStorm;
         float startHour;
+        // Partie en réseau à l'ouverture du menu : météo et heure du serveur, ligne « Voiture »
+        bool online;
 
-        const int RowGhost = 0, RowTraffic = 1, RowWeather = 2, RowTime = 3, RowStart = 4, RowCancel = 5, RowCount = 6;
+        const int RowGhost = 0, RowTraffic = 1, RowWeather = 2, RowTime = 3, RowCar = 4, RowStart = 5, RowCancel = 6, RowCount = 7;
 
         public void Init(GameManager g, Races r)
         {
@@ -115,6 +133,10 @@ namespace NoHesi
             openedFrame = ChangedFrame = Time.frameCount;
             races.PlaceOnLine(t);
             game.SetInputEnabled(false);
+            online = game.Online;
+            rows[RowCar].button.gameObject.SetActive(online);
+            rows[RowWeather].button.interactable = rows[RowTime].button.interactable = !online;
+            Wire();
             startStorm = game.Weather && game.Weather.Stormy;
             startHour = game.DayNight ? game.DayNight.timeOfDay : 12f;
             ApplyConditions(true);
@@ -124,7 +146,25 @@ namespace NoHesi
             Refresh();
         }
 
-        /// <summary>Ferme le menu. go : la course démarre (décompte), sinon on reprend la main sur la ligne.</summary>
+        /// <summary>Ligne que l'on peut choisir : affichée et active (en réseau, la météo et l'heure ne le sont pas).</summary>
+        bool Usable(int row) => row >= 0 && row < rows.Count && rows[row].button.gameObject.activeSelf && rows[row].button.interactable;
+
+        /// <summary>Navigation haut / bas entre les lignes que l'on peut choisir, en boucle.</summary>
+        void Wire()
+        {
+            for (int k = 0; k < rows.Count; k++)
+            {
+                int up = k, down = k;
+                do up = (up - 1 + rows.Count) % rows.Count; while (up != k && !Usable(up));
+                do down = (down + 1) % rows.Count; while (down != k && !Usable(down));
+                rows[k].button.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnUp = rows[up].button, selectOnDown = rows[down].button };
+            }
+        }
+
+        /// <summary>
+        /// Ferme le menu. go : la course démarre (décompte ; en réseau, elle est proposée aux autres joueurs), sinon on
+        /// reprend la main sur la ligne.
+        /// </summary>
         void Close(bool go)
         {
             if (!IsOpen) return;
@@ -139,10 +179,11 @@ namespace NoHesi
             track = null;
             if (go)
             {
-                races.Begin(t);
+                races.Launch(t);
                 return;
             }
-            // Annulé : le temps et l'heure reviennent comme à l'ouverture, et reprennent leur cours
+            // Annulé : le temps et l'heure reviennent comme à l'ouverture, et reprennent leur cours (en réseau, on n'y a pas touché)
+            if (online) return;
             if (game.Weather) { game.Weather.Hold(startStorm, true); game.Weather.Release(); }
             if (game.DayNight) { game.DayNight.SetTime(startHour); game.DayNight.frozen = false; }
         }
@@ -160,7 +201,8 @@ namespace NoHesi
                 int selected = -1;
                 for (int i = 0; i < rows.Count; i++)
                     if (es.currentSelectedGameObject == rows[i].button.gameObject) selected = i;
-                if (selected < 0) Select(shown);
+                // Une ligne inactive survolée à la souris ne se choisit pas
+                if (!Usable(selected)) Select(Usable(shown) ? shown : RowStart);
                 else shown = selected;
             }
             // Gauche / droite : change le réglage de la ligne choisie
@@ -186,7 +228,8 @@ namespace NoHesi
                 case RowGhost:
                 case RowTraffic:
                 case RowWeather:
-                case RowTime: Change(row, 1); break;
+                case RowTime:
+                case RowCar: Change(row, 1); break;
                 case RowStart: Close(true); break;
                 default: Close(false); break;
             }
@@ -203,17 +246,18 @@ namespace NoHesi
                 int n = TrafficFactors.Length;
                 TrafficLevel = ((TrafficLevel + dir) % n + n) % n;
             }
-            else if (row == RowWeather)
+            else if (row == RowWeather && !online)
             {
                 WeatherChoice = ((WeatherChoice + dir) % 3 + 3) % 3;
                 ApplyConditions(false);
             }
-            else if (row == RowTime)
+            else if (row == RowTime && !online)
             {
                 int n = Hours.Length;
                 TimeChoice = ((TimeChoice + dir) % n + n) % n;
                 ApplyConditions(false);
             }
+            else if (row == RowCar && online) ImposeCar = !ImposeCar;
             else return;
             if (game.Local.Audio) game.Local.Audio.Chime();
         }
@@ -221,9 +265,11 @@ namespace NoHesi
         /// <summary>
         /// Météo et heure choisies, appliquées tout de suite et tenues (plus de changement de temps, horloge arrêtée)
         /// jusqu'à la fin de la course. « Actuelle » : le temps et l'heure trouvés à l'ouverture.
+        /// Sans effet en partie réseau : la météo et l'heure y sont celles du serveur, pour tous les joueurs.
         /// </summary>
         void ApplyConditions(bool opening)
         {
+            if (game.Online) return;
             if (game.Weather)
             {
                 int w = WeatherChoice;
@@ -304,11 +350,29 @@ namespace NoHesi
             rows[RowStart].value.text = "";
             rows[RowCancel].name.text = Loc.T("Annuler", "Cancel");
             rows[RowCancel].value.text = "";
+            if (online)
+            {
+                // Partie en réseau : météo et heure du serveur ; voiture libre ou imposée ; la course est proposée à tous
+                rows[RowWeather].value.text = rows[RowTime].value.text = Loc.T("réglée par le serveur", "set by the server");
+                rows[RowCar].name.text = Loc.T("Voiture", "Car");
+                rows[RowCar].value.text = "‹  " + (ImposeCar ? Loc.T("Imposée : ", "Same for all: ") + carName : Loc.T("Libre", "Free choice")) + "  ›";
+                var net = game.Net;
+                int others = net.PlayerCount - 1;
+                if (net.Race.Exists)
+                {
+                    // Une seule course à la fois par serveur : pendant celle des autres, on court pour son chrono
+                    rows[RowStart].name.text = Loc.T("Lancer en solo", "Start solo");
+                    rows[RowStart].value.text = Loc.T("course en cours sur le serveur", "a race is running on the server");
+                }
+                else if (others > 0)
+                    rows[RowStart].value.text = others > 1 ? Loc.T($"{others} joueurs invités", $"{others} players invited") : Loc.T("1 joueur invité", "1 player invited");
+            }
             for (int i = 0; i < rows.Count; i++)
             {
                 bool on = i == shown;
-                rows[i].name.color = on ? Ink : White;
-                bool muted = i == RowGhost && !hasBest;
+                bool off = online && (i == RowWeather || i == RowTime);
+                rows[i].name.color = off ? Dim : on ? Ink : White;
+                bool muted = off || i == RowGhost && !hasBest;
                 rows[i].value.color = on ? (muted ? InkDim : Ink) : (muted ? Dim : White);
             }
 
@@ -377,13 +441,7 @@ namespace NoHesi
                 int index = i;
                 rows.Add(MakeRow(panel, () => Choose(index), i == RowStart ? 56f : 48f, i == RowStart ? 26 : 23));
             }
-            for (int k = 0; k < rows.Count; k++)
-                rows[k].button.navigation = new Navigation
-                {
-                    mode = Navigation.Mode.Explicit,
-                    selectOnUp = rows[(k - 1 + rows.Count) % rows.Count].button,
-                    selectOnDown = rows[(k + 1) % rows.Count].button,
-                };
+            Wire();
             hintText = Label(panel, 18, TextAnchor.MiddleLeft, Dim, FontStyle.Bold);
             hintText.gameObject.AddComponent<LayoutElement>().preferredHeight = 34;
             root.SetActive(false);
@@ -427,6 +485,7 @@ namespace NoHesi
             colors.highlightedColor = new Color(0.16f, 0.18f, 0.23f, 0.92f);
             colors.selectedColor = new Color(0.95f, 0.96f, 0.97f, 1f);
             colors.pressedColor = new Color(0.8f, 0.82f, 0.86f, 1f);
+            colors.disabledColor = new Color(0.04f, 0.05f, 0.07f, 0.55f);
             colors.fadeDuration = 0.06f;
             b.colors = colors;
             b.onClick.AddListener(onClick);

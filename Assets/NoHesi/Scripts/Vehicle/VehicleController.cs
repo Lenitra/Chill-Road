@@ -66,7 +66,10 @@ namespace NoHesi
         public VehicleSpec Spec { get; private set; }
         public Rigidbody Body => rb;
         public bool InputEnabled { get; set; } = true;
-        /// <summary>Freins serrés tant que les commandes sont coupées : la voiture ne part pas en roue libre dans la pente.</summary>
+        /// <summary>
+        /// Freins serrés tant que les commandes sont coupées : en réseau, le monde continue quand un menu est ouvert, et
+        /// la voiture ne doit pas partir en roue libre dans la pente.
+        /// </summary>
         public bool Parked { get; set; }
         public float Speed { get; private set; }
         public float SpeedKmh => Speed * 3.6f;
@@ -104,12 +107,23 @@ namespace NoHesi
         float InThrottle => InputEnabled ? GameInput.Throttle : Autopilot ? AutoThrottle : 0f;
         float InBrake => InputEnabled ? GameInput.Brake : Autopilot ? AutoBrake : 0f;
         /// <summary>Frein demandé (joueur ou pilote automatique), pour les feux stop.</summary>
-        public float BrakeInput => InBrake;
+        public float BrakeInput => Remote ? remoteBrake : InBrake;
         float InSteer => InputEnabled ? GameInput.Steer : Autopilot ? AutoSteer : 0f;
         public float SteerAngle => steerAngle;
-        public Vector3 Velocity => rb ? rb.linearVelocity : Vector3.zero;
-        /// <summary>Nombre de téléportations (départ, replacement) : les compteurs de distance repartent de là.</summary>
+        public Vector3 Velocity => Remote ? remoteVelocity : rb ? rb.linearVelocity : Vector3.zero;
+        /// <summary>
+        /// Voiture d'un autre joueur (partie en réseau) : aucune physique ici, son état arrive par le réseau
+        /// (<see cref="ApplyRemote"/>) et elle est déplacée comme un corps cinématique.
+        /// </summary>
+        public bool Remote { get; private set; }
+        /// <summary>Nombre de téléportations (départ, replacement) : transmis en réseau pour que la voiture saute au lieu de glisser.</summary>
         public int TeleportCount { get; private set; }
+        /// <summary>Glisse la plus forte des roues avant et arrière (0-1), transmise en réseau pour la fumée et les traces.</summary>
+        public float SkidFront { get; private set; }
+        public float SkidRear { get; private set; }
+        Vector3 remoteVelocity;
+        float remoteBrake;
+        bool remoteGrounded;
         public Bounds LocalBounds { get; private set; }
         /// <summary>Sorties d'échappement du modèle (repères « exhaust-* », +Z local dans le sens du flux). Vide : pas de pot.</summary>
         public IReadOnlyList<Transform> Exhausts => exhausts;
@@ -148,7 +162,16 @@ namespace NoHesi
             public float vLong, vLat, denom, cap, brakeF;
             public bool abs;
             public float fx, fy;           // forces moyennes sur les sous-pas
+            // Frein de stationnement : point du sol où le pneu s'est posé à l'arrêt
+            public bool held;
+            public Vector3 anchor;
         }
+
+        /// <summary>
+        /// Frein de stationnement : déplacement (m) du pneu par rapport à son point d'arrêt pour lequel il retient
+        /// autant que le poids qu'il porte. Il tient ainsi la pente au millimètre près, sans à-coup.
+        /// </summary>
+        const float HoldStretch = 0.02f;
 
         Rigidbody rb;
         Transform model;
@@ -323,12 +346,49 @@ namespace NoHesi
             steerVelocity = 0f;
             // Roues qui roulent déjà à la vitesse de la voiture, moteur embrayé
             driveW = speed;
-            foreach (var w in wheels) w.omegaR = speed;
+            foreach (var w in wheels) { w.omegaR = speed; w.held = false; }
             clutchOut = false;
             lastSlipAngle = slipRate = 0f;
             // Lancé : 4e (ou le dernier rapport des boîtes plus courtes, ex. 3 rapports de la Peel P50)
             Gear = speed > 20f ? Mathf.Min(4, Spec != null ? Spec.gearRatios.Length : 4) : 1;
             if (Spec != null && Gear >= 1) Rpm = Mathf.Clamp(RpmForSpeed(speed, Gear), IdleRpm, Spec.redline);
+        }
+
+        // ------------------------------------------------------------------ réseau
+
+        /// <summary>Fait de cette voiture celle d'un autre joueur : corps cinématique, sans commandes ni physique.</summary>
+        public void SetRemote()
+        {
+            Remote = true;
+            InputEnabled = false;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            rb.isKinematic = true;
+        }
+
+        /// <summary>État reçu du réseau (voiture d'un autre joueur) : ce que lisent les feux, les effets, la caméra et le trafic.</summary>
+        public void ApplyRemote(in NetCarState s, Vector3 velocity)
+        {
+            remoteVelocity = velocity;
+            Speed = velocity.magnitude;
+            ForwardSpeed = Vector3.Dot(velocity, transform.forward);
+            if (Spec != null) Rpm = Mathf.Lerp(IdleRpm, Spec.redline, s.rpm01);
+            throttle = s.throttle;
+            steerAngle = s.steer;
+            remoteBrake = s.braking ? 1f : 0f;
+            HandbrakeOn = s.handbrake;
+            OnRoad = s.onRoad;
+            SurfaceDirt = s.dirt;
+            remoteGrounded = s.grounded;
+            GroundedWheels = s.grounded ? wheels.Count : 0;
+            SkidAmount = s.skid;
+            SkidFront = s.skidFront;
+            SkidRear = s.skidRear;
+            foreach (var w in wheels) w.omegaR = HandbrakeOn && !w.front ? 0f : ForwardSpeed;
+            int gear = s.gear == 0 ? 1 : s.gear;
+            if (gear == Gear) return;
+            bool up = gear > Gear && Gear >= 1;
+            Gear = gear;
+            if (up) GearChanged?.Invoke(gear);
         }
 
         // ------------------------------------------------------------------ moteur
@@ -520,7 +580,7 @@ namespace NoHesi
 
         void FixedUpdate()
         {
-            if (Spec == null) return;
+            if (Spec == null || Remote) return;
             float dt = Time.fixedDeltaTime;
             float rawThrottle = InThrottle;
             float rawBrake = InBrake;
@@ -549,8 +609,9 @@ namespace NoHesi
             bool reverse = Gear == -1;
             float drivePedal = reverse ? brake : throttle;
             float brakePedal = reverse ? throttle : brake;
-            // Voiture laissée seule (accueil, menu ouvert) : freins serrés, quel que soit le rapport
-            if (Parked && !InputEnabled && !Autopilot)
+            // Voiture laissée seule (menu ouvert pendant une partie en réseau) : freins serrés, quel que soit le rapport
+            bool parked = Parked && !InputEnabled && !Autopilot;
+            if (parked)
             {
                 drivePedal = 0f;
                 brakePedal = 1f;
@@ -667,13 +728,34 @@ namespace NoHesi
             float skidSum = 0f;
             foreach (var w in wheels)
             {
-                if (!w.grounded) { w.locked = false; w.skid = 0f; continue; }
+                if (!w.grounded) { w.locked = false; w.skid = 0f; w.held = false; continue; }
                 float fx = w.fx, fy = w.fy;
                 // Immobilisation à l'arrêt
                 if (Mathf.Abs(w.vLong) < 0.5f && drivePedal < 0.01f) fx = -w.vLong * w.load / 9.81f / dt * 0.5f;
                 // À très basse vitesse, la formule de glissement est instable : on annule directement la glisse latérale
                 float stop = Mathf.Clamp(-w.vLat * w.load / 9.81f / dt * 0.3f, -w.cap, w.cap);
                 fy = Mathf.Lerp(stop, fy, Mathf.Clamp01(Mathf.Abs(w.vLong) / 3f));
+                // Frein de stationnement. Les deux forces ci-dessus ne font que freiner : proportionnelles à la vitesse,
+                // elles laissent la voiture descendre une pente à vitesse lente mais constante (2 cm/s sur celle du
+                // départ). Voiture laissée seule, chaque pneu arrêté retient donc aussi le point du sol où il s'est posé,
+                // comme un ressort court, dans la limite de son adhérence : poussé plus fort (choc), il glisse et se
+                // repose plus loin.
+                if (parked && Mathf.Abs(w.vLong) < 0.5f && Mathf.Abs(w.vLat) < 0.5f && w.load > 0f)
+                {
+                    if (!w.held) { w.held = true; w.anchor = w.hit.point; }
+                    float stiffness = w.load / HoldStretch;
+                    Vector3 pull = Vector3.ProjectOnPlane(w.anchor - w.hit.point, w.hit.normal);
+                    float reach = w.cap / stiffness;
+                    if (pull.sqrMagnitude > reach * reach)
+                    {
+                        pull = pull.normalized * reach;
+                        w.anchor = w.hit.point + pull;
+                    }
+                    var hold = Vector2.ClampMagnitude(new Vector2(fx + Vector3.Dot(pull, w.wf) * stiffness, fy + Vector3.Dot(pull, w.wr) * stiffness), w.cap);
+                    fx = hold.x;
+                    fy = hold.y;
+                }
+                else w.held = false;
                 rb.AddForceAtPosition(w.wf * fx + w.wr * fy, w.hit.point + up * rollCenterHeight);
 
                 // Glisse réelle (au-delà du pic d'adhérence, avec une vraie vitesse de glissement) : fumée, traces, crissement
@@ -685,6 +767,15 @@ namespace NoHesi
                 skidSum += Mathf.Clamp01((x - 0.6f) / 2.2f) * Mathf.Clamp01(slipSpeed / 2f);
             }
             SkidAmount = Mathf.Clamp01(skidSum / Mathf.Max(1, wheels.Count));
+            float skidFront = 0f, skidRear = 0f;
+            foreach (var w in wheels)
+            {
+                if (w.front) skidFront = Mathf.Max(skidFront, w.skid);
+                else skidRear = Mathf.Max(skidRear, w.skid);
+            }
+            SkidFront = skidFront;
+            SkidRear = skidRear;
+
             // --- Caisse à plat : couple de rappel contre le roulis et le tangage excessifs
             Vector3 tilt = Vector3.Cross(up, Vector3.up);
             if (GroundedWheels >= 2) rb.AddTorque(tilt * uprightAssist * rb.mass - Vector3.ProjectOnPlane(rb.angularVelocity, Vector3.up) * rb.mass * 0.4f);
@@ -785,6 +876,14 @@ namespace NoHesi
         public bool WheelContact(int i, out Vector3 point, out Vector3 normal, out float skid)
         {
             var w = wheels[i];
+            if (Remote)
+            {
+                // Voiture d'un autre joueur : roue à sa place de repos, glisse de son essieu reçue du réseau
+                point = transform.TransformPoint(w.mount) - transform.up * (suspensionTravel - staticSag + w.radius);
+                normal = transform.up;
+                skid = remoteGrounded ? (w.front ? SkidFront : SkidRear) : 0f;
+                return remoteGrounded;
+            }
             point = w.grounded ? w.hit.point : Vector3.zero;
             normal = w.grounded ? w.hit.normal : Vector3.up;
             skid = w.grounded ? w.skid : 0f;

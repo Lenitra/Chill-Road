@@ -15,6 +15,8 @@ namespace NoHesi
     /// zoomant.
     /// GPS : un clic sur la carte (ou A / Entrée sur le viseur) y pose la destination, l'itinéraire le plus rapide
     /// s'affiche (<see cref="RouteGuide"/>) ; un clic sur le repère, Y ou Suppr le retire.
+    /// En réseau, le repère d'un autre joueur se choisit de la même façon (clic, ou A / Entrée avec le viseur dessus) :
+    /// le GPS mène à lui et le suit ; son repère est alors cerclé de cyan, et un clic dessus cesse de le suivre.
     /// </summary>
     public class WorldMap : MonoBehaviour
     {
@@ -61,6 +63,11 @@ namespace NoHesi
         readonly List<RectTransform> markArrows = new List<RectTransform>();
         readonly List<Graphic> markCores = new List<Graphic>();
         readonly List<Text> markNames = new List<Text>();
+        readonly List<HudRing> markRings = new List<HudRing>();
+        // Autre joueur désigné par le curseur ou le viseur (son repère grossit et dit comment le choisir)
+        RemoteCar hoveredPlayer;
+        /// <summary>Distance à un repère de joueur (unités d'écran) sous laquelle le curseur ou le viseur le désigne.</summary>
+        const float PlayerHoverRadius = 22f;
         Text placeText, destName, destDetail, scaleText;
         RectTransform scaleBar, hintRow;
         bool hintsForPad;
@@ -138,6 +145,7 @@ namespace NoHesi
                 markArrows.Clear();
                 markCores.Clear();
                 markNames.Clear();
+                markRings.Clear();
                 routeVersion = -1;
                 raceLines.Clear();
                 raceLabels.Clear();
@@ -149,7 +157,7 @@ namespace NoHesi
             if (open && !root) Build();
             IsOpen = open;
             root.SetActive(open);
-            Time.timeScale = open ? 0f : 1f;
+            Time.timeScale = open && !game.Online ? 0f : 1f;
             game.SetInputEnabled(!open);
             openedFrame = Time.frameCount;
             ChangedFrame = Time.frameCount;
@@ -262,7 +270,14 @@ namespace NoHesi
         {
             if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(content, screen, null, out var local)) return;
             var nav = game.Nav;
-            if (nav && nav.HasDestination && pin && (local - pin.anchoredPosition).magnitude * zoom < 20f)
+            if (nav && nav.HasDestination && pin && pin.gameObject.activeSelf && (local - pin.anchoredPosition).magnitude * zoom < 20f)
+            {
+                ClearDestination();
+                return;
+            }
+            // Clic sur le joueur déjà suivi : on cesse de le suivre
+            var player = PlayerAt(local);
+            if (nav && player && nav.Friend == player)
             {
                 ClearDestination();
                 return;
@@ -270,12 +285,50 @@ namespace NoHesi
             PlaceAt(local * MetresPerUnit);
         }
 
+        /// <summary>Autre joueur (partie en réseau) dont le repère est sous ce point de la carte, ou null.</summary>
+        RemoteCar PlayerAt(Vector2 local)
+        {
+            var remotes = game.Net ? game.Net.Remotes : null;
+            if (remotes == null) return null;
+            RemoteCar found = null;
+            float best = PlayerHoverRadius;
+            foreach (var r in remotes)
+            {
+                if (!r || !r.Ready) continue;
+                Vector3 p = r.transform.position;
+                float d = (Local(p.x, p.z) - local).magnitude * zoom;
+                if (d < best) { best = d; found = r; }
+            }
+            return found;
+        }
+
+        /// <summary>Point de la carte désigné : sous le viseur s'il est affiché (manette, flèches), sinon sous le curseur.</summary>
+        bool Pointed(out Vector2 local)
+        {
+            local = Vector2.zero;
+            if (cross.gameObject.activeSelf)
+            {
+                local = Local(aim.x, aim.y);
+                return true;
+            }
+            if (Mouse.current == null) return false;
+            Vector2 screen = Mouse.current.position.ReadValue();
+            return OnMap(screen) && RectTransformUtility.ScreenPointToLocalPointInRectangle(content, screen, null, out local);
+        }
+
         /// <summary>Destination au point de la carte (m) : un lieu-dit tout proche lui donne son nom.</summary>
         void PlaceAt(Vector2 xz)
         {
             var nav = game.Nav;
             // Pendant une course, le GPS affiche son parcours : pas d'autre destination
-            if (!nav || nav.OnCourse) return;
+            if (!nav || nav.OnCourse || GameManager.DedicatedServer) return;
+            // Sur le repère d'un autre joueur : le GPS mène à lui et le suit
+            var player = PlayerAt(Local(xz.x, xz.y));
+            if (player)
+            {
+                nav.Follow(player);
+                return;
+            }
             // Clic sur le départ d'une course : le GPS y mène
             if (game.Races)
                 foreach (var t in game.Races.All)
@@ -320,8 +373,10 @@ namespace NoHesi
         {
             var nav = game.Nav;
             bool has = nav && nav.HasDestination;
-            pin.gameObject.SetActive(has);
-            if (has)
+            // Joueur suivi : pas de losange, c'est son repère qui est cerclé (Refresh)
+            bool friend = has && nav.Friend;
+            pin.gameObject.SetActive(has && !friend);
+            if (has && !friend)
             {
                 pin.anchoredPosition = Local(nav.Destination.x, nav.Destination.z);
                 pin.localScale = Vector3.one * ((1f + Mathf.Sin(Time.unscaledTime * 4f) * 0.06f) / zoom);
@@ -355,8 +410,13 @@ namespace NoHesi
             {
                 destName.text = Loc.T("Aucune", "None");
                 destName.color = Dim;
-                destDetail.text = GameInput.UsingGamepad ? Loc.T("A : poser la destination sur le viseur", "A: set the destination at the crosshair")
-                    : Loc.T("Clic sur la carte : choisir où aller", "Click the map to choose where to go");
+                // En réseau avec d'autres joueurs : on peut aussi choisir l'un d'eux
+                bool others = game.Net && game.Net.Remotes.Count > 0;
+                destDetail.text = GameInput.UsingGamepad
+                    ? (others ? Loc.T("A : poser la destination sur le viseur, ou rejoindre le joueur visé", "A: set the destination at the crosshair, or drive to the player under it")
+                              : Loc.T("A : poser la destination sur le viseur", "A: set the destination at the crosshair"))
+                    : others ? Loc.T("Clic sur la carte ou sur un joueur : choisir où aller", "Click the map or a player to choose where to go")
+                             : Loc.T("Clic sur la carte : choisir où aller", "Click the map to choose where to go");
             }
             else
             {
@@ -365,6 +425,7 @@ namespace NoHesi
                 destDetail.text = nav.OnCourse ? Loc.T("Course en cours : suivre le parcours", "Race in progress: follow the course")
                     : !nav.HasRoute ? Loc.T("Pas d'itinéraire", "No route")
                     : Loc.F($"{nav.Remaining / 1000f:0.0} km  ·  ≈ {Mathf.Max(1, Mathf.RoundToInt(nav.RemainingTime / 60f))} min");
+                if (friend) destDetail.text += Loc.T("\nLe GPS suit ce joueur", "\nThe GPS follows this player");
             }
         }
 
@@ -391,14 +452,34 @@ namespace NoHesi
             cross.anchoredPosition = openOffset + (Local(aim.x, aim.y) - Local(center.x, center.y)) * zoom;
             // Repères et noms : taille constante à l'écran quel que soit le zoom
             foreach (var mark in fixedSize) mark.localScale = Vector3.one / zoom;
+            var remotes = game.Net ? game.Net.Remotes : null;
+            int others = remotes != null ? remotes.Count : 0;
+            while (playerMarks.Count < 1 + others) playerMarks.Add(PlayerMark(playerMarks.Count));
+            hoveredPlayer = others > 0 && Pointed(out var pointed) ? PlayerAt(pointed) : null;
+            var followed = game.Nav ? game.Nav.Friend : null;
             for (int i = 0; i < playerMarks.Count; i++)
             {
-                Transform t = i == 0 && game.Player ? game.Player.transform : null;
+                var remote = i > 0 && i - 1 < others ? remotes[i - 1] : null;
+                Transform t = i == 0 ? (GameManager.DedicatedServer ? null : game.Player.transform) : remote && remote.Ready ? remote.transform : null;
                 playerMarks[i].gameObject.SetActive(t);
                 if (!t) continue;
+                bool over = remote && remote == hoveredPlayer, target = remote && remote == followed;
+                if (remote)
+                {
+                    markCores[i].color = remote.Color;
+                    // Sous son pseudo : comment le choisir (survolé), ou le rappel qu'il est la destination
+                    bool pad = GameInput.UsingGamepad;
+                    string note = over && target ? (pad ? Loc.T("Y : ne plus le suivre", "Y: stop following") : Loc.T("Clic : ne plus le suivre", "Click: stop following"))
+                        : over ? (pad ? Loc.T("A : le rejoindre", "A: drive to this player") : Loc.T("Clic : le rejoindre", "Click: drive to this player"))
+                        : target ? Loc.T("destination du GPS", "GPS destination") : null;
+                    markNames[i].text = note == null ? remote.Name : remote.Name + "\n<size=16><color=#FFFFFFD8>" + note + "</color></size>";
+                }
+                // Joueur suivi : son repère est cerclé de cyan
+                if (markRings[i].gameObject.activeSelf != target) markRings[i].gameObject.SetActive(target);
+                if (target) markRings[i].transform.localScale = Vector3.one * (1f + Mathf.Sin(Time.unscaledTime * 4f) * 0.07f);
                 playerMarks[i].anchoredPosition = Local(t.position.x, t.position.z);
                 markArrows[i].localEulerAngles = new Vector3(0f, 0f, -t.eulerAngles.y);
-                float pulse = i == 0 ? 1f + Mathf.Sin(Time.unscaledTime * 5f) * 0.08f : 0.85f;
+                float pulse = i == 0 ? 1f + Mathf.Sin(Time.unscaledTime * 5f) * 0.08f : over ? 1.15f : target ? 1f : 0.85f;
                 playerMarks[i].localScale = Vector3.one * (pulse / zoom);
             }
             // Le joueur reste au-dessus de tout le reste
@@ -812,18 +893,8 @@ namespace NoHesi
         void UpdateRaceHover()
         {
             if (raceStarts.Count == 0) return;
-            bool has = false;
-            Vector2 local = Vector2.zero;
-            if (cross.gameObject.activeSelf)
-            {
-                local = Local(aim.x, aim.y);
-                has = true;
-            }
-            else if (Mouse.current != null)
-            {
-                Vector2 screen = Mouse.current.position.ReadValue();
-                has = OnMap(screen) && RectTransformUtility.ScreenPointToLocalPointInRectangle(content, screen, null, out local);
-            }
+            // Un joueur désigné passe avant le départ sur lequel il se trouve (c'est lui que la validation choisit)
+            bool has = Pointed(out var local) && !hoveredPlayer;
             int hover = -1;
             if (has)
             {
@@ -1013,6 +1084,13 @@ namespace NoHesi
             core.raycastTarget = false;
             var name = MapLabel(mark, 20, TextAnchor.MiddleLeft, Color.white, new Vector2(24f, 0f), FontStyle.BoldAndItalic);
             name.rectTransform.pivot = new Vector2(0f, 0.5f);
+            // Cercle du joueur suivi par le GPS (masqué sinon)
+            var ring = Box(mark, "Followed", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero).gameObject.AddComponent<HudRing>();
+            ring.inner = 19f;
+            ring.outer = 22.5f;
+            ring.color = Info;
+            ring.gameObject.SetActive(false);
+            markRings.Add(ring);
             markArrows.Add(turn);
             markCores.Add(core);
             markNames.Add(name);

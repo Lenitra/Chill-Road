@@ -171,7 +171,7 @@ namespace NoHesi
             {
                 var p = passes[i];
                 var c = p.car;
-                if (c == null || !c.go || !c.go.activeInHierarchy || c.crashed || !traffic.Cars.Contains(c)) { passes.RemoveAt(i); continue; }
+                if (c == null || !c.go || !c.go.activeInHierarchy || c.crashed || c.veiled || !traffic.Cars.Contains(c)) { passes.RemoveAt(i); continue; }
                 Vector3 d = c.go.transform.position - pos; d.y = 0f;
                 float along = Vector3.Dot(d, fwd), side = Vector3.Dot(d, right);
                 bool overlap = Mathf.Abs(along) < TrafficSystem.Extent(c, fwd) + halfLen + 0.3f;
@@ -189,10 +189,10 @@ namespace NoHesi
             }
 
             if (!fastEnough) return;
-            // Nouveaux passages : véhicules proches, encore devant ou derrière
+            // Nouveaux passages : véhicules proches, encore devant ou derrière (pas ceux qu'une course en réseau masque)
             foreach (var c in traffic.Cars)
             {
-                if (c.crashed || !c.go || !c.go.activeInHierarchy) continue;
+                if (c.crashed || c.veiled || !c.go || !c.go.activeInHierarchy) continue;
                 Vector3 d = c.go.transform.position - pos; d.y = 0f;
                 if (d.sqrMagnitude > 25f * 25f) continue;
                 float along = Vector3.Dot(d, fwd);

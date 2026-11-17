@@ -31,6 +31,7 @@ namespace NoHesi
         public event Action<bool> Changed;
 
         bool stormy;
+        bool remote;                               // partie en réseau rejointe : le temps est celui du serveur
         float chance = StormShare;                 // probabilité de pluie en vigueur (part du temps sous l'orage)
         float periodLeft, nextStrike, flashT = 99f, flashPeak, gustSeed;
         Camera cam;
@@ -145,6 +146,28 @@ namespace NoHesi
             periodLeft = fresh >= float.MaxValue ? fresh : Mathf.Min(periodLeft, fresh);
         }
 
+        /// <summary>Partie en réseau rejointe : le temps qu'il fait est celui du serveur (reçu plusieurs fois par seconde).</summary>
+        public void SetRemote(bool stormyNow, float storm, float rainNow, float wetness)
+        {
+            remote = true;
+            if (stormyNow != stormy)
+            {
+                stormy = stormyNow;
+                Changed?.Invoke(stormy);
+            }
+            Storm = storm;
+            Rain = rainNow;
+            Wetness = wetness;
+        }
+
+        /// <summary>Retour à la météo locale (partie en réseau quittée ou perdue) : elle reprend d'où en était le serveur.</summary>
+        public void ClearRemote()
+        {
+            if (!remote) return;
+            remote = false;
+            periodLeft = PeriodLength(stormy);
+        }
+
         // Orage de 50 s à 1 min 40 (75 s en moyenne) ; période claire de durée moyenne 75 s × (1 − p) / p pour que
         // l'orage occupe la part p du temps (225 s à 25 %, soit 2 min 30 à 5 min), ±33 %. Jamais / toujours : sans fin.
         float PeriodLength(bool storm)
@@ -158,6 +181,13 @@ namespace NoHesi
         void Update()
         {
             float dt = Time.deltaTime;
+            if (remote)
+            {
+                // Nuages, pluie et route mouillée viennent du serveur ; les éclairs restent tirés ici
+                Shader.SetGlobalFloat("_NoHesiWet", Wetness);
+                UpdateLightning(dt);
+                return;
+            }
             if (!Held) periodLeft -= dt;
             if (!Held && periodLeft <= 0f)
             {

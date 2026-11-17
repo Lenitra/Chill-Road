@@ -10,7 +10,7 @@ namespace NoHesi
     /// Menu Options (construit en code), ouvert depuis l'accueil ou la pause, dans le langage visuel du HUD et de la
     /// pause : voile sombre, plaque inclinée anthracite (<see cref="HudShape"/>), police du HUD, titre or, rubriques
     /// cyan, curseurs or.
-    /// Rangé par onglets : Audio, Jeu (trafic, pluie, commandes tactiles), Graphismes (qualité, distance des détails,
+    /// Rangé par onglets : Audio, Jeu (trafic, pluie, commandes tactiles si l'écran est tactile), Graphismes (qualité, distance des détails,
     /// limite d'images), Carte (retour au départ). Tout s'applique tout de suite.
     /// Manette : LB/RB (clavier : Tab, Maj+Tab) pour changer d'onglet, haut/bas pour choisir (la ligne choisie
     /// s'éclaire), gauche/droite pour régler.
@@ -93,10 +93,15 @@ namespace NoHesi
             Section(play, "PARTIE", "GAMEPLAY", "appliqué tout de suite", "applied immediately");
             var traffic = AddSlider(play, "Densité du trafic", "Traffic density", 0.2f, 2f, 18, () => GameSettings.TrafficDensity, v => GameSettings.TrafficDensity = v, Percent);
             var rain = AddSlider(play, "Probabilité de pluie", "Rain probability", 0f, 1f, 20, () => GameSettings.RainChance, v => GameSettings.RainChance = v, v => v < 0.01f ? Loc.T("Jamais", "Never") : v > 0.99f ? Loc.T("Toujours", "Always") : Percent(v));
-            Section(play, "COMMANDES", "CONTROLS", "téléphone, tablette", "phone, tablet");
-            // Commandes tactiles (téléphone, tablette) : façon de diriger, ou désactivées
-            var touch = AddSlider(play, "Commandes tactiles", "Touch controls", 0f, 3f, 3, () => GameSettings.TouchSteer, v => GameSettings.TouchSteer = Mathf.RoundToInt(v),
-                v => v < 0.5f ? Loc.T("Désactivées", "Off") : v < 1.5f ? Loc.T("Glisser", "Slide") : v < 2.5f ? Loc.T("Boutons ‹ ›", "‹ › buttons") : Loc.T("Inclinaison", "Tilt"));
+            // Commandes tactiles (téléphone, tablette) : façon de diriger, ou désactivées. Absentes sur un PC sans
+            // écran tactile, où elles ne s'affichent jamais.
+            Slider touch = null;
+            if (TouchScreen)
+            {
+                Section(play, "COMMANDES", "CONTROLS", "téléphone, tablette", "phone, tablet");
+                touch = AddSlider(play, "Commandes tactiles", "Touch controls", 0f, 3f, 3, () => GameSettings.TouchSteer, v => GameSettings.TouchSteer = Mathf.RoundToInt(v),
+                    v => v < 0.5f ? Loc.T("Désactivées", "Off") : v < 1.5f ? Loc.T("Glisser", "Slide") : v < 2.5f ? Loc.T("Boutons ‹ ›", "‹ › buttons") : Loc.T("Inclinaison", "Tilt"));
+            }
 
             // Graphismes : changer la qualité remet la distance des détails au niveau conseillé
             var gfx = pages[2];
@@ -157,7 +162,7 @@ namespace NoHesi
             pageItems = new[]
             {
                 new Selectable[] { music, effects },
-                new Selectable[] { traffic, rain, touch },
+                touch ? new Selectable[] { traffic, rain, touch } : new Selectable[] { traffic, rain },
                 new Selectable[] { quality, detail, fps },
                 new Selectable[] { apply.button },
             };
@@ -166,6 +171,9 @@ namespace NoHesi
             RefreshAll();
             root.SetActive(false);
         }
+
+        /// <summary>Téléphone, tablette, ou PC muni d'un écran tactile : seuls appareils où les commandes tactiles s'affichent.</summary>
+        static bool TouchScreen => Application.isMobilePlatform || UnityEngine.InputSystem.Touchscreen.current != null;
 
         static string Percent(float v) => Loc.T($"{Mathf.RoundToInt(v * 100f)} %", $"{Mathf.RoundToInt(v * 100f)}%");
 
@@ -196,6 +204,13 @@ namespace NoHesi
         void ApplyRoad()
         {
             GameSettings.Save();
+            // En réseau, la partie continue : la voiture revient au départ et le menu se referme
+            if (game.Online)
+            {
+                game.Restart();
+                Close();
+                return;
+            }
             IsOpen = false;
             game.Restart();
         }

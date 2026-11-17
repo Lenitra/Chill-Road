@@ -32,7 +32,7 @@ namespace NoHesi
             wind = Loop(Noise(0.06f, 2.5f));
             skid = Loop(Screech());
             siren = Loop(Siren());
-            horn = Loop(HornTone());
+            horn = Loop(HornClip);
             oneShots = new AudioSource[8];
             for (int i = 0; i < oneShots.Length; i++) { oneShots[i] = gameObject.AddComponent<AudioSource>(); oneShots[i].playOnAwake = false; }
             whoosh = Whoosh();
@@ -86,8 +86,8 @@ namespace NoHesi
             float skidTarget = car.GroundedWheels > 0 && car.Speed > 4f ? Mathf.Clamp01((car.SkidAmount - 0.25f) * 1.6f) : 0f;
             skid.volume = Mathf.Lerp(skid.volume, paused ? 0f : masterVolume * skidTarget * 0.35f, Time.unscaledDeltaTime * 10f);
             // Klaxon : attaque franche, relâchement très court
-            float hornTarget = Horn && !paused ? masterVolume * 0.5f : 0f;
-            horn.volume = Mathf.MoveTowards(horn.volume, hornTarget, Time.unscaledDeltaTime * (hornTarget > horn.volume ? 25f : 12f));
+            float hornTarget = Horn && !paused ? masterVolume * HornVolume : 0f;
+            horn.volume = HornFade(horn.volume, hornTarget, Time.unscaledDeltaTime);
             bool chase = false;
             siren.volume = paused || !chase ? 0f : 0f;
         }
@@ -169,6 +169,20 @@ namespace NoHesi
             }
             return Clip("Siren", d);
         }
+
+        /// <summary>Volume du klaxon entendu de sa propre voiture (part du volume des effets).</summary>
+        public const float HornVolume = 0.5f;
+
+        static AudioClip hornClip;
+
+        /// <summary>
+        /// Son du klaxon, le même pour toutes les voitures : celle du joueur et celles des autres joueurs d'une partie en
+        /// réseau (<see cref="RemoteCar"/>), synthétisé une seule fois.
+        /// </summary>
+        public static AudioClip HornClip => hornClip ? hornClip : hornClip = HornTone();
+
+        /// <summary>Volume du klaxon une image plus tard : attaque franche, relâchement très court.</summary>
+        public static float HornFade(float volume, float target, float dt) => Mathf.MoveTowards(volume, target, dt * (target > volume ? 25f : 12f));
 
         /// <summary>
         /// Klaxon de voiture : deux trompes accordées à la tierce majeure (420 et 525 Hz), timbre nasillard (harmoniques

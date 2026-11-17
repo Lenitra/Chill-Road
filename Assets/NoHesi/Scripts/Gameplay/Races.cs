@@ -23,7 +23,11 @@ namespace NoHesi
     /// passage : à chaque porte, l'écart au record s'annonce en haut au centre (<see cref="Hud.Announce"/>).
     /// Pendant la course, le cadre en haut à droite ne montre que l'avancement (pourcentage du sprint, ou tour) et le chrono.
     /// Le record court avec nous : sa voiture, en fantôme translucide, refait son parcours (<see cref="RaceGhost"/>).
-    /// Chaque joueur court pour lui (rien ne passe par le réseau).
+    /// Seul, chaque joueur court pour lui. En partie réseau, « Lancer la course » propose la course à tous : le serveur
+    /// tient la séance (<see cref="NetRace"/>), les autres joueurs reçoivent une invitation, et ceux qui l'acceptent
+    /// sont posés sur la grille pour un décompte commun. La course elle-même se déroule ici comme en solo (portes,
+    /// chrono, abandon, record et fantôme personnels) ; chacun remonte ses portes franchies, son avancement et son temps
+    /// final, et le serveur en tire le classement, affiché en direct dans le cadre du chrono puis en tableau à la fin.
     /// </summary>
     public class Races : MonoBehaviour
     {
@@ -45,6 +49,8 @@ namespace NoHesi
         const float GateBefore = 16f, GateAfter = 5f, GateStep = 1f;
         const float AbandonHold = 0.8f;
         const float LostDistance = 650f, LostTime = 6f, GateTimeout = 300f;
+        /// <summary>Course à plusieurs avec collisions entre joueurs : les coureurs partent en file, espacés de cette distance (m).</summary>
+        const float GridSpacing = 9f;
 
         /// <summary>Tracé : points de la carte (x, z) à relier dans l'ordre ; pour une boucle, le dernier revient au premier.</summary>
         class Def
@@ -239,15 +245,42 @@ namespace NoHesi
 
         RaceSetup setup;
 
+        // Course à plusieurs (partie en réseau) : séance du serveur que l'on suit (0 : aucune), notre réponse à cette
+        // séance puis notre état de coureur, et ce que l'on en remonte au serveur
+        byte netSession;
+        NetRaceStatus netStatus;
+        NetRacePhase netPhase;
+        int netGates;
+        float netProgress, netTime;
+        /// <summary>La course en cours ici est celle de la séance du serveur.</summary>
+        bool netRace;
+        /// <summary>Voiture imposée au volant : la nôtre revient à la fin de la course.</summary>
+        bool borrowed;
+        /// <summary>Invitation affichée, en attente de réponse.</summary>
+        bool inviteOpen;
+        /// <summary>Course que l'on vient de proposer au serveur, tant qu'il ne l'a pas reprise.</summary>
+        Track proposed;
+
+        /// <summary>Voiture imposée par la course à plusieurs en cours : on ne change pas de voiture avant la fin.</summary>
+        public bool CarLocked => borrowed;
+        /// <summary>Invitation à une course à plusieurs affichée, en attente de réponse (la touche d'entrée y répond).</summary>
+        public bool InvitePending => inviteOpen;
+
         public void Init(GameManager g)
         {
             game = g;
+            if (GameManager.DedicatedServer) return;
             MiniMap.Overlay += DrawOnMiniMap;
             setup = gameObject.AddComponent<RaceSetup>();
             setup.Init(g, this);
+            if (g.Net) g.Net.ProposalDropped += OnProposalDropped;
         }
 
-        void OnDestroy() => MiniMap.Overlay -= DrawOnMiniMap;
+        void OnDestroy()
+        {
+            MiniMap.Overlay -= DrawOnMiniMap;
+            if (game && game.Net) game.Net.ProposalDropped -= OnProposalDropped;
+        }
 
         // ------------------------------------------------------------------ tracés
 
@@ -415,7 +448,7 @@ namespace NoHesi
 
         void Update()
         {
-            if (!game) return;
+            if (!game || GameManager.DedicatedServer) return;
             Load();
             if (tracks == null) return;
             if (game.State != GameManager.Phase.Playing)
@@ -431,6 +464,7 @@ namespace NoHesi
             Vector3 pos = car.transform.position;
             bool menu = game.Hud && game.Hud.Paused || OptionsMenu.IsOpen;
             float dt = Time.deltaTime;
+            UpdateNet(menu);
             switch (mode)
             {
                 case Mode.Idle: UpdateIdle(car, pos, menu); break;
@@ -454,10 +488,12 @@ namespace NoHesi
                 d.y = 0f;
                 if (d.magnitude < best) { best = d.magnitude; near = t; }
             }
-            candidate = near != null && best < StartRadius && car.Speed < StartSpeed && !menu ? near : null;
+            // Course à plusieurs proposée ou acceptée : on attend son départ, pas de menu d'avant-course
+            bool waiting = proposed != null || netSession != 0 && netStatus == NetRaceStatus.Accepted;
+            candidate = near != null && best < StartRadius && car.Speed < StartSpeed && !menu && !waiting ? near : null;
             if (near != null && best < 140f)
             {
-                if (near != announced && !menu && candidate == null)
+                if (near != announced && !menu && candidate == null && !waiting)
                 {
                     announced = near;
                     string hint = Loc.T("arrête-toi au départ", "stop at the start");
@@ -465,21 +501,31 @@ namespace NoHesi
                 }
             }
             else if (best > 220f) announced = null;
-            if (candidate != null && GameInput.InteractPressed) setup.Open(candidate);
+            if (candidate != null && !inviteOpen && GameInput.InteractPressed) setup.Open(candidate);
         }
 
         /// <summary>Lance la course : la voiture est posée derrière la ligne, dans le sens du parcours ; décompte.</summary>
         public void Begin(Track t)
         {
             if (t == null || mode != Mode.Idle || game.State != GameManager.Phase.Playing) return;
+            StartRace(t, false, 0, RaceSetup.TrafficFactor);
+        }
+
+        /// <summary>
+        /// Départ d'une course. Seul : sur la ligne, décompte de trois temps. Course à plusieurs (<paramref name="net"/>) :
+        /// à sa place de la grille, et le décompte s'achève à l'instant fixé par le serveur, le même pour tous.
+        /// </summary>
+        void StartRace(Track t, bool net, int slot, float traffic)
+        {
             Active = t;
+            netRace = net;
             mode = Mode.Countdown;
             candidate = null;
             announced = t;
             resultTimer = 0f;
             progress = 0f;
             clockTintTimer = 0f;
-            countdown = Beat * 3f;
+            countdown = net ? game.Net.SecondsTo(game.Net.Race.StartMs) : Beat * 3f;
             shownBeat = 0;
             next = 0;
             elapsed = 0f;
@@ -494,8 +540,9 @@ namespace NoHesi
             for (int lap = 0; lap < t.laps; lap++) course.AddRange(t.path);
             alongPath = new float[t.path.Count];
             for (int i = 1; i < t.path.Count; i++) alongPath[i] = alongPath[i - 1] + Flat(t.path[i] - t.path[i - 1]);
-            PlaceOnLine(t);
-            ApplyTraffic(RaceSetup.TrafficFactor);
+            if (net) PlaceOnGrid(t, slot);
+            else PlaceOnLine(t);
+            ApplyTraffic(traffic);
             game.SetInputEnabled(false);
             game.Nav.SetCourse(course, 0, t.fr, t.en);
         }
@@ -510,12 +557,53 @@ namespace NoHesi
         }
 
         /// <summary>
+        /// Place de grille d'une course à plusieurs. La première est sur la ligne, comme en solo ; les suivantes sont en
+        /// file derrière elle, tous les <see cref="GridSpacing"/> m le long de la route qui mène au départ.
+        /// </summary>
+        void PlaceOnGrid(Track t, int slot)
+        {
+            if (slot <= 0) { PlaceOnLine(t); return; }
+            Vector3 f = t.start.forward;
+            float back = StartBack + slot * GridSpacing;
+            // À défaut de route derrière la ligne (départ au bout d'une route) : tout droit dans l'axe du départ
+            Vector3 p = t.path[0] - f * back, forward = f;
+            var hit = game.Road.Nearest(t.path[0], 40f);
+            if (hit.Found)
+            {
+                var e = hit.edge;
+                e.Evaluate(hit.s, out var tangent, out _);
+                int direction = Vector3.Dot(tangent, f) >= 0f ? 1 : -1;
+                float s = hit.s - direction * back;
+                if (s >= 0f && s <= e.Length)
+                {
+                    // Même écart à l'axe de la route que la ligne de départ : la même voie
+                    p = e.Evaluate(s, out tangent, out var right) + right * hit.lateral;
+                    forward = tangent * direction;
+                }
+            }
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 1e-4f) forward = f;
+            var ground = game.Road.Nearest(p, 20f);
+            if (ground.Found) p.y = ground.point.y;
+            p += Vector3.up * 0.5f;
+            game.Traffic.ClearAround(p, 12f);
+            game.Player.Teleport(p, Quaternion.LookRotation(forward.normalized, Vector3.up), 0f);
+        }
+
+        /// <summary>
         /// Trafic de la course (<see cref="RaceSetup"/>) : 1 normal ; moins, une partie des véhicules présents s'en va
         /// tout de suite et il en vient moins ; 0, la route est vidée pour toute la course.
+        /// En partie réseau, le trafic est celui de tous les joueurs : il reste entier, et seul ce joueur en perd une
+        /// partie de vue (<see cref="TrafficSystem.LocalFactor"/>), qu'il traverse.
         /// </summary>
         void ApplyTraffic(float factor)
         {
             var traffic = game.Traffic;
+            if (game.Online)
+            {
+                traffic.LocalFactor = factor;
+                return;
+            }
             traffic.RaceFactor = factor;
             if (factor >= 1f) return;
             var cars = traffic.Cars;
@@ -527,9 +615,11 @@ namespace NoHesi
         {
             // Voiture tenue sur la ligne (un menu refermé pendant le décompte lui rend la main)
             if (!menu) game.SetInputEnabled(false);
-            countdown -= dt;
+            // Course à plusieurs : le départ est donné à l'heure du serveur ; les trois temps du décompte le précèdent
+            if (netRace) countdown = game.Net.SecondsTo(game.Net.Race.StartMs);
+            else countdown -= dt;
             int beat = Mathf.CeilToInt(countdown / Beat);
-            if (beat != shownBeat && beat >= 1)
+            if (beat != shownBeat && beat >= 1 && beat <= 3)
             {
                 shownBeat = beat;
                 if (game.Local.Audio) game.Local.Audio.Rev(beat == 1 ? 1f : 0.7f);
@@ -570,7 +660,13 @@ namespace NoHesi
                 }
             }
             prevPos = pos;
-            if (!Active.Loop) progress = Mathf.Max(progress, SprintProgress(pos));
+            if (!Active.Loop || netRace)
+            {
+                float lap = LapProgress(pos);
+                if (!Active.Loop) progress = Mathf.Max(progress, lap);
+                // Course à plusieurs : part de toute la course déjà couverte, pour le classement du serveur
+                if (netRace) netProgress = Mathf.Max(netProgress, Mathf.Clamp01((next / Active.gates.Length + lap) / Active.laps));
+            }
 
             // Abandon : touche maintenue, magasin ouvert, parcours quitté pour de bon ou plus aucune porte franchie
             if (Dealership.IsOpen || TuningGarage.IsOpen) { Abandon(); return; }
@@ -589,14 +685,18 @@ namespace NoHesi
             clockTintTimer = ClockTintTime;
         }
 
-        /// <summary>Sprint : part du parcours déjà couverte (0-1), point le plus proche entre la dernière porte et la suivante.</summary>
-        float SprintProgress(Vector3 pos)
+        /// <summary>
+        /// Part du sprint (ou du tour en cours) déjà couverte (0-1) : point du parcours le plus proche, entre la dernière
+        /// porte franchie (la ligne, en début de tour) et la suivante.
+        /// </summary>
+        float LapProgress(Vector3 pos)
         {
             var path = Active.path;
             float total = alongPath[alongPath.Length - 1];
             if (path.Count < 2 || total <= 0f) return 0f;
-            int lo = Mathf.Clamp(next > 0 ? GateOf(next - 1).index - 1 : 0, 0, path.Count - 2);
-            int hi = Mathf.Clamp(GateOf(next).index, lo, path.Count - 2);
+            int gate = next % Active.gates.Length;
+            int lo = Mathf.Clamp(gate > 0 ? Active.gates[gate - 1].index - 1 : 0, 0, path.Count - 2);
+            int hi = Mathf.Clamp(Active.gates[gate].index, lo, path.Count - 2);
             float bestDist = float.MaxValue, along = 0f;
             for (int i = lo; i <= hi; i++)
             {
@@ -637,6 +737,7 @@ namespace NoHesi
             }
             else game.Hud.Announce(Clock(time), what, White, 2.4f);
             int passed = next++;
+            netGates = next;
             sinceGate = 0f;
             game.Hud.Flash(t.Tint, 0.1f);
             if (game.Local.Audio) game.Local.Audio.Chime();
@@ -675,6 +776,14 @@ namespace NoHesi
             game.Hud.Flash(record ? Good : t.Tint, 0.3f);
             game.Camera.Shake(0.25f);
             if (game.Local.Audio) game.Local.Audio.Chime();
+            if (netRace)
+            {
+                // Course à plusieurs : notre temps part au serveur, qui nous classe
+                netStatus = NetRaceStatus.Finished;
+                netTime = time;
+                netGates = times.Length;
+                netProgress = 1f;
+            }
             Stop();
             Finished?.Invoke(t, time, record);
         }
@@ -685,20 +794,195 @@ namespace NoHesi
             Stop();
         }
 
-        /// <summary>Fin de la course (arrivée, abandon, retour à l'accueil) : la balade reprend.</summary>
+        /// <summary>
+        /// Fin de la course (arrivée, abandon, retour à l'accueil, séance du serveur fermée ou perdue) : la balade
+        /// reprend, avec tout le trafic et sa propre voiture.
+        /// </summary>
         void Stop()
         {
             if (mode == Mode.Countdown && !(game.Hud && game.Hud.Paused)) game.SetInputEnabled(true);
+            // Course à plusieurs quittée autrement que par l'arrivée : un abandon pour le serveur
+            if (netRace && netStatus == NetRaceStatus.Racing) netStatus = NetRaceStatus.Abandoned;
+            netRace = false;
             mode = Mode.Idle;
             announced = Active;     // pas d'annonce du départ que l'on vient de quitter (ligne d'une boucle)
             Active = null;
             goTimer = abandonHeld = 0f;
             recording = null;
-            if (game.Traffic) game.Traffic.RaceFactor = 1f;
+            if (game.Traffic)
+            {
+                game.Traffic.RaceFactor = 1f;
+                game.Traffic.LocalFactor = 1f;
+            }
+            if (borrowed)
+            {
+                // La voiture imposée est rendue : on retrouve la sienne, avec ses améliorations
+                borrowed = false;
+                game.ShowCar(game.Local.CarIndex);
+            }
             // Le temps et l'heure, tenus pendant la course (menu d'avant-course), reprennent leur cours
             if (game.Weather) game.Weather.Release();
             if (game.DayNight) game.DayNight.frozen = false;
             if (game.Nav) game.Nav.ClearCourse();
+        }
+
+        // ------------------------------------------------------------------ course à plusieurs (partie en réseau)
+
+        /// <summary>
+        /// « Lancer la course » du menu d'avant-course. Seul : le décompte part. En partie réseau : la course est
+        /// proposée au serveur, qui invite les autres joueurs (<see cref="NetRace"/>) ; s'il y a déjà une course sur le
+        /// serveur (une seule à la fois), on court seul, pour son chrono.
+        /// </summary>
+        public void Launch(Track t)
+        {
+            if (t == null || tracks == null || mode != Mode.Idle) return;
+            var net = game.Net;
+            int car = RaceSetup.ImposeCar ? game.Local.CarIndex : NetRace.FreeCar;
+            if (game.Online && !net.Race.Exists && net.ProposeRace(tracks.IndexOf(t), RaceSetup.TrafficLevel, car)) proposed = t;
+            else Begin(t);
+        }
+
+        void OnProposalDropped()
+        {
+            if (proposed == null) return;
+            proposed = null;
+            game.Hud.Announce(Loc.T("COURSE NON LANCÉE", "RACE NOT STARTED"), Loc.T("le serveur ne l'a pas reprise", "the server did not take it up"), Bad, 3f);
+        }
+
+        static string Racer(NetRace.Entry e) => e != null && !string.IsNullOrEmpty(e.name) ? e.name : Loc.T("Pilote", "Driver");
+
+        /// <summary>
+        /// Partie en réseau : suit la séance de course du serveur. Invitation reçue : on y répond (sauf occupé) ;
+        /// acceptée, on est posé sur la grille au décompte commun, puis la course se déroule ici comme en solo. Notre
+        /// réponse, puis notre avancement, repartent vers le serveur avec l'état de la voiture (<see cref="NetGame.LocalRace"/>).
+        /// </summary>
+        void UpdateNet(bool menu)
+        {
+            var net = game.Net;
+            bool online = net && net.Active;
+            var s = online && net.Race.Exists && net.Race.Track < tracks.Count ? net.Race : null;
+            inviteOpen = false;
+            if (!online) proposed = null;
+            byte id = s != null ? s.Id : (byte)0;
+            if (id != netSession)
+            {
+                if (netSession != 0) LeaveSession(online);
+                if (s != null) EnterSession(s, net);
+            }
+            if (s == null)
+            {
+                if (net) net.LocalRace = default;
+                return;
+            }
+            var t = tracks[s.Track];
+            var me = s.Find(net.LocalId);
+            bool busy = Dealership.IsOpen || TuningGarage.IsOpen || RaceSetup.IsOpen;
+            switch (s.Phase)
+            {
+                case NetRacePhase.Invite:
+                    // Invite à répondre, sauf pour qui est occupé (course en solo, magasin, menu d'avant-course) :
+                    // l'annonce lui a suffi, et l'invitation expirera sans lui
+                    if (netStatus != NetRaceStatus.Invited || me == null || Active != null || busy) break;
+                    inviteOpen = true;
+                    if (menu) break;
+                    if (GameInput.InteractPressed) Answer(true);
+                    else if (GameInput.DeclinePressed) Answer(false);
+                    break;
+                case NetRacePhase.Countdown:
+                case NetRacePhase.Running:
+                    if (netStatus == NetRaceStatus.Invited) netStatus = NetRaceStatus.Declined;     // invitation expirée
+                    else if (netStatus == NetRaceStatus.Accepted)
+                    {
+                        if (me == null || me.status == NetRaceStatus.Abandoned)
+                        {
+                            // Réponse arrivée après la fin de l'invitation, ou départ donné depuis trop longtemps
+                            netStatus = NetRaceStatus.Declined;
+                            game.Hud.Announce(Loc.T("COURSE MANQUÉE", "RACE MISSED"), Loc.T("le départ a été donné sans toi", "it started without you"), Bad, 3f);
+                        }
+                        else if (mode != Mode.Idle || busy) netStatus = NetRaceStatus.Abandoned;     // occupé au moment du départ
+                        else JoinGrid(s, t, s.Entries.IndexOf(me));
+                    }
+                    break;
+                case NetRacePhase.Results:
+                    if (netRace && mode != Mode.Idle)
+                    {
+                        // Délai dépassé après le premier arrivé : la course est finie pour tous
+                        netStatus = NetRaceStatus.Abandoned;
+                        game.Hud.Announce(Loc.T("COURSE TERMINÉE", "RACE OVER"), Loc.T("délai dépassé", "time limit reached"), Bad, 3f);
+                        Stop();
+                    }
+                    else if (netStatus == NetRaceStatus.Invited || netStatus == NetRaceStatus.Accepted) netStatus = NetRaceStatus.Declined;
+                    break;
+            }
+            if (s.Phase != netPhase)
+            {
+                netPhase = s.Phase;
+                // Fin de la course, pour qui n'y courait pas : le vainqueur
+                var winner = s.Winner;
+                if (s.Phase == NetRacePhase.Results && me == null && winner != null && s.Entries.Count > 1)
+                    game.Hud.Announce(Loc.T($"{Racer(winner)} gagne la course", $"{Racer(winner)} wins the race"), t.Name + "  ·  " + Clock(winner.time), t.Tint, 3.5f);
+            }
+            net.LocalRace = new NetGame.RaceReply { id = netSession, status = netStatus, gates = netGates, progress = netProgress, time = netTime };
+        }
+
+        /// <summary>Nouvelle séance sur le serveur : la nôtre si nous l'avons lancée, sinon une invitation.</summary>
+        void EnterSession(NetRace s, NetGame net)
+        {
+            netSession = s.Id;
+            bool ours = s.Launcher == net.LocalId;
+            netStatus = ours ? NetRaceStatus.Accepted : NetRaceStatus.Invited;
+            netPhase = NetRacePhase.None;
+            netGates = 0;
+            netProgress = netTime = 0f;
+            if (ours) proposed = null;
+            // Occupé (course en solo, magasin) : une annonce, sans invite à répondre
+            if (!ours && s.Phase == NetRacePhase.Invite && (Active != null || Dealership.IsOpen || TuningGarage.IsOpen))
+            {
+                var t = tracks[s.Track];
+                string who = Racer(s.Find(s.Launcher));
+                game.Hud.Announce(Loc.T($"{who} lance une course", $"{who} is starting a race"), t.Kind + "  ·  " + t.Name.ToUpperInvariant(), t.Tint, 3.5f);
+            }
+        }
+
+        /// <summary>La séance suivie n'existe plus (finie, annulée, partie quittée ou connexion perdue).</summary>
+        void LeaveSession(bool online)
+        {
+            if (netRace && mode != Mode.Idle)
+            {
+                game.Hud.Announce(Loc.T("COURSE INTERROMPUE", "RACE INTERRUPTED"),
+                    online ? Loc.T("le serveur a fermé la course", "the server closed the race") : Loc.T("connexion au serveur perdue", "connection to the server lost"), Bad, 3f);
+                Stop();
+            }
+            else if (online && netStatus == NetRaceStatus.Accepted && netPhase == NetRacePhase.Invite)
+                game.Hud.Announce(Loc.T("COURSE ANNULÉE", "RACE CANCELLED"), Loc.T("le lanceur a quitté la partie", "the starter left the game"), Bad, 3f);
+            netSession = 0;
+            netStatus = NetRaceStatus.Invited;
+            netPhase = NetRacePhase.None;
+        }
+
+        /// <summary>Réponse à l'invitation.</summary>
+        void Answer(bool accept)
+        {
+            netStatus = accept ? NetRaceStatus.Accepted : NetRaceStatus.Declined;
+            inviteOpen = false;
+            if (accept && game.Local.Audio) game.Local.Audio.Chime();
+        }
+
+        /// <summary>Départ de la course à plusieurs : voiture imposée, place sur la grille, décompte réglé sur l'heure du serveur.</summary>
+        void JoinGrid(NetRace s, Track t, int slot)
+        {
+            if (s.Car != NetRace.FreeCar && s.Car < game.assets.playerCars.Length)
+            {
+                // Prêtée, avec sa fiche d'origine (la même pour tous) ; notre voiture revient à la fin de la course
+                borrowed = true;
+                game.ShowCar(s.Car, true);
+            }
+            netStatus = NetRaceStatus.Racing;
+            // Sans collisions entre joueurs, tous partent de la ligne (ils se traversent) ; sinon en file derrière elle
+            StartRace(t, true, game.Net.Collisions ? Mathf.Max(0, slot) : 0, RaceSetup.FactorOf(s.Traffic));
+            int n = s.Entries.Count;
+            game.Hud.Announce(t.Kind + "  ·  " + t.Name.ToUpperInvariant(),
+                n > 1 ? Loc.T($"{n} coureurs  ·  départ imminent", $"{n} racers  ·  starting soon") : Loc.T("départ imminent", "starting soon"), t.Tint, 3f);
         }
 
         /// <summary>Fantôme du record : sur la ligne pendant le décompte, puis à sa place de l'instant du chrono.</summary>
@@ -1153,6 +1437,18 @@ namespace NoHesi
         HudShape panelStripe, promptStripe;
         Text progressText, timeText, abandonText, countText, promptTitle, promptDetail;
         RectTransform abandonFill;
+        // Course à plusieurs : place dans le cadre du chrono, invitation (ou attente du départ), classement
+        HudShape timerPlate, inviteStripe, boardPlate, boardStripe;
+        Text placeText, inviteTitle, inviteDetail, inviteKeys, boardTitle, boardNote;
+        CanvasGroup inviteGroup, boardGroup;
+        RectTransform inviteFill;
+        Image inviteFillImage;
+        const int BoardRows = 8;
+        const float BoardWidth = 490f, BoardTop = 74f, BoardStep = 30f;
+        readonly Text[,] boardCells = new Text[BoardRows, 4];
+        readonly List<NetRace.Entry> boardOrder = new List<NetRace.Entry>();
+        /// <summary>Ordre du tableau : les classés par place, puis les abandons.</summary>
+        static readonly Comparison<NetRace.Entry> ByPlace = (a, b) => (a.rank > 0 ? a.rank : 1000 + a.id).CompareTo(b.rank > 0 ? b.rank : 1000 + b.id);
 
         void BuildHud()
         {
@@ -1174,7 +1470,8 @@ namespace NoHesi
             panelGroup = panel.gameObject.AddComponent<CanvasGroup>();
             panelGroup.alpha = 0f;
             panelGroup.blocksRaycasts = panelGroup.interactable = false;
-            Shape(panel, "Plate", new Vector2(1f, 0.5f), Vector2.zero, new Vector2(250f, 100f), Plate).Set(16f, 120f, 0f);
+            timerPlate = Shape(panel, "Plate", new Vector2(1f, 0.5f), Vector2.zero, new Vector2(250f, 100f), Plate);
+            timerPlate.Set(16f, 120f, 0f);
             panelStripe = Shape(panel, "Stripe", new Vector2(1f, 0.5f), Vector2.zero, new Vector2(6f, 100f), SprintTint);
             panelStripe.Set(16f, 0f, 0f);
             progressText = Label(panel, 48, TextAnchor.UpperRight, White, corner, new Vector2(-22f, -4f), new Vector2(230f, 56f), FontStyle.BoldAndItalic);
@@ -1218,6 +1515,174 @@ namespace NoHesi
             promptTitle.supportRichText = true;
             promptDetail = Label(prompt, 21, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.78f), new Vector2(0.5f, 0.5f), new Vector2(0f, -22f), new Vector2(860f, 30f), FontStyle.Normal);
             promptDetail.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+
+            // Course à plusieurs : place au classement, à gauche de l'avancement (la plaque du chrono s'élargit)
+            placeText = Label(panel, 60, TextAnchor.MiddleRight, White, corner, new Vector2(-266f, -12f), new Vector2(120f, 76f), FontStyle.BoldAndItalic);
+            placeText.supportRichText = true;
+
+            // Invitation à une course à plusieurs (bouton : clic ou doigt pour accepter), ou attente de son départ :
+            // à la place de l'invite de départ, dans la même allure ; une fine jauge donne le temps qui reste
+            var invite = Box(hudRoot, "RaceInvite", new Vector2(0.5f, 0.24f), new Vector2(0f, 16f), new Vector2(880f, 128f));
+            inviteGroup = invite.gameObject.AddComponent<CanvasGroup>();
+            inviteGroup.alpha = 0f;
+            inviteGroup.blocksRaycasts = inviteGroup.interactable = false;
+            var invitePlate = Shape(invite, "Plate", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(880f, 128f), new Color(0.02f, 0.03f, 0.05f, 0.75f));
+            invitePlate.Set(18f, 0f, 0f);
+            invitePlate.raycastTarget = true;
+            inviteStripe = Shape(invite, "Stripe", new Vector2(0.5f, 1f), Vector2.zero, new Vector2(520f, 3f), SprintTint);
+            inviteStripe.Set(0f, 140f, 140f);
+            var accept = invite.gameObject.AddComponent<Button>();
+            // Sans transition avant de lui désigner la plaque : sinon le bouton, créé dans un groupe non interactif, la
+            // teinte en « désactivé » (moitié de son opacité) pour de bon, et le texte se lit mal sur une voiture claire
+            accept.transition = Selectable.Transition.None;
+            accept.targetGraphic = invitePlate;
+            accept.navigation = new Navigation { mode = Navigation.Mode.None };
+            accept.onClick.AddListener(() => { if (inviteOpen) Answer(true); });
+            inviteTitle = Label(invite, 28, TextAnchor.MiddleCenter, White, new Vector2(0.5f, 0.5f), new Vector2(0f, 36f), new Vector2(860f, 40f), FontStyle.BoldAndItalic);
+            inviteTitle.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            inviteTitle.supportRichText = true;
+            inviteDetail = Label(invite, 21, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.78f), new Vector2(0.5f, 0.5f), new Vector2(0f, 0f), new Vector2(860f, 30f), FontStyle.Normal);
+            inviteDetail.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            inviteKeys = Label(invite, 21, TextAnchor.MiddleCenter, White, new Vector2(0.5f, 0.5f), new Vector2(0f, -32f), new Vector2(860f, 30f), FontStyle.Bold);
+            inviteKeys.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            var inviteBar = Box(invite, "TimeBar", new Vector2(0.5f, 0f), new Vector2(0f, 9f), new Vector2(520f, 3f));
+            inviteBar.gameObject.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.14f);
+            inviteFill = Box(inviteBar, "Fill", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(520f, 3f));
+            inviteFillImage = inviteFill.gameObject.AddComponent<Image>();
+            inviteBar.GetComponent<Image>().raycastTarget = inviteFillImage.raycastTarget = false;
+
+            // Classement de la course à plusieurs, sous le cadre du chrono : place, pseudo, temps (ou abandon), écart au premier
+            var board = Box(hudRoot, "RaceBoard", corner, new Vector2(-26f, -182f), new Vector2(BoardWidth, 100f));
+            board.pivot = corner;
+            boardGroup = board.gameObject.AddComponent<CanvasGroup>();
+            boardGroup.alpha = 0f;
+            boardGroup.blocksRaycasts = boardGroup.interactable = false;
+            boardPlate = Shape(board, "Plate", corner, Vector2.zero, new Vector2(BoardWidth, 100f), Plate);
+            boardPlate.Set(16f, 40f, 0f);
+            boardStripe = Shape(board, "Stripe", corner, Vector2.zero, new Vector2(6f, 100f), SprintTint);
+            boardStripe.Set(16f, 0f, 0f);
+            boardTitle = Label(board, 26, TextAnchor.UpperRight, White, corner, new Vector2(-22f, -8f), new Vector2(BoardWidth - 50f, 32f), FontStyle.BoldAndItalic);
+            boardNote = Label(board, 17, TextAnchor.UpperRight, Dim, corner, new Vector2(-22f, -43f), new Vector2(BoardWidth - 50f, 22f), FontStyle.Normal);
+            for (int i = 0; i < BoardRows; i++)
+            {
+                float y = -BoardTop - i * BoardStep;
+                boardCells[i, 0] = Label(board, 21, TextAnchor.UpperRight, Dim, corner, new Vector2(-432f, y), new Vector2(34f, 28f), FontStyle.BoldAndItalic);
+                boardCells[i, 1] = Label(board, 21, TextAnchor.UpperLeft, White, corner, new Vector2(-232f, y), new Vector2(190f, 28f), FontStyle.Bold);
+                boardCells[i, 2] = Label(board, 21, TextAnchor.UpperRight, White, corner, new Vector2(-116f, y), new Vector2(110f, 28f), FontStyle.Bold);
+                boardCells[i, 3] = Label(board, 19, TextAnchor.UpperRight, Dim, corner, new Vector2(-22f, y), new Vector2(86f, 28f), FontStyle.Normal);
+                boardCells[i, 1].supportRichText = false;
+            }
+        }
+
+        /// <summary>
+        /// Course à plusieurs : place au classement dans le cadre du chrono, invitation à rejoindre la course (ou attente
+        /// de son départ pour qui l'a lancée ou acceptée), et classement des coureurs une fois sa propre course finie.
+        /// </summary>
+        void UpdateNetHud(float dt)
+        {
+            var net = game.Net;
+            var s = netSession != 0 && net && net.Active && net.Race.Exists && net.Race.Id == netSession ? net.Race : null;
+            var me = s != null ? s.Find(net.LocalId) : null;
+
+            // Place au classement du serveur, dès qu'il y a un adversaire
+            bool placed = netRace && Active != null && me != null && me.rank > 0 && s.Entries.Count > 1;
+            placeText.text = placed ? $"{me.rank}<size=30>/{s.Ranked}</size>" : "";
+            float plate = 250f;
+            if (placed)
+            {
+                // À gauche de l'avancement, quelle que soit sa largeur (« 41 % », « TOUR 3/5 ») ; la plaque s'allonge d'autant
+                placeText.color = Active.Tint;
+                float x = 22f + progressText.preferredWidth + 34f;
+                placeText.rectTransform.anchoredPosition = new Vector2(-x, -12f);
+                plate = Mathf.Max(plate, x + placeText.preferredWidth + 140f);
+            }
+            timerPlate.rectTransform.sizeDelta = new Vector2(plate, 100f);
+
+            // Invitation, ou attente du départ pour qui a lancé ou accepté la course
+            bool invited = inviteOpen && s != null;
+            bool waiting = !invited && mode == Mode.Idle && (proposed != null || s != null && s.Phase == NetRacePhase.Invite && netStatus == NetRaceStatus.Accepted);
+            if (invited || waiting)
+            {
+                var t = s != null ? tracks[s.Track] : proposed;
+                inviteStripe.color = inviteFillImage.color = t.Tint;
+                string hex = ColorUtility.ToHtmlStringRGB(t.Tint);
+                inviteTitle.text = Loc.F($"<color=#{hex}>{t.Kind}</color>   ·   {t.Name.ToUpperInvariant()}   ·   {t.Distance / 1000f:0.0} km");
+                float left = s != null ? Mathf.Clamp(net.SecondsTo(s.StartMs), 0f, NetRace.InviteTime) : NetRace.InviteTime;
+                int seconds = Mathf.CeilToInt(left);
+                inviteFill.localScale = new Vector3(left / NetRace.InviteTime, 1f, 1f);
+                if (invited)
+                {
+                    var cars = game.assets.playerCars;
+                    string who = Racer(s.Find(s.Launcher));
+                    string car = s.Car != NetRace.FreeCar && s.Car < cars.Length
+                        ? Loc.T("voiture imposée : ", "same car for all: ") + cars[s.Car].displayName : Loc.T("voiture libre", "any car");
+                    inviteDetail.text = Loc.T($"{who} lance une course   ·   {car}", $"{who} is starting a race   ·   {car}");
+                    string yes = GameInput.UsingGamepad ? "A" : Loc.T("E ou Entrée", "E or Enter");
+                    string no = GameInput.UsingGamepad ? Loc.T("Croix ↓", "D-pad ↓") : "N";
+                    inviteKeys.text = TouchInput.Showing ? Loc.T($"touche ici : rejoindre   ·   {seconds} s", $"tap here: join   ·   {seconds} s")
+                        : Loc.T($"{yes} : rejoindre   ·   {no} : refuser   ·   {seconds} s", $"{yes}: join   ·   {no}: decline   ·   {seconds} s");
+                }
+                else if (s == null)
+                {
+                    inviteDetail.text = Loc.T("Course proposée au serveur…", "Race sent to the server…");
+                    inviteKeys.text = "";
+                }
+                else
+                {
+                    int ready = 0, pending = 0;
+                    foreach (var e in s.Entries)
+                    {
+                        if (e.status == NetRaceStatus.Accepted) ready++;
+                        else if (e.status == NetRaceStatus.Invited) pending++;
+                    }
+                    inviteDetail.text = (ready > 1 ? Loc.T($"{ready} coureurs prêts", $"{ready} racers ready") : Loc.T("1 coureur prêt", "1 racer ready"))
+                        + (pending > 0 ? Loc.T($"   ·   {pending} sans réponse", $"   ·   {pending} yet to answer") : "");
+                    inviteKeys.text = Loc.T($"Départ dès que tous ont répondu   ·   {seconds} s au plus", $"Starts once everyone has answered   ·   {seconds} s at most");
+                }
+            }
+            inviteGroup.alpha = Mathf.MoveTowards(inviteGroup.alpha, invited || waiting ? 1f : 0f, dt * 5f);
+            inviteGroup.blocksRaycasts = inviteGroup.interactable = invited;
+
+            // Classement : en direct pour un coureur qui a fini ou abandonné pendant que d'autres roulent, puis résultats
+            bool done = netStatus == NetRaceStatus.Finished || netStatus == NetRaceStatus.Abandoned;
+            bool board = s != null && me != null && s.Entries.Count > 1 && mode == Mode.Idle
+                && (s.Phase == NetRacePhase.Results || s.Phase == NetRacePhase.Running && done);
+            if (board)
+            {
+                var t = tracks[s.Track];
+                boardOrder.Clear();
+                boardOrder.AddRange(s.Entries);
+                boardOrder.Sort(ByPlace);
+                int rows = Mathf.Min(boardOrder.Count, BoardRows);
+                float height = BoardTop + rows * BoardStep + 12f;
+                boardPlate.rectTransform.sizeDelta = new Vector2(BoardWidth, height);
+                boardStripe.rectTransform.sizeDelta = new Vector2(6f, height);
+                boardStripe.color = t.Tint;
+                bool final = s.Phase == NetRacePhase.Results;
+                boardTitle.text = final ? Loc.T("RÉSULTATS", "RESULTS") : Loc.T("CLASSEMENT", "STANDINGS");
+                int left = !final && s.EndMs != 0 ? Mathf.CeilToInt(net.SecondsTo(s.EndMs)) : 0;
+                boardNote.text = t.Name + (left > 0 ? Loc.T($"   ·   fin dans {left} s", $"   ·   ends in {left} s") : "");
+                var winner = s.Winner;
+                for (int i = 0; i < BoardRows; i++)
+                {
+                    if (i >= rows)
+                    {
+                        for (int k = 0; k < 4; k++) boardCells[i, k].text = "";
+                        continue;
+                    }
+                    var e = boardOrder[i];
+                    bool arrived = e.status == NetRaceStatus.Finished, retired = e.status == NetRaceStatus.Abandoned;
+                    boardCells[i, 0].text = e.rank > 0 ? e.rank.ToString() : "—";
+                    boardCells[i, 1].text = Racer(e);
+                    boardCells[i, 1].color = e.id == net.LocalId ? t.Tint : retired ? Dim : White;
+                    boardCells[i, 2].text = arrived ? Clock(e.time) : retired ? Loc.T("abandon", "retired") : Loc.T("en course", "racing");
+                    boardCells[i, 2].color = arrived ? (e == winner ? Good : White) : Dim;
+                    float gap = arrived && winner != null ? e.time - winner.time : 0f;
+                    boardCells[i, 3].text = arrived ? (e == winner ? "" : gap < 60f ? Delta(gap) : "+" + Clock(gap))
+                        : retired ? "" : Loc.F($"{Mathf.FloorToInt(e.progress * 100f)} %", $"{Mathf.FloorToInt(e.progress * 100f)}%");
+                }
+            }
+            boardGroup.alpha = Mathf.MoveTowards(boardGroup.alpha, board ? 1f : 0f, dt * 5f);
         }
 
         void UpdateHud(float dt, bool visible)
@@ -1286,7 +1751,7 @@ namespace NoHesi
             countGroup.alpha = counting ? 1f : Mathf.Clamp01(goTimer / 0.35f);
 
             // Invite
-            bool ask = candidate != null && mode == Mode.Idle;
+            bool ask = candidate != null && mode == Mode.Idle && !inviteOpen;
             if (ask)
             {
                 var t = candidate;
@@ -1300,6 +1765,7 @@ namespace NoHesi
             }
             promptGroup.alpha = Mathf.MoveTowards(promptGroup.alpha, ask ? 1f : 0f, dt * 5f);
             promptGroup.blocksRaycasts = promptGroup.interactable = ask;
+            UpdateNetHud(dt);
         }
 
         // ------------------------------------------------------------------ helpers

@@ -9,6 +9,8 @@ namespace NoHesi
     /// Point d'entrée : charge la carte (ville de montagne : relief, routes, forêts, bâtiments), crée le joueur,
     /// le trafic d'ambiance, le cycle jour/nuit, la météo, la caméra, le son et le HUD.
     /// Déroulé : chargement → écran d'accueil → compte à rebours → balade libre sur la carte.
+    /// À plusieurs : partie en réseau (<see cref="NetGame"/>), hébergée par un joueur ou par un serveur dédié
+    /// (jeu lancé avec « -server » : pas d'accueil, pas de voiture, la caméra suit les joueurs).
     /// </summary>
     public class GameManager : MonoBehaviour
     {
@@ -18,6 +20,15 @@ namespace NoHesi
         static bool skipTitle;
 
         const string CarKey = "nohesi_car";
+        /// <summary>Départ à plusieurs : les joueurs sont rangés en file, espacés de cette distance (m).</summary>
+        const float GridSpacing = 9f;
+
+        /// <summary>
+        /// Serveur dédié (ligne de commande « -server », avec au besoin « -port 47777 », « -name MonServeur »,
+        /// « -players 8 », « -nocollisions » pour que les voitures des joueurs se traversent, « -invite » pour demander
+        /// un code d'invitation, affiché dans sa fenêtre et écrit dans son journal) : héberge une partie sans y jouer.
+        /// </summary>
+        public static bool DedicatedServer { get; private set; }
 
         public GameAssets assets;
         public CameraRig cameraRig;
@@ -32,10 +43,16 @@ namespace NoHesi
         public DayNightCycle DayNight { get; private set; }
         public SynthwaveMusic Music { get; private set; }
         public OptionsMenu Options { get; private set; }
+        /// <summary>Partie en réseau (hébergée, rejointe, ou inactive en solo).</summary>
+        public NetGame Net { get; private set; }
         /// <summary>GPS : destination choisie sur la carte globale et itinéraire le plus rapide.</summary>
         public RouteGuide Nav { get; private set; }
-        /// <summary>Phares du joueur (allumés / éteints au L3).</summary>
+        /// <summary>Partie en réseau en cours : le monde ne s'arrête plus quand un menu est ouvert.</summary>
+        public bool Online => Net && Net.Active;
+        /// <summary>Phares du joueur (allumés / éteints au L3, appel de phares à la croix ↓).</summary>
         public CarLights Lights => carLights;
+        /// <summary>Le joueur klaxonne (les autres joueurs d'une partie en réseau l'entendent).</summary>
+        public bool Horn => local.Audio && local.Audio.Horn;
         public CameraRig Camera => cameraRig;
         public Hud Hud => hud;
         public Phase State { get; private set; } = Phase.Loading;
@@ -45,6 +62,12 @@ namespace NoHesi
         public WeatherSystem Weather { get; private set; }
         /// <summary>Le joueur de cette machine : sa voiture, sa caméra, son HUD, son son.</summary>
         public PlayerSlot Local => local;
+        /// <summary>
+        /// Voiture réellement affichée (indice du garage) : celle du joueur (<see cref="PlayerSlot.CarIndex"/>), ou une
+        /// autre mise à sa place sans la lui attribuer (voiture imposée d'une course à plusieurs). C'est elle que les
+        /// autres joueurs voient en réseau.
+        /// </summary>
+        public int ShownCar { get; private set; }
         /// <summary>Progression de l'appui long sur le bouton de replacement (0-1), pour le HUD.</summary>
         /// <summary>Appui sur Y / R plus court que ceci : un simple replacement (au-delà, en course, c'est l'abandon qui se charge).</summary>
         public const float ResetTapTime = 0.25f;
@@ -63,8 +86,8 @@ namespace NoHesi
         public Races Races { get; private set; }
 
         readonly PlayerSlot local = new PlayerSlot();
-        /// <summary>Position de la voiture (terrain fin, décor, trafic).</summary>
-        readonly List<Vector3> around = new List<Vector3>();
+        /// <summary>Position de la voiture locale (terrain fin, décor) et positions de tous les joueurs (trafic).</summary>
+        readonly List<Vector3> around = new List<Vector3>(), positions = new List<Vector3>();
         MapProps props;
         CarLights carLights;
         Hud hud;
@@ -72,10 +95,16 @@ namespace NoHesi
         ScreenFx screenFx;
         FxBursts fx;
         float musicMuffle = 0.6f, launchT, launchLen = 1f, placeTimer;
+        bool flashBlocked, wasInvited;
         MapData.PoiJson currentPoi;
 
         void Awake()
         {
+            DedicatedServer = HasArgument("-server");
+#if UNITY_EDITOR
+            // Essai du serveur dédié dans l'éditeur : PlayerPrefs « nohesi_server_test » à 1
+            if (PlayerPrefs.GetInt("nohesi_server_test", 0) == 1) DedicatedServer = true;
+#endif
             Application.targetFrameRate = 60;
             Time.fixedDeltaTime = 1f / 100f; // physique véhicule plus stable à haute vitesse
             GameSettings.Load();
@@ -95,6 +124,7 @@ namespace NoHesi
             int saved = PlayerPrefs.GetInt(CarKey, -1);
             local.CarIndex = saved >= 0 && saved < assets.playerCars.Length && Wallet.Owns(assets.playerCars[saved])
                 ? saved : Wallet.StarterIndex(assets.playerCars);
+            ShownCar = local.CarIndex;
             Player.Setup(CarTuning.Apply(assets.playerCars[local.CarIndex]));
             CarPaint.Apply(Player.Model, CarPaint.Selected(assets.playerCars[local.CarIndex]));
             Player.assist = 0.6f; // assistance fixe (non réglable)
@@ -158,6 +188,9 @@ namespace NoHesi
             Weather = gameObject.AddComponent<WeatherSystem>();
             Weather.Init(mainCam, assets, audioFx, DayNight);
             DayNight.Weather = Weather;
+
+            Net = gameObject.AddComponent<NetGame>();
+            Net.Init(this);
             ApplyLiveSettings();
         }
 
@@ -165,7 +198,8 @@ namespace NoHesi
         public void ApplyLiveSettings()
         {
             Traffic.density = GameSettings.TrafficDensity;
-            if (Weather) Weather.SetChance(GameSettings.RainChance);
+            // Partie rejointe : la météo est celle du serveur
+            if (Weather && !(Net && Net.IsClient)) Weather.SetChance(GameSettings.RainChance);
             if (local.Audio) local.Audio.masterVolume = GameSettings.EffectsVolume;
             GraphicsQuality.Apply(this);
         }
@@ -191,10 +225,15 @@ namespace NoHesi
             Races.Init(this);
             menus = gameObject.AddComponent<MenuScreens>();
             menus.Init(this);
+            if (DedicatedServer) AudioListener.volume = 0f;
             GraphicsQuality.Apply(this);
             StartCoroutine(Load());
             // Banc d'essai des performances : « Chill Road.exe -benchmark »
-            if (HasArgument("-benchmark")) gameObject.AddComponent<Benchmark>().Init(this);
+            if (HasArgument("-benchmark") && !DedicatedServer) gameObject.AddComponent<Benchmark>().Init(this);
+            // Exemplaire automatique pour les essais du réseau : « Chill Road.exe -nettest [secondes] -join CODE »
+            if (HasArgument("-nettest") && !DedicatedServer)
+                gameObject.AddComponent<NetTestBot>().Init(this, float.TryParse(Argument("-nettest"), out float seconds) ? seconds : 0f,
+                    float.TryParse(Argument("-nettest-race"), out float race) ? race : 0f);
         }
 
         /// <summary>Charge la carte par étapes (écran de chargement), puis affiche l'accueil ou lance la partie.</summary>
@@ -226,7 +265,7 @@ namespace NoHesi
 
             // Le joueur est posé au départ ; le terrain fin (avec collision) se construit autour de lui
             Player.Body.isKinematic = false;
-            PlaceAtStart();
+            PlaceAtStart(0f);
             around.Clear();
             around.Add(Player.transform.position);
             int guard = 0;
@@ -239,18 +278,64 @@ namespace NoHesi
             LoadStep = Loc.T("Circulation", "Traffic");
             LoadProgress = 0.98f;
             yield return null;
-            for (int i = 0; i < 80; i++) Traffic.Tick(around, 0.2f);
+            if (!DedicatedServer)
+                for (int i = 0; i < 80; i++) Traffic.Tick(around, 0.2f);
             LoadProgress = 1f;
             GraphicsQuality.Apply(this);       // distances de la végétation et de la flore (créées pendant le chargement)
             // Laisse l'écran de chargement visible au moins un instant
             while (Time.realtimeSinceStartup - started < 1.5f) yield return null;
 
-            if (skipTitle) StartCountdown();
+            if (DedicatedServer) StartDedicated();
+            else if (skipTitle) StartCountdown();
             else
             {
                 State = Phase.Title;
                 cameraRig.Showcase = true;
+                StartFromArguments();
             }
+        }
+
+        /// <summary>
+        /// Partie en réseau dès le lancement, sans passer par le salon (raccourci du bureau, essais à plusieurs
+        /// exemplaires) : « -host » héberge une partie (collisions selon le choix mémorisé du salon, ou « -nocollisions »)
+        /// et demande son code d'invitation ; « -join CODE » ou « -join adresse » en rejoint une. En cas d'échec, le jeu
+        /// reste à l'accueil et le motif est écrit dans le journal.
+        /// </summary>
+        void StartFromArguments()
+        {
+            string join = Argument("-join");
+            if (HasArgument("-host"))
+            {
+                bool collisions = NetLobby.HostCollisions && !HasArgument("-nocollisions");
+                if (!Net.Host(NetGame.PlayerName, NetProtocol.DefaultPort, NetProtocol.DefaultMaxPlayers, false, collisions, out string error))
+                {
+                    Debug.LogWarning("[Net] " + error);
+                    return;
+                }
+                Net.OpenInvite();
+                StartOnline();
+            }
+            else if (!string.IsNullOrEmpty(join))
+            {
+                Net.Joined += JoinedFromArguments;
+                Net.Failed += FailedFromArguments;
+                if (NetRelay.IsCode(join)) Net.JoinCode(join);
+                else Net.Join(join);
+            }
+        }
+
+        void JoinedFromArguments()
+        {
+            Net.Joined -= JoinedFromArguments;
+            Net.Failed -= FailedFromArguments;
+            StartOnline();
+        }
+
+        void FailedFromArguments(string message)
+        {
+            Net.Joined -= JoinedFromArguments;
+            Net.Failed -= FailedFromArguments;
+            Debug.LogWarning("[Net] " + message);
         }
 
         /// <summary>Bouton « Jouer » : compte à rebours puis départ.</summary>
@@ -261,13 +346,56 @@ namespace NoHesi
             StartCoroutine(Countdown());
         }
 
+        // ------------------------------------------------------------------ partie en réseau
+
+        /// <summary>
+        /// Partie en réseau hébergée ou rejointe depuis l'accueil : la voiture prend sa place dans la file de départ
+        /// (une par joueur), puis compte à rebours et départ.
+        /// </summary>
+        public void StartOnline()
+        {
+            if (State != Phase.Title) return;
+            PlaceAtStart(-GridSpacing * Net.LocalId);
+            StartCountdown();
+        }
+
+        /// <summary>
+        /// Serveur dédié : pas d'accueil ni de voiture locale. La partie est ouverte tout de suite ; la caméra montre
+        /// la place du départ, puis suit les joueurs à tour de rôle.
+        /// </summary>
+        void StartDedicated()
+        {
+            State = Phase.Playing;
+            Player.InputEnabled = false;
+            Player.Body.isKinematic = true;
+            Traffic.Drivers.Remove(Player);
+            Player.gameObject.SetActive(false);
+            cameraRig.Showcase = true;
+            string name = Argument("-name") ?? Loc.T("Serveur Chill Road", "Chill Road server");
+            int port = int.TryParse(Argument("-port"), out int p) && p > 0 && p < 65536 ? p : NetProtocol.DefaultPort;
+            int players = int.TryParse(Argument("-players"), out int n) ? n : NetProtocol.DefaultMaxPlayers;
+            // Collisions entre joueurs : actives, sauf demande contraire au lancement (option fixe ensuite)
+            bool collisions = !HasArgument("-nocollisions");
+            if (!Net.Host(name, port, players, true, collisions, out string error)) Debug.LogError("[Net] " + error);
+            // Code d'invitation à la demande : sans lui, le serveur ne parle à aucun service en ligne
+            else if (HasArgument("-invite")) Net.OpenInvite();
+        }
+
         static bool HasArgument(string name) => System.Array.IndexOf(System.Environment.GetCommandLineArgs(), name) >= 0;
+
+        static string Argument(string name)
+        {
+            var args = System.Environment.GetCommandLineArgs();
+            int i = System.Array.IndexOf(args, name);
+            return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+        }
 
         /// <summary>Active ou coupe les commandes du joueur (pause, carte).</summary>
         public void SetInputEnabled(bool enabled)
         {
+            if (DedicatedServer) return;
             Player.InputEnabled = enabled;
-            // Menu ouvert : la voiture freine
+            // Menu ouvert : la voiture freine (utile en réseau, où le temps ne s'arrête pas)
             Player.Parked = !enabled;
         }
 
@@ -310,9 +438,10 @@ namespace NoHesi
 
         /// <summary>
         /// Point de départ : sur la route de la vallée (lieu « depart » de la carte s'il existe, son rayon donnant
-        /// le cap en degrés).
+        /// le cap en degrés). back : recul le long de la voie (en réseau, les joueurs sont
+        /// rangés en file l'un derrière l'autre).
         /// </summary>
-        void PlaceAtStart()
+        void PlaceAtStart(float back)
         {
             Vector3 near = Vector3.zero;
             float yaw = float.NaN;
@@ -326,7 +455,7 @@ namespace NoHesi
             hit.edge.Evaluate(hit.s, out var tangent, out _);
             // Bretelle à sens unique : toujours dans le sens de la circulation (de a vers b)
             int direction = hit.edge.oneway || Vector3.Dot(tangent, want) >= 0f ? 1 : -1;
-            float s = Mathf.Clamp(hit.s, hit.edge.trimA + 2f, hit.edge.Length - hit.edge.trimB - 2f);
+            float s = Mathf.Clamp(hit.s + back * direction, hit.edge.trimA + 2f, hit.edge.Length - hit.edge.trimB - 2f);
             Vector3 pos = hit.edge.LanePosition(s, direction, out var forward);
             Traffic.ClearAround(pos, 14f);
             Player.Teleport(pos + Vector3.up * 0.5f, Quaternion.LookRotation(new Vector3(forward.x, 0f, forward.z), Vector3.up), 0f);
@@ -357,6 +486,7 @@ namespace NoHesi
         /// <summary>Quitte le jeu (arrête la lecture dans l'éditeur).</summary>
         public void Quit()
         {
+            if (Net) Net.Leave();
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
 #else
@@ -385,6 +515,10 @@ namespace NoHesi
             around.Add(pos);
             Road.UpdateOrigin(pos);
             Terrain.UpdateAround(around, 1);
+            // Le trafic vit autour de tous les joueurs (en réseau : ceux des autres machines aussi)
+            positions.Clear();
+            if (!DedicatedServer) positions.Add(pos);
+            Net.AddPlayers(positions);
             // Pluie : trafic plus prudent
             Traffic.WeatherSpeed = Mathf.Lerp(1f, 0.86f, Weather.Wetness);
 
@@ -392,13 +526,15 @@ namespace NoHesi
             if (State != Phase.Playing)
             {
                 if (local.Audio) local.Audio.Horn = false;
-                Traffic.Tick(around, dt);
+                carLights.Flash = false;
+                Traffic.Tick(positions, dt);
                 return;
             }
 
-            // Menu ouvert (pause, carte) : le monde s'arrête
+            // Menu ouvert (pause, carte) : seul, le monde s'arrête ; en réseau, il continue sans nous
             bool menu = hud.Paused;
-            if (!menu) Traffic.Tick(around, dt);
+            if (!menu || Online) Traffic.Tick(positions, dt);
+            if (DedicatedServer) return;
             if (!menu)
             {
                 Score.Tick(dt);
@@ -406,6 +542,13 @@ namespace NoHesi
                 UpdateResetButton();
                 if (GameInput.CameraPressed) cameraRig.NextView();
                 if (local.Audio) local.Audio.Horn = GameInput.HornHeld;
+                // Appel de phares, au volant seulement. La croix ↓ refuse d'abord une invitation de course : tant qu'une
+                // invitation attend, et jusqu'à ce que la croix soit relâchée, elle ne fait pas d'appel de phares
+                bool flashPad = GameInput.FlashPadHeld, invited = Races && Races.InvitePending;
+                if (!flashPad) flashBlocked = false;
+                else if (invited || wasInvited) flashBlocked = true;
+                wasInvited = invited;
+                carLights.Flash = Player.InputEnabled && (GameInput.FlashKeyHeld || flashPad && !flashBlocked);
                 if (GameInput.NextTrackPressed) Music.Next();
                 UpdatePlace(dt);
             }
@@ -414,6 +557,7 @@ namespace NoHesi
                 local.ResetHeld = 0f;
                 local.ResetConsumed = false;
                 if (local.Audio) local.Audio.Horn = false;
+                carLights.Flash = false;
             }
 
             // Retournée, tombée sous la carte, au fond de l'eau ou sortie des limites : on la replace sur la route
@@ -511,6 +655,8 @@ namespace NoHesi
         /// </summary>
         public bool CycleCar(int delta, bool remember = true)
         {
+            // Voiture imposée par une course à plusieurs : on la garde jusqu'à la fin
+            if (Races && Races.CarLocked) return false;
             var cars = assets.playerCars;
             int step = delta >= 0 ? 1 : -1;
             for (int n = 1; n < cars.Length; n++)
@@ -533,14 +679,17 @@ namespace NoHesi
         }
 
         /// <summary>
-        /// Met une voiture du garage à la place de celle du joueur sans la lui attribuer (vitrine de la concession) ;
-        /// <see cref="SelectCar"/> ou <c>ShowCar(Local.CarIndex)</c> pour revenir à la sienne.
+        /// Met une voiture du garage à la place de celle du joueur sans la lui attribuer (vitrine de la concession,
+        /// voiture imposée d'une course à plusieurs) ; <see cref="SelectCar"/> ou <c>ShowCar(Local.CarIndex)</c> pour
+        /// revenir à la sienne. <paramref name="stock"/> : avec sa fiche d'origine, sans les améliorations du garage de
+        /// tuning (la même voiture pour tous les coureurs).
         /// </summary>
-        public void ShowCar(int index)
+        public void ShowCar(int index, bool stock = false)
         {
             // Fiche avec les améliorations du garage de tuning (la même tant qu'elles ne changent pas), et sa peinture
-            var basic = assets.playerCars[Mathf.Clamp(index, 0, assets.playerCars.Length - 1)];
-            var spec = CarTuning.Apply(basic);
+            ShownCar = Mathf.Clamp(index, 0, assets.playerCars.Length - 1);
+            var basic = assets.playerCars[ShownCar];
+            var spec = stock ? basic : CarTuning.Apply(basic);
             var car = Player;
             if (car.Spec != spec) Swap(car, spec);
             CarPaint.Apply(car.Model, CarPaint.Selected(basic));
@@ -586,17 +735,26 @@ namespace NoHesi
             }
         }
 
-        /// <summary>Retour au menu principal : rechargement et écran d'accueil.</summary>
+        /// <summary>Retour au menu principal : rechargement et écran d'accueil (la partie en réseau est quittée).</summary>
         public void ReturnToTitle()
         {
+            if (Net) Net.Leave();
             skipTitle = false;
             Time.timeScale = 1f;
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
 
-        /// <summary>Recommence au point de départ, sans repasser par l'accueil.</summary>
+        /// <summary>
+        /// Recommence au point de départ, sans repasser par l'accueil. En réseau, la partie continue : la voiture est
+        /// seulement ramenée à sa place de départ.
+        /// </summary>
         public void Restart()
         {
+            if (Online)
+            {
+                if (!DedicatedServer) PlaceAtStart(-GridSpacing * Net.LocalId);
+                return;
+            }
             skipTitle = true;
             Time.timeScale = 1f;
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);

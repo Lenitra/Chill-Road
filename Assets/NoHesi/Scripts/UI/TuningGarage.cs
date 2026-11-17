@@ -146,8 +146,10 @@ namespace NoHesi
         bool InZone()
         {
             var p = Poi;
-            if (p == null || game.State != GameManager.Phase.Playing) return false;
+            if (p == null || GameManager.DedicatedServer || game.State != GameManager.Phase.Playing) return false;
             if ((game.Hud && game.Hud.Paused) || OptionsMenu.IsOpen || WorldMap.IsOpen || Dealership.IsOpen) return false;
+            // Invitation à une course affichée : la touche d'entrée y répond
+            if (game.Races && game.Races.InvitePending) return false;
             var car = game.Player;
             if (!car || car.Speed > EnterSpeed) return false;
             Vector3 pos = car.transform.position;

@@ -159,7 +159,7 @@ namespace NoHesi
             if (traffic != null)
                 foreach (var c in traffic.Cars)
                 {
-                    if (c.go == null || !c.go.activeInHierarchy) continue;
+                    if (c.go == null || c.veiled || !c.go.activeInHierarchy) continue;
                     Vector2 p = ToUi(c.go.transform.position);
                     if (p.sqrMagnitude < (Radius - 6f) * (Radius - 6f)) dots.points.Add(p);
                 }

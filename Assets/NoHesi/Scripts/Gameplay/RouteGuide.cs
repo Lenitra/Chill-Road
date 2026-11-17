@@ -14,6 +14,10 @@ namespace NoHesi
     ///   beaucoup.
     /// - Affichage : un ruban lumineux à chevrons posé sur la route devant la voiture, une colonne de lumière sur la
     ///   destination, le tracé sur la carte globale et sur la minicarte, la distance restante en bas de la minicarte.
+    /// - GPS vers un ami (partie en réseau) : la destination peut être un autre joueur, choisi sur la carte globale
+    ///   (<see cref="Follow"/>). Elle suit sa voiture, et l'arrivée de l'itinéraire est reportée toutes les deux secondes
+    ///   sur la route où il se trouve s'il a bougé. Elle s'efface s'il quitte la partie, ou une fois arrivé auprès de
+    ///   lui à l'arrêt ; tant qu'il roule, on continue de le suivre.
     /// Chaque joueur a sa propre destination (rien ne passe par le réseau).
     /// </summary>
     public class RouteGuide : MonoBehaviour
@@ -22,11 +26,22 @@ namespace NoHesi
         const float ArriveDistance = 28f;
         const float RibbonLength = 650f, RibbonWidth = 1.7f, RibbonLift = 0.22f, ChevronSpacing = 5f;
         const float UTurnPenalty = 25f, DeadEndPenalty = 12f;
+        /// <summary>
+        /// Joueur suivi : période (s) à laquelle l'arrivée de l'itinéraire est reportée sur sa route, et déplacement
+        /// (m) en dessous duquel elle reste où elle est.
+        /// </summary>
+        const float FriendRefresh = 2f, FriendMove = 12f;
+        /// <summary>Arrivé auprès du joueur suivi : s'il roule moins vite que ceci (m/s) pendant ce temps (s).</summary>
+        const float FriendStopSpeed = 3f, FriendStopTime = 2f;
+        static readonly Color GpsColor = new Color(0.35f, 0.85f, 1f);
 
         public bool HasDestination { get; private set; }
-        /// <summary>Destination, posée sur la route la plus proche du point choisi.</summary>
+        /// <summary>Destination : le point choisi, posé sur la route la plus proche, ou la voiture du joueur suivi.</summary>
         public Vector3 Destination { get; private set; }
-        public string DestinationName => HasDestination ? Loc.T(nameFr, nameEn) : "";
+        /// <summary>Nom de la destination : celui du lieu, ou le pseudo du joueur suivi.</summary>
+        public string DestinationName => !HasDestination ? "" : following ? friendName : Loc.T(nameFr, nameEn);
+        /// <summary>Joueur suivi (partie en réseau), quand la destination est sa voiture.</summary>
+        public RemoteCar Friend => following && friend ? friend : null;
         /// <summary>Itinéraire (points dans la voie, du point de la route le plus proche de la voiture à la destination).</summary>
         public IReadOnlyList<Vector3> Route => route;
         /// <summary>Distance (m) et temps estimé (s) restant jusqu'à la destination.</summary>
@@ -43,6 +58,12 @@ namespace NoHesi
         float timer;
         int teleports = -1;
         float[][] times;
+        // Arrivée de l'itinéraire (sur la route) ; pour un joueur suivi, là où il était au dernier report
+        Vector3 goal, goalFrom;
+        RemoteCar friend;
+        bool following;
+        string friendName = "";
+        float friendTimer, friendStill;
 
         readonly List<Vector3> route = new List<Vector3>();
         readonly List<float> routeDist = new List<float>();
@@ -60,11 +81,12 @@ namespace NoHesi
         readonly List<int> tris = new List<int>();
         RouteLine miniLine;
         RectTransform miniPin;
-        Text miniDistance;
+        Text miniDistance, miniName;
 
         public void Init(GameManager g)
         {
             game = g;
+            if (GameManager.DedicatedServer) return;
             BuildWorld();
             MiniMap.Overlay += DrawOnMiniMap;
         }
@@ -81,19 +103,49 @@ namespace NoHesi
             point.y = game.Map.Height(point.x, point.z);
             var hit = road.Nearest(point, 4000f);
             if (!hit.Found) return false;
-            Destination = hit.point;
+            Destination = goal = hit.point;
             nameFr = string.IsNullOrEmpty(fr) ? "Repère" : fr;
             nameEn = string.IsNullOrEmpty(en) ? "Map pin" : en;
+            following = false;
+            friend = null;
             HasDestination = true;
             timer = 0f;
             Compute();
             return true;
         }
 
+        /// <summary>
+        /// Prend pour destination un autre joueur de la partie en réseau : l'itinéraire mène à la route où il se trouve
+        /// et le suit dans ses déplacements. Faux s'il n'est pas encore en place, ou pendant une course.
+        /// </summary>
+        public bool Follow(RemoteCar player)
+        {
+            road = game.Road;
+            if (OnCourse || !player || !player.Ready || !road || game.Map == null) return false;
+            Vector3 at = player.transform.position;
+            var hit = road.Nearest(at, 4000f);
+            if (!hit.Found) return false;
+            friend = player;
+            following = true;
+            friendName = FriendName(player);
+            friendTimer = FriendRefresh;
+            friendStill = 0f;
+            Destination = goalFrom = at;
+            goal = hit.point;
+            HasDestination = true;
+            timer = 0f;
+            Compute();
+            return true;
+        }
+
+        static string FriendName(RemoteCar player) => string.IsNullOrEmpty(player.Name) ? Loc.T("Joueur", "Player") : player.Name;
+
         public void ClearDestination()
         {
             if (OnCourse) return;       // parcours imposé : il se retire avec ClearCourse
             HasDestination = false;
+            following = false;
+            friend = null;
             route.Clear();
             routeDist.Clear();
             Remaining = RemainingTime = 0f;
@@ -110,6 +162,8 @@ namespace NoHesi
         bool savedHas;
         Vector3 savedPoint;
         string savedFr, savedEn;
+        bool savedFollowing;
+        RemoteCar savedFriend;
 
         /// <summary>
         /// Affiche un parcours imposé à la place de l'itinéraire : les points de <paramref name="points"/> à partir de
@@ -118,15 +172,19 @@ namespace NoHesi
         /// </summary>
         public void SetCourse(IReadOnlyList<Vector3> points, int first, string fr, string en)
         {
-            if (points == null || points.Count - first < 2) return;
+            if (GameManager.DedicatedServer || points == null || points.Count - first < 2) return;
             if (!OnCourse)
             {
                 savedHas = HasDestination;
                 savedPoint = Destination;
                 savedFr = nameFr;
                 savedEn = nameEn;
+                savedFollowing = following;
+                savedFriend = friend;
             }
             OnCourse = true;
+            following = false;
+            friend = null;
             route.Clear();
             routeDist.Clear();
             for (int i = Mathf.Max(0, first); i < points.Count; i++) Add(route, routeDist, points[i]);
@@ -147,12 +205,52 @@ namespace NoHesi
             if (!OnCourse) return;
             OnCourse = false;
             ClearDestination();
-            if (savedHas) SetDestination(savedPoint, savedFr, savedEn);
+            // Le joueur suivi avant la course l'est de nouveau, s'il est encore là
+            if (savedFollowing) { if (savedFriend) Follow(savedFriend); }
+            else if (savedHas) SetDestination(savedPoint, savedFr, savedEn);
+            savedFollowing = false;
+            savedFriend = null;
+        }
+
+        /// <summary>
+        /// Joueur suivi : la destination est sa voiture, image par image. S'il a quitté la partie (sa voiture n'existe
+        /// plus), la destination s'efface et le joueur en est prévenu.
+        /// </summary>
+        void TrackFriend()
+        {
+            if (friend)
+            {
+                Destination = friend.transform.position;
+                friendName = FriendName(friend);
+                return;
+            }
+            string name = friendName;
+            ClearDestination();
+            if (game.Hud && game.State == GameManager.Phase.Playing)
+                game.Hud.Announce(Loc.T("DESTINATION EFFACÉE", "DESTINATION CLEARED"), Loc.T($"{name} a quitté la partie", $"{name} left the game"), GpsColor, 3f);
+        }
+
+        /// <summary>
+        /// Joueur suivi : toutes les deux secondes, s'il a bougé, l'arrivée de l'itinéraire est reportée sur la route la
+        /// plus proche de sa voiture, et l'itinéraire est refait aussitôt.
+        /// </summary>
+        void FollowFriend(float dt)
+        {
+            friendTimer -= dt;
+            if (friendTimer > 0f) return;
+            friendTimer = FriendRefresh;
+            if ((Destination - goalFrom).sqrMagnitude < FriendMove * FriendMove) return;
+            var hit = game.Road.Nearest(Destination, 4000f);
+            if (!hit.Found) return;
+            goal = hit.point;
+            goalFrom = Destination;
+            timer = 0f;
         }
 
         void Update()
         {
-            if (!game) return;
+            if (!game || GameManager.DedicatedServer) return;
+            if (following) TrackFriend();
             if (OnCourse)
             {
                 if (game.State == GameManager.Phase.Playing) Track();
@@ -161,6 +259,7 @@ namespace NoHesi
             {
                 // Recalcul régulier (on peut quitter l'itinéraire), et tout de suite après un replacement sur la route
                 timer -= Time.unscaledDeltaTime;
+                if (following) FollowFriend(Time.unscaledDeltaTime);
                 var car = game.Player;
                 if (timer <= 0f || car.TeleportCount != teleports)
                 {
@@ -171,7 +270,15 @@ namespace NoHesi
                 Track();
                 Vector3 d = car.transform.position - Destination;
                 d.y = 0f;
-                if (d.magnitude < ArriveDistance || HasRoute && Remaining - along < ArriveDistance * 0.6f)
+                if (following)
+                {
+                    // Auprès du joueur suivi : arrivé seulement s'il est à l'arrêt, ou presque, depuis un moment ; tant
+                    // qu'il roule, on continue de le suivre
+                    bool stopped = d.magnitude < ArriveDistance && friend.Car.Speed < FriendStopSpeed;
+                    friendStill = stopped ? friendStill + Time.unscaledDeltaTime : 0f;
+                    if (friendStill >= FriendStopTime) ClearDestination();
+                }
+                else if (d.magnitude < ArriveDistance || HasRoute && Remaining - along < ArriveDistance * 0.6f)
                 {
                     ClearDestination();
                 }
@@ -310,7 +417,7 @@ namespace NoHesi
             along = 0f;
             if (!HasDestination) return;
             var car = game.Player.transform;
-            float time = Solve(car.position, car.forward, Destination);
+            float time = Solve(car.position, car.forward, goal);
             if (time < 0f) return;
             RemainingTime = time;
             BuildPolyline(route, routeDist);
@@ -651,8 +758,11 @@ namespace NoHesi
             float dist = cam ? Vector3.Distance(cam.transform.position, Destination) : 100f;
             beacon.SetPosition(0, Destination - Vector3.up * 2f);
             beacon.SetPosition(1, Destination + Vector3.up * 260f);
+            // Joueur suivi : la colonne s'amincit puis disparaît en approchant de sa voiture (on roule avec lui)
+            float close = following ? Mathf.InverseLerp(45f, 110f, dist) : 1f;
+            beacon.enabled = close > 0.01f;
             // Visible de loin : la largeur grandit avec la distance
-            beacon.widthMultiplier = Mathf.Clamp(dist * 0.006f, 1.6f, 16f) * (1f + Mathf.Sin(Time.time * 3f) * 0.08f);
+            beacon.widthMultiplier = Mathf.Clamp(dist * 0.006f, 1.6f, 16f) * (1f + Mathf.Sin(Time.time * 3f) * 0.08f) * close;
         }
 
         static string Distance(float m) => m < 950f
@@ -682,19 +792,29 @@ namespace NoHesi
                 pinCore.raycastTarget = false;
                 miniPin.localEulerAngles = new Vector3(0f, 0f, 45f);
                 miniPin.SetSiblingIndex(miniLine.transform.GetSiblingIndex() + 1);
-                // Distance restante : en bas du disque, gris presque noir liseré de blanc (la minicarte reste en gris)
-                miniDistance = Label(root, 18, new Color(0.08f, 0.08f, 0.08f, 1f), FontStyle.BoldAndItalic, TextAnchor.MiddleCenter, new Vector2(0f, -radius + 18f), new Vector2(160f, 24f));
-                miniDistance.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                Destroy(miniDistance.GetComponent<Shadow>());
-                var edge = miniDistance.gameObject.AddComponent<Outline>();
-                edge.effectColor = new Color(1f, 1f, 1f, 0.95f);
-                edge.effectDistance = new Vector2(1.3f, -1.3f);
+                // Distance restante : en bas du disque, gris presque noir liseré de blanc (la minicarte reste en gris) ;
+                // juste au-dessus, le pseudo du joueur suivi
+                Text Caption(int size, float y)
+                {
+                    var text = Label(root, size, new Color(0.08f, 0.08f, 0.08f, 1f), FontStyle.BoldAndItalic, TextAnchor.MiddleCenter, new Vector2(0f, y), new Vector2(160f, 24f));
+                    text.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                    Destroy(text.GetComponent<Shadow>());
+                    var edge = text.gameObject.AddComponent<Outline>();
+                    edge.effectColor = new Color(1f, 1f, 1f, 0.95f);
+                    edge.effectDistance = new Vector2(1.3f, -1.3f);
+                    return text;
+                }
+                miniDistance = Caption(18, -radius + 18f);
+                miniName = Caption(15, -radius + 38f);
+                miniName.supportRichText = false;
             }
             miniLine.strips.Clear();
             bool show = HasDestination;
             miniPin.gameObject.SetActive(show);
             miniDistance.gameObject.SetActive(show);
+            miniName.gameObject.SetActive(show && following);
             if (show) miniDistance.text = HasRoute ? "◆ " + Distance(Mathf.Max(0f, Remaining - along)) : "◆ —";
+            if (show && following) miniName.text = friendName;
             if (show && HasRoute)
             {
                 // Seulement la partie devant la voiture, découpée au bord du disque

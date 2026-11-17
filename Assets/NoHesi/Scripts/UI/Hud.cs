@@ -17,6 +17,7 @@ namespace NoHesi
     /// - bas gauche : minicarte (pendant du compte-tours), à sa droite le morceau en cours et l'aide des commandes
     ///   (quelques secondes seulement) ;
     /// - menu pause avec le panneau des contrôles (manette ou clavier selon le dernier appareil utilisé).
+    /// En réseau, le menu pause n'arrête pas le monde : la partie continue pour les autres joueurs.
     /// </summary>
     public class Hud : MonoBehaviour
     {
@@ -39,6 +40,7 @@ namespace NoHesi
             new[] { "Diriger", "Steer", "@LS", "Q / A · D   (← →)", "A / Q · D   (← →)", "@TS", "@TS" },
             new[] { "Frein à main", "Handbrake", "B / RB", "Espace", "Space", "FREIN À MAIN", "HANDBRAKE" },
             new[] { "Phares", "Headlights", "L3", "L", "L", "PHARES", "LIGHTS" },
+            new[] { "Appel de phares", "Flash headlights", "@DD", "F", "F", "—", "—" },
             new[] { "Regarder autour", "Look around", "@RS", "Clic droit + souris", "Right-click + mouse", "Glisser sur l'écran", "Drag on screen" },
             new[] { "Changer de vue", "Change camera", "X", "C / V", "C / V", "VUE", "CAMERA" },
             new[] { "Klaxon", "Horn", "R3", "H", "H", "—", "—" },
@@ -123,15 +125,22 @@ namespace NoHesi
 
         // Pause
         GameObject pausePanel;
-        Text carLabel, timeLabel;
+        Text carLabel, timeLabel, netLabel, pauseTitle;
         bool inPause;
         Text controlsTitle;
         readonly List<(Text action, Text key)> controlRows = new List<(Text, Text)>();
         int controlsShown = -1;   // appareil + langue affichés (0-3), -1 = à construire
         Button firstButton;
         int openedFrame;
+        // Partie en réseau : plaque du menu (elle grandit avec ses lignes), ligne d'état, bouton du code d'invitation
+        RectTransform pauseBox;
+        LayoutElement netLayout;
+        Text inviteLabel;
+        float netRefresh, inviteCopied = -10f, inviteClock;
+        string inviteAnnounced;
         /// <summary>
-        /// Menu pause (ou options ouvertes depuis la pause), carte : le joueur ne conduit pas et le monde est arrêté.
+        /// Menu pause (ou options ouvertes depuis la pause), carte : le joueur ne conduit pas. Seul, le monde est arrêté ;
+        /// en réseau, il continue.
         /// </summary>
         public bool Paused => WorldMap.IsOpen || inPause || Dealership.IsOpen || TuningGarage.IsOpen || RaceSetup.IsOpen;
 
@@ -412,7 +421,8 @@ namespace NoHesi
             bool shift = rpm > 0.93f && car.Gear > 0;
             gearDisc.color = shift && Mathf.Repeat(Time.unscaledTime * 8f, 1f) < 0.5f ? Danger : Accent;
             distText.text = Loc.F($"{score.RunDistance / 1000f:0.0} km");
-            bool lightsOn = slot.Lights && slot.Lights.On;
+            // Témoin des phares : allumé aussi le temps d'un appel de phares
+            bool lightsOn = slot.Lights && (slot.Lights.On || slot.Lights.Flashing);
             lightsText.text = Loc.T("PHARES", "LIGHTS");
             lightsText.color = lightsOn ? Info : new Color(1f, 1f, 1f, 0.28f);
             bool esp = car.EspIntervention > 0.05f, tcs = car.TcsIntervention > 0.05f;
@@ -535,7 +545,35 @@ namespace NoHesi
             UpdateTouchLayout();
             UpdateSlides(dt);
             UpdateBottomLeft(dt);
+            UpdateInvite(dt);
             UpdatePause();
+        }
+
+        /// <summary>
+        /// Partie hébergée : le code d'invitation est annoncé dès qu'il est obtenu (une fois le HUD arrivé, après le
+        /// « GO »), et son absence aussi (pas d'Internet, services en panne, code expiré) : la partie reste alors
+        /// ouverte en réseau local et par adresse IP.
+        /// </summary>
+        void UpdateInvite(float dt)
+        {
+            var net = game.Net;
+            if (!net || !net.IsHost || GameManager.DedicatedServer || game.State != GameManager.Phase.Playing)
+            {
+                inviteClock = 0f;
+                if (!net || !net.IsHost) inviteAnnounced = null;
+                return;
+            }
+            inviteClock += dt;
+            if (inviteClock < 1.5f || Paused) return;
+            string now = net.InviteCode ?? (net.InviteError != null ? "!" + net.InviteError : null);
+            if (now == null || now == inviteAnnounced) return;
+            inviteAnnounced = now;
+            if (net.InviteCode != null)
+                Announce(Loc.T("CODE D'INVITATION", "INVITE CODE") + "  ·  " + net.InviteCode,
+                    Loc.T("donne-le à tes amis pour qu'ils te rejoignent  ·  il se copie depuis le menu", "give it to your friends so they can join  ·  copy it from the menu"), Info, 9f);
+            else
+                Announce(Loc.T("PAS DE CODE D'INVITATION", "NO INVITE CODE"),
+                    net.InviteError + Loc.T("  ·  la partie reste ouverte en réseau local et par adresse IP", "  ·  the game stays open on the local network and by IP address"), Danger, 7f);
         }
 
         void UpdateBottomLeft(float dt)
@@ -685,18 +723,29 @@ namespace NoHesi
             // Menu à gauche, contrôles à droite
             var box = Rect(pausePanel.transform, "Box", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-760, -340), new Vector2(-40, 340));
             Backdrop(box);
+            pauseBox = box;
             var layout = box.gameObject.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(50, 50, 30, 30);
             layout.spacing = 12;
             layout.childControlHeight = true; layout.childControlWidth = true; layout.childForceExpandHeight = false;
             var title = Label(box, "PAUSE", 64, TextAnchor.MiddleLeft, Accent, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600, 90), FontStyle.BoldAndItalic);
             title.gameObject.AddComponent<LayoutElement>().preferredHeight = 90;
+            pauseTitle = title;
+            // Partie en réseau : nombre de joueurs, adresse et code d'invitation à donner aux autres (hôte) ; dessous,
+            // l'option de collisions
+            netLabel = Label(box, "", 22, TextAnchor.MiddleLeft, Info, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600, 56), FontStyle.Bold);
+            netLayout = netLabel.gameObject.AddComponent<LayoutElement>();
+            netLayout.preferredHeight = 56;
+            netLabel.gameObject.SetActive(false);
 
             var resume = Button(box, "", () => SetPaused(false));
             Loc.Bind(resume.text, "Reprendre", "Resume");
             firstButton = resume.button;
+            // Hôte : copie le code d'invitation dans le presse-papiers (ou en demande un s'il n'y en a pas)
+            inviteLabel = Button(box, "", InviteAction).text;
             carLabel = Button(box, "", () => { game.CycleCar(1); RefreshPause(); }).text;
-            timeLabel = Button(box, "", () => { game.DayNight.Advance(3f); RefreshPause(); }).text;
+            // L'heure d'une partie rejointe est celle du serveur
+            timeLabel = Button(box, "", () => { if (!(game.Net && game.Net.IsClient)) game.DayNight.Advance(3f); RefreshPause(); }).text;
             Button(box, "Options", OpenOptions);
             Loc.Bind(Button(box, "", game.ReturnToTitle).text, "Menu principal", "Main menu");
             Loc.Bind(Button(box, "", game.Quit).text, "Quitter le jeu", "Quit game");
@@ -711,14 +760,15 @@ namespace NoHesi
             Backdrop(panel);
             var layout = panel.gameObject.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(50, 50, 30, 30);
-            layout.spacing = 4;
+            layout.spacing = 3;
             layout.childControlHeight = true; layout.childControlWidth = true; layout.childForceExpandHeight = false;
             controlsTitle = Label(panel, "", 30, TextAnchor.MiddleLeft, Info, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600, 60), FontStyle.BoldAndItalic);
             controlsTitle.gameObject.AddComponent<LayoutElement>().preferredHeight = 70;
             foreach (var _ in Controls)
             {
+                // Quatorze lignes dans la hauteur du panneau
                 var row = Rect(panel, "Row", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-                row.gameObject.AddComponent<LayoutElement>().preferredHeight = 42;
+                row.gameObject.AddComponent<LayoutElement>().preferredHeight = 40;
                 var h = row.gameObject.AddComponent<HorizontalLayoutGroup>();
                 h.childControlWidth = true; h.childControlHeight = true; h.childForceExpandWidth = false;
                 var action = Label(row, "", 23, TextAnchor.MiddleLeft, White, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300, 40), FontStyle.Normal);
@@ -747,6 +797,7 @@ namespace NoHesi
                 if (key == "@LS") key = Loc.T("Joystick gauche", "Left stick");
                 else if (key == "@RS") key = Loc.T("Joystick droit", "Right stick");
                 else if (key == "@DU") key = Loc.T("Croix ↑", "D-pad ↑");
+                else if (key == "@DD") key = Loc.T("Croix ↓", "D-pad ↓");
                 else if (key == "@TS") key = GameSettings.TouchSteer == 3 ? Loc.T("Incliner l'écran", "Tilt the screen")
                     : GameSettings.TouchSteer == 2 ? Loc.T("Boutons ‹ ›", "‹ › buttons") : Loc.T("Glisser à gauche", "Slide on the left");
                 controlRows[i].key.text = key;
@@ -756,17 +807,89 @@ namespace NoHesi
         void RefreshPause()
         {
             RefreshControls();
-            // Une seule voiture achetée : pas de bouton de choix
-            carLabel.transform.parent.gameObject.SetActive(game.OwnedCars > 1);
+            // Une seule voiture achetée, ou voiture imposée par une course à plusieurs : pas de bouton de choix
+            carLabel.transform.parent.gameObject.SetActive(game.OwnedCars > 1 && !(game.Races && game.Races.CarLocked));
             carLabel.text = Loc.T($"Voiture : {game.Player.Spec.displayName}  >", $"Car: {game.Player.Spec.displayName}  >");
-            timeLabel.text = Loc.T($"Heure : {game.DayNight.Clock}  (+3 h)  >", $"Time: {game.DayNight.Clock}  (+3 h)  >");
+            var net = game.Net;
+            bool online = game.Online;
+            timeLabel.text = online && net.IsClient
+                ? Loc.T($"Heure : {game.DayNight.Clock}  (réglée par l'hôte)", $"Time: {game.DayNight.Clock}  (set by the host)")
+                : Loc.T($"Heure : {game.DayNight.Clock}  (+3 h)  >", $"Time: {game.DayNight.Clock}  (+3 h)  >");
+            // En réseau, rien ne s'arrête : c'est un menu, pas une pause
+            pauseTitle.text = online ? "MENU" : "PAUSE";
+            RefreshNet();
+        }
+
+        /// <summary>
+        /// Partie en réseau, dans le menu : joueurs présents, adresse et code d'invitation à donner aux autres (hôte) ou
+        /// serveur rejoint et latence par le relais (joueur entré par code), option de collisions ; bouton du code
+        /// d'invitation (hôte). La plaque du menu prend la hauteur de ce qu'elle montre.
+        /// </summary>
+        void RefreshNet()
+        {
+            var net = game.Net;
+            bool online = game.Online, host = online && net.IsHost;
+            netRefresh = 0.5f;
+            int lines = 0;
+            netLabel.gameObject.SetActive(online);
+            inviteLabel.transform.parent.gameObject.SetActive(host);
+            if (online)
+            {
+                // Option fixée par le serveur à l'ouverture de la partie : rappelée, pas modifiable ici
+                string collisions = net.Collisions
+                    ? Loc.T("Collisions entre joueurs : activées", "Player collisions: on")
+                    : Loc.T("Collisions entre joueurs : désactivées", "Player collisions: off");
+                string first, invite = "";
+                if (host)
+                {
+                    first = Loc.T($"EN LIGNE  ·  joueurs : {net.PlayerCount}  ·  ton adresse : {net.LocalAddress}", $"ONLINE  ·  players: {net.PlayerCount}  ·  your address: {net.LocalAddress}");
+                    var step = net.InviteState;
+                    invite = step == NetRelay.Step.Ready ? Loc.T($"Code d'invitation : {net.InviteCode}", $"Invite code: {net.InviteCode}")
+                        : step == NetRelay.Step.Pending ? Loc.T("Code d'invitation : demande en cours", "Invite code: requesting")
+                        : step == NetRelay.Step.Failed ? Loc.T($"Pas de code : {net.InviteError}", $"No code: {net.InviteError}") : "";
+                    bool copied = Time.unscaledTime - inviteCopied < 2.5f;
+                    inviteLabel.text = step == NetRelay.Step.Ready ? (copied ? Loc.T("Code copié dans le presse-papiers", "Code copied to the clipboard") : Loc.T("Copier le code d'invitation", "Copy the invite code"))
+                        : step == NetRelay.Step.Pending ? Loc.T("Code d'invitation : demande en cours", "Invite code: requesting")
+                        : Loc.T("Demander un code d'invitation  >", "Request an invite code  >");
+                }
+                else
+                {
+                    string relay = !net.ViaRelay ? "" : net.RelayPing >= 0
+                        ? Loc.T($"  ·  par code d'invitation, {net.RelayPing} ms", $"  ·  by invite code, {net.RelayPing} ms")
+                        : Loc.T("  ·  par code d'invitation", "  ·  by invite code");
+                    first = Loc.T($"EN LIGNE  ·  {net.ServerName}  ·  joueurs : {net.PlayerCount}{relay}", $"ONLINE  ·  {net.ServerName}  ·  players: {net.PlayerCount}{relay}");
+                }
+                lines = invite.Length > 0 ? 3 : 2;
+                netLabel.text = first + "\n" + (invite.Length > 0 ? invite + "\n" : "") + collisions;
+                netLayout.preferredHeight = lines * 28f;
+            }
+            // Hauteur de la plaque : titre, ligne d'état, boutons affichés, espaces et marges
+            int buttons = 5 + (carLabel.transform.parent.gameObject.activeSelf ? 1 : 0) + (host ? 1 : 0);
+            float height = Mathf.Max(680f, 60f + 90f + buttons * 62f + lines * 28f + 12f * (buttons + (online ? 1 : 0)) + 14f);
+            pauseBox.offsetMin = new Vector2(pauseBox.offsetMin.x, -height * 0.5f);
+            pauseBox.offsetMax = new Vector2(pauseBox.offsetMax.x, height * 0.5f);
+        }
+
+        /// <summary>Bouton du code d'invitation (hôte) : le copie dans le presse-papiers ; sans code (panne, expiré), en demande un.</summary>
+        void InviteAction()
+        {
+            var net = game.Net;
+            if (!net || !net.IsHost) return;
+            if (net.InviteCode != null)
+            {
+                GUIUtility.systemCopyBuffer = net.InviteCode;
+                inviteCopied = Time.unscaledTime;
+            }
+            else net.OpenInvite();
+            RefreshNet();
         }
 
         public void SetPaused(bool paused)
         {
             pausePanel.SetActive(paused);
             inPause = paused;
-            Time.timeScale = paused ? 0f : 1f;
+            // En réseau, le monde continue pour tous : seule notre voiture n'est plus conduite
+            Time.timeScale = paused && !game.Online ? 0f : 1f;
             game.SetInputEnabled(!paused);
             openedFrame = Time.frameCount;
             if (paused)
@@ -791,7 +914,7 @@ namespace NoHesi
 
         void UpdatePause()
         {
-            if (OptionsMenu.IsOpen || Dealership.IsOpen || TuningGarage.IsOpen || RaceSetup.IsOpen || game.Demo) return;
+            if (OptionsMenu.IsOpen || Dealership.IsOpen || TuningGarage.IsOpen || RaceSetup.IsOpen || game.Demo || GameManager.DedicatedServer) return;
             // Carte globale ouverte (ou tout juste fermée par Échap) : la pause attend
             if (WorldMap.IsOpen || Time.frameCount == WorldMap.ChangedFrame || Time.frameCount == Dealership.ChangedFrame
                 || Time.frameCount == TuningGarage.ChangedFrame || Time.frameCount == RaceSetup.ChangedFrame) return;
@@ -802,6 +925,12 @@ namespace NoHesi
                 EventSystem.current.SetSelectedGameObject(firstButton.gameObject);
             // Les contrôles suivent l'appareil touché en dernier, même menu ouvert
             if (Paused) RefreshControls();
+            // En réseau, l'état de la partie change menu ouvert (joueurs, code d'invitation obtenu, latence)
+            if (inPause && pausePanel.activeSelf && game.Online)
+            {
+                netRefresh -= Time.unscaledDeltaTime;
+                if (netRefresh <= 0f) RefreshNet();
+            }
         }
 
         // ------------------------------------------------------------------ helpers

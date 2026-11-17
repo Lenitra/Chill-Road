@@ -2,7 +2,7 @@ namespace NoHesi
 {
     /// <summary>
     /// Le joueur de cette machine : sa voiture, sa caméra, son HUD, son son, son score, et l'état de son bouton de
-    /// replacement.
+    /// replacement. (Les voitures des autres joueurs d'une partie en réseau sont des <see cref="RemoteCar"/>.)
     /// </summary>
     public class PlayerSlot
     {
