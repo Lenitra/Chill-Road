@@ -507,7 +507,7 @@ namespace ChillRoad
             Player.OnRoad = surface.onRoad;
             Player.RoadGrip = surface.grip;
             Player.SurfaceDirt = surface.onRoad ? surface.dirt : 0f;
-            Player.Wetness = Weather.Wetness;
+            Player.Wetness = Weather.WetnessAt(pos);       // sèche dans les tunnels
             // Neige : la voiture s'y enfonce (quelques centimètres sur la chaussée tassée, davantage en neige fraîche)
             Player.SurfaceSnow = surface.snow;
             Player.SnowSink = Mathf.MoveTowards(Player.SnowSink, surface.snow * (surface.onRoad ? 0.035f : 0.09f), dt * 0.25f);

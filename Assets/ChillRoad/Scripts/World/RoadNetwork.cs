@@ -173,6 +173,21 @@ namespace ChillRoad
 
         Material tunnelGlow, tunnelAmber, tunnelGreen, tunnelBlue, tunnelVault, tunnelTile, tunnelKerb, tunnelTrim, tunnelFan, tunnelOrange, tunnelPipe, tunnelPortal;
 
+        /// <summary>Chaussée à l'abri (tunnels) : le shader de route n'y applique pas l'humidité de la pluie.</summary>
+        static MaterialPropertyBlock dryBlock;
+        static MaterialPropertyBlock DryBlock
+        {
+            get
+            {
+                if (dryBlock == null)
+                {
+                    dryBlock = new MaterialPropertyBlock();
+                    dryBlock.SetFloat("_WetScale", 0f);
+                }
+                return dryBlock;
+            }
+        }
+
         /// <summary>Copie teintée ; selfLit &gt; 0 : part de la couleur toujours éclairée (l'intérieur d'un tunnel est
         /// à l'ombre de sa coque, seule l'ambiante l'atteindrait — or un tunnel est éclairé jour et nuit).</summary>
         static Material Tint(Material source, string name, Color color, float selfLit = 0f)
@@ -772,6 +787,10 @@ namespace ChillRoad
             var info = new Vector4(highway || ramp ? 1f : 0f, dirtness, hw, ramp ? 0f : 1f);
             var auxInfo = new Vector4(1f, 0f, hw, 0f);
             road.SetInfo(info, info); walk.SetInfo(info, info); marks.SetInfo(info, info);
+            // Chaussée et marquages des tunnels : maillages à part, jamais mouillés (DryBlock : _WetScale = 0)
+            var roadDry = new MeshBuilder();
+            var marksDry = new MeshBuilder();
+            roadDry.SetInfo(info, info); marksDry.SetInfo(info, info);
             Vector3 up = Vector3.up;
             // Aux abords d'un carrefour, pas de glissière : elle barrerait la vue et les branches voisines
             float railFrom = IsJunction(e.a) ? e.trimA + JunctionClear : -1f;
@@ -865,8 +884,10 @@ namespace ChillRoad
                 bool tunnel = A.span == "tunnel" && B.span == "tunnel";
                 bool bridge = !tunnel && A.span != null && B.span != null && A.span != "tunnel" && B.span != "tunnel";
                 bool dam = bridge && A.span == "dam";
+                var surf = tunnel ? roadDry : road;      // à l'abri : chaussée et marquages toujours secs
+                var mk = tunnel ? marksDry : marks;
 
-                road.Quad(a - ra * hw, a + ra * hw, b - rb * hw, b + rb * hw,
+                surf.Quad(a - ra * hw, a + ra * hw, b - rb * hw, b + rb * hw,
                     new Vector2(-hw, sa), new Vector2(hw, sa), new Vector2(-hw, sb), new Vector2(hw, sb));
 
                 foreach (float side in new[] { -1f, 1f })
@@ -877,10 +898,10 @@ namespace ChillRoad
                     if (wa > 0.01f || wb > 0.01f)
                     {
                         Vector3 xa = a + ra * (hw + wa) * side, xb = b + rb * (hw + wb) * side;
-                        road.SetInfo(auxInfo, auxInfo);
-                        if (side > 0) road.Quad(ea, xa, eb, xb, new Vector2(0f, sa), new Vector2(0f, sa), new Vector2(0f, sb), new Vector2(0f, sb));
-                        else road.Quad(xa, ea, xb, eb, new Vector2(0f, sa), new Vector2(0f, sa), new Vector2(0f, sb), new Vector2(0f, sb));
-                        road.SetInfo(info, info);
+                        surf.SetInfo(auxInfo, auxInfo);
+                        if (side > 0) surf.Quad(ea, xa, eb, xb, new Vector2(0f, sa), new Vector2(0f, sa), new Vector2(0f, sb), new Vector2(0f, sb));
+                        else surf.Quad(xa, ea, xb, eb, new Vector2(0f, sa), new Vector2(0f, sa), new Vector2(0f, sb), new Vector2(0f, sb));
+                        surf.SetInfo(info, info);
                         ea = xa;
                         eb = xb;
                     }
@@ -984,13 +1005,13 @@ namespace ChillRoad
                             if (k == e.lanes && aux) { if (Mathf.Repeat(mid, 6f) >= 3f) continue; }
                             else if (!solid && !dash) continue;
                             float o = (e.median + k * LaneWidth) * side, w = solid ? 0.1f : 0.07f;
-                            marks.Quad(a + ra * (o - w) + lift, a + ra * (o + w) + lift, b + rb * (o - w) + lift, b + rb * (o + w) + lift);
+                            mk.Quad(a + ra * (o - w) + lift, a + ra * (o + w) + lift, b + rb * (o - w) + lift, b + rb * (o + w) + lift);
                         }
                         // Rive de la voie d'insertion (là où elle est assez large pour en porter une)
                         if (aux && wa > 0.8f && wb > 0.8f)
                         {
                             float oa2 = (hw + wa - 0.3f) * side, ob2 = (hw + wb - 0.3f) * side;
-                            marks.Quad(a + ra * (oa2 - 0.1f) + lift, a + ra * (oa2 + 0.1f) + lift, b + rb * (ob2 - 0.1f) + lift, b + rb * (ob2 + 0.1f) + lift);
+                            mk.Quad(a + ra * (oa2 - 0.1f) + lift, a + ra * (oa2 + 0.1f) + lift, b + rb * (ob2 - 0.1f) + lift, b + rb * (ob2 + 0.1f) + lift);
                         }
                     }
                 }
@@ -1000,10 +1021,10 @@ namespace ChillRoad
                     Vector3 lift = up * 0.025f;
                     bool tight = Mathf.Max(A.curve, B.curve) > 1f / 55f;
                     if (center && (tight || Mathf.Repeat(mid, 12f) < 4.5f))
-                        marks.Quad(a - ra * 0.07f + lift, a + ra * 0.07f + lift, b - rb * 0.07f + lift, b + rb * 0.07f + lift);
+                        mk.Quad(a - ra * 0.07f + lift, a + ra * 0.07f + lift, b - rb * 0.07f + lift, b + rb * 0.07f + lift);
                     if (edgeLines)
                         foreach (float side in new[] { -1f, 1f })
-                            marks.Quad(a + ra * (edgeLine * side - 0.07f) + lift, a + ra * (edgeLine * side + 0.07f) + lift,
+                            mk.Quad(a + ra * (edgeLine * side - 0.07f) + lift, a + ra * (edgeLine * side + 0.07f) + lift,
                                 b + rb * (edgeLine * side - 0.07f) + lift, b + rb * (edgeLine * side + 0.07f) + lift);
                 }
             }
@@ -1035,6 +1056,11 @@ namespace ChillRoad
             if (shoulder.v.Count > 0) AddMesh(go, "Shoulder", shoulder.Build("Shoulder"), assets.terrain, true);
             if (walk.v.Count > 0) AddMesh(go, "Sidewalk", walk.Build("Sidewalk"), assets.concrete, true);
             if (marks.v.Count > 0) AddMesh(go, "Markings", marks.Build("Marks"), assets.roadMarking, false);
+            // Sous les tunnels : même matériau (réglages partagés), sans la pluie
+            if (roadDry.v.Count > 0)
+                AddMesh(go, e.dirt ? "DirtSurfaceDry" : "SurfaceDry", roadDry.Build("RoadDry"), surface, true).GetComponent<MeshRenderer>().SetPropertyBlock(DryBlock);
+            if (marksDry.v.Count > 0)
+                AddMesh(go, "MarkingsDry", marksDry.Build("MarksDry"), assets.roadMarking, false).GetComponent<MeshRenderer>().SetPropertyBlock(DryBlock);
             if (rails.v.Count > 0) AddMesh(go, "Rails", rails.Build("Rails"), assets.metal, true);
             if (barrier.v.Count > 0) AddMesh(go, "Barrier", barrier.Build("Barrier"), assets.concrete, true);
             if (deck.v.Count > 0) AddMesh(go, "Deck", deck.Build("Deck"), assets.concrete, true);

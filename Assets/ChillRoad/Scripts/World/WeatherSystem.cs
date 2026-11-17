@@ -446,6 +446,20 @@ namespace ChillRoad
             return h > -2f && h < (tube ? c.inHeight : c.outHeight);
         }
 
+        /// <summary>Route mouillée au point p : celle du temps qu'il fait, sauf dans un tunnel (chaussée toujours sèche).</summary>
+        public float WetnessAt(Vector3 p)
+        {
+            if (Wetness <= 0f) return 0f;
+            if (!coversBuilt) BuildCovers();
+            for (int i = 0; i < covers.Count; i++)
+            {
+                var c = covers[i];
+                if ((c.center - p).sqrMagnitude > c.radius * c.radius) continue;
+                if (Inside(c, p, true, out _)) return 0f;
+            }
+            return Wetness;
+        }
+
         bool UnderCover(Vector3 q)
         {
             foreach (int i in near)

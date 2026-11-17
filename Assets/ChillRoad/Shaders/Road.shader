@@ -39,6 +39,7 @@ Shader "ChillRoad/Road"
         [Header(Voies)]
         _Lanes ("Largeur de voie, bord du terre-plein, rive autoroute, rive nationale (m)", Vector) = (3.9, 2.4, 14.1, 4.0)
         _DirtLane ("Chemin : axe des voies (m)", Float) = 1.65
+        _WetScale ("Humidité reçue (0 : à l'abri, chaussée des tunnels)", Range(0, 1)) = 1
     }
 
     SubShader
@@ -57,6 +58,7 @@ Shader "ChillRoad/Road"
             half4 _GravelColor, _EarthColor, _RutColor, _GrassColor, _GrassDark, _BareColor, _PaintColor;
             float4 _Lanes;
             float _DirtLane;
+            half _WetScale;
         CBUFFER_END
 
         // Origine des coordonnées de bruit : multiple de 960 m proche de la caméra (précision loin de l'origine).
@@ -396,7 +398,7 @@ Shader "ChillRoad/Road"
 
                 // Route mouillée : revêtement assombri et lustré (reflets du ciel, des lampadaires et des phares), flaques
                 // nettes dans les creux de l'enrobé et les ornières ; la terre devient boue, l'herbe fonce à peine
-                half wet = (half)_ChillRoadWet;
+                half wet = (half)_ChillRoadWet * _WetScale;      // chaussée des tunnels : _WetScale = 0 (toujours sèche)
                 UNITY_BRANCH
                 if (wet > 0.001)
                 {
