@@ -3,7 +3,8 @@ Ford Mustang fastback 1969 façon John Wick (gris anthracite, bandes noires mate
 (1962-1965, tricycle : roue arrière seule dans l'axe, « wheel-back-center ») ... et Renault Twingo de première
 génération (phase 1, 1993 : monocorps, phares « yeux de grenouille », ouïes de capot, boucliers gris enveloppants)
 et Citroën Ami (2020 : cube aux faces avant et arrière identiques, optiques rondes, toit vitré, vitres à compas, porte
-conducteur à contresens).
+conducteur à contresens), Toyota GR Yaris (2020 : 3 portes blanche à toit carbone noir, grande calandre, ailes arrière
+larges, vitrage latéral en goutte posé en décor, aileron de toit, deux sorties d'échappement).
 
 Même direction artistique que le trafic (sections à facettes, palette de dégradés, peinture sur PK_Paint), un peu
 plus de détails vus de près (aileron, habitacle ouvert de la MX-5). Les phares escamotables de la MX-5 sont deux
@@ -1196,4 +1197,168 @@ reg(dict(
     details=ami_details,
 ))
 
-PLAYABLE = ["supra", "miata", "mustang", "p50", "ae86", "dmc12", "jesko", "valkyrie", "twingo", "ami"]
+# ================================================================= Toyota GR Yaris (XP210, 2020) : 3 portes, 4 roues motrices
+def _poly_line(c, key, xs, dz):
+    """Points (x, z) le long d'une courbe de profil de la fiche (« belt », « re »...), décalés de dz."""
+    f = c.car["_z"][key]
+    return [(x, f(x) + dz) for x in xs]
+
+
+def gryaris_dlo(c, m=0.0):
+    """Contour (x, z) du vitrage latéral, d'un seul tenant : pointe avant au pied du montant de pare-brise, bord
+    haut sous le pavillon qui descend, bord bas le long de la ceinture qui remonte, et fin en goutte dans la
+    custode, au-dessus de la roue arrière. m : marge ajoutée tout autour (encadrement noir)."""
+    bz, rz = c.car["_z"]["belt"], c.car["_z"]["re"]
+    top = _poly_line(c, "re", (0.72, 0.62, 0.44, 0.26, 0.08, -0.25, -0.60), -0.034 + m)
+    top += [(-0.85, rz(-0.85) - 0.045 + m), (-1.02, rz(-1.02) - 0.075 + m), (-1.15, rz(-1.15) - 0.12 + m),
+            (-1.24 - m * 0.4, rz(-1.24) - 0.17 + m)]
+    end = [(-1.285 - m * 1.3, bz(-1.25) + 0.048)]
+    bot = [(-1.20 - m * 0.3, bz(-1.20) + 0.035 - m), (-1.05, bz(-1.05) + 0.025 - m)]
+    bot += _poly_line(c, "belt", (-0.80, -0.50, -0.20, 0.10, 0.50, 0.74), 0.022 - m)
+    tip = [(0.80 + m * 1.6, bz(0.80) + 0.03)]
+    return tip + top + end + bot
+
+
+def gryaris_details(c):
+    z = c.car["_z"]
+    # ---- avant : grande calandre basse noire (barre de plaque, blocs latéraux), fin bandeau noir entre les phares
+    # avec l'écusson, écopes d'angle noires à ailette couleur caisse et antibrouillard rond
+    c.decal([(0.0, 0.235), (0.50, 0.235), (0.58, 0.33), (0.58, 0.52), (0.50, 0.615), (0.0, 0.615)], 'front', 'dark',
+            name="Grille")
+    c.decal(rect(0.0, 0.42, 0.53, 0.51), 'front', 'trim', offset=0.008, name="GrilleBar")
+    c.decal([(0.47, 0.25), (0.57, 0.335), (0.57, 0.45), (0.47, 0.45)], 'front', 'black', offset=0.008,
+            name="GrilleBlock")
+    c.decal(rect(0.0, 0.41, 0.26, 0.52), 'front', 'plate', offset=0.012, name="Plate")
+    c.decal([(0.0, 0.703), (0.36, 0.706), (0.45, 0.724), (0.36, 0.744), (0.0, 0.747)], 'front', 'black',
+            name="UpperGrille", min_facing=0.2)
+    c.decal(ellipse(0.0, 0.708, 0.062, 0.04, n=14), 'front', 'chrome', mirror=False, offset=0.010, name="Emblem",
+            min_facing=0.2)
+    c.decal(ellipse(0.0, 0.708, 0.044, 0.026, n=12), 'front', 'black', mirror=False, offset=0.013, name="EmblemCore",
+            min_facing=0.2)
+    c.decal([(0.63, 0.61), (0.845, 0.60), (0.85, 0.52), (0.835, 0.27), (0.68, 0.27), (0.68, 0.565)], 'front',
+            'dark', name="CornerVent", min_facing=0.12)
+    c.decal([(0.68, 0.44), (0.815, 0.45), (0.815, 0.474), (0.68, 0.464)], 'front', 'paint', offset=0.010,
+            name="VentBlade", min_facing=0.12)
+    c.decal(ellipse(0.755, 0.34, 0.04, 0.04, n=12), 'front', 'lens', offset=0.010, name="FogLight", min_facing=0.12)
+    # phares effilés (boîtier noir, lame de feux de jour, deux projecteurs) : pointe intérieure contre le bandeau,
+    # ils s'élargissent vers le coin puis filent sur l'aile
+    c.decal([(0.42, 0.724), (0.56, 0.712), (0.72, 0.722), (0.86, 0.75), (0.875, 0.80), (0.82, 0.83), (0.64, 0.80),
+             (0.50, 0.76)], 'front', 'black', name="Headlight", min_facing=0.12)
+    c.decal([(0.45, 0.722), (0.56, 0.716), (0.72, 0.727), (0.855, 0.755), (0.855, 0.768), (0.72, 0.741),
+             (0.56, 0.730), (0.45, 0.733)], 'front', 'led', offset=0.009, name="DRL", min_facing=0.12)
+    for yc, zc in ((0.61, 0.764), (0.735, 0.785)):
+        c.decal(ellipse(yc, zc, 0.036, 0.024, n=10), 'front', 'led', offset=0.009, name="Projector", min_facing=0.12)
+    c.decal([(2.04, 0.735), (2.02, 0.82), (1.90, 0.855), (1.72, 0.885), (1.62, 0.89), (1.74, 0.845), (1.90, 0.79)],
+            'side', 'black', name="HeadlightTail", min_facing=0.2)
+    c.decal([(2.03, 0.745), (1.90, 0.80), (1.74, 0.855), (1.64, 0.885), (1.74, 0.868), (1.90, 0.815), (2.025, 0.76)],
+            'side', 'led', offset=0.009, name="DRLTail", min_facing=0.2)
+    # capot : joints le long des ailes, de la baie de pare-brise à la pointe des phares
+    seam = [(0.99, 0.745), (1.45, 0.73), (1.80, 0.69), (1.98, 0.60), (2.06, 0.47)]
+    c.decal(band(seam, -0.004, 0.004), 'top', 'trim', offset=0.004, name="HoodSeam", min_facing=0.3)
+    # ---- flancs : vitrage en goutte cerclé de noir, montant central noir, joints et poignée de la grande porte,
+    # écusson rouge et noir derrière la roue avant, rétroviseurs noirs
+    c.decal(gryaris_dlo(c, 0.018), 'side', 'black', offset=0.004, name="WindowFrame", min_facing=0.2)
+    c.decal(gryaris_dlo(c), 'side', 'glass', offset=0.008, name="SideGlass", min_facing=0.2)
+    c.decal(rect(-0.41, z["belt"](-0.38) + 0.02, -0.34, z["re"](-0.38) - 0.03), 'side', 'black', offset=0.011,
+            name="BPillar", min_facing=0.2)
+    for x in (0.80, -0.41):
+        c.decal(rect(x - 0.006, z["rk"](x) + 0.05, x + 0.006, z["belt"](x) + 0.01), 'side', 'trim', offset=0.004,
+                name="DoorSeam", min_facing=0.15)
+    c.decal(rect(-0.41, z["rk"](0.0) + 0.045, 0.80, z["rk"](0.0) + 0.057), 'side', 'trim', offset=0.004,
+            name="DoorSill", min_facing=0.15)
+    xh, zh = -0.24, z["belt"](-0.24) - 0.085
+    yh = c.side(xh, zh)
+    c.box([((xh, yh + 0.008, zh), (0.15, 0.03, 0.034), None)], 'paint', mirror=True, name="Handle")
+    c.decal(rect(0.865, 0.745, 0.895, 0.77), 'side', 'red', offset=0.006, name="Badge")
+    c.decal(rect(0.835, 0.745, 0.865, 0.77), 'side', 'black', offset=0.006, name="Badge")
+    mirrors(c, 0.80, 0.90, 1.045, size=(0.10, 0.16, 0.095), color='black')
+    # ---- toit : aileron noir dans le prolongement du pavillon carbone, troisième feu stop, antenne requin
+    zt = z["top"](-1.45)
+    c.prism([(-1.39, zt + 0.012), (-1.66, zt - 0.02), (-1.695, zt - 0.032), (-1.69, zt - 0.052), (-1.49, zt - 0.055),
+             (-1.39, zt - 0.03)], 'y', -0.60, 0.60, 'black', name="Spoiler")
+    for y in (0.60, -0.60):
+        c.prism([(-1.37, zt - 0.005), (-1.68, zt - 0.022), (-1.69, zt - 0.052), (-1.58, zt - 0.135),
+                 (-1.43, zt - 0.07)], 'y', y - 0.02, y + 0.02, 'black', name="SpoilerSide")
+    c.box([((-1.697, 0.0, zt - 0.042), (0.012, 0.26, 0.014), None)], 'red', name="StopLight")
+    zr = c.top(-1.20)
+    c.prism([(-1.13, zr - 0.01), (-1.26, zr + 0.06), (-1.30, zr + 0.055), (-1.31, zr - 0.01)], 'y', -0.02, 0.02,
+            'black', name="Antenna")
+    # ---- arrière : bandeau noir d'un feu à l'autre sous la lunette (crocs vers le bas côté intérieur des feux),
+    # feux rouges en C qui tournent sur les ailes, écusson, plaque sur le hayon, diffuseur noir, catadioptres,
+    # deux sorties d'échappement et leurs repères
+    c.decal([(0.0, 0.875), (0.40, 0.875), (0.47, 0.82), (0.545, 0.815), (0.60, 0.84), (0.82, 0.83), (0.855, 0.91),
+             (0.82, 0.985), (0.0, 0.997)], 'rear', 'black', name="TailBand", min_facing=0.15)
+    c.decal([(0.565, 0.85), (0.81, 0.84), (0.845, 0.91), (0.81, 0.975), (0.565, 0.97)], 'rear', 'tail',
+            offset=0.009, name="Tail", min_facing=0.15)
+    c.decal([(0.565, 0.885), (0.77, 0.88), (0.795, 0.91), (0.77, 0.94), (0.565, 0.938)], 'rear', 'dark',
+            offset=0.012, name="TailCore", min_facing=0.15)
+    c.decal([(-1.878, 0.825), (-1.76, 0.85), (-1.64, 0.91), (-1.76, 0.965), (-1.85, 0.99)], 'side', 'black',
+            name="TailBandSide", min_facing=0.3)
+    c.decal([(-1.873, 0.84), (-1.78, 0.865), (-1.70, 0.91), (-1.78, 0.955), (-1.86, 0.975)], 'side', 'tail',
+            offset=0.009, name="TailSide", min_facing=0.3)
+    c.decal(ellipse(0.0, 0.93, 0.058, 0.038, n=14), 'rear', 'chrome', mirror=False, offset=0.010, name="Emblem",
+            min_facing=0.15)
+    c.decal(ellipse(0.0, 0.93, 0.041, 0.025, n=12), 'rear', 'black', mirror=False, offset=0.013, name="EmblemCore",
+            min_facing=0.15)
+    c.decal(rect(0.0, 0.60, 0.26, 0.71), 'rear', 'plate', offset=0.012, name="Plate")
+    c.decal(band([(0.50, 0.812), (0.475, 0.63), (0.43, 0.572), (0.0, 0.565)], -0.004, 0.004), 'rear', 'trim',
+            offset=0.004, name="HatchSeam")
+    c.decal([(0.0, 0.255), (0.72, 0.255), (0.735, 0.34), (0.58, 0.43), (0.0, 0.43)], 'rear', 'black',
+            name="Diffuser")
+    c.decal(rect(0.0, 0.33, 0.11, 0.365), 'rear', 'red', offset=0.009, name="RearFog")
+    c.decal(rect(0.60, 0.46, 0.72, 0.485), 'rear', 'red', offset=0.008, name="Reflector")
+    xr = c.car["rear"]
+    for y, tag in ((0.47, "left"), (-0.47, "right")):
+        limb(c, (xr + 0.12, y, 0.262), (xr - 0.03, y, 0.262), 0.047, 'chrome', n=12, name="Exhaust")
+        limb(c, (xr - 0.03, y, 0.262), (xr - 0.034, y, 0.262), 0.036, 'dark', n=12, name="ExhaustBore")
+        c.marker("exhaust-" + tag, (xr - 0.034, y, 0.262))
+
+
+reg(dict(
+    id="gryaris", file="GRYaris", name="Toyota GR Yaris", color=(0.87, 0.87, 0.86),
+    front=2.115, rear=-1.88, height=1.455, axles=(1.28, -1.28),
+    wheel=dict(rt=0.319, rr=0.232, w=0.225, y=0.7675, style="multi", rim="grey"),
+    axle_wheels=[{}, {"y": 0.7825}],
+    arch_n=10, arch_gap=0.04,
+    roof="black",                                                     # pavillon en carbone
+    smooth=dict(dx=0.07, sub={2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 7: 2, 8: 3}),
+    inset=dict(sh=[(2.115, .03), (-0.60, .03), (-1.28, .045), (-1.88, .035)],
+               rail=[(2.115, .10), (0.98, .07), (0.26, .06), (-1.45, .05), (-1.76, .05), (-1.88, .10)]),
+    z=dict(
+        bot=[(2.115, .22), (2.06, .17), (1.90, .14), (-1.60, .15), (-1.80, .21), (-1.88, .27)],
+        lo=[(2.115, .25), (2.06, .21), (1.90, .185), (-1.60, .195), (-1.80, .25), (-1.88, .30)],
+        rk=[(2.115, .32), (2.06, .29), (1.90, .27), (-1.60, .28), (-1.80, .33), (-1.88, .36)],
+        mx=[(2.115, .46), (2.06, .53), (1.90, .58), (1.28, .62), (0.0, .63), (-1.28, .65), (-1.76, .63),
+            (-1.88, .52)],
+        # nez haut et droit, capot court qui monte jusqu'à la baie ; pavillon qui plonge vers l'arrière, ceinture
+        # qui remonte ; l'arrière tombe presque à la verticale sous la lunette
+        sh=[(2.115, .62), (2.10, .67), (2.06, .715), (2.00, .75), (1.90, .78), (1.60, .83), (1.28, .865), (0.98, .885),
+            (0.0, .89), (-0.70, .90), (-1.28, .935), (-1.60, .925), (-1.76, .895), (-1.82, .86), (-1.85, .815),
+            (-1.866, .75), (-1.88, .70)],
+        belt=[(2.115, .66), (2.10, .715), (2.06, .76), (2.00, .80), (1.90, .835), (1.60, .895), (1.28, .94),
+              (0.98, .99), (0.50, .995), (-0.30, 1.025), (-0.90, 1.075), (-1.25, 1.105), (-1.55, 1.09), (-1.76, .99),
+              (-1.79, .96), (-1.82, .925), (-1.85, .87), (-1.866, .795), (-1.88, .72)],
+        re=[(2.115, .668), (2.10, .722), (2.06, .77), (2.00, .81), (1.90, .845), (1.60, .905), (1.28, .95),
+            (0.98, 1.00), (0.62, 1.19), (0.26, 1.375), (0.08, 1.394), (-0.20, 1.40), (-0.80, 1.378), (-1.45, 1.318),
+            (-1.76, .995), (-1.79, .968), (-1.82, .933), (-1.85, .878), (-1.866, .803), (-1.88, .735)],
+        top=[(2.115, .675), (2.10, .728), (2.06, .775), (2.00, .815), (1.90, .855), (1.60, .918), (1.28, .965),
+             (0.98, 1.015), (0.62, 1.21), (0.26, 1.405), (0.08, 1.442), (-0.20, 1.455), (-0.80, 1.432), (-1.45, 1.345),
+             (-1.76, 1.00), (-1.79, .975), (-1.82, .94), (-1.85, .885), (-1.866, .81), (-1.88, .74)],
+    ),
+    w=dict(
+        # ailes arrière très larges (voie de 1,57 m), habitacle qui se resserre vers l'arrière
+        W=[(2.115, .68), (2.10, .76), (2.06, .815), (2.00, .85), (1.90, .875), (1.70, .888), (1.28, .892), (0.80, .86),
+           (0.0, .845), (-0.55, .85), (-0.95, .882), (-1.28, .9025), (-1.60, .897), (-1.78, .878), (-1.85, .845),
+           (-1.88, .78)],
+        belt=[(2.115, .655), (2.10, .73), (2.06, .78), (2.00, .81), (1.90, .832), (1.28, .845), (0.98, .825),
+              (0.50, .80), (0.0, .785), (-0.60, .75), (-1.00, .715), (-1.28, .695), (-1.60, .695), (-1.79, .725),
+              (-1.85, .745), (-1.88, .72)],
+        re=[(2.115, .62), (2.10, .69), (2.06, .735), (2.00, .76), (1.90, .775), (1.28, .78), (0.98, .76), (0.62, .69),
+            (0.26, .615), (-0.20, .60), (-0.80, .585), (-1.45, .57), (-1.76, .655), (-1.79, .675), (-1.85, .69),
+            (-1.88, .67)],
+    ),
+    glass=dict(cowl=0.98, ws_top=0.26, rw_top=-1.45, rw_bot=-1.76, side=[], pillars=[]),
+    details=gryaris_details,
+))
+
+PLAYABLE = ["supra", "miata", "mustang", "p50", "ae86", "dmc12", "jesko", "valkyrie", "twingo", "ami", "gryaris"]
