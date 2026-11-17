@@ -52,6 +52,11 @@ namespace NoHesi
         Vector3 lastCam2Pos, cam2Velocity;
         ParticleSystem.MainModule rainMain;
         ParticleSystem.EmissionModule rainEmission;
+        float rainRate, emitCarry;
+        ParticleSystem.Particle[] rainParticles;
+        /// <summary>Caméra à l'abri d'un tunnel (0 = à l'air libre, 1 = loin des têtes) : pas d'éclair qui illumine
+        /// l'intérieur, averse étouffée.</summary>
+        public float Shelter { get; private set; }
         AudioSource rainSource;
         AudioSource[] thunderSources;
         AudioClip[] thunderFar, thunderClose;
@@ -232,11 +237,17 @@ namespace NoHesi
             camVelocity = Vector3.Lerp(camVelocity, v, 1f - Mathf.Exp(-dt * 5f));
             lastCamPos = p;
 
+            NearCovers(p + camVelocity * 0.4f, 60f);
+            Shelter = Mathf.MoveTowards(Shelter, ShelterAt(p), dt * 3f);
+
             if (rain)
             {
-                // Gouttes semées autour de la caméra, en avance sur son déplacement (on roule vers elles)
+                // Gouttes semées autour de la caméra, en avance sur son déplacement (on roule vers elles), jamais
+                // sous un tunnel ; celles que le vent y pousserait disparaissent dans la coque
                 rain.transform.position = p + camVelocity * 0.4f + Vector3.up * 6f;
-                rainEmission.rateOverTime = Rain * 5200f * (1f - SnowZone);
+                rainRate = Rain * 5200f * (1f - SnowZone);
+                EmitRain(rain.transform.position, Time.deltaTime);
+                if (near.Count > 0) CullRain();
                 float night = dayNight ? dayNight.Night : 0f;
                 if (rainAdditive)
                 {
@@ -260,7 +271,7 @@ namespace NoHesi
                 lastCam2Pos = p2;
                 rain2.transform.position = p2 + cam2Velocity * 0.4f + Vector3.up * 6f;
                 var emission2 = rain2.emission;
-                emission2.rateOverTime = rainEmission.rateOverTime;
+                emission2.rateOverTime = rainRate;
                 var main2 = rain2.main;
                 main2.startColor = rainMain.startColor;
             }
@@ -278,7 +289,7 @@ namespace NoHesi
 
             bool paused = Time.timeScale < 0.01f;
             float master = audioFx ? audioFx.masterVolume : 0.8f;
-            if (rainSource) rainSource.volume = paused ? 0f : master * Rain * 0.42f;
+            if (rainSource) rainSource.volume = paused ? 0f : master * Rain * 0.42f * (1f - 0.75f * Shelter);
             if (bolt)
             {
                 boltT += Time.deltaTime;
@@ -302,7 +313,8 @@ namespace NoHesi
             // Lueur : un premier arc, un creux, un second arc, puis extinction
             flashT += dt;
             float f = flashT < 0.07f ? 1f : flashT < 0.13f ? 0.2f : flashT < 0.2f ? 0.75f : Mathf.Exp(-(flashT - 0.2f) * 14f) * 0.75f;
-            Flash = flashT > 1.2f ? 0f : f * flashPeak;
+            // Sous un tunnel, l'éclair n'illumine pas l'intérieur (il éclaire ciel, soleil et ambiante de toute la scène)
+            Flash = flashT > 1.2f ? 0f : f * flashPeak * (1f - Shelter);
 
             float master = audioFx ? audioFx.masterVolume : 0.8f;
             for (int i = pendingThunder.Count - 1; i >= 0; i--)
@@ -351,6 +363,139 @@ namespace NoHesi
             float w = distance * 0.0045f;
             bolt.widthMultiplier = w;
             boltT = 0f;
+        }
+
+        // ------------------------------------------------------------------ abri des tunnels
+
+        /// <summary>Tronçon de tunnel (≈ 6 m) : boîte qui suit l'axe de la route, coque comprise.</summary>
+        struct Cover
+        {
+            public Vector3 a, fwd, right, center;   // fwd, right : horizontaux
+            public float len, slope, inner, outer, inHeight, outHeight, radius;
+            public float s, spanLength;             // abscisse du début du tronçon dans le tunnel, longueur du tunnel
+        }
+
+        readonly List<Cover> covers = new List<Cover>();
+        readonly List<int> near = new List<int>();
+        bool coversBuilt;
+        const float CoverStep = 6f, RainBoxW = 36f, RainBoxH = 20f;
+
+        /// <summary>Découpe les tunnels du réseau en tronçons (une fois le réseau chargé).</summary>
+        void BuildCovers()
+        {
+            var rn = RoadNetwork.Instance;
+            if (!rn || rn.Edges.Count == 0) return;
+            coversBuilt = true;
+            foreach (var e in rn.Edges)
+            {
+                if (e.spans == null) continue;
+                float inner = e.TotalHalfWidth + 1f;
+                float hin = e.kind == RoadKind.Highway ? RoadNetwork.TunnelHeightHighway : RoadNetwork.TunnelHeight;
+                foreach (var sp in e.spans)
+                {
+                    if (sp.kind != "tunnel") continue;
+                    float length = sp.s1 - sp.s0;
+                    int n = Mathf.Max(1, Mathf.CeilToInt(length / CoverStep));
+                    for (int i = 0; i < n; i++)
+                    {
+                        float s0 = sp.s0 + length * i / n, s1 = sp.s0 + length * (i + 1) / n;
+                        Vector3 a = e.Evaluate(s0, out _, out var right), b = e.Evaluate(s1, out _, out _);
+                        Vector3 flat = new Vector3(b.x - a.x, 0f, b.z - a.z);
+                        float len = flat.magnitude;
+                        if (len < 0.01f) continue;
+                        float roof = e.RoofAt((s0 + s1) * 0.5f);
+                        float outer = inner + RoadNetwork.TunnelShell, outHeight = hin + roof + 1f;
+                        covers.Add(new Cover
+                        {
+                            a = a, fwd = flat / len, right = right, len = len, slope = (b.y - a.y) / len,
+                            inner = inner, outer = outer, inHeight = hin, outHeight = outHeight,
+                            s = s0 - sp.s0, spanLength = length,
+                            center = (a + b) * 0.5f,
+                            radius = new Vector3(len * 0.5f, outHeight, outer).magnitude,
+                        });
+                    }
+                }
+            }
+        }
+
+        /// <summary>Tronçons de tunnel à moins de « reach » mètres (en plus de leur taille) du point p.</summary>
+        void NearCovers(Vector3 p, float reach)
+        {
+            near.Clear();
+            if (!coversBuilt) BuildCovers();
+            for (int i = 0; i < covers.Count; i++)
+            {
+                float r = covers[i].radius + reach;
+                if ((covers[i].center - p).sqrMagnitude < r * r) near.Add(i);
+            }
+        }
+
+        /// <summary>
+        /// Le point q est-il dans ce tronçon ? tube : seulement le gabarit intérieur (là où roulent les voitures),
+        /// sinon toute la coque (une goutte qui y entre est dans la roche : elle disparaît avant d'atteindre le tube).
+        /// t : distance parcourue depuis le début du tronçon.
+        /// </summary>
+        static bool Inside(in Cover c, Vector3 q, bool tube, out float t)
+        {
+            Vector3 v = q - c.a;
+            t = v.x * c.fwd.x + v.z * c.fwd.z;
+            if (t < 0f || t > c.len) return false;
+            float lateral = Mathf.Abs(v.x * c.right.x + v.z * c.right.z);
+            if (lateral > (tube ? c.inner : c.outer)) return false;
+            float h = v.y - c.slope * t;
+            return h > -2f && h < (tube ? c.inHeight : c.outHeight);
+        }
+
+        bool UnderCover(Vector3 q)
+        {
+            foreach (int i in near)
+                if (Inside(covers[i], q, false, out _)) return true;
+            return false;
+        }
+
+        /// <summary>Abri à la position de la caméra : 0 à la tête du tunnel, 1 à partir de 25 m à l'intérieur.</summary>
+        float ShelterAt(Vector3 p)
+        {
+            foreach (int i in near)
+            {
+                var c = covers[i];
+                if (!Inside(c, p, true, out float t)) continue;
+                float s = c.s + t;
+                return Mathf.SmoothStep(0f, 1f, Mathf.Min(s, c.spanLength - s) / 25f);
+            }
+            return 0f;
+        }
+
+        /// <summary>Sème les gouttes de l'image dans la boîte de pluie centrée en « center », hors des tunnels.</summary>
+        void EmitRain(Vector3 center, float dt)
+        {
+            emitCarry += rainRate * dt;
+            int count = Mathf.Min((int)emitCarry, 600);
+            emitCarry = Mathf.Min(emitCarry - (int)emitCarry, 1f);
+            var ep = new ParticleSystem.EmitParams();
+            bool check = near.Count > 0;
+            for (int k = 0; k < count; k++)
+            {
+                Vector3 q = center + new Vector3((UnityEngine.Random.value - 0.5f) * RainBoxW, (UnityEngine.Random.value - 0.5f) * RainBoxH, (UnityEngine.Random.value - 0.5f) * RainBoxW);
+                if (check && UnderCover(q)) continue;
+                ep.position = q;
+                rain.Emit(ep, 1);
+            }
+        }
+
+        /// <summary>Supprime les gouttes entrées dans la coque d'un tunnel (poussées par le vent ou le déplacement).</summary>
+        void CullRain()
+        {
+            if (rainParticles == null || rainParticles.Length < rainMain.maxParticles) rainParticles = new ParticleSystem.Particle[rainMain.maxParticles];
+            int n = rain.GetParticles(rainParticles);
+            bool changed = false;
+            for (int i = 0; i < n; i++)
+            {
+                if (!UnderCover(rainParticles[i].position)) continue;
+                rainParticles[i].remainingLifetime = -1f;
+                changed = true;
+            }
+            if (changed) rain.SetParticles(rainParticles, n);
         }
 
         // ------------------------------------------------------------------ construction
