@@ -67,6 +67,8 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
     Hc = SK.groom(g, Hc, edge)                 # pistes damées de la station
     water = water_masks(g, Hc)
     Hc = clear_water(g, Hc, water)
+    # Lits des rivières sur le relief final : sens du courant, niveau sous les berges, lit creusé de largeur variable
+    Hc, info["rivers"] = E.river_beds(g, Hc, edge, info["rivers"], water)
     hole = R.holes(g, Hc, edges, edge)
     print("tetes de tunnel : %d mailles ouvertes" % int(hole.sum()))
     villages = [(v[2], v[3], v[4]) for v in D.VILLAGES + D.HAMLETS]

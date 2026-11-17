@@ -2,7 +2,8 @@
 // rive, réseau de lumière sur les hauts-fonds). Couleur selon la profondeur (dégradé ou paliers nets), écume de rive
 // animée et ronds qui viennent mourir sur la berge, motif de surface au choix (crêtes, cellules, éclats, facettes,
 // risées), reflet du ciel en incidence rasante et scintillement dessiné du soleil. Opaque.
-// Maillage (MapTerrain) : UV0.x = profondeur (m), UV0.y = 1 pour une rivière ; UV1 = (travers, long du cours) en mètres.
+// Maillage (MapTerrain) : UV0.x = profondeur (m), UV0.y = 1 + rapide (0-1) pour une rivière, 0 pour un lac ;
+// UV1 = (travers, long du cours) en mètres. Rapides : traînées d'écume étirées dans le sens du courant.
 Shader "ChillRoad/Water"
 {
     Properties
@@ -238,6 +239,22 @@ Shader "ChillRoad/Water"
                 mark = saturate(mark * _PatternStrength * shoreBoost * patternFade * lerp(1.0, 0.45, river));
                 albedo *= 1.0 - shadeMark * _PatternStrength * patternFade * 0.45;
                 albedo = lerp(albedo, _PatternColor.rgb, mark);
+
+                // Rapides et cascades : eau battue plus claire, traînées d'écume étirées dans le sens du courant, qui
+                // filent plus vite que le reste. Une seule vitesse partout (une vitesse qui varierait d'un sommet à
+                // l'autre cisaillerait le motif au fil du temps) : c'est le seuil qui fait apparaître les traînées.
+                half rapid = saturate(input.data.y - 1.0) * river;
+                if (rapid > 0.001)
+                {
+                    float2 q = input.data.zw + float2(0, _RiverSpeed * 2.6 * t);
+                    float s = SAMPLE_TEXTURE2D(_Noise, sampler_Noise, float2(q.x / 2.4, q.y / 10.0)).b * 0.6
+                        + SAMPLE_TEXTURE2D(_Noise, sampler_Noise, float2(q.x / 1.3, q.y / 5.0 - t * 0.5) + 0.53).b * 0.4;
+                    float px = max(fwidth(s), 1e-4);
+                    half white = saturate((s - lerp(0.74, 0.6, rapid)) / px + 0.5) * smoothstep(0.0, 0.3, rapid);
+                    albedo = lerp(albedo, lerp(albedo, _Shallow.rgb, 0.35), rapid * 0.3);
+                    albedo = lerp(albedo, _Foam.rgb, white);
+                    mark = max(mark, white);
+                }
 
                 // Rive : liseré d'écume qui respire, ronds qui viennent mourir sur la berge
                 float lap = 0.5 + 0.5 * sin(t * 0.9 + w * 9.0);

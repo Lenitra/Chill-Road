@@ -258,14 +258,54 @@ namespace ChillRoad
             return mesh;
         }
 
+        byte[] riverNodes;
+
+        /// <summary>
+        /// Nœuds de grille autour des rivières, marqués une fois au premier appel : 1 = abords (lit, berges et marge),
+        /// 2 = lit et pied des berges (ni arbre, ni rocher, ni troupeau).
+        /// </summary>
+        int RiverZone(int gi)
+        {
+            if (riverNodes == null)
+            {
+                riverNodes = new byte[map.N * map.N];
+                if (map.Json.rivers != null)
+                    foreach (var rv in map.Json.rivers)
+                    {
+                        // lit le plus large (1,45 × la demi-largeur), berges, et demi-pas entre deux points du tracé
+                        float bed = rv.width * 0.5f * 1.45f + 2.5f + 2f, reach = bed + 11f;
+                        int rc = Mathf.CeilToInt(reach / map.Step);
+                        for (int i = 0; i < rv.pts.Length / 3; i++)
+                        {
+                            float x = rv.pts[i * 3], z = rv.pts[i * 3 + 2];
+                            int cx = Mathf.RoundToInt((x + map.Half) / map.Step), cz = Mathf.RoundToInt((z + map.Half) / map.Step);
+                            for (int dz = -rc; dz <= rc; dz++)
+                            for (int dx = -rc; dx <= rc; dx++)
+                            {
+                                int ix = cx + dx, iz = cz + dz;
+                                float ddx = -map.Half + ix * map.Step - x, ddz = -map.Half + iz * map.Step - z;
+                                float d2 = ddx * ddx + ddz * ddz;
+                                if (d2 > reach * reach) continue;
+                                int gi2 = map.Index(ix, iz);
+                                riverNodes[gi2] = (byte)Mathf.Max(riverNodes[gi2], d2 <= bed * bed ? 2 : 1);
+                            }
+                        }
+                    }
+            }
+            return riverNodes[gi];
+        }
+
+        bool NearRiver(int gi) => RiverZone(gi) > 0;
+
         /// <summary>Hauteur d'un sommet du maillage de pas k (nœuds de grille).</summary>
         float VertexHeight(int gx, int gz, int k)
         {
             int gi = map.Index(gx, gz);
             float h = map.H[gi];
-            // Niveaux grossiers : près des routes, on garde le point le plus bas du voisinage pour que le relief
-            // simplifié ne recouvre jamais la chaussée
-            if (k > 1 && map.Info[gi * 4] < (k * 4 + 8) * 4)
+            // Niveaux grossiers : près des routes et des rivières, on garde le point le plus bas du voisinage pour que
+            // le relief simplifié ne recouvre jamais la chaussée ni la nappe (sinon, de loin, la rivière flotte au-dessus
+            // d'un pré : son lit est plus étroit qu'une maille de 8 m)
+            if (k > 1 && (map.Info[gi * 4] < (k * 4 + 8) * 4 || NearRiver(gi)))
             {
                 int r = k / 2;
                 for (int dz = -r; dz <= r; dz++)
@@ -502,58 +542,217 @@ namespace ChillRoad
             }
         }
 
-        /// <summary>Rivières et torrents : rubans d'eau qui suivent le lit creusé dans le relief.</summary>
+        /// <summary>
+        /// Rivières et torrents : rubans d'eau qui suivent le lit creusé dans le relief. Le courant va toujours vers
+        /// l'aval (certains tracés sont donnés depuis l'embouchure) et le niveau ne remonte jamais. Chaque section va de
+        /// chaque côté jusqu'à la berge réelle (là où le sol dépasse l'eau), un peu au-delà, sous le sol : la ligne d'écume
+        /// tombe sur la rive au lieu d'un bord de ruban qui flotte. Les rapides (forte pente) le disent au shader. Les
+        /// affluents se jettent dans la rivière principale, les rivières dans le lac.
+        /// </summary>
         void BuildRivers()
         {
             if (!assets.water || map.Json.rivers == null) return;
+            var courses = new List<List<Vector3>>();
+            var widths = new List<float>();
+            var ids = new List<string>();
             foreach (var rv in map.Json.rivers)
             {
                 int count = rv.pts.Length / 3;
-                if (count < 2) continue;
-                float hw = rv.width * 0.5f + 1.2f;
-                Vector3 P(int i) => new Vector3(rv.pts[i * 3], rv.pts[i * 3 + 1], rv.pts[i * 3 + 2]);
-                Vector3 Right(int i)
-                {
-                    Vector3 d = P(Mathf.Min(i + 1, count - 1)) - P(Mathf.Max(i - 1, 0));
-                    d.y = 0f;
-                    d.Normalize();
-                    return new Vector3(d.z, 0f, -d.x);
-                }
-                // Trois sommets par section (berge, fil de l'eau, berge). UV0 = (profondeur, 1 = rivière) : nulle aux
-                // berges, d'où l'écume ; UV1 = (travers, longueur le long du cours) en mètres : le motif suit le courant.
-                var verts = new List<Vector3>();
-                var depths = new List<Vector2>();
-                var flow = new List<Vector2>();
-                var tris = new List<int>();
-                float along = 0f;
-                for (int i = 0; i < count; i++)
-                {
-                    Vector3 p = P(i), r = Right(i);
-                    if (i > 0) along += Vector3.Distance(P(i - 1), p);
-                    for (int k = -1; k <= 1; k++)
-                    {
-                        verts.Add(p + r * (hw * k));
-                        depths.Add(new Vector2(k == 0 ? RiverDepth : 0f, 1f));
-                        flow.Add(new Vector2(hw * k, along));
-                    }
-                    if (i == 0) continue;
-                    int s = (i - 1) * 3;
-                    for (int k = 0; k < 2; k++, s++)
-                    {
-                        tris.Add(s); tris.Add(s + 3); tris.Add(s + 1);
-                        tris.Add(s + 1); tris.Add(s + 3); tris.Add(s + 4);
-                    }
-                }
-                var mesh = new Mesh { name = "River_" + rv.id };
-                mesh.SetVertices(verts);
-                mesh.SetUVs(0, depths);
-                mesh.SetUVs(1, flow);
-                mesh.SetTriangles(tris, 0);
-                mesh.RecalculateNormals();
-                mesh.RecalculateBounds();
-                var go = RoadNetwork.AddMesh(root.gameObject, "River_" + rv.id, mesh, assets.water, false);
-                go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                // Bouts de quelques mètres entre deux remblais : une flaque carrée, mieux vaut rien
+                if (count < 4) continue;
+                var p = new Vector3[count];
+                for (int i = 0; i < count; i++) p[i] = new Vector3(rv.pts[i * 3], rv.pts[i * 3 + 1], rv.pts[i * 3 + 2]);
+                if (p[0].y < p[count - 1].y) System.Array.Reverse(p);
+                Descending(p);
+                courses.Add(new List<Vector3>(p));
+                widths.Add(rv.width);
+                ids.Add(rv.id);
             }
+            // Embouchures calculées sur les cours d'origine (un affluent ne vise pas le prolongement d'un autre)
+            var mouths = new List<Vector3>[courses.Count];
+            for (int r = 0; r < courses.Count; r++) mouths[r] = Mouth(r, courses, widths);
+            for (int r = 0; r < courses.Count; r++)
+            {
+                courses[r].AddRange(mouths[r]);
+                BuildRiver(ids[r], courses[r], widths[r]);
+            }
+        }
+
+        /// <summary>Niveau qui ne fait que descendre vers l'aval (régression isotone : les bosses sont moyennées).</summary>
+        static void Descending(Vector3[] p)
+        {
+            int n = p.Length, m = 0;
+            var val = new float[n];
+            var wt = new int[n];
+            for (int i = 0; i < n; i++)
+            {
+                val[m] = p[i].y;
+                wt[m] = 1;
+                m++;
+                while (m > 1 && val[m - 1] > val[m - 2])
+                {
+                    val[m - 2] = (val[m - 2] * wt[m - 2] + val[m - 1] * wt[m - 1]) / (wt[m - 2] + wt[m - 1]);
+                    wt[m - 2] += wt[m - 1];
+                    m--;
+                }
+            }
+            for (int b = 0, k = 0; b < m; b++)
+                for (int j = 0; j < wt[b]; j++) p[k++].y = val[b];
+        }
+
+        /// <summary>
+        /// Prolongement à l'aval : jusque dans la rivière principale (affluent coupé au bord de son lit) ou jusque dans
+        /// le lac, en ligne droite dans le sens du courant, sans jamais passer sur une route.
+        /// </summary>
+        List<Vector3> Mouth(int r, List<List<Vector3>> courses, List<float> widths)
+        {
+            var add = new List<Vector3>();
+            var c = courses[r];
+            if (c.Count < 2) return add;
+            Vector3 end = c[c.Count - 1], dir = end - c[Mathf.Max(0, c.Count - 4)];
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.01f) return add;
+            dir.Normalize();
+            // Rivière principale toute proche, devant : on la rejoint au milieu de son lit, un peu au-dessus de son niveau
+            for (int o = 0; o < courses.Count; o++)
+            {
+                if (o == r || widths[o] < widths[r]) continue;
+                var oc = courses[o];
+                int best = -1;
+                float bd = float.MaxValue;
+                for (int i = 0; i < oc.Count; i++)
+                {
+                    Vector3 d = oc[i] - end;
+                    d.y = 0f;
+                    if (d.sqrMagnitude < bd) { bd = d.sqrMagnitude; best = i; }
+                }
+                Vector3 target = oc[best], to = target - end;
+                to.y = 0f;
+                float dist = to.magnitude;
+                if (dist > widths[o] * 0.5f + widths[r] * 0.5f + 30f || Vector3.Dot(to, dir) < dist * 0.3f) continue;
+                if (target.y > end.y + 0.3f || !Clear(end, target)) continue;
+                // Deux sections : bord du lit principal, puis son milieu (la nappe de l'affluent s'y fond)
+                Vector3 u = to / Mathf.Max(dist, 0.01f);
+                float lv = target.y + 0.03f;
+                add.Add(new Vector3(end.x + u.x * (dist - widths[o] * 0.5f), Mathf.Lerp(end.y, lv, 0.6f), end.z + u.z * (dist - widths[o] * 0.5f)));
+                add.Add(new Vector3(target.x - u.x * 1f, lv, target.z - u.z * 1f));
+                return add;
+            }
+            // Lac droit devant (à 40 m au plus) : la rivière descend jusqu'à son niveau et y entre de 6 m
+            for (float s = 4f; s <= 40f; s += 2f)
+            {
+                Vector3 q = end + dir * s;
+                int w = map.Water(q.x, q.z);
+                if (w == 0) continue;
+                float lv = map.Json.waters[w - 1].level;
+                if (lv > end.y + 0.3f || !Clear(end, q)) break;
+                int steps = Mathf.Max(1, Mathf.CeilToInt((s + 6f) / 10f));
+                for (int k = 1; k <= steps; k++)
+                {
+                    float f = k / (float)steps;
+                    Vector3 pt = end + dir * ((s + 6f) * f);
+                    pt.y = Mathf.Lerp(end.y, lv + 0.03f, Mathf.Clamp01(f * (s + 6f) / Mathf.Max(s, 1f)));
+                    add.Add(pt);
+                }
+                break;
+            }
+            return add;
+        }
+
+        /// <summary>Aucune chaussée entre deux points (pour ne pas faire couler une rivière sur une route).</summary>
+        bool Clear(Vector3 a, Vector3 b)
+        {
+            float len = Vector2.Distance(new Vector2(a.x, a.z), new Vector2(b.x, b.z));
+            for (float s = 0f; s <= len; s += 2f)
+            {
+                Vector3 q = Vector3.Lerp(a, b, len > 0f ? s / len : 0f);
+                if (map.RoadEdge(q.x, q.z) < 2f) return false;
+            }
+            return true;
+        }
+
+        /// <summary>Distance de la berge (le sol dépasse l'eau) dans une direction, ou -1 si le sol reste plus bas.</summary>
+        float Bank(Vector3 c, Vector3 side, float level, float max)
+        {
+            for (float d = 0.5f; d <= max; d += 0.25f)
+                if (map.Height(c.x + side.x * d, c.z + side.z * d) > level + 0.02f) return d;
+            return -1f;
+        }
+
+        void BuildRiver(string id, List<Vector3> p, float width)
+        {
+            int count = p.Count;
+            if (count < 2) return;
+            Vector3 Right(int i)
+            {
+                Vector3 d = p[Mathf.Min(i + 1, count - 1)] - p[Mathf.Max(i - 1, 0)];
+                d.y = 0f;
+                d.Normalize();
+                return new Vector3(d.z, 0f, -d.x);
+            }
+            // Berges de chaque côté, prises au plus large sur trois sections voisines (le ruban couvre la rive entre deux)
+            float max = width * 0.5f + 9f, nominal = width * 0.5f + 1.2f;
+            var bank = new float[count, 2];
+            var perched = new bool[count, 2];
+            for (int i = 0; i < count; i++)
+            for (int s = 0; s < 2; s++)
+            {
+                float d = Bank(p[i], Right(i) * (s == 0 ? -1f : 1f), p[i].y, max);
+                perched[i, s] = d < 0f;
+                bank[i, s] = d < 0f ? nominal : d;
+            }
+            var reach = new float[count, 2];
+            for (int i = 0; i < count; i++)
+            for (int s = 0; s < 2; s++)
+                reach[i, s] = Mathf.Max(bank[i, s], Mathf.Max(bank[Mathf.Max(i - 1, 0), s], bank[Mathf.Min(i + 1, count - 1), s]));
+            // Sept sommets par section : dessous de berge, berge, mi-pente, fil de l'eau (et symétriques).
+            // UV0 = (profondeur : nulle à la berge, d'où l'écume ; 1 + rapide : 1 = eau calme, 2 = cascade)
+            // UV1 = (travers, longueur le long du cours) en mètres : le motif suit le courant.
+            var verts = new List<Vector3>();
+            var data = new List<Vector2>();
+            var flow = new List<Vector2>();
+            var tris = new List<int>();
+            float along = 0f;
+            for (int i = 0; i < count; i++)
+            {
+                Vector3 c = p[i], r = Right(i);
+                if (i > 0) along += Vector3.Distance(p[i - 1], c);
+                // Pente de l'eau sur ±2 sections : 4 % = encore calme, 25 % = cascade
+                int a = Mathf.Max(0, i - 2), b = Mathf.Min(count - 1, i + 2);
+                float run = 0f;
+                for (int k = a; k < b; k++) run += Vector2.Distance(new Vector2(p[k].x, p[k].z), new Vector2(p[k + 1].x, p[k + 1].z));
+                float rapid = Mathf.Clamp01(((p[a].y - p[b].y) / Mathf.Max(run, 1f) - 0.04f) / 0.21f);
+                for (int k = 0; k < 7; k++)
+                {
+                    int s = k < 3 ? 0 : 1;
+                    float sign = s == 0 ? -1f : 1f;
+                    float shore = reach[i, s];
+                    float d = k == 3 ? 0f : (k == 2 || k == 4) ? shore * 0.5f : (k == 1 || k == 5) ? shore : shore + 1f;
+                    Vector3 v = c + r * (sign * d);
+                    // Rive basse (sol plus bas que l'eau) : le bord de la nappe descend jusqu'au sol, pas de jour dessous
+                    if (k != 3 && k != 2 && k != 4 && perched[i, s]) v.y = Mathf.Min(v.y, map.Height(v.x, v.z) - (k == 1 || k == 5 ? 0.05f : 0.3f));
+                    verts.Add(v);
+                    float depth = k == 3 ? RiverDepth : (k == 2 || k == 4) ? RiverDepth * 0.7f : 0f;
+                    data.Add(new Vector2(depth, 1f + rapid));
+                    flow.Add(new Vector2(sign * d, along));
+                }
+                if (i == 0) continue;
+                int o = (i - 1) * 7;
+                for (int k = 0; k < 6; k++, o++)
+                {
+                    tris.Add(o); tris.Add(o + 7); tris.Add(o + 1);
+                    tris.Add(o + 1); tris.Add(o + 7); tris.Add(o + 8);
+                }
+            }
+            var mesh = new Mesh { name = "River_" + id };
+            mesh.SetVertices(verts);
+            mesh.SetUVs(0, data);
+            mesh.SetUVs(1, flow);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            var go = RoadNetwork.AddMesh(root.gameObject, "River_" + id, mesh, assets.water, false);
+            go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         }
 
         /// <summary>Barrage : mur de béton en travers de la vallée, parement aval incliné ; la route passe sur la crête.</summary>
@@ -658,7 +857,7 @@ namespace ChillRoad
                     int gi = map.Nearest(x, z);
                     float edge = map.Info[gi * 4] * 0.25f - 1f;
                     int flags = map.Info[gi * 4 + 1];
-                    if (edge < 5f || (flags & 31) != 0 || map.Info[gi * 4 + 2] > 70) continue;
+                    if (edge < 5f || (flags & 31) != 0 || map.Info[gi * 4 + 2] > 70 || mt.RiverZone(gi) == 2) continue;
                     float forest = map.Masks[gi * 4] / 255f, dry = map.Masks[gi * 4 + 1] / 255f, rock = map.Masks[gi * 4 + 2] / 255f;
                     float snow = map.Info[gi * 4 + 3] / 255f;
                     float h = map.H[gi];
@@ -718,7 +917,7 @@ namespace ChillRoad
                     for (int i = 0; i < count; i++)
                     {
                         float px = x + R(-22f, 22f), pz = z + R(-22f, 22f);
-                        if (map.Blocked(px, pz) || map.RoadEdge(px, pz) < 12f || map.Water(px, pz) != 0) continue;
+                        if (map.Blocked(px, pz) || map.RoadEdge(px, pz) < 12f || map.Water(px, pz) != 0 || mt.RiverZone(map.Nearest(px, pz)) == 2) continue;
                         Add(Pick(herd), new Vector3(px, map.Height(px, pz), pz), R(0.92f, 1.08f), 0f, 0.02f);
                     }
                 }
