@@ -1414,8 +1414,8 @@ namespace ChillRoad
         static RectTransform MiniMark(RectTransform root, float size)
         {
             var mark = Box(root, "RaceMark", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size, size));
-            var traffic = root.Find("Traffic");
-            if (traffic) mark.SetSiblingIndex(traffic.GetSiblingIndex() + 1);
+            var map = root.Find("Map");
+            if (map) mark.SetSiblingIndex(map.GetSiblingIndex() + 1);
             Disc(mark, size, new Color(0.08f, 0.08f, 0.08f, 1f));
             Disc(mark, size - 4.5f, Color.white);
             Disc(mark, size - 10f, new Color(0.08f, 0.08f, 0.08f, 1f));

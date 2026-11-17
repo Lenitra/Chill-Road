@@ -9,8 +9,8 @@ namespace ChillRoad
     /// Minicarte du HUD (bas gauche, pendant du compte-tours), en version claire : disque découpé dans
     /// Resources/Map/map_minimap.png (style « épuré » : fond crème, routes blanches bordées de beige, autoroute orange,
     /// dessinée par Tools/Map/map_minimap.py) et tourné avec la voiture (l'avant toujours en haut). La voiture, flèche noire cerclée de
-    /// blanc, est un peu sous le centre pour voir plus loin devant ; le champ s'élargit avec la vitesse. Circulation en
-    /// points gris foncé, autres joueurs en flèches grises (posées sur le bord quand ils sont hors champ), nord sur le
+    /// blanc, est un peu sous le centre pour voir plus loin devant ; le champ s'élargit avec la vitesse. Pas de
+    /// circulation affichée ; autres joueurs en flèches grises (posées sur le bord quand ils sont hors champ), nord sur le
     /// bord du disque.
     /// </summary>
     public class MiniMap : MonoBehaviour
@@ -23,8 +23,6 @@ namespace ChillRoad
 
         static readonly Color Black = new Color(0.04f, 0.04f, 0.04f, 0.95f);
         static readonly Color White = new Color(0.98f, 0.98f, 0.98f, 1f);
-        internal static readonly Color TrafficCore = new Color(0.36f, 0.36f, 0.36f, 1f);
-        internal static readonly Color TrafficEdge = new Color(0.98f, 0.98f, 0.98f, 0.95f);
 
         // ------------------------------------------------------------------ autres joueurs
 
@@ -55,7 +53,6 @@ namespace ChillRoad
         PlayerSlot slot;
         CanvasGroup group;
         MiniMapDisc disc;
-        MiniMapDots dots;
         RectTransform north, carMark;
         readonly List<(RectTransform rt, HudArrow fill)> others = new List<(RectTransform, HudArrow)>();
         float heading, range = NearRange;
@@ -83,8 +80,6 @@ namespace ChillRoad
             disc.color = new Color(1f, 1f, 1f, 0.96f);
             disc.raycastTarget = false;
             disc.radius = Radius;
-
-            dots = Box(root, "Traffic", Vector2.zero, new Vector2(Radius * 2f, Radius * 2f)).gameObject.AddComponent<MiniMapDots>();
 
             // Liseré : fin cercle sombre, net sur le bord clair de la carte
             var rim = Box(root, "Rim", Vector2.zero, new Vector2(Radius * 2f + 8f, Radius * 2f + 8f)).gameObject.AddComponent<HudRing>();
@@ -153,17 +148,6 @@ namespace ChillRoad
             // Nord : direction (−sin ψ, cos ψ) depuis le centre
             north.anchoredPosition = new Vector2(-sin, cos) * Radius;
 
-            // Circulation
-            dots.points.Clear();
-            var traffic = game.Traffic;
-            if (traffic != null)
-                foreach (var c in traffic.Cars)
-                {
-                    if (c.go == null || c.veiled || !c.go.activeInHierarchy) continue;
-                    Vector2 p = ToUi(c.go.transform.position);
-                    if (p.sqrMagnitude < (Radius - 6f) * (Radius - 6f)) dots.points.Add(p);
-                }
-            dots.SetVerticesDirty();
             Overlay?.Invoke((RectTransform)transform, ToUi, Radius);
 
             // Autres joueurs : flèche grise cerclée de blanc, posée sur le bord quand ils sont hors du disque
@@ -297,38 +281,6 @@ namespace ChillRoad
                 vh.AddTriangle(a0, a1, a1 + 1);
                 vh.AddTriangle(a0, a1 + 1, a0 + 1);
             }
-        }
-    }
-
-    /// <summary>Points de la circulation : un disque blanc et un disque gris foncé par voiture, en un seul maillage.</summary>
-    public class MiniMapDots : MaskableGraphic
-    {
-        public readonly List<Vector2> points = new List<Vector2>();
-        public override Texture mainTexture => HudArt.Disc.texture;
-
-        protected override void Awake()
-        {
-            base.Awake();
-            raycastTarget = false;
-        }
-
-        protected override void OnPopulateMesh(VertexHelper vh)
-        {
-            vh.Clear();
-            Color32 edge = MiniMap.TrafficEdge, core = MiniMap.TrafficCore;
-            foreach (var p in points) Quad(vh, p, 5.2f, edge);
-            foreach (var p in points) Quad(vh, p, 3.4f, core);
-        }
-
-        static void Quad(VertexHelper vh, Vector2 p, float r, Color32 c)
-        {
-            int b = vh.currentVertCount;
-            vh.AddVert(new Vector3(p.x - r, p.y - r), c, new Vector2(0f, 0f));
-            vh.AddVert(new Vector3(p.x - r, p.y + r), c, new Vector2(0f, 1f));
-            vh.AddVert(new Vector3(p.x + r, p.y + r), c, new Vector2(1f, 1f));
-            vh.AddVert(new Vector3(p.x + r, p.y - r), c, new Vector2(1f, 0f));
-            vh.AddTriangle(b, b + 1, b + 2);
-            vh.AddTriangle(b, b + 2, b + 3);
         }
     }
 
