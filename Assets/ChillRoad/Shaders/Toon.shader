@@ -439,5 +439,19 @@ Shader "ChillRoad/Toon"
             }
             ENDHLSL
         }
+
+        // Vecteurs de mouvement par objet (flou de mouvement, option Graphismes) : sans cette passe, URP prend chaque
+        // voiture pour un objet immobile et la floute avec le décor alors qu'elle suit la caméra. Passe standard d'URP,
+        // tampon de matériau partagé (HLSLINCLUDE) : le SRP Batcher reste compatible.
+        Pass
+        {
+            Name "MotionVectors"
+            Tags { "LightMode" = "MotionVectors" }
+            ColorMask RG
+
+            HLSLPROGRAM
+            #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/ObjectMotionVectors.hlsl"
+            ENDHLSL
+        }
     }
 }
