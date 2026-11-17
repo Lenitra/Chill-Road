@@ -178,6 +178,14 @@ namespace NoHesi
             return l;
         }
 
+        /// <summary>Heure fixée (menu d'avant-course) : ciel, lumière et reflets refaits tout de suite.</summary>
+        public void SetTime(float hour)
+        {
+            timeOfDay = Mathf.Repeat(hour, 24f);
+            Apply();
+            UpdateReflection(true);
+        }
+
         /// <summary>Avance l'heure (bouton du menu pause).</summary>
         public void Advance(float hours)
         {

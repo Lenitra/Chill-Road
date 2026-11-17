@@ -15,7 +15,8 @@ namespace NoHesi
     /// Un tracé est donné par quelques points de la carte (<see cref="Defs"/>) : son parcours est l'itinéraire le
     /// plus rapide de l'un à l'autre (<see cref="RouteGuide.Plan"/>), et ses points de passage sont posés dessus à
     /// intervalles réguliers. Rien n'est écrit dans la carte générée : les tracés suivent le réseau tel qu'il est.
-    /// Déroulé : on s'arrête sur la porte de départ (visible de loin), l'invite propose de lancer le chrono ; décompte,
+    /// Déroulé : on s'arrête sur la porte de départ (visible de loin), l'invite ouvre le menu d'avant-course
+    /// (<see cref="RaceSetup"/> : record, fantôme, trafic) d'où l'on lance le chrono ; décompte,
     /// puis il faut franchir les portes dans l'ordre, dans le sens de la course. Une porte n'a rien de solide : une
     /// ligne de lumière posée sur la route, deux projecteurs de bas-côté et leur fumée (<see cref="GateFx"/>). Le GPS affiche le parcours (ruban sur
     /// la route, minicarte). À l'arrivée, le temps est comparé au record personnel du tracé, gardé avec ses temps de
@@ -236,10 +237,14 @@ namespace NoHesi
         /// <summary>Course terminée : tracé, temps, nouveau record.</summary>
         public event Action<Track, float, bool> Finished;
 
+        RaceSetup setup;
+
         public void Init(GameManager g)
         {
             game = g;
             MiniMap.Overlay += DrawOnMiniMap;
+            setup = gameObject.AddComponent<RaceSetup>();
+            setup.Init(g, this);
         }
 
         void OnDestroy() => MiniMap.Overlay -= DrawOnMiniMap;
@@ -460,7 +465,7 @@ namespace NoHesi
                 }
             }
             else if (best > 220f) announced = null;
-            if (candidate != null && GameInput.InteractPressed) Begin(candidate);
+            if (candidate != null && GameInput.InteractPressed) setup.Open(candidate);
         }
 
         /// <summary>Lance la course : la voiture est posée derrière la ligne, dans le sens du parcours ; décompte.</summary>
@@ -489,13 +494,33 @@ namespace NoHesi
             for (int lap = 0; lap < t.laps; lap++) course.AddRange(t.path);
             alongPath = new float[t.path.Count];
             for (int i = 1; i < t.path.Count; i++) alongPath[i] = alongPath[i - 1] + Flat(t.path[i] - t.path[i - 1]);
-            var car = game.Player;
+            PlaceOnLine(t);
+            ApplyTraffic(RaceSetup.TrafficFactor);
+            game.SetInputEnabled(false);
+            game.Nav.SetCourse(course, 0, t.fr, t.en);
+        }
+
+        /// <summary>Voiture posée juste derrière la ligne de départ, dans le sens du parcours (menu d'avant-course, départ).</summary>
+        public void PlaceOnLine(Track t)
+        {
             Vector3 f = t.start.forward;
             Vector3 p = t.path[0] - f * StartBack + Vector3.up * 0.5f;
             game.Traffic.ClearAround(p, 18f);
-            car.Teleport(p, Quaternion.LookRotation(f, Vector3.up), 0f);
-            game.SetInputEnabled(false);
-            game.Nav.SetCourse(course, 0, t.fr, t.en);
+            game.Player.Teleport(p, Quaternion.LookRotation(f, Vector3.up), 0f);
+        }
+
+        /// <summary>
+        /// Trafic de la course (<see cref="RaceSetup"/>) : 1 normal ; moins, une partie des véhicules présents s'en va
+        /// tout de suite et il en vient moins ; 0, la route est vidée pour toute la course.
+        /// </summary>
+        void ApplyTraffic(float factor)
+        {
+            var traffic = game.Traffic;
+            traffic.RaceFactor = factor;
+            if (factor >= 1f) return;
+            var cars = traffic.Cars;
+            for (int i = cars.Count - 1; i >= 0; i--)
+                if (factor <= 0f || (i * 0.618f) % 1f >= factor) traffic.Despawn(cars[i]);
         }
 
         void UpdateCountdown(VehicleController car, Vector3 pos, bool menu, float dt)
@@ -587,16 +612,11 @@ namespace NoHesi
             return Mathf.Clamp01(along / total);
         }
 
-        static bool AbandonKey
-        {
-            get
-            {
-                var kb = Keyboard.current;
-                if (kb != null && kb.backspaceKey.isPressed) return true;
-                foreach (var p in Gamepad.all) if (p.buttonWest.isPressed) return true;
-                return false;
-            }
-        }
+        /// <summary>Abandon : le bouton de replacement (Y / R) maintenu ; un appui bref ne fait que replacer (<see cref="GameManager"/>).</summary>
+        static bool AbandonKey => GameInput.ResetHeld;
+
+        /// <summary>Remplissage de la jauge d'abandon (0-1) : elle ne part qu'au-delà d'un simple appui de replacement.</summary>
+        float AbandonFill => Mathf.Clamp01((abandonHeld - GameManager.ResetTapTime) / (AbandonHold - GameManager.ResetTapTime));
 
         /// <summary>Porte franchie à l'instant <paramref name="time"/> : écart au record, tour suivant, ou arrivée.</summary>
         void Pass(float time)
@@ -674,13 +694,17 @@ namespace NoHesi
             Active = null;
             goTimer = abandonHeld = 0f;
             recording = null;
+            if (game.Traffic) game.Traffic.RaceFactor = 1f;
+            // Le temps et l'heure, tenus pendant la course (menu d'avant-course), reprennent leur cours
+            if (game.Weather) game.Weather.Release();
+            if (game.DayNight) game.DayNight.frozen = false;
             if (game.Nav) game.Nav.ClearCourse();
         }
 
         /// <summary>Fantôme du record : sur la ligne pendant le décompte, puis à sa place de l'instant du chrono.</summary>
         void UpdateGhost()
         {
-            var run = Active != null ? Active.ghost : null;
+            var run = Active != null && RaceSetup.ShowGhost ? Active.ghost : null;
             if (run == null)
             {
                 ghostFx?.Hide();
@@ -1188,7 +1212,7 @@ namespace NoHesi
             button.targetGraphic = plate;
             button.transition = Selectable.Transition.None;
             button.navigation = new Navigation { mode = Navigation.Mode.None };
-            button.onClick.AddListener(() => Begin(candidate));
+            button.onClick.AddListener(() => setup.Open(candidate));
             promptTitle = Label(prompt, 28, TextAnchor.MiddleCenter, White, new Vector2(0.5f, 0.5f), new Vector2(0f, 18f), new Vector2(860f, 40f), FontStyle.BoldAndItalic);
             promptTitle.rectTransform.pivot = new Vector2(0.5f, 0.5f);
             promptTitle.supportRichText = true;
@@ -1223,11 +1247,13 @@ namespace NoHesi
                 timeText.text = Clock(mode == Mode.Running ? elapsed : 0f);
                 timeText.color = clockColor;
                 // Rappel de la touche d'abandon au départ, puis seulement pendant l'appui
-                bool hint = mode == Mode.Running && !TouchInput.Showing && (elapsed < 7f || abandonHeld > 0f);
-                abandonText.text = !hint ? "" : GameInput.UsingGamepad ? Loc.T("Maintenir X : abandonner", "Hold X: abandon")
-                                                                       : Loc.T("Maintenir Retour arrière : abandonner", "Hold Backspace: abandon");
-                abandonFill.parent.gameObject.SetActive(abandonHeld > 0f);
-                abandonFill.localScale = new Vector3(Mathf.Clamp01(abandonHeld / AbandonHold), 1f, 1f);
+                bool charging = AbandonFill > 0f;
+                bool hint = mode == Mode.Running && (charging || !TouchInput.Showing && elapsed < 7f);
+                abandonText.text = !hint ? "" : TouchInput.Showing ? Loc.T("Maintenir REPLACER : abandonner", "Hold RESET: abandon")
+                    : GameInput.UsingGamepad ? Loc.T("Maintenir Y : abandonner", "Hold Y: abandon")
+                    : Loc.T("Maintenir R : abandonner", "Hold R: abandon");
+                abandonFill.parent.gameObject.SetActive(charging);
+                abandonFill.localScale = new Vector3(AbandonFill, 1f, 1f);
             }
             else if (shown != null)
             {

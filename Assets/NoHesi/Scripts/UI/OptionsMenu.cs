@@ -127,7 +127,7 @@ namespace NoHesi
                 ("Un massif alpin de 5 km : la vallée qui en fait le tour, le lac, les cols et les alpages.", "A 5 km alpine massif: the valley around it, the lake, the passes and the pastures."),
                 ("55 km de routes : autoroute en boucle, route de campagne, lacets de cols, chemins de terre.", "55 km of roads: motorway loop, country road, pass hairpins, dirt tracks."),
                 ("Y (ou R) : replacer la voiture sur la route la plus proche.", "Y (or R): put the car back on the nearest road."),
-                ("Y (ou R) maintenu : changer de voiture.", "Hold Y (or R): switch cars."),
+                ("En course, Y (ou R) maintenu : abandonner.", "In a race, hold Y (or R): abandon."),
             })
                 Note(mapPage, fr, en, 24, 44);
             var gap = Rect(mapPage, "Gap", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);

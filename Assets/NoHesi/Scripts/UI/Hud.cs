@@ -12,8 +12,8 @@ namespace NoHesi
     /// - haut centre : argent du joueur ; pendant un combo, badge du multiplicateur, jauge du combo et cagnotte en jeu ;
     /// - haut gauche : heure ; haut droite : épreuve en cours ;
     /// - bas droite : compte-tours circulaire, vitesse, rapport, phares, distance ;
-    /// - centre : gains (frôlements, drifts, vitesse, encaissement), bannières, compteur de drift, maintien du bouton
-    ///   de replacement, invite de la concession ;
+    /// - centre : gains (frôlements, drifts, vitesse, encaissement), bannières, compteur de drift, invite de la
+    ///   concession ;
     /// - bas gauche : minicarte (pendant du compte-tours), à sa droite le morceau en cours et l'aide des commandes
     ///   (quelques secondes seulement) ;
     /// - menu pause avec le panneau des contrôles (manette ou clavier selon le dernier appareil utilisé).
@@ -40,9 +40,10 @@ namespace NoHesi
             new[] { "Frein à main", "Handbrake", "B / RB", "Espace", "Space", "FREIN À MAIN", "HANDBRAKE" },
             new[] { "Phares", "Headlights", "L3", "L", "L", "PHARES", "LIGHTS" },
             new[] { "Regarder autour", "Look around", "@RS", "Clic droit + souris", "Right-click + mouse", "Glisser sur l'écran", "Drag on screen" },
-            new[] { "Changer de vue", "Change camera", "R3", "C / V", "C / V", "VUE", "CAMERA" },
+            new[] { "Changer de vue", "Change camera", "X", "C / V", "C / V", "VUE", "CAMERA" },
+            new[] { "Klaxon", "Horn", "R3", "H", "H", "—", "—" },
             new[] { "Regarder derrière", "Look back", "LB", "B", "B", "DERRIÈRE", "LOOK BACK" },
-            new[] { "Replacer · maintenir : changer de voiture", "Reset · hold: change car", "Y", "R", "R", "REPLACER", "RESET" },
+            new[] { "Replacer · en course, maintenir : abandonner", "Reset · in a race, hold: abandon", "Y", "R", "R", "REPLACER", "RESET" },
             new[] { "Musique suivante", "Next song", "@DU", "M", "M", "MUSIQUE", "MUSIC" },
             new[] { "Carte", "Map", "Select", ",", ",", "—", "—" },
             new[] { "Pause", "Pause", "Start", "Échap / P", "Esc / P", "II", "II" },
@@ -85,15 +86,13 @@ namespace NoHesi
         float assistLampT;
         Image rpmArc, gearDisc;
 
-        // Bas centre : drift, maintien du replacement, invite d'entrée
+        // Bas centre : drift, invite d'entrée
         CanvasGroup driftGroup;
         Text driftText, driftChain, driftTitle;
         Outline driftOutline;
         Image driftBarImage;
         RectTransform driftBar;
         float driftAlpha;
-        CanvasGroup holdGroup;
-        Image holdRing;
         CanvasGroup dealerGroup;
         Text dealerText;
         HudShape dealerStripe;
@@ -134,7 +133,7 @@ namespace NoHesi
         /// <summary>
         /// Menu pause (ou options ouvertes depuis la pause), carte : le joueur ne conduit pas et le monde est arrêté.
         /// </summary>
-        public bool Paused => WorldMap.IsOpen || inPause || Dealership.IsOpen || TuningGarage.IsOpen;
+        public bool Paused => WorldMap.IsOpen || inPause || Dealership.IsOpen || TuningGarage.IsOpen || RaceSetup.IsOpen;
 
         /// <summary>Masque le HUD (chargement, écran d'accueil).</summary>
         public void SetVisible(bool visible)
@@ -149,11 +148,14 @@ namespace NoHesi
             game = gm;
             slot = gm.Local;
             font = HudArt.Font;
-            if (!FindAnyObjectByType<EventSystem>())
+            var eventSystem = FindAnyObjectByType<EventSystem>();
+            if (!eventSystem)
             {
                 var es = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
                 es.GetComponent<InputSystemUIInputModule>().AssignDefaultActions();
+                eventSystem = es.GetComponent<EventSystem>();
             }
+            GameInput.LeftStickMenus(eventSystem.GetComponent<InputSystemUIInputModule>());
             var cgo = new GameObject("HUD", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             cgo.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
             var scaler = cgo.GetComponent<CanvasScaler>();
@@ -342,20 +344,6 @@ namespace NoHesi
             driftBarImage = driftBar.gameObject.AddComponent<Image>();
             driftBarImage.color = DriftColor;
 
-            // Maintien du bouton de replacement : anneau qui se remplit avant le changement de voiture
-            var hold = Rect(canvas, "Hold", new Vector2(0.5f, 0.15f), new Vector2(0.5f, 0.15f), new Vector2(-220f, -40f), new Vector2(220f, 40f));
-            holdGroup = hold.gameObject.AddComponent<CanvasGroup>();
-            holdGroup.alpha = 0f;
-            Img(hold, "RingBack", HudArt.Ring, new Vector2(54f, 54f), new Vector2(-150f, 0f), new Color(1f, 1f, 1f, 0.18f));
-            holdRing = Img(hold, "Ring", HudArt.Ring, new Vector2(54f, 54f), new Vector2(-150f, 0f), Accent);
-            holdRing.type = Image.Type.Filled;
-            holdRing.fillMethod = Image.FillMethod.Radial360;
-            holdRing.fillOrigin = (int)Image.Origin360.Top;
-            holdRing.fillClockwise = true;
-            var holdLabel = Label(hold, "", 24, TextAnchor.MiddleLeft, White, new Vector2(0.5f, 0.5f), new Vector2(-112f, 0f), new Vector2(340f, 30f), FontStyle.BoldAndItalic);
-            holdLabel.rectTransform.pivot = new Vector2(0f, 0.5f);
-            Loc.Bind(holdLabel, "CHANGER DE VOITURE", "CHANGE CAR");
-
             // Concession : invite à entrer, à l'arrêt dans la zone (bouton : clic ou doigt)
             var dealer = Rect(canvas, "DealerPrompt", new Vector2(0.5f, 0.24f), new Vector2(0.5f, 0.24f), new Vector2(-330f, -32f), new Vector2(330f, 32f));
             dealerGroup = dealer.gameObject.AddComponent<CanvasGroup>();
@@ -523,11 +511,6 @@ namespace NoHesi
             driftAlpha = Mathf.MoveTowards(driftAlpha, showPanel ? 1f : 0f, dt * (showPanel ? 8f : 3f));
             driftGroup.alpha = driftAlpha;
 
-            // Maintien du bouton de replacement
-            float hold = slot.ResetHold;
-            holdRing.fillAmount = hold;
-            holdGroup.alpha = Mathf.MoveTowards(holdGroup.alpha, hold > 0.01f ? 1f : 0f, dt * 8f);
-
             // Concession ou garage de tuning : invite à entrer
             bool tuning = TuningGarage.Current && TuningGarage.Current.CanEnter && !Paused;
             bool dealer = tuning || (game.Dealer && game.Dealer.CanEnter && !Paused);
@@ -571,13 +554,13 @@ namespace NoHesi
             bool pad = GameInput.UsingGamepad, touch = TouchInput.Showing;
             if (pad != hintPad || touch != hintTouch) { hintPad = pad; hintTouch = touch; hintTimer = Mathf.Max(hintTimer, 6f); }
             if (touch)
-                hintText.text = Loc.T("Gauche : diriger · droite : pédales · glisser sur l'écran : regarder autour · maintenir REPLACER : changer de voiture · II : pause",
-                                      "Left: steer · right: pedals · drag on screen: look around · hold RESET: change car · II: pause");
+                hintText.text = Loc.T("Gauche : diriger · droite : pédales · glisser sur l'écran : regarder autour · REPLACER : retour sur la route · II : pause",
+                                      "Left: steer · right: pedals · drag on screen: look around · RESET: back on the road · II: pause");
             else hintText.text = pad
-                ? Loc.T("RT gaz · LT frein · B frein à main · L3 phares · R3 vue · LB regarder derrière · Y replacer (maintenir : voiture) · ↑ musique · Start pause",
-                        "RT throttle · LT brake · B handbrake · L3 lights · R3 camera · LB look back · Y reset (hold: car) · ↑ music · Start pause")
-                : Loc.T("Z/W gaz · S frein · Q/A D direction · Espace frein à main · L phares · C vue · B regarder derrière · R replacer (maintenir : voiture) · M musique · Échap pause",
-                        "W/Z throttle · S brake · A/Q D steer · Space handbrake · L lights · C camera · B look back · R reset (hold: car) · M music · Esc pause");
+                ? Loc.T("RT gaz · LT frein · B frein à main · L3 phares · R3 klaxon · X vue · LB regarder derrière · Y replacer · ↑ musique · Start pause",
+                        "RT throttle · LT brake · B handbrake · L3 lights · R3 horn · X camera · LB look back · Y reset · ↑ music · Start pause")
+                : Loc.T("Z/W gaz · S frein · Q/A D direction · Espace frein à main · L phares · H klaxon · C vue · B regarder derrière · R replacer · M musique · Échap pause",
+                        "W/Z throttle · S brake · A/Q D steer · Space handbrake · L lights · H horn · C camera · B look back · R reset · M music · Esc pause");
             bool visible = hintTimer > 0f && !Paused && !game.Demo && game.State == GameManager.Phase.Playing;
             if (visible) hintTimer -= dt;
             hintGroup.alpha = Mathf.MoveTowards(hintGroup.alpha, visible ? 1f : 0f, dt * 2f);
@@ -724,7 +707,7 @@ namespace NoHesi
         /// <summary>Panneau des contrôles, à droite du menu pause.</summary>
         void BuildControls(Transform parent)
         {
-            var panel = Rect(parent, "Controls", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(40, -340), new Vector2(780, 340));
+            var panel = Rect(parent, "Controls", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(40, -370), new Vector2(780, 370));
             Backdrop(panel);
             var layout = panel.gameObject.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(50, 50, 30, 30);
@@ -735,7 +718,7 @@ namespace NoHesi
             foreach (var _ in Controls)
             {
                 var row = Rect(panel, "Row", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-                row.gameObject.AddComponent<LayoutElement>().preferredHeight = 44;
+                row.gameObject.AddComponent<LayoutElement>().preferredHeight = 42;
                 var h = row.gameObject.AddComponent<HorizontalLayoutGroup>();
                 h.childControlWidth = true; h.childControlHeight = true; h.childForceExpandWidth = false;
                 var action = Label(row, "", 23, TextAnchor.MiddleLeft, White, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300, 40), FontStyle.Normal);
@@ -808,10 +791,10 @@ namespace NoHesi
 
         void UpdatePause()
         {
-            if (OptionsMenu.IsOpen || Dealership.IsOpen || TuningGarage.IsOpen || game.Demo) return;
+            if (OptionsMenu.IsOpen || Dealership.IsOpen || TuningGarage.IsOpen || RaceSetup.IsOpen || game.Demo) return;
             // Carte globale ouverte (ou tout juste fermée par Échap) : la pause attend
             if (WorldMap.IsOpen || Time.frameCount == WorldMap.ChangedFrame || Time.frameCount == Dealership.ChangedFrame
-                || Time.frameCount == TuningGarage.ChangedFrame) return;
+                || Time.frameCount == TuningGarage.ChangedFrame || Time.frameCount == RaceSetup.ChangedFrame) return;
             if (Time.frameCount == openedFrame || game.State != GameManager.Phase.Playing) return;
             if (!Paused && GameInput.PausePressed) SetPaused(true);
             else if (Paused && (GameInput.PausePressed || GameInput.CancelPressed)) SetPaused(false);

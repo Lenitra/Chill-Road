@@ -11,8 +11,8 @@ namespace NoHesi
     /// <summary>
     /// Commandes tactiles du joueur seul, dans la DA du HUD (plaques inclinées, or au toucher).
     /// À gauche : direction (glisser le pouce, boutons ‹ › ou inclinaison, réglable dans les options).
-    /// À droite : pédales d'accélérateur et de frein, frein à main. En haut : pause, replacer (maintenir : changer de
-    /// voiture), regarder derrière, vue, phares, musique. Un doigt glissé ailleurs sur l'écran fait regarder autour.
+    /// À droite : pédales d'accélérateur et de frein, frein à main. En haut : pause, replacer (en course, maintenir :
+    /// abandonner), regarder derrière, vue, phares, musique. Un doigt glissé ailleurs sur l'écran fait regarder autour.
     /// Les doigts sont lus directement (Enhanced Touch) : plusieurs à la fois, et on peut glisser d'une pédale à
     /// l'autre sans lever le pouce. Affichées sur mobile, ou sur PC dès que l'écran est touché ; le clavier ou la
     /// manette les masquent.
@@ -104,7 +104,7 @@ namespace NoHesi
             Tap(Corner(0f, 1f), new Vector2(240f, -72f), new Vector2(84f, 44f), "II", "II", 26, TouchInput.QueuePause);
             reset = Hold(Corner(0f, 1f), new Vector2(26f, -150f), new Vector2(210f, 58f), "REPLACER", "RESET", 22);
             lookBack = Hold(Corner(0f, 1f), new Vector2(26f, -236f), new Vector2(210f, 58f), "DERRIÈRE", "LOOK BACK", 22);
-            AddCaption(reset, "maintenir : voiture", "hold: change car");
+            AddCaption(reset, "course, maintenir : abandon", "race, hold: abandon");
 
             // En haut à droite, sous l'épreuve en cours : vue, phares, musique
             Tap(Corner(1f, 1f), new Vector2(-196f, -190f), new Vector2(170f, 54f), "VUE", "CAMERA", 22, TouchInput.QueueCamera);

@@ -17,10 +17,8 @@ namespace NoHesi
 
         /// <summary>Voiture retournée depuis… (s) : au-delà de quelques secondes, elle est replacée sur la route.</summary>
         public float UpsideDown;
-        // Bouton de replacement : appui court = replacer, maintenu = voiture suivante
+        // Bouton de replacement : appui court = replacer ; en course, maintenu = abandonner (le relâchement ne replace plus)
         public float ResetHeld;
         public bool ResetConsumed;
-        /// <summary>Progression de l'appui long sur le bouton de replacement (0-1), pour le HUD.</summary>
-        public float ResetHold;
     }
 }

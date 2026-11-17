@@ -96,6 +96,34 @@ namespace NoHesi
             }
         }
 
+        /// <summary>Temps tenu (course chronométrée) : plus aucun changement de période tant qu'il n'est pas relâché.</summary>
+        public bool Held { get; private set; }
+
+        /// <summary>
+        /// Tient le temps (course chronométrée, menu d'avant-course) : orage ou clair jusqu'à <see cref="Release"/>.
+        /// instant : ciel, pluie et route mouillée y sont tout de suite (choix du menu) ; sinon la transition en cours
+        /// s'achève et le temps en reste là. Sans annonce (pas de bannière « orage en approche »).
+        /// </summary>
+        public void Hold(bool storm, bool instant)
+        {
+            Held = true;
+            stormy = storm;
+            periodLeft = float.MaxValue;
+            if (!instant) return;
+            Storm = storm ? 1f : 0f;
+            Rain = storm ? 0.8f : 0f;
+            Wetness = storm ? 1f : 0f;
+            Shader.SetGlobalFloat("_NoHesiWet", Wetness);
+        }
+
+        /// <summary>Fin de la course : le temps reprend son cours (nouvelle période tirée à partir du temps actuel).</summary>
+        public void Release()
+        {
+            if (!Held) return;
+            Held = false;
+            periodLeft = PeriodLength(stormy);
+        }
+
         /// <summary>
         /// Nouvelle probabilité de pluie (menu Options, en cours de partie) : 0 % éclaircit et 100 % fait venir l'orage
         /// tout de suite ; sinon la période en cours est seulement raccourcie si elle dépasse la nouvelle durée tirée.
@@ -105,6 +133,8 @@ namespace NoHesi
             p = Mathf.Clamp01(p);
             if (Mathf.Abs(p - chance) < 0.0001f) return;
             chance = p;
+            // Temps tenu (course) : la nouvelle probabilité vaudra après la course
+            if (Held) return;
             bool want = chance <= 0.001f ? false : chance >= 0.999f ? true : stormy;
             if (want != stormy)
             {
@@ -128,8 +158,8 @@ namespace NoHesi
         void Update()
         {
             float dt = Time.deltaTime;
-            periodLeft -= dt;
-            if (periodLeft <= 0f)
+            if (!Held) periodLeft -= dt;
+            if (!Held && periodLeft <= 0f)
             {
                 stormy = !stormy;
                 periodLeft = PeriodLength(stormy);

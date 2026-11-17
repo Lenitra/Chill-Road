@@ -46,8 +46,8 @@ namespace NoHesi
         /// <summary>Le joueur de cette machine : sa voiture, sa caméra, son HUD, son son.</summary>
         public PlayerSlot Local => local;
         /// <summary>Progression de l'appui long sur le bouton de replacement (0-1), pour le HUD.</summary>
-        public float ResetHold => local.ResetHold;
-        const float HoldToChangeCar = 0.7f;
+        /// <summary>Appui sur Y / R plus court que ceci : un simple replacement (au-delà, en course, c'est l'abandon qui se charge).</summary>
+        public const float ResetTapTime = 0.25f;
         /// <summary>Avancement du chargement (0-1) et étape en cours.</summary>
         public float LoadProgress { get; private set; }
         public string LoadStep { get; private set; } = "";
@@ -391,6 +391,7 @@ namespace NoHesi
             // Accueil et compte à rebours : le monde vit (trafic)
             if (State != Phase.Playing)
             {
+                if (local.Audio) local.Audio.Horn = false;
                 Traffic.Tick(around, dt);
                 return;
             }
@@ -404,6 +405,7 @@ namespace NoHesi
                 Stunts.Tick(dt);
                 UpdateResetButton();
                 if (GameInput.CameraPressed) cameraRig.NextView();
+                if (local.Audio) local.Audio.Horn = GameInput.HornHeld;
                 if (GameInput.NextTrackPressed) Music.Next();
                 UpdatePlace(dt);
             }
@@ -411,7 +413,7 @@ namespace NoHesi
             {
                 local.ResetHeld = 0f;
                 local.ResetConsumed = false;
-                local.ResetHold = 0f;
+                if (local.Audio) local.Audio.Horn = false;
             }
 
             // Retournée, tombée sous la carte, au fond de l'eau ou sortie des limites : on la replace sur la route
@@ -454,8 +456,8 @@ namespace NoHesi
         }
 
         /// <summary>
-        /// Bouton de replacement : un appui court replace la voiture sur la route (au relâchement),
-        /// un appui maintenu 0,7 s passe à la voiture suivante du garage.
+        /// Bouton de replacement (Y / R) : un appui replace la voiture sur la route (au relâchement). En course, le
+        /// maintenir abandonne (<see cref="Races"/>, avec sa jauge) : passé un court instant, le relâchement ne replace plus.
         /// </summary>
         void UpdateResetButton()
         {
@@ -463,11 +465,7 @@ namespace NoHesi
             if (GameInput.ResetHeld)
             {
                 p.ResetHeld += Time.unscaledDeltaTime;
-                if (!p.ResetConsumed && p.ResetHeld >= HoldToChangeCar)
-                {
-                    p.ResetConsumed = true;
-                    CycleCar(1, true);
-                }
+                if (p.ResetHeld > ResetTapTime && Races && Races.Running) p.ResetConsumed = true;
             }
             else
             {
@@ -475,7 +473,6 @@ namespace NoHesi
                 p.ResetHeld = 0f;
                 p.ResetConsumed = false;
             }
-            p.ResetHold = p.ResetConsumed ? 0f : Mathf.Clamp01((p.ResetHeld - 0.12f) / (HoldToChangeCar - 0.12f));
         }
 
         /// <summary>Replace la voiture sur la route la plus proche, dans sa voie, dans le sens où elle regardait.</summary>

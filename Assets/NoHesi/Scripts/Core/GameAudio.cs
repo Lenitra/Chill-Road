@@ -4,14 +4,16 @@ namespace NoHesi
 {
     /// <summary>
     /// Sons synthétisés : moteur propre à chaque voiture (<see cref="EngineSynth"/>, en temps réel), vent, crissement,
-    /// frôlement, radar, sirène, choc, retours de flamme.
+    /// frôlement, radar, sirène, klaxon, choc, retours de flamme.
     /// </summary>
     public class GameAudio : MonoBehaviour
     {
         const int Rate = 44100;
         [Range(0f, 1f)] public float masterVolume = 0.8f;
 
-        AudioSource wind, skid, siren;
+        AudioSource wind, skid, siren, horn;
+        /// <summary>Klaxon tenu (R3 / H) : réglé par <see cref="GameManager"/> chaque image de conduite.</summary>
+        public bool Horn;
         EngineSynth engine;
         float lastThrottle, revT, revPeak;
         bool revPop;
@@ -30,6 +32,7 @@ namespace NoHesi
             wind = Loop(Noise(0.06f, 2.5f));
             skid = Loop(Screech());
             siren = Loop(Siren());
+            horn = Loop(HornTone());
             oneShots = new AudioSource[8];
             for (int i = 0; i < oneShots.Length; i++) { oneShots[i] = gameObject.AddComponent<AudioSource>(); oneShots[i].playOnAwake = false; }
             whoosh = Whoosh();
@@ -82,6 +85,9 @@ namespace NoHesi
             wind.pitch = 0.7f + speed01 * 0.6f;
             float skidTarget = car.GroundedWheels > 0 && car.Speed > 4f ? Mathf.Clamp01((car.SkidAmount - 0.25f) * 1.6f) : 0f;
             skid.volume = Mathf.Lerp(skid.volume, paused ? 0f : masterVolume * skidTarget * 0.35f, Time.unscaledDeltaTime * 10f);
+            // Klaxon : attaque franche, relâchement très court
+            float hornTarget = Horn && !paused ? masterVolume * 0.5f : 0f;
+            horn.volume = Mathf.MoveTowards(horn.volume, hornTarget, Time.unscaledDeltaTime * (hornTarget > horn.volume ? 25f : 12f));
             bool chase = false;
             siren.volume = paused || !chase ? 0f : 0f;
         }
@@ -162,6 +168,29 @@ namespace NoHesi
                 d[i] = (Mathf.Sin(phase) > 0f ? 0.4f : -0.4f) * 0.5f + Mathf.Sin(phase) * 0.3f;
             }
             return Clip("Siren", d);
+        }
+
+        /// <summary>
+        /// Klaxon de voiture : deux trompes accordées à la tierce majeure (420 et 525 Hz), timbre nasillard (harmoniques
+        /// écrêtées doucement). Un nombre entier de périodes par seconde : la boucle est sans raccord.
+        /// </summary>
+        static AudioClip HornTone()
+        {
+            var d = new float[Rate];
+            var tones = new[] { 420f, 525f };
+            for (int i = 0; i < d.Length; i++)
+            {
+                float t = i / (float)Rate;
+                float v = 0f;
+                foreach (float f in tones)
+                {
+                    float a = 2f * Mathf.PI * f * t;
+                    float s = Mathf.Sin(a) + 0.55f * Mathf.Sin(2f * a) + 0.35f * Mathf.Sin(3f * a) + 0.2f * Mathf.Sin(4f * a);
+                    v += (float)System.Math.Tanh(s * 1.8f);
+                }
+                d[i] = v * 0.32f;
+            }
+            return Clip("Horn", d);
         }
 
         static AudioClip Whoosh()

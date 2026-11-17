@@ -88,7 +88,7 @@ namespace NoHesi
             }
         }
 
-        /// <summary>Bouton de replacement maintenu (appui long : changer de voiture).</summary>
+        /// <summary>Bouton de replacement (Y / R) : appui court = replacer ; en course, maintenu = abandonner.</summary>
         public static bool ResetHeld
         {
             get
@@ -121,13 +121,41 @@ namespace NoHesi
             }
         }
 
+        /// <summary>Changer de vue : X sur la manette, C ou V au clavier.</summary>
         public static bool CameraPressed
         {
             get
             {
                 var p = Pad;
                 var kb = Kb;
-                return (p != null && p.rightStickButton.wasPressedThisFrame) || (kb != null && (kb.cKey.wasPressedThisFrame || kb.vKey.wasPressedThisFrame)) || TouchInput.CameraPressed;
+                return (p != null && p.buttonWest.wasPressedThisFrame) || (kb != null && (kb.cKey.wasPressedThisFrame || kb.vKey.wasPressedThisFrame)) || TouchInput.CameraPressed;
+            }
+        }
+
+        /// <summary>Klaxon : R3 (clic du joystick droit) maintenu, ou H au clavier.</summary>
+        public static bool HornHeld
+        {
+            get
+            {
+                var p = Pad;
+                var kb = Kb;
+                return (p != null && p.rightStickButton.isPressed) || (kb != null && kb.hKey.isPressed);
+            }
+        }
+
+        /// <summary>
+        /// Menus : la manette ne navigue qu'au joystick gauche (et à la croix) ; le joystick droit reste libre pour
+        /// tourner la caméra ou la voiture (concession, garage de tuning).
+        /// </summary>
+        public static void LeftStickMenus(UnityEngine.InputSystem.UI.InputSystemUIInputModule module)
+        {
+            var nav = module && module.move != null ? module.move.action : null;
+            if (nav == null) return;
+            for (int i = 0; i < nav.bindings.Count; i++)
+            {
+                string path = nav.bindings[i].path;
+                if (path != null && path.IndexOf("rightStick", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    nav.ApplyBindingOverride(i, "");
             }
         }
 

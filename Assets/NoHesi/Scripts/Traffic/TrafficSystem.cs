@@ -64,6 +64,8 @@ namespace NoHesi
         public float TimeDensity { get; set; } = 1f;
         /// <summary>Vitesse relative du trafic (pluie : on roule moins vite et on laisse plus de distance).</summary>
         public float WeatherSpeed { get; set; } = 1f;
+        /// <summary>Trafic pendant une course chronométrée (menu d'avant-course) : 1 normal, moins léger, 0 aucun véhicule.</summary>
+        public float RaceFactor { get; set; } = 1f;
 
         GameAssets assets;
         RoadNetwork road;
@@ -112,7 +114,7 @@ namespace NoHesi
             players.Clear();
             players.AddRange(playerPositions);
             spawnTimer -= dt;
-            int target = Mathf.Clamp(Mathf.RoundToInt(baseCount * density * TimeDensity), 2, 60);
+            int target = RaceFactor <= 0f ? 0 : Mathf.Clamp(Mathf.RoundToInt(baseCount * density * TimeDensity * RaceFactor), 2, 60);
             if (spawnTimer <= 0f && Cars.Count < target)
             {
                 spawnTimer = 0.12f;
