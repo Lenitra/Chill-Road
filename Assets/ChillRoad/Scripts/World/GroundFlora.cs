@@ -115,8 +115,6 @@ namespace ChillRoad
         public GrassField Grass => grass;
         bool FieldOn => grass && grass.Ready;
 
-        public int Chunks => baseLayer.live.Count + denseLayer.live.Count;
-
         public void Init(GameAssets assets, MapData m, VegetationRenderer renderer)
         {
             map = m;

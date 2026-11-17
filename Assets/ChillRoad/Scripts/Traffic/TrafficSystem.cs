@@ -395,7 +395,6 @@ namespace ChillRoad
 
         bool HasBikes => assets.trafficBikes != null && assets.trafficBikes.Length > 0;
         bool HasFarm => assets.trafficFarm != null && assets.trafficFarm.Length > 0;
-        static float FarmKmh() => Random.Range(25f, 40f);
 
         /// <summary>Modèles d'une famille : 0 voitures, 1 poids lourds, 2 deux-roues, 3 engins agricoles.</summary>
         GameObject[] Models(int kind) => kind == 3 ? assets.trafficFarm : kind == 1 ? assets.trafficTrucks : kind == 2 ? assets.trafficBikes : assets.trafficCars;

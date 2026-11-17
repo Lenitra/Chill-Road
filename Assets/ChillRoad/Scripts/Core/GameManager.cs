@@ -32,7 +32,6 @@ namespace ChillRoad
 
         public GameAssets assets;
         public CameraRig cameraRig;
-        [HideInInspector] public int worldSeed;
 
         public VehicleController Player { get; private set; }
         public ScoreSystem Score { get; private set; }

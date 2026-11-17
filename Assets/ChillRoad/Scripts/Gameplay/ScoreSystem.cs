@@ -402,6 +402,5 @@ namespace ChillRoad
         void OnDestroy() => SaveBest();
         void OnApplicationQuit() => SaveBest();
 
-        public void ClearBest() { Best = 0f; PlayerPrefs.DeleteKey(BestKey); }
     }
 }

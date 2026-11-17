@@ -32,7 +32,6 @@ namespace ChillRoad
         public bool Directed { get; set; }
         float showcaseAngle;
         public int ViewIndex { get; private set; }
-        public string ViewName => Views[ViewIndex].name;
 
         Camera cam;
         Quaternion smoothedRot;

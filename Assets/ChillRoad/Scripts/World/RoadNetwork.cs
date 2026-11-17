@@ -733,7 +733,6 @@ namespace ChillRoad
         }
 
         static readonly Vector2[] RailProfile = { new Vector2(-0.05f, 0.42f), new Vector2(-0.12f, 0.58f), new Vector2(-0.05f, 0.74f), new Vector2(0.05f, 0.74f), new Vector2(0.05f, 0.42f) };
-        static readonly Vector2[] RailProfileMirrored = { new Vector2(-0.05f, 0.42f), new Vector2(-0.05f, 0.74f), new Vector2(0.05f, 0.74f), new Vector2(0.12f, 0.58f), new Vector2(0.05f, 0.42f) };
         // Glissière en béton du terre-plein central (profil décrit de gauche à droite en passant par le haut)
         static readonly Vector2[] JerseyProfile = { new Vector2(-0.35f, 0f), new Vector2(-0.3f, 0.3f), new Vector2(-0.12f, 0.85f), new Vector2(0.12f, 0.85f), new Vector2(0.3f, 0.3f), new Vector2(0.35f, 0f) };
         static readonly Vector2[] ParapetProfile = { new Vector2(-0.18f, -0.2f), new Vector2(-0.18f, 0.95f), new Vector2(0.18f, 0.95f), new Vector2(0.18f, -0.2f) };

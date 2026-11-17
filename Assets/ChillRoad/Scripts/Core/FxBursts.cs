@@ -3,14 +3,14 @@ using UnityEngine;
 namespace ChillRoad
 {
     /// <summary>
-    /// Effets ponctuels partagés : étincelles de réussite, confettis, éclairs lumineux (radar, portes),
+    /// Effets ponctuels partagés : confettis, éclairs lumineux (radar, portes),
     /// traînées d'air au frôlement d'un véhicule.
     /// </summary>
     public class FxBursts : MonoBehaviour
     {
         public static FxBursts Instance { get; private set; }
 
-        ParticleSystem glitter, confetti, streaks;
+        ParticleSystem confetti, streaks;
         readonly Light[] flashes = new Light[4];
         readonly float[] flashTime = new float[4];
         readonly float[] flashDuration = new float[4];
@@ -24,12 +24,6 @@ namespace ChillRoad
             // Matériau additif blanc : la couleur de chaque particule donne la teinte
             var white = new Material(assets.spark) { name = "FxWhite (runtime)" };
             white.SetColor("_BaseColor", new Color(2.2f, 2.2f, 2.2f, 1f));
-
-            glitter = System("Glitter", white, 500, -0.15f, ParticleSystemRenderMode.Billboard);
-            var gSize = glitter.sizeOverLifetime;
-            gSize.enabled = true;
-            gSize.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.EaseInOut(0f, 1f, 1f, 0f));
-            Fade(glitter, 1f);
 
             confetti = System("Confetti", white, 600, 0.35f, ParticleSystemRenderMode.Billboard);
             var spin = confetti.rotationOverLifetime;
@@ -89,21 +83,6 @@ namespace ChillRoad
             g.SetKeys(new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
                       new[] { new GradientAlphaKey(peak, 0f), new GradientAlphaKey(peak, 0.6f), new GradientAlphaKey(0f, 1f) });
             col.color = g;
-        }
-
-        /// <summary>Gerbe d'étincelles colorées (porte franchie, bonus).</summary>
-        public void Sparkle(Vector3 pos, Color color, int count = 40, float radius = 1.5f, Vector3 carry = default)
-        {
-            if (!glitter) return;
-            for (int i = 0; i < count; i++)
-                glitter.Emit(new ParticleSystem.EmitParams
-                {
-                    position = pos + Random.insideUnitSphere * radius,
-                    velocity = carry + Random.insideUnitSphere * 5f + Vector3.up * Random.Range(1f, 5f),
-                    startSize = Random.Range(0.08f, 0.22f),
-                    startLifetime = Random.Range(0.5f, 1.2f),
-                    startColor = Color.Lerp(color, Color.white, Random.value * 0.4f),
-                }, 1);
         }
 
         /// <summary>Pluie de confettis multicolores (victoire).</summary>
