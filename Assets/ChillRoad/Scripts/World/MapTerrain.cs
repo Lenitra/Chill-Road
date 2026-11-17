@@ -293,6 +293,9 @@ namespace ChillRoad
 
         // ------------------------------------------------------------------ eau, rivières, barrage
 
+        /// <summary>Profondeur au-delà de laquelle l'eau d'un lac garde la même couleur (m), profondeur au fil d'une rivière (m).</summary>
+        const float WaterDeep = 24f, RiverDepth = 3f;
+
         /// <summary>Plans d'eau : une nappe par lac, découpée en bandes sur les cellules marquées dans la carte.</summary>
         void BuildWater()
         {
@@ -307,9 +310,29 @@ namespace ChillRoad
                 int z0 = Mathf.Clamp(Mathf.FloorToInt((lk.z - lk.r + map.Half) / map.Step), 1, map.N - 2);
                 int z1 = Mathf.Clamp(Mathf.CeilToInt((lk.z + lk.r + map.Half) / map.Step), 1, map.N - 2);
                 var verts = new List<Vector3>();
+                var depths = new List<Vector2>();
+                var flow = new List<Vector2>();
                 var tris = new List<int>();
+                // Profondeur aux nœuds (UV0.x, plafonnée) : le shader y lit la couleur de l'eau et l'écume de rive.
+                // Même découpage en triangles que le terrain : la ligne de rive tombe exactement sur le sol.
+                float Depth(int x, int z) => Mathf.Min(lk.level - map.H[map.Index(x, z)], WaterDeep);
+                void Strip(int xa, int xb, int z)
+                {
+                    int s = verts.Count;
+                    for (int k = 0; k < 4; k++)
+                    {
+                        int gx = (k & 1) == 0 ? xa : xb, gz = z + (k >> 1);
+                        var p = new Vector3(-map.Half + gx * map.Step, lk.level, -map.Half + gz * map.Step);
+                        verts.Add(p);
+                        depths.Add(new Vector2(Depth(gx, gz), 0f));
+                        flow.Add(new Vector2(p.x, p.z));
+                    }
+                    tris.Add(s); tris.Add(s + 2); tris.Add(s + 1);
+                    tris.Add(s + 1); tris.Add(s + 2); tris.Add(s + 3);
+                }
                 for (int z = z0; z < z1; z++)
                 {
+                    // Le large (profondeur plafonnée aux quatre coins) part en longues bandes, la rive maille par maille
                     int run = -1;
                     for (int x = x0; x <= x1; x++)
                     {
@@ -319,23 +342,18 @@ namespace ChillRoad
                             for (int dz = -1; dz <= 2 && !wet; dz++)
                             for (int dx = -1; dx <= 2 && !wet; dx++)
                                 wet = (map.Info[map.Index(x + dx, z + dz) * 4 + 1] & 7) == id;
-                        if (wet && run < 0) run = x;
-                        if (!wet && run >= 0)
-                        {
-                            int s = verts.Count;
-                            float xa = -map.Half + run * map.Step, xb = -map.Half + x * map.Step;
-                            float za = -map.Half + z * map.Step, zb = za + map.Step;
-                            verts.Add(new Vector3(xa, lk.level, za)); verts.Add(new Vector3(xb, lk.level, za));
-                            verts.Add(new Vector3(xa, lk.level, zb)); verts.Add(new Vector3(xb, lk.level, zb));
-                            tris.Add(s); tris.Add(s + 2); tris.Add(s + 1);
-                            tris.Add(s + 1); tris.Add(s + 2); tris.Add(s + 3);
-                            run = -1;
-                        }
+                        bool deep = wet && Depth(x, z) >= WaterDeep && Depth(x + 1, z) >= WaterDeep
+                            && Depth(x, z + 1) >= WaterDeep && Depth(x + 1, z + 1) >= WaterDeep;
+                        if (!deep && run >= 0) { Strip(run, x, z); run = -1; }
+                        if (deep && run < 0) run = x;
+                        if (wet && !deep) Strip(x, x + 1, z);
                     }
                 }
                 if (verts.Count == 0) continue;
                 var mesh = new Mesh { name = "Water_" + lk.id, indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
                 mesh.SetVertices(verts);
+                mesh.SetUVs(0, depths);
+                mesh.SetUVs(1, flow);
                 mesh.SetTriangles(tris, 0);
                 mesh.RecalculateNormals();
                 mesh.RecalculateBounds();
@@ -356,7 +374,6 @@ namespace ChillRoad
             {
                 int count = rv.pts.Length / 3;
                 if (count < 2) continue;
-                var mb = new RoadNetwork.MeshBuilder();
                 float hw = rv.width * 0.5f + 1.2f;
                 Vector3 P(int i) => new Vector3(rv.pts[i * 3], rv.pts[i * 3 + 1], rv.pts[i * 3 + 2]);
                 Vector3 Right(int i)
@@ -366,12 +383,39 @@ namespace ChillRoad
                     d.Normalize();
                     return new Vector3(d.z, 0f, -d.x);
                 }
-                for (int i = 0; i + 1 < count; i++)
+                // Trois sommets par section (berge, fil de l'eau, berge). UV0 = (profondeur, 1 = rivière) : nulle aux
+                // berges, d'où l'écume ; UV1 = (travers, longueur le long du cours) en mètres : le motif suit le courant.
+                var verts = new List<Vector3>();
+                var depths = new List<Vector2>();
+                var flow = new List<Vector2>();
+                var tris = new List<int>();
+                float along = 0f;
+                for (int i = 0; i < count; i++)
                 {
-                    Vector3 a = P(i), b = P(i + 1), ra = Right(i), rb = Right(i + 1);
-                    mb.Quad(a - ra * hw, a + ra * hw, b - rb * hw, b + rb * hw);
+                    Vector3 p = P(i), r = Right(i);
+                    if (i > 0) along += Vector3.Distance(P(i - 1), p);
+                    for (int k = -1; k <= 1; k++)
+                    {
+                        verts.Add(p + r * (hw * k));
+                        depths.Add(new Vector2(k == 0 ? RiverDepth : 0f, 1f));
+                        flow.Add(new Vector2(hw * k, along));
+                    }
+                    if (i == 0) continue;
+                    int s = (i - 1) * 3;
+                    for (int k = 0; k < 2; k++, s++)
+                    {
+                        tris.Add(s); tris.Add(s + 3); tris.Add(s + 1);
+                        tris.Add(s + 1); tris.Add(s + 3); tris.Add(s + 4);
+                    }
                 }
-                var go = RoadNetwork.AddMesh(root.gameObject, "River_" + rv.id, mb.Build("River_" + rv.id), assets.water, false);
+                var mesh = new Mesh { name = "River_" + rv.id };
+                mesh.SetVertices(verts);
+                mesh.SetUVs(0, depths);
+                mesh.SetUVs(1, flow);
+                mesh.SetTriangles(tris, 0);
+                mesh.RecalculateNormals();
+                mesh.RecalculateBounds();
+                var go = RoadNetwork.AddMesh(root.gameObject, "River_" + rv.id, mesh, assets.water, false);
                 go.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             }
         }
