@@ -211,16 +211,7 @@ namespace ChillRoad
             {
                 int gx = ox + x * k, gz = oz + z * k;
                 int gi = map.Index(gx, gz);
-                float h = map.H[gi];
-                // Niveaux grossiers : près des routes, on garde le point le plus bas du voisinage pour que le relief
-                // simplifié ne recouvre jamais la chaussée
-                if (k > 1 && map.Info[gi * 4] < (k * 4 + 8) * 4)
-                {
-                    int r = k / 2;
-                    for (int dz = -r; dz <= r; dz++)
-                    for (int dx = -r; dx <= r; dx++)
-                        h = Mathf.Min(h, map.H[map.Index(gx + dx, gz + dz)]);
-                }
+                float h = VertexHeight(gx, gz, k);
                 int i = z * n + x;
                 verts[i] = new Vector3(x * step, h, z * step);
                 colors[i] = new Color32(map.Masks[gi * 4], map.Masks[gi * 4 + 1], map.Masks[gi * 4 + 2], map.Masks[gi * 4 + 3]);
@@ -265,6 +256,151 @@ namespace ChillRoad
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             return mesh;
+        }
+
+        /// <summary>Hauteur d'un sommet du maillage de pas k (nœuds de grille).</summary>
+        float VertexHeight(int gx, int gz, int k)
+        {
+            int gi = map.Index(gx, gz);
+            float h = map.H[gi];
+            // Niveaux grossiers : près des routes, on garde le point le plus bas du voisinage pour que le relief
+            // simplifié ne recouvre jamais la chaussée
+            if (k > 1 && map.Info[gi * 4] < (k * 4 + 8) * 4)
+            {
+                int r = k / 2;
+                for (int dz = -r; dz <= r; dz++)
+                for (int dx = -r; dx <= r; dx++)
+                    h = Mathf.Min(h, map.H[map.Index(gx + dx, gz + dz)]);
+            }
+            return h;
+        }
+
+        /// <summary>Hauteur de la surface dessinée par le maillage de pas k (même découpage en triangles que BuildMesh).</summary>
+        float SurfaceHeight(float x, float z, int k)
+        {
+            if (k <= 1) return map.Height(x, z);
+            float s = map.Step * k;
+            int cells = (map.N - 1) / k;
+            float fx = Mathf.Clamp((x + map.Half) / s, 0f, cells - 0.001f), fz = Mathf.Clamp((z + map.Half) / s, 0f, cells - 0.001f);
+            int ix = (int)fx, iz = (int)fz;
+            float u = fx - ix, v = fz - iz;
+            float h00 = VertexHeight(ix * k, iz * k, k), h10 = VertexHeight((ix + 1) * k, iz * k, k);
+            float h01 = VertexHeight(ix * k, (iz + 1) * k, k), h11 = VertexHeight((ix + 1) * k, (iz + 1) * k, k);
+            if (u + v <= 1f) return h00 + (h10 - h00) * u + (h01 - h00) * v;
+            return h11 + (h01 - h11) * (1f - u) + (h10 - h11) * (1f - v);
+        }
+
+        /// <summary>
+        /// Dessous d'un modèle posé au sol (rocher, éboulis, névé), par niveau de détail : le point le plus bas de son
+        /// maillage dans chaque secteur (12 directions × 3 anneaux + centre), dans le repère du prefab.
+        /// </summary>
+        class Footing
+        {
+            public Vector3[][] low = new Vector3[3][];
+            public float radius = 0.5f, top = 0.5f;
+        }
+
+        readonly Dictionary<GameObject, Footing> footings = new Dictionary<GameObject, Footing>();
+
+        Footing FootingOf(GameObject prefab)
+        {
+            if (footings.TryGetValue(prefab, out var f)) return f;
+            f = new Footing();
+            var group = prefab.GetComponentInChildren<LODGroup>();
+            var levels = group ? group.GetLODs() : null;
+            var verts = new List<Vector3>[3];
+            // Sommets du dessous seulement (normale vers le bas) : un fond plat n'a de sommets que sur son pourtour, et le
+            // plus bas d'un secteur central serait sinon un sommet du dessus du rocher
+            var under = new List<Vector3>[3];
+            for (int l = 0; l < 3; l++)
+            {
+                verts[l] = new List<Vector3>();
+                under[l] = new List<Vector3>();
+                IEnumerable<Renderer> rs = levels != null ? levels[Mathf.Min(l, levels.Length - 1)].renderers : prefab.GetComponentsInChildren<MeshRenderer>();
+                foreach (var r in rs)
+                {
+                    var mf = r ? r.GetComponent<MeshFilter>() : null;
+                    if (!mf || !mf.sharedMesh) continue;
+                    Matrix4x4 m = prefab.transform.worldToLocalMatrix * r.transform.localToWorldMatrix;
+                    var mesh = mf.sharedMesh;
+                    if (mesh.isReadable)
+                    {
+                        var vs = mesh.vertices;
+                        var ns = mesh.normals;
+                        for (int i = 0; i < vs.Length; i++)
+                        {
+                            var p = m.MultiplyPoint3x4(vs[i]);
+                            verts[l].Add(p);
+                            if (ns.Length == vs.Length && m.MultiplyVector(ns[i]).y < -0.05f) under[l].Add(p);
+                        }
+                    }
+                    else
+                    {
+                        // Maillage illisible (build) : à défaut, le pourtour du bas de sa boîte
+                        Bounds b = mesh.bounds;
+                        for (int c = 0; c < 8; c++)
+                            verts[l].Add(m.MultiplyPoint3x4(b.center + Vector3.Scale(b.extents, new Vector3((c & 1) * 2 - 1, -1f, (c >> 1 & 1) * 2 - 1) * (c < 4 ? 1f : 0.5f))));
+                    }
+                }
+                if (under[l].Count < 8) under[l] = verts[l];
+            }
+            foreach (var v in verts[0])
+            {
+                f.radius = Mathf.Max(f.radius, new Vector2(v.x, v.z).magnitude);
+                f.top = Mathf.Max(f.top, v.y);
+            }
+            const int Dirs = 12, Rings = 3;
+            for (int l = 0; l < 3; l++)
+            {
+                var bins = new Vector3[Dirs * Rings + 1];
+                var has = new bool[bins.Length];
+                foreach (var v in under[l])
+                {
+                    float r = new Vector2(v.x, v.z).magnitude / f.radius;
+                    int b = r < 0.12f ? Dirs * Rings
+                        : Mathf.Min(Rings - 1, (int)(r * Rings)) * Dirs + (int)Mathf.Repeat(Mathf.Atan2(v.z, v.x) / (Mathf.PI * 2f) * Dirs, Dirs - 0.001f);
+                    if (!has[b] || v.y < bins[b].y) { bins[b] = v; has[b] = true; }
+                }
+                var low = new List<Vector3>();
+                for (int b = 0; b < bins.Length; b++) if (has[b]) low.Add(bins[b]);
+                if (low.Count == 0) low.Add(Vector3.zero);
+                f.low[l] = low.ToArray();
+            }
+            footings[prefab] = f;
+            return f;
+        }
+
+        /// <summary>Normale du plan qui épouse le mieux le relief dans un disque (moindres carrés sur deux anneaux).</summary>
+        Vector3 GroundNormal(float x, float z, float radius)
+        {
+            float sx = 0f, sz = 0f, sxx = 0f, szz = 0f;
+            for (int ring = 1; ring <= 2; ring++)
+            for (int a = 0; a < 8; a++)
+            {
+                float ang = (a + ring * 0.5f) * Mathf.PI / 4f, d = radius * ring * 0.5f;
+                float dx = Mathf.Cos(ang) * d, dz = Mathf.Sin(ang) * d;
+                float h = map.Height(x + dx, z + dz);
+                sx += h * dx; sz += h * dz;
+                sxx += dx * dx; szz += dz * dz;
+            }
+            return new Vector3(-sx / sxx, 1f, -sz / szz).normalized;
+        }
+
+        /// <summary>
+        /// Hauteur du pivot pour qu'aucun point du dessous du modèle ne reste au-dessus du sol. k = pas du maillage de
+        /// terrain à respecter en plus du relief fin (1 = relief fin seul).
+        /// </summary>
+        float Seat(Vector3[] low, float x, float z, Quaternion rot, float scale, int k)
+        {
+            float y = float.MaxValue;
+            foreach (var p in low)
+            {
+                Vector3 w = rot * (p * scale);
+                float h = map.Height(x + w.x, z + w.z);
+                if (k > 1) h = Mathf.Min(h, SurfaceHeight(x + w.x, z + w.z, k));
+                y = Mathf.Min(y, h - w.y);
+            }
+            return y;
         }
 
         /// <summary>Une des mailles fines couvertes par ce carré (k × k) est-elle un trou du terrain ?</summary>
@@ -531,9 +667,9 @@ namespace ChillRoad
                     if (rock > 0.55f)
                     {
                         // Éboulis et blocs au pied des parois
-                        if (roll < 0.05f * far) Add(Pick(f.boulders), p, R(0.8f, 2.4f), collide ? 1.2f : 0f);
-                        else if (roll < 0.07f * far && snow < 0.3f) Add(Pick(f.scree), p, R(1f, 2f), 0f);
-                        else if (roll < 0.075f && snow > 0.5f) Add(Pick(f.snow), p, R(1.5f, 4f), 0f);
+                        if (roll < 0.05f * far) Settle(Pick(f.boulders), x, z, R(0.8f, 2.4f), 50f, collide ? 1.2f : 0f);
+                        else if (roll < 0.07f * far && snow < 0.3f) Settle(Pick(f.scree), x, z, R(1f, 2f), 65f, 0f);
+                        else if (roll < 0.075f && snow > 0.5f) Settle(Pick(f.snow), x, z, R(1.5f, 4f), 65f, 0f);
                         continue;
                     }
                     if (forest > 0.5f)
@@ -557,7 +693,7 @@ namespace ChillRoad
                     {
                         // Pelouse alpine : rhododendrons, genévriers, blocs épars
                         if (roll < 0.03f * far && snow < 0.4f) Add(Pick(f.alpineShrubs), p, R(0.8f, 1.6f), 0f);
-                        else if (roll < 0.045f * far) Add(Pick(f.boulders), p, R(0.5f, 1.6f), collide ? 0.9f : 0f);
+                        else if (roll < 0.045f * far) Settle(Pick(f.boulders), x, z, R(0.5f, 1.6f), 50f, collide ? 0.9f : 0f);
                         continue;
                     }
                     // Prés du fond de vallée et des replats : feuillus isolés, haies
@@ -593,6 +729,46 @@ namespace ChillRoad
             {
                 if (!prefab) return;
                 Matrix4x4 place = Matrix4x4.TRS(pos - Vector3.up * sink, Quaternion.Euler(0f, R() * 360f, 0f), Vector3.one * scale);
+                Register(prefab, pos, place, place, place);
+                if (colliderRadius > 0f) tile.trunks.Add(new Vector4(pos.x, pos.y, pos.z, colliderRadius * scale));
+            }
+
+            /// <summary>
+            /// Objet large posé à même le relief (rochers, éboulis, névés) : penché selon la pente moyenne sous lui (au
+            /// plus maxTilt degrés), puis enfoncé juste assez pour que le dessous de son maillage ne flotte nulle part.
+            /// Le niveau lointain (au-delà de 170 m) se cale aussi sur le relief simplifié du terrain lointain (pas de
+            /// 8 m), plus bas que le relief fin sur les bosses. Relief trop tourmenté pour sa taille : plus petit, ou rien.
+            /// </summary>
+            void Settle(GameObject prefab, float x, float z, float scale, float maxTilt, float colliderRadius)
+            {
+                if (!prefab) return;
+                var foot = mt.FootingOf(prefab);
+                var yaw = Quaternion.Euler(0f, R() * 360f, 0f);
+                float hc = map.Height(x, z);
+                for (int attempt = 0; attempt < 3; attempt++, scale *= 0.65f)
+                {
+                    Vector3 n = mt.GroundNormal(x, z, Mathf.Max(foot.radius * scale, 2f));
+                    var tilt = Quaternion.FromToRotation(Vector3.up, n);
+                    float angle = Vector3.Angle(Vector3.up, n);
+                    if (angle > maxTilt) tilt = Quaternion.Slerp(Quaternion.identity, tilt, maxTilt / angle);
+                    var rot = tilt * yaw;
+                    // Un peu plus bas que le contact exact : entre deux points d'appui, pas de jour sous la pierre
+                    float extra = Mathf.Clamp(foot.radius * scale * 0.02f, 0.03f, 0.2f);
+                    float y0 = mt.Seat(foot.low[0], x, z, rot, scale, 1) - extra;
+                    if (hc - y0 > foot.top * scale * 0.55f) continue;
+                    float y1 = mt.Seat(foot.low[1], x, z, rot, scale, 1) - extra;
+                    float y2 = mt.Seat(foot.low[2], x, z, rot, scale, 2) - extra;
+                    var s = Vector3.one * scale;
+                    Register(prefab, new Vector3(x, hc, z), Matrix4x4.TRS(new Vector3(x, y0, z), rot, s),
+                        Matrix4x4.TRS(new Vector3(x, y1, z), rot, s), Matrix4x4.TRS(new Vector3(x, y2, z), rot, s));
+                    if (colliderRadius > 0f) tile.trunks.Add(new Vector4(x, hc, z, colliderRadius * scale));
+                    return;
+                }
+            }
+
+            /// <summary>Enregistre les 3 niveaux de détail d'un modèle, chacun avec sa propre pose.</summary>
+            void Register(GameObject prefab, Vector3 pos, Matrix4x4 place0, Matrix4x4 place1, Matrix4x4 place2)
+            {
                 // Case de 64 m : le niveau de détail se choisit par case, pas par tuile de 256 m (sinon des centaines
                 // d'arbres détaillés s'affichent d'un coup autour du joueur)
                 int cx = Mathf.FloorToInt(pos.x / TreeCell), cz = Mathf.FloorToInt(pos.z / TreeCell);
@@ -600,16 +776,17 @@ namespace ChillRoad
                 var bounds = new Bounds(new Vector3((cx + 0.5f) * TreeCell, tile.bounds.center.y, (cz + 0.5f) * TreeCell),
                     new Vector3(TreeCell + 24f, tile.bounds.size.y, TreeCell + 24f));
                 var group = prefab.GetComponentInChildren<LODGroup>();
-                if (group)
+                for (int l = 0; l < 3; l++)
                 {
-                    var levels = group.GetLODs();
-                    for (int l = 0; l < 3; l++)
+                    Matrix4x4 place = l == 0 ? place0 : l == 1 ? place1 : place2;
+                    if (group)
+                    {
+                        var levels = group.GetLODs();
                         foreach (var r in levels[Mathf.Min(l, levels.Length - 1)].renderers) Collect(key, bounds, l, r, prefab, place);
+                    }
+                    else
+                        foreach (var r in prefab.GetComponentsInChildren<MeshRenderer>()) Collect(key, bounds, l, r, prefab, place);
                 }
-                else
-                    foreach (var r in prefab.GetComponentsInChildren<MeshRenderer>())
-                        for (int l = 0; l < 3; l++) Collect(key, bounds, l, r, prefab, place);
-                if (colliderRadius > 0f) tile.trunks.Add(new Vector4(pos.x, pos.y, pos.z, colliderRadius * scale));
             }
 
             const float TreeCell = 64f;
