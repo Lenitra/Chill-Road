@@ -214,11 +214,25 @@ namespace ChillRoad
             Transform t = target.transform;
             float speed = target.Speed;
 
-            // Référence de rotation : le lacet suit la trajectoire à vitesse (le drift se voit de côté), sans roulis
-            Vector3 vel = target.Velocity;
-            Vector3 fwd = t.forward;
-            if (vel.sqrMagnitude > 25f && v.follow > 0f) fwd = Vector3.Slerp(fwd, vel.normalized, 0.5f);
-            fwd = Vector3.ProjectOnPlane(fwd, Vector3.up).normalized;
+            // Référence de rotation : le lacet suit à moitié la trajectoire (le drift se voit de côté), sans roulis.
+            // Seulement quand la voiture avance : en marche arrière la trajectoire est à l'opposé du capot, et la
+            // moitié entre les deux tombait de côté (caméra qui sautait à gauche ou à droite au-delà de 18 km/h).
+            Vector3 fwd = Vector3.ProjectOnPlane(t.forward, Vector3.up);
+            if (fwd.sqrMagnitude < 1e-4f) fwd = Vector3.ProjectOnPlane(smoothedRot * Vector3.forward, Vector3.up);
+            fwd.Normalize();
+            if (v.follow > 0f)
+            {
+                Vector3 vel = Vector3.ProjectOnPlane(target.Velocity, Vector3.up);
+                float sp = vel.magnitude;
+                if (sp > 0.5f)
+                {
+                    float angle = Vector3.SignedAngle(fwd, vel / sp, Vector3.up);
+                    // Toute la part jusqu'à 90° de glisse, plus rien passé 120° (marche arrière, tête-à-queue),
+                    // et un fondu avec la vitesse plutôt qu'un seuil sec
+                    float w = 0.5f * Mathf.InverseLerp(120f, 90f, Mathf.Abs(angle)) * Mathf.InverseLerp(3f, 8f, sp);
+                    fwd = Quaternion.AngleAxis(angle * w, Vector3.up) * fwd;
+                }
+            }
             if (GameInput.LookBack && v.follow > 0f) fwd = -fwd;
             Quaternion yaw = Quaternion.LookRotation(fwd, Vector3.up);
             // Tangage : suit la pente de la route
