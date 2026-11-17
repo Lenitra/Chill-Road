@@ -125,7 +125,7 @@ namespace ChillRoad
 
         // Pause
         GameObject pausePanel;
-        Text carLabel, timeLabel, netLabel, pauseTitle;
+        Text netLabel, pauseTitle;
         bool inPause;
         Text controlsTitle;
         readonly List<(Text action, Text key)> controlRows = new List<(Text, Text)>();
@@ -135,7 +135,18 @@ namespace ChillRoad
         // Partie en réseau : plaque du menu (elle grandit avec ses lignes), ligne d'état, bouton du code d'invitation
         RectTransform pauseBox;
         LayoutElement netLayout;
-        Text inviteLabel;
+        // Tuiles du menu (pictogramme, nom, détail) ; la voiture ouvre le garage (CarPicker)
+        class PauseTile { public Button button; public HudShape plate; public HudIcon icon; public Text label, sub; public float on; }
+        readonly List<PauseTile> pauseTiles = new List<PauseTile>();
+        PauseTile carTile, timeTile, inviteTile;
+        CarPicker picker;
+        static readonly Color TileNormal = new Color(0.13f, 0.15f, 0.19f, 0.96f);
+        static readonly Color TileOff = new Color(0.09f, 0.1f, 0.12f, 0.9f);
+        static readonly Color TileGold = new Color(0.95f, 0.62f, 0.12f, 1f);
+        static readonly Color Ink = new Color(0.06f, 0.07f, 0.09f);
+        static readonly Color InkDim = new Color(0.06f, 0.07f, 0.09f, 0.72f);
+        static readonly Color Muted = new Color(0.46f, 0.48f, 0.52f);
+        const float HeroH = 124f, MidH = 236f, ExitH = 100f, RowGap = 14f;
         float netRefresh, inviteCopied = -10f, inviteClock;
         string inviteAnnounced;
         /// <summary>
@@ -724,17 +735,21 @@ namespace ChillRoad
 
         // ------------------------------------------------------------------ pause
 
+        /// <summary>
+        /// Menu pause en tuiles (pictogramme + nom + détail) : Reprendre (et Inviter, hôte d'une partie en réseau) ;
+        /// Voiture (ouvre le garage), Heure, Options ; Menu principal, Quitter. Contrôles à droite.
+        /// </summary>
         void BuildPause()
         {
             pausePanel = Rect(screen, "Pause", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
             pausePanel.AddComponent<Image>().color = new Color(0.01f, 0.01f, 0.03f, 0.62f);
             // Menu à gauche, contrôles à droite
-            var box = Rect(pausePanel.transform, "Box", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-760, -340), new Vector2(-40, 340));
+            var box = Rect(pausePanel.transform, "Box", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-760, -326), new Vector2(-40, 326));
             Backdrop(box);
             pauseBox = box;
             var layout = box.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(50, 50, 30, 30);
-            layout.spacing = 12;
+            layout.padding = new RectOffset(46, 46, 30, 30);
+            layout.spacing = RowGap;
             layout.childControlHeight = true; layout.childControlWidth = true; layout.childForceExpandHeight = false;
             var title = Label(box, "PAUSE", 64, TextAnchor.MiddleLeft, Accent, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600, 90), FontStyle.BoldAndItalic);
             title.gameObject.AddComponent<LayoutElement>().preferredHeight = 90;
@@ -746,19 +761,154 @@ namespace ChillRoad
             netLayout.preferredHeight = 56;
             netLabel.gameObject.SetActive(false);
 
-            var resume = Button(box, "", () => SetPaused(false));
-            Loc.Bind(resume.text, "Reprendre", "Resume");
+            var hero = TileRow(box, HeroH);
+            var resume = Tile(hero, HeroH, HudIcon.Kind.Play, "Reprendre", "Resume", true, 1.45f, () => SetPaused(false));
+            Loc.Bind(resume.sub, "Retour sur la route", "Back on the road");
+            resume.label.fontSize = 34;
             firstButton = resume.button;
             // Hôte : copie le code d'invitation dans le presse-papiers (ou en demande un s'il n'y en a pas)
-            inviteLabel = Button(box, "", InviteAction).text;
-            carLabel = Button(box, "", () => { game.CycleCar(1); RefreshPause(); }).text;
+            inviteTile = Tile(hero, HeroH, HudIcon.Kind.Invite, "Inviter", "Invite", true, 1f, InviteAction);
+
+            var mid = TileRow(box, MidH);
+            carTile = Tile(mid, MidH, HudIcon.Kind.Car, "Voiture", "Car", false, 1f, OpenPicker);
             // L'heure d'une partie rejointe est celle du serveur
-            timeLabel = Button(box, "", () => { if (!(game.Net && game.Net.IsClient)) game.DayNight.Advance(3f); RefreshPause(); }).text;
-            Button(box, "Options", OpenOptions);
-            Loc.Bind(Button(box, "", game.ReturnToTitle).text, "Menu principal", "Main menu");
-            Loc.Bind(Button(box, "", game.Quit).text, "Quitter le jeu", "Quit game");
+            timeTile = Tile(mid, MidH, HudIcon.Kind.Clock, "Heure", "Time", false, 1f,
+                () => { if (!(game.Net && game.Net.IsClient)) game.DayNight.Advance(3f); RefreshPause(); });
+            var options = Tile(mid, MidH, HudIcon.Kind.Gear, "Options", "Options", false, 1f, OpenOptions);
+            Loc.Bind(options.sub, "Son, jeu, graphismes", "Sound, game, graphics");
+
+            var exits = TileRow(box, ExitH);
+            var home = Tile(exits, ExitH, HudIcon.Kind.Home, "Menu principal", "Main menu", true, 1f, game.ReturnToTitle);
+            Loc.Bind(home.sub, "Écran d'accueil", "Title screen");
+            var quit = Tile(exits, ExitH, HudIcon.Kind.Power, "Quitter", "Quit", true, 1f, game.Quit);
+            Loc.Bind(quit.sub, "Fermer le jeu", "Close the game");
             BuildControls(pausePanel.transform);
             pausePanel.SetActive(false);
+        }
+
+        /// <summary>Rangée de tuiles de hauteur fixe (elle n'absorbe pas la place libre de la plaque).</summary>
+        static RectTransform TileRow(Transform parent, float height)
+        {
+            var row = Rect(parent, "Row", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            var le = row.gameObject.AddComponent<LayoutElement>();
+            le.preferredHeight = le.minHeight = height;
+            le.flexibleHeight = 0f;
+            var h = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+            h.spacing = RowGap;
+            h.childControlWidth = h.childControlHeight = true;
+            h.childForceExpandWidth = h.childForceExpandHeight = true;
+            return row;
+        }
+
+        /// <summary>
+        /// Tuile du menu : plaque inclinée, pictogramme et nom (dessous : un détail). wide : pictogramme à gauche et
+        /// textes à sa droite ; sinon pictogramme en haut, textes centrés dessous. Survol = sélection ; la tuile
+        /// sélectionnée passe à l'or (animée dans <see cref="AnimateTiles"/>).
+        /// </summary>
+        PauseTile Tile(Transform row, float height, HudIcon.Kind kind, string fr, string en, bool wide, float flex, UnityEngine.Events.UnityAction onClick)
+        {
+            var go = new GameObject("Tile", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape), typeof(Button), typeof(LayoutElement), typeof(HoverSelect));
+            go.transform.SetParent(row, false);
+            go.GetComponent<LayoutElement>().flexibleWidth = flex;
+            var t = new PauseTile();
+            t.plate = go.GetComponent<HudShape>();
+            t.plate.Set(18f, 0f, 0f);
+            t.plate.color = TileNormal;
+            t.button = go.GetComponent<Button>();
+            t.button.targetGraphic = t.plate;
+            t.button.transition = Selectable.Transition.None;
+            t.button.onClick.AddListener(onClick);
+
+            var ig = new GameObject("Icon", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudIcon));
+            ig.transform.SetParent(go.transform, false);
+            var ir = (RectTransform)ig.transform;
+            t.icon = ig.GetComponent<HudIcon>();
+            t.icon.Shape = kind;
+            t.icon.raycastTarget = false;
+            t.label = Label(go.transform, "", 30, wide ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, White, Vector2.zero, Vector2.zero, Vector2.zero, FontStyle.BoldAndItalic);
+            t.sub = Label(go.transform, "", 19, wide ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, Dim, Vector2.zero, Vector2.zero, Vector2.zero, FontStyle.Bold);
+            t.sub.horizontalOverflow = HorizontalWrapMode.Wrap;
+            t.sub.verticalOverflow = VerticalWrapMode.Truncate;
+            t.sub.resizeTextForBestFit = true;
+            t.sub.resizeTextMinSize = 13;
+            t.sub.resizeTextMaxSize = 19;
+            Loc.Bind(t.label, fr, en);
+            if (wide)
+            {
+                float size = Mathf.Min(height * 0.48f, 60f), x = 30f + size * 0.5f, tx = 30f + size + 24f;
+                ir.anchorMin = ir.anchorMax = new Vector2(0f, 0.5f);
+                ir.sizeDelta = new Vector2(size, size);
+                ir.anchoredPosition = new Vector2(x, 0f);
+                Fit(t.label.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(tx, -8f), new Vector2(-14f, 34f));
+                Fit(t.sub.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(tx + 2f, -34f), new Vector2(-14f, -8f));
+            }
+            else
+            {
+                const float textTop = 76f;
+                float size = Mathf.Min(height * 0.34f, (height - textTop) * 0.7f);
+                ir.anchorMin = ir.anchorMax = new Vector2(0.5f, 0f);
+                ir.sizeDelta = new Vector2(size, size);
+                ir.anchoredPosition = new Vector2(0f, textTop + (height - textTop) * 0.5f);
+                Fit(t.label.rectTransform, Vector2.zero, new Vector2(1f, 0f), new Vector2(10f, 42f), new Vector2(-10f, 78f));
+                Fit(t.sub.rectTransform, Vector2.zero, new Vector2(1f, 0f), new Vector2(14f, 12f), new Vector2(-14f, 42f));
+            }
+            pauseTiles.Add(t);
+            return t;
+        }
+
+        static void Fit(RectTransform rt, Vector2 aMin, Vector2 aMax, Vector2 oMin, Vector2 oMax)
+        {
+            rt.anchorMin = aMin; rt.anchorMax = aMax;
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.offsetMin = oMin; rt.offsetMax = oMax;
+        }
+
+        /// <summary>État des tuiles : la sélectionnée passe à l'or (textes à l'encre) et grossit un peu ; grisées si indisponibles.</summary>
+        void AnimateTiles(float dt)
+        {
+            var sel = EventSystem.current ? EventSystem.current.currentSelectedGameObject : null;
+            foreach (var t in pauseTiles)
+            {
+                bool usable = t.button.interactable;
+                t.on = dt > 0f ? Mathf.MoveTowards(t.on, usable && sel == t.button.gameObject ? 1f : 0f, dt * 9f) : 0f;
+                float e = t.on * t.on * (3f - 2f * t.on);
+                Color plate = usable ? Color.Lerp(TileNormal, TileGold, e) : TileOff;
+                t.plate.color = plate;
+                plate.a = 1f;
+                t.icon.SetColors(usable ? Color.Lerp(Accent, Ink, e) : Muted, plate);
+                t.label.color = usable ? Color.Lerp(White, Ink, e) : Muted;
+                t.sub.color = usable ? Color.Lerp(Dim, InkDim, e) : Muted;
+                t.button.transform.localScale = Vector3.one * (1f + 0.035f * e);
+            }
+        }
+
+        /// <summary>Garage (tuile Voiture) : choisir la voiture parmi celles achetées ; on repart dès qu'une est prise.</summary>
+        void OpenPicker()
+        {
+            if (game.OwnedCars <= 1 || (game.Races && game.Races.CarLocked)) return;
+            if (!picker)
+            {
+                picker = gameObject.AddComponent<CarPicker>();
+                picker.Init(game);
+            }
+            pausePanel.SetActive(false);
+            canvas.gameObject.SetActive(false);
+            picker.Open(chosen =>
+            {
+                canvas.gameObject.SetActive(true);
+                if (chosen)
+                {
+                    SetPaused(false);
+                    Announce(Loc.T("AU VOLANT", "DRIVING"), game.Player.Spec.displayName, Accent, 2.2f);
+                }
+                else
+                {
+                    pausePanel.SetActive(true);
+                    openedFrame = Time.frameCount;
+                    RefreshPause();
+                    EventSystem.current?.SetSelectedGameObject(carTile.button.gameObject);
+                }
+            });
         }
 
         /// <summary>Panneau des contrôles, à droite du menu pause.</summary>
@@ -827,14 +977,17 @@ namespace ChillRoad
         void RefreshPause()
         {
             RefreshControls();
-            // Une seule voiture achetée, ou voiture imposée par une course à plusieurs : pas de bouton de choix
-            carLabel.transform.parent.gameObject.SetActive(game.OwnedCars > 1 && !(game.Races && game.Races.CarLocked));
-            carLabel.text = Loc.T($"Voiture : {game.Player.Spec.displayName}  >", $"Car: {game.Player.Spec.displayName}  >");
+            // Une seule voiture achetée, ou voiture imposée par une course à plusieurs : tuile grisée
+            bool locked = game.Races && game.Races.CarLocked;
+            carTile.button.interactable = game.OwnedCars > 1 && !locked;
+            carTile.sub.text = locked ? Loc.T("Imposée par la course", "Set by the race") : game.Player.Spec.displayName;
             var net = game.Net;
             bool online = game.Online;
-            timeLabel.text = online && net.IsClient
-                ? Loc.T($"Heure : {game.DayNight.Clock}  (réglée par l'hôte)", $"Time: {game.DayNight.Clock}  (set by the host)")
-                : Loc.T($"Heure : {game.DayNight.Clock}  (+3 h)  >", $"Time: {game.DayNight.Clock}  (+3 h)  >");
+            bool client = online && net.IsClient;
+            timeTile.button.interactable = !client;
+            timeTile.sub.text = client
+                ? Loc.T($"{game.DayNight.Clock}  ·  réglée par l'hôte", $"{game.DayNight.Clock}  ·  set by the host")
+                : Loc.F($"{game.DayNight.Clock}  ·  +3 h");
             // En réseau, rien ne s'arrête : c'est un menu, pas une pause
             pauseTitle.text = online ? "MENU" : "PAUSE";
             RefreshNet();
@@ -852,7 +1005,7 @@ namespace ChillRoad
             netRefresh = 0.5f;
             int lines = 0;
             netLabel.gameObject.SetActive(online);
-            inviteLabel.transform.parent.gameObject.SetActive(host);
+            inviteTile.button.gameObject.SetActive(host);
             if (online)
             {
                 // Option fixée par le serveur à l'ouverture de la partie : rappelée, pas modifiable ici
@@ -868,9 +1021,9 @@ namespace ChillRoad
                         : step == NetRelay.Step.Pending ? Loc.T("Code d'invitation : demande en cours", "Invite code: requesting")
                         : step == NetRelay.Step.Failed ? Loc.T($"Pas de code : {net.InviteError}", $"No code: {net.InviteError}") : "";
                     bool copied = Time.unscaledTime - inviteCopied < 2.5f;
-                    inviteLabel.text = step == NetRelay.Step.Ready ? (copied ? Loc.T("Code copié dans le presse-papiers", "Code copied to the clipboard") : Loc.T("Copier le code d'invitation", "Copy the invite code"))
-                        : step == NetRelay.Step.Pending ? Loc.T("Code d'invitation : demande en cours", "Invite code: requesting")
-                        : Loc.T("Demander un code d'invitation  >", "Request an invite code  >");
+                    inviteTile.sub.text = step == NetRelay.Step.Ready ? (copied ? Loc.T("Code copié !", "Code copied!") : Loc.T("Copier le code", "Copy the code"))
+                        : step == NetRelay.Step.Pending ? Loc.T("Demande en cours…", "Requesting…")
+                        : Loc.T("Demander un code", "Request a code");
                 }
                 else
                 {
@@ -883,9 +1036,8 @@ namespace ChillRoad
                 netLabel.text = first + "\n" + (invite.Length > 0 ? invite + "\n" : "") + collisions;
                 netLayout.preferredHeight = lines * 28f;
             }
-            // Hauteur de la plaque : titre, ligne d'état, boutons affichés, espaces et marges
-            int buttons = 5 + (carLabel.transform.parent.gameObject.activeSelf ? 1 : 0) + (host ? 1 : 0);
-            float height = Mathf.Max(680f, 60f + 90f + buttons * 62f + lines * 28f + 12f * (buttons + (online ? 1 : 0)) + 14f);
+            // Hauteur de la plaque : marges, titre, ligne d'état (en réseau), trois rangées de tuiles et leurs espaces
+            float height = 60f + 90f + HeroH + MidH + ExitH + RowGap * 3f + (online ? lines * 28f + RowGap : 0f);
             pauseBox.offsetMin = new Vector2(pauseBox.offsetMin.x, -height * 0.5f);
             pauseBox.offsetMax = new Vector2(pauseBox.offsetMax.x, height * 0.5f);
         }
@@ -916,6 +1068,7 @@ namespace ChillRoad
             {
                 controlsPanel.SetActive(!PlayersInMenu);
                 RefreshPause();
+                AnimateTiles(0f);
                 EventSystem.current?.SetSelectedGameObject(firstButton.gameObject);
             }
         }
@@ -935,10 +1088,11 @@ namespace ChillRoad
 
         void UpdatePause()
         {
-            if (OptionsMenu.IsOpen || Dealership.IsOpen || TuningGarage.IsOpen || RaceSetup.IsOpen || game.Demo || GameManager.DedicatedServer) return;
+            if (OptionsMenu.IsOpen || Dealership.IsOpen || TuningGarage.IsOpen || RaceSetup.IsOpen || CarPicker.IsOpen || game.Demo || GameManager.DedicatedServer) return;
             // Carte globale ouverte (ou tout juste fermée par Échap) : la pause attend
             if (WorldMap.IsOpen || Time.frameCount == WorldMap.ChangedFrame || Time.frameCount == Dealership.ChangedFrame
-                || Time.frameCount == TuningGarage.ChangedFrame || Time.frameCount == RaceSetup.ChangedFrame) return;
+                || Time.frameCount == TuningGarage.ChangedFrame || Time.frameCount == RaceSetup.ChangedFrame
+                || Time.frameCount == CarPicker.ChangedFrame) return;
             if (Time.frameCount == openedFrame || game.State != GameManager.Phase.Playing) return;
             if (!Paused && GameInput.PausePressed) SetPaused(true);
             else if (Paused && (GameInput.PausePressed || GameInput.CancelPressed)) SetPaused(false);
@@ -949,6 +1103,7 @@ namespace ChillRoad
             // En réseau : Tab ou RB (LB) passe des contrôles au tableau des joueurs, qui prend leur place
             if (inPause && pausePanel.activeSelf)
             {
+                AnimateTiles(Time.unscaledDeltaTime);
                 if (game.Online && (GameInput.TabNextPressed || GameInput.TabPrevPressed)) playersPage = !playersPage;
                 bool controls = !PlayersInMenu;
                 if (controlsPanel.activeSelf != controls) controlsPanel.SetActive(controls);
@@ -1055,27 +1210,6 @@ namespace ChillRoad
             sh.effectColor = new Color(0, 0, 0, 0.55f);
             sh.effectDistance = new Vector2(2, -2);
             return t;
-        }
-
-        (Button button, Text text) Button(Transform parent, string label, UnityEngine.Events.UnityAction onClick)
-        {
-            var go = new GameObject("Button", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape), typeof(Button), typeof(LayoutElement));
-            go.transform.SetParent(parent, false);
-            go.GetComponent<LayoutElement>().preferredHeight = 62;
-            var shape = go.GetComponent<HudShape>();
-            shape.Set(18f, 0f, 0f);
-            shape.color = Color.white;
-            var b = go.GetComponent<Button>();
-            b.targetGraphic = shape;
-            var colors = b.colors;
-            colors.normalColor = new Color(0.14f, 0.16f, 0.2f, 0.95f);
-            colors.highlightedColor = new Color(0.24f, 0.27f, 0.33f, 1f);
-            colors.selectedColor = new Color(0.95f, 0.62f, 0.12f, 1f);
-            colors.pressedColor = new Color(1f, 0.8f, 0.4f, 1f);
-            b.colors = colors;
-            b.onClick.AddListener(onClick);
-            var t = Label(go.transform, label, 28, TextAnchor.MiddleLeft, White, new Vector2(0f, 0.5f), new Vector2(28f, 0f), new Vector2(600, 56), FontStyle.BoldAndItalic);
-            return (b, t);
         }
     }
 }
