@@ -70,33 +70,20 @@ namespace ChillRoad
         [Tooltip("Part des deux-roues parmi les voitures du trafic (0-1)")] [Range(0f, 0.3f)] public float bikeShare = 0.06f;
         [Tooltip("Engins agricoles (tracteurs) : routes de campagne et chemins seulement, voie de droite, 25-40 km/h")] public GameObject[] trafficFarm;
         [Tooltip("Part des engins agricoles dans le trafic des routes de campagne (0-1)")] [Range(0f, 0.3f)] public float farmShare = 0.07f;
-        public GameObject policeCar;
         [Tooltip("Échelle des voitures du trafic (1 = modèles à l'échelle réelle, 1.72 = Kenney)")] public float trafficCarScale = 1.72f;
         [Tooltip("Échelle des camions du trafic")] public float trafficTruckScale = 2f;
-        [Tooltip("Échelle de la voiture de police")] public float policeCarScale = 1.72f;
 
         [Header("Décor")]
         public GameObject[] buildings;
-        public GameObject streetLight;
-        [Tooltip("Lampadaire à une seule crosse (carrefours)")] public GameObject streetLightSingle;
-        public GameObject stopSign;
-        public GameObject warningSign;
-        [Header("Travaux")]
-        public GameObject cone;
-        public GameObject constructionBarrier;
-        public GameObject constructionLight;
 
         [Header("Nature (pack d'environnement)")]
         public GameObject[] pines;
-        public GameObject[] deadTrees;
         public GameObject[] fruitTrees;
         public GameObject[] shrubs;
         public GameObject[] grass;
         public GameObject[] flowers;
         public GameObject[] smallRocks;
         public GameObject[] bigRocks;
-        public GameObject[] logsAndStumps;
-        public GameObject[] mushrooms;
         public GameObject fence;
 
         [Header("Carte")]
@@ -112,11 +99,8 @@ namespace ChillRoad
         public Material water;
         public Material concrete;
         public Material metal;
-        public Material signBlue;
-        public Material signRed;
         public Material emissiveWhite;
         public Material emissiveRed;
-        public Material emissiveBlue;
         public Material particle;
         [Tooltip("Étincelles, flammes, traînées (additif)")] public Material spark;
         [Tooltip("Traces de pneus")] public Material skidMark;

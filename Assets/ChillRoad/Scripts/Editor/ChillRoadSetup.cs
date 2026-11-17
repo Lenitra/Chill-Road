@@ -58,11 +58,8 @@ namespace ChillRoad.EditorTools
             a.skidMark = ParticleMaterial("SkidMark", Tex("SkidTex", SkidPixel, 128, true), "Universal Render Pipeline/Particles/Unlit", false, new Color(0.035f, 0.035f, 0.04f, 0.8f));
             a.concrete = Lit("Concrete", new Color(0.72f, 0.72f, 0.7f), 0.1f, Tex("ConcreteTex", ConcretePixel, 256), true);
             a.metal = Lit("Metal", new Color(0.7f, 0.72f, 0.75f), 0.6f, null, true, 0.8f);
-            a.signBlue = Lit("SignBlue", new Color(0.1f, 0.3f, 0.75f), 0.3f, null, true);
-            a.signRed = Lit("SignRed", new Color(0.8f, 0.15f, 0.12f), 0.3f, null, true);
             a.emissiveWhite = Emissive("EmissiveWhite", new Color(1f, 0.97f, 0.9f), 4f);
             a.emissiveRed = Emissive("EmissiveRed", new Color(1f, 0.08f, 0.05f), 5f);
-            a.emissiveBlue = Emissive("EmissiveBlue", new Color(0.15f, 0.45f, 1f), 5f);
             // Référencé ici pour être embarqué dans le jeu construit (ses matériaux sont créés à l'exécution)
             a.gateFx = Shader.Find("ChillRoad/GateFx");
             a.ghost = Shader.Find("ChillRoad/Ghost");

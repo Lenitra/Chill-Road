@@ -6,7 +6,7 @@ namespace ChillRoad.EditorTools
 {
     /// <summary>
     /// Pack de véhicules réels low poly modélisés dans Blender (Assets/ChillRoad/Models/CarPack) : remplace les
-    /// voitures et camions Kenney du trafic et la voiture de police, ajoute utilitaires, poids lourds (bus, autocar,
+    /// voitures et camions Kenney du trafic, ajoute utilitaires, poids lourds (bus, autocar,
     /// porteur, benne à ordures, semi-remorques, bétonnière, dépanneuse, pompiers), deux-roues et tracteurs agricoles. Une palette de dégradés partagée (CarPack_Palette.png),
     /// la peinture sur un matériau à part (PK_Paint, teintée au hasard par TrafficSystem), des optiques émissives.
     /// Menu : ChillRoad > Importer pack voitures (également appelé par ChillRoad > Setup).
@@ -23,7 +23,6 @@ namespace ChillRoad.EditorTools
                                             "CementMixer", "TowTruck", "FireTruck" };
         static readonly string[] Bikes = { "Motorcycle", "Scooter" };
         static readonly string[] Farm = { "Tractor" };
-        const string PoliceModel = "Police";
 
         [MenuItem("Chill Road/Importer pack voitures")]
         public static void Import()
@@ -66,12 +65,6 @@ namespace ChillRoad.EditorTools
             }
             a.trafficBikes = PrepareAll(Bikes, mats).ToArray();
             a.trafficFarm = PrepareAll(Farm, mats).ToArray();       // routes de campagne seulement
-            var police = Prepare(PoliceModel, mats);
-            if (police)
-            {
-                a.policeCar = police;
-                a.policeCarScale = 1f;
-            }
             EditorUtility.SetDirty(a);
             return true;
         }

@@ -308,30 +308,18 @@ MonoBehaviour:
   trafficFarm:
   - {fileID: 919132149155446097, guid: 547133b6a0f4e78498b7c627bc872408, type: 3}
   farmShare: 0.07
-  policeCar: {fileID: 919132149155446097, guid: 9fd162dc91a348e49b67a32c935872ef, type: 3}
   trafficCarScale: 1
   trafficTruckScale: 1
-  policeCarScale: 1
   buildings:
   - {fileID: 919132149155446097, guid: 392ac4a57c23adf479b59e9051a9086f, type: 3}
   - {fileID: 919132149155446097, guid: 08f24ded1f29ffc4b865e0ba80e20463, type: 3}
   - {fileID: 919132149155446097, guid: 39c5ecd87472df34787d9d3070741f2e, type: 3}
   - {fileID: 919132149155446097, guid: 3215fb53758e52f498ad8b5e63ea386d, type: 3}
   - {fileID: 919132149155446097, guid: a2a439e266f473a42a2ba5f47be7f09f, type: 3}
-  streetLight: {fileID: 919132149155446097, guid: 3178c22aafeaf2f4fb6ad602368735f7, type: 3}
-  streetLightSingle: {fileID: 919132149155446097, guid: 483eeb8f4eb24aa49a37d6225a4f8dc9, type: 3}
-  stopSign: {fileID: 919132149155446097, guid: 4d2faaac498613947874decf4a49b18c, type: 3}
-  warningSign: {fileID: 919132149155446097, guid: f1403382118d1024997df9433e587a09, type: 3}
-  cone: {fileID: 919132149155446097, guid: 40c683a9cf9609947b776b2fbe1e81c9, type: 3}
-  constructionBarrier: {fileID: 919132149155446097, guid: fcded8efd34e64345b6308e183b368d0, type: 3}
-  constructionLight: {fileID: 919132149155446097, guid: a9a1c00da06a73046ac5f820b1a7fae9, type: 3}
   pines:
   - {fileID: 919132149155446097, guid: b4f03bc14868ec0459f01d700286e1c9, type: 3}
   - {fileID: 919132149155446097, guid: a25faa6de56e0d84c9610d2ec0effe2d, type: 3}
   - {fileID: 919132149155446097, guid: 8d5e080cd4378b74685a24ef6b9af45a, type: 3}
-  deadTrees:
-  - {fileID: 919132149155446097, guid: ad7b64d456d5ccc48b447f8d699e793f, type: 3}
-  - {fileID: 919132149155446097, guid: 263753abf49f4b64ca395c240424958e, type: 3}
   fruitTrees:
   - {fileID: 919132149155446097, guid: 14180d13ab800bd41a353c6082c5ce30, type: 3}
   - {fileID: 919132149155446097, guid: 58019a17fed325e41b54587bb988e491, type: 3}
@@ -350,13 +338,6 @@ MonoBehaviour:
   - {fileID: 919132149155446097, guid: d383bd6471a69a8459dc8dd97ac826b9, type: 3}
   bigRocks:
   - {fileID: 919132149155446097, guid: a9e85cea116f06845a144c5bcdb7c177, type: 3}
-  logsAndStumps:
-  - {fileID: 919132149155446097, guid: f891831a87782d74f8571b11108f51e7, type: 3}
-  - {fileID: 919132149155446097, guid: 0565ff19af26cd448bf71f8a230c6d20, type: 3}
-  - {fileID: 919132149155446097, guid: bc572a819c0067148b07f93d33dfb402, type: 3}
-  - {fileID: 919132149155446097, guid: faab7c15a14fd194caae885736436b5d, type: 3}
-  mushrooms:
-  - {fileID: 919132149155446097, guid: 56ae6e9d7183e45498b79d3d66bf02ba, type: 3}
   fence: {fileID: 919132149155446097, guid: b128d87b390628a4f8f77ee8eadeaee0, type: 3}
   alp: {fileID: 11400000, guid: 8f9c561c41d7c854fb94476988ec7e50, type: 2}
   asphalt: {fileID: 2100000, guid: 9c11f80707cd2ef41a467b72e882c984, type: 2}
@@ -368,11 +349,8 @@ MonoBehaviour:
   water: {fileID: 2100000, guid: 064c8e881a9607c45af564e6a9353dc0, type: 2}
   concrete: {fileID: 2100000, guid: 26b915a839a8f4b4fa554cd0a76d49e2, type: 2}
   metal: {fileID: 2100000, guid: cb4a6e5575e998643b4cfd21706414f9, type: 2}
-  signBlue: {fileID: 2100000, guid: 20f8c162e0576b3408248168e8219963, type: 2}
-  signRed: {fileID: 2100000, guid: bb509c50aea2d6544aa70eefdc23ee55, type: 2}
   emissiveWhite: {fileID: 2100000, guid: 006078c98d5151849b40c811faf9358b, type: 2}
   emissiveRed: {fileID: 2100000, guid: 859842f0fed2c9348bdcd665de6a21cf, type: 2}
-  emissiveBlue: {fileID: 2100000, guid: f73fdecbeba459143997cf97c6b725a7, type: 2}
   particle: {fileID: 2100000, guid: 941ddd0bbd218a341be294eab3df6051, type: 2}
   spark: {fileID: 2100000, guid: 7e541a876ee490c4fbff095354053862, type: 2}
   skidMark: {fileID: 2100000, guid: 81b4e50a9cf68604cb16f1737573022c, type: 2}

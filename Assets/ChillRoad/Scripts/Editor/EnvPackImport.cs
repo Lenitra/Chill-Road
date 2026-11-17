@@ -27,7 +27,7 @@ namespace ChillRoad.EditorTools
             if (!Apply(assets)) { Debug.LogError("Pack d'environnement introuvable : " + Folder); return; }
             AssetDatabase.SaveAssets();
             Debug.Log($"Pack environnement : {assets.pines.Length} conifères, {assets.fruitTrees.Length} fruitiers, " +
-                      $"{assets.deadTrees.Length} arbres morts, {assets.shrubs.Length} buissons, rochers, souches, herbe, fleurs, clôture");
+                      $"{assets.shrubs.Length} buissons, rochers, herbe, fleurs, clôture, bâtiments");
         }
 
         /// <summary>Prépare les modèles et les branche sur GameAssets ; false si le pack est absent.</summary>
@@ -39,36 +39,20 @@ namespace ChillRoad.EditorTools
             var pines = All(mat, "Pine_A", "Pine_B", "Pine_C");
             if (pines.Length == 0) return false;
             a.pines = pines;
-            a.deadTrees = All(mat, "DeadPine", "DeadFruitTree");
             a.fruitTrees = All(mat, "FruitTree", "AppleTree", "PearTree", "PlumTree");
             a.shrubs = All(mat, "Shrub_A", "Shrub_B", "DeadShrub");
             a.grass = All(mat, "GrassTuft");
             a.flowers = All(mat, "Poppies");
             a.smallRocks = All(mat, "Rock", "RockPile");
             a.bigRocks = All(mat, "Menhir");
-            a.logsAndStumps = All(mat, "PineLogs", "PineStump", "FruitLogs", "FruitStump");
-            a.mushrooms = All(mat, "Mushrooms");
             // Clôture fusionnée le long des nationales : son maillage doit être lisible
             var fence = Prepare("Fence", mat, true);
             if (fence) a.fence = fence;
-            // Mobilier routier et bâtiments : exportés à la taille des modèles Kenney remplacés
-            // (le code les pose à l'échelle 9 pour les lampadaires, 5 pour les panneaux, 7 pour le reste)
-            Set(ref a.streetLight, Prepare("StreetLightDouble", mat, false));
-            Set(ref a.streetLightSingle, Prepare("StreetLightSingle", mat, false));
-            Set(ref a.stopSign, Prepare("StopSign", mat, false));
-            Set(ref a.warningSign, Prepare("WarningSign", mat, false));
-            Set(ref a.cone, Prepare("Cone", mat, false));
-            Set(ref a.constructionBarrier, Prepare("WorksBarrier", mat, false));
-            Set(ref a.constructionLight, Prepare("WorksLight", mat, false));
+            // Bâtiments : exportés à la taille des modèles Kenney remplacés
             var buildings = All(mat, "Longere", "Maison", "Grange", "Maisonnette", "Hangar");
             if (buildings.Length > 0) a.buildings = buildings;
             EditorUtility.SetDirty(a);
             return true;
-        }
-
-        static void Set(ref GameObject field, GameObject model)
-        {
-            if (model) field = model;
         }
 
         static GameObject[] All(Material mat, params string[] names)
