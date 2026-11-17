@@ -1222,7 +1222,7 @@ def gryaris_dlo(c, m=0.0):
 def gryaris_details(c):
     z = c.car["_z"]
     # ---- avant : grande calandre basse noire (barre de plaque, blocs latéraux), fin bandeau noir entre les phares
-    # avec l'écusson, écopes d'angle noires à ailette couleur caisse et antibrouillard rond
+    # (sans écusson), écopes d'angle noires à ailette couleur caisse et antibrouillard rond
     c.decal([(0.0, 0.235), (0.50, 0.235), (0.58, 0.33), (0.58, 0.52), (0.50, 0.615), (0.0, 0.615)], 'front', 'dark',
             name="Grille")
     c.decal(rect(0.0, 0.42, 0.53, 0.51), 'front', 'trim', offset=0.008, name="GrilleBar")
@@ -1231,10 +1231,6 @@ def gryaris_details(c):
     c.decal(rect(0.0, 0.41, 0.26, 0.52), 'front', 'plate', offset=0.012, name="Plate")
     c.decal([(0.0, 0.703), (0.36, 0.706), (0.45, 0.724), (0.36, 0.744), (0.0, 0.747)], 'front', 'black',
             name="UpperGrille", min_facing=0.2)
-    c.decal(ellipse(0.0, 0.708, 0.062, 0.04, n=14), 'front', 'chrome', mirror=False, offset=0.010, name="Emblem",
-            min_facing=0.2)
-    c.decal(ellipse(0.0, 0.708, 0.044, 0.026, n=12), 'front', 'black', mirror=False, offset=0.013, name="EmblemCore",
-            min_facing=0.2)
     c.decal([(0.63, 0.61), (0.845, 0.60), (0.85, 0.52), (0.835, 0.27), (0.68, 0.27), (0.68, 0.565)], 'front',
             'dark', name="CornerVent", min_facing=0.12)
     c.decal([(0.68, 0.44), (0.815, 0.45), (0.815, 0.474), (0.68, 0.464)], 'front', 'paint', offset=0.010,
@@ -1280,7 +1276,7 @@ def gryaris_details(c):
     c.prism([(-1.13, zr - 0.01), (-1.26, zr + 0.06), (-1.30, zr + 0.055), (-1.31, zr - 0.01)], 'y', -0.02, 0.02,
             'black', name="Antenna")
     # ---- arrière : bandeau noir d'un feu à l'autre sous la lunette (crocs vers le bas côté intérieur des feux),
-    # feux rouges en C qui tournent sur les ailes, écusson, plaque sur le hayon, diffuseur noir, catadioptres,
+    # feux rouges en C qui tournent sur les ailes, plaque sur le hayon, diffuseur noir, catadioptres,
     # deux sorties d'échappement et leurs repères
     c.decal([(0.0, 0.875), (0.40, 0.875), (0.47, 0.82), (0.545, 0.815), (0.60, 0.84), (0.82, 0.83), (0.855, 0.91),
              (0.82, 0.985), (0.0, 0.997)], 'rear', 'black', name="TailBand", min_facing=0.15)
@@ -1292,10 +1288,6 @@ def gryaris_details(c):
             name="TailBandSide", min_facing=0.3)
     c.decal([(-1.873, 0.84), (-1.78, 0.865), (-1.70, 0.91), (-1.78, 0.955), (-1.86, 0.975)], 'side', 'tail',
             offset=0.009, name="TailSide", min_facing=0.3)
-    c.decal(ellipse(0.0, 0.93, 0.058, 0.038, n=14), 'rear', 'chrome', mirror=False, offset=0.010, name="Emblem",
-            min_facing=0.15)
-    c.decal(ellipse(0.0, 0.93, 0.041, 0.025, n=12), 'rear', 'black', mirror=False, offset=0.013, name="EmblemCore",
-            min_facing=0.15)
     c.decal(rect(0.0, 0.60, 0.26, 0.71), 'rear', 'plate', offset=0.012, name="Plate")
     c.decal(band([(0.50, 0.812), (0.475, 0.63), (0.43, 0.572), (0.0, 0.565)], -0.004, 0.004), 'rear', 'trim',
             offset=0.004, name="HatchSeam")
