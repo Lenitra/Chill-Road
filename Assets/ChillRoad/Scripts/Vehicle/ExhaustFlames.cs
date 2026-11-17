@@ -13,7 +13,9 @@ namespace ChillRoad
     ///   étirées, qui refroidissent (plus sombres) avant de disparaître ;
     /// - boules de feu (conséquent, gazole) : flammes lobées qui gonflent, tournent et montent, puis virent au sombre ;
     /// - escarbilles (conséquent, gazole) et fumée noire (gazole).
-    /// Les flammes vivent dans le repère de la voiture (elles restent au pot quand elle roule) ; la fumée, dans le monde.
+    /// Tout vit dans le monde : les flammes partent avec la vitesse de la voiture, puis s'en détachent (les boules de feu
+    /// ralentissent et restent derrière) ; elles ne tournent pas avec elle dans les virages. L'étirement des dards et des
+    /// langues retire le mouvement de la caméra (qui suit la voiture) : ils restent dans l'axe du jet.
     /// Utilisé par la voiture (<see cref="VehicleEffects"/>) et par l'atelier du garage (<see cref="WorkshopStage"/>).
     /// </summary>
     public class ExhaustFlames
@@ -59,7 +61,7 @@ namespace ChillRoad
 
         /// <summary>Accessoires de la voiture : pop and bang, couleur des flammes.</summary>
         public CarCosmetics.Look Look = CarCosmetics.Look.Stock;
-        /// <summary>Vitesse de la voiture (la fumée part avec elle).</summary>
+        /// <summary>Vitesse de la voiture : les flammes partent avec elle, puis s'en détachent.</summary>
         public Vector3 Velocity;
         /// <summary>Une détonation (pour le son) : volume relatif (1 = petit pop and bang).</summary>
         public event System.Action<float> Popped;
@@ -67,20 +69,20 @@ namespace ChillRoad
         public ExhaustFlames(Transform parent, GameAssets a, int layer)
         {
             Materials(a);
-            core = System(parent, "FlameCore", coreMaterial, 300, layer, true, ParticleSystemRenderMode.Stretch);
+            core = System(parent, "FlameCore", coreMaterial, 300, layer, ParticleSystemRenderMode.Stretch);
             Stretch(core, 0.03f, 1.6f);
             SizeCurve(core, new Keyframe(0f, 1f), new Keyframe(1f, 0.3f));
             Colors(core, new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
                          new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0f, 1f) });
 
-            tongues = System(parent, "FlameTongues", tongueMaterial, 600, layer, true, ParticleSystemRenderMode.Stretch);
+            tongues = System(parent, "FlameTongues", tongueMaterial, 600, layer, ParticleSystemRenderMode.Stretch);
             Stretch(tongues, 0.045f, 1.4f);
             SizeCurve(tongues, new Keyframe(0f, 0.7f), new Keyframe(0.3f, 1f), new Keyframe(1f, 0.35f));
             // Flamme qui refroidit : sa couleur, puis plus sombre, avant de s'effacer
             Colors(tongues, new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 0.45f), new GradientColorKey(new Color(0.42f, 0.3f, 0.3f), 1f) },
                             new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.95f, 0.6f), new GradientAlphaKey(0f, 1f) });
 
-            balls = System(parent, "Fireballs", ballMaterial, 200, layer, true, ParticleSystemRenderMode.Billboard);
+            balls = System(parent, "Fireballs", ballMaterial, 200, layer, ParticleSystemRenderMode.Billboard);
             var bm = balls.main;
             bm.gravityModifier = -0.12f;
             SizeCurve(balls, new Keyframe(0f, 0.45f), new Keyframe(0.35f, 1f), new Keyframe(1f, 1.25f));
@@ -91,16 +93,16 @@ namespace ChillRoad
             spin.z = new ParticleSystem.MinMaxCurve(-2.5f, 2.5f);
             var slow = balls.limitVelocityOverLifetime;
             slow.enabled = true;
-            slow.drag = 3f;
+            slow.drag = 1.4f;
 
-            embers = System(parent, "Embers", emberMaterial, 300, layer, false, ParticleSystemRenderMode.Stretch);
+            embers = System(parent, "Embers", emberMaterial, 300, layer, ParticleSystemRenderMode.Stretch);
             Stretch(embers, 0.02f, 1f);
             var em = embers.main;
             em.gravityModifier = 0.6f;
             Colors(embers, new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
                            new[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.8f, 0.6f), new GradientAlphaKey(0f, 1f) });
 
-            smoke = System(parent, "DieselSmoke", a.particle, 200, layer, false, ParticleSystemRenderMode.Billboard);
+            smoke = System(parent, "DieselSmoke", a.particle, 200, layer, ParticleSystemRenderMode.Billboard);
             var sm = smoke.main;
             sm.gravityModifier = -0.05f;
             SizeCurve(smoke, new Keyframe(0f, 0.6f), new Keyframe(1f, 2.4f));
@@ -142,15 +144,14 @@ namespace ChillRoad
             return m;
         }
 
-        static ParticleSystem System(Transform parent, string name, Material material, int max, int layer, bool local, ParticleSystemRenderMode mode)
+        static ParticleSystem System(Transform parent, string name, Material material, int max, int layer, ParticleSystemRenderMode mode)
         {
             var go = new GameObject(name) { layer = layer };
             go.transform.SetParent(parent, false);
             var ps = go.AddComponent<ParticleSystem>();
             ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             var main = ps.main;
-            // Flammes : repère de la voiture (Bind), elles restent au pot ; le reste dans le monde
-            main.simulationSpace = local ? ParticleSystemSimulationSpace.Custom : ParticleSystemSimulationSpace.World;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
             main.maxParticles = max;
             main.gravityModifier = 0f;
             main.playOnAwake = false;
@@ -173,6 +174,8 @@ namespace ChillRoad
         {
             var r = ps.GetComponent<ParticleSystemRenderer>();
             r.velocityScale = velocityScale;
+            // La caméra suit la voiture : son mouvement retiré, l'étirement suit le jet et non la vitesse de la voiture
+            r.cameraVelocityScale = velocityScale;
             r.lengthScale = lengthScale;
         }
 
@@ -256,17 +259,11 @@ namespace ChillRoad
 
         // ------------------------------------------------------------------ utilisation
 
-        /// <summary>Sorties d'échappement et voiture à suivre (repère des flammes).</summary>
+        /// <summary>Sorties d'échappement et voiture (sens du jet).</summary>
         public void Bind(IReadOnlyList<Transform> exhausts, Transform carTransform)
         {
             pipes = exhausts;
-            if (car == carTransform) return;
             car = carTransform;
-            foreach (var ps in new[] { core, tongues, balls })
-            {
-                var main = ps.main;
-                main.customSimulationSpace = car;
-            }
         }
 
         /// <summary>Le pop and bang est actif et la voiture a un pot.</summary>
@@ -325,15 +322,13 @@ namespace ChillRoad
                 Vector3 dir = pipe.forward;
                 if (Vector3.Dot(dir, -car.forward) < 0.3f) dir = -car.forward;
                 Vector3 mouth = pipe.position;
-                // Repère de la voiture pour les flammes
-                Vector3 lm = car.InverseTransformPoint(mouth), ld = car.InverseTransformDirection(dir);
 
                 int count = Mathf.Max(1, Mathf.RoundToInt(p.core * (main ? 1f : 0.6f)));
                 for (int k = 0; k < count; k++)
                     core.Emit(new ParticleSystem.EmitParams
                     {
-                        position = lm + ld * Random.Range(0f, 0.05f),
-                        velocity = (ld + Random.insideUnitSphere * 0.08f) * Random.Range(p.speedMin, p.speedMax) * 0.8f,
+                        position = mouth + dir * Random.Range(0f, 0.05f),
+                        velocity = Velocity + (dir + Random.insideUnitSphere * 0.08f) * Random.Range(p.speedMin, p.speedMax) * 0.8f,
                         startSize = Random.Range(p.sizeMin, p.sizeMax) * 0.55f * scale,
                         startLifetime = Random.Range(p.lifeMin, p.lifeMax) * 0.7f,
                         startColor = hotOrange,
@@ -345,8 +340,8 @@ namespace ChillRoad
                     float spread = Random.value;
                     tongues.Emit(new ParticleSystem.EmitParams
                     {
-                        position = lm + ld * Random.Range(0.02f, 0.12f),
-                        velocity = (ld + Random.insideUnitSphere * (0.12f + 0.2f * spread)) * Random.Range(p.speedMin, p.speedMax),
+                        position = mouth + dir * Random.Range(0.02f, 0.12f),
+                        velocity = Velocity + (dir + Random.insideUnitSphere * (0.12f + 0.2f * spread)) * Random.Range(p.speedMin, p.speedMax),
                         startSize = Random.Range(p.sizeMin, p.sizeMax) * scale,
                         startLifetime = Random.Range(p.lifeMin, p.lifeMax) * (main ? 1f : 0.75f),
                         startColor = Color.Lerp(color, hot, Random.value * 0.3f),
@@ -357,8 +352,9 @@ namespace ChillRoad
                 for (int k = 0; k < count; k++)
                     balls.Emit(new ParticleSystem.EmitParams
                     {
-                        position = lm + ld * Random.Range(0.25f, 0.9f) * (1f + p.ballSize) + Random.insideUnitSphere * 0.1f,
-                        velocity = (ld + Random.insideUnitSphere * 0.35f) * Random.Range(2f, 5f),
+                        position = mouth + dir * Random.Range(0.25f, 0.9f) * (1f + p.ballSize) + Random.insideUnitSphere * 0.1f,
+                        // Vitesse de la voiture au départ, freinée ensuite : la boule de feu reste en arrière
+                        velocity = Velocity * 0.9f + (dir + Random.insideUnitSphere * 0.35f) * Random.Range(2f, 5f),
                         startSize = p.ballSize * Random.Range(0.75f, 1.25f) * scale,
                         startLifetime = p.ballLife * Random.Range(0.75f, 1.25f),
                         startColor = Color.Lerp(color, hot, Random.value * 0.25f),
