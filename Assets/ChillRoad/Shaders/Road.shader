@@ -40,6 +40,7 @@ Shader "ChillRoad/Road"
         _Lanes ("Largeur de voie, bord du terre-plein, rive autoroute, rive nationale (m)", Vector) = (3.9, 2.4, 14.1, 4.0)
         _DirtLane ("Chemin : axe des voies (m)", Float) = 1.65
         _WetScale ("Humidité reçue (0 : à l'abri, chaussée des tunnels)", Range(0, 1)) = 1
+        _Occlusion ("Lumière ambiante reçue (< 1 : chaussée des tunnels, sous la coque)", Range(0, 1)) = 1
     }
 
     SubShader
@@ -58,7 +59,7 @@ Shader "ChillRoad/Road"
             half4 _GravelColor, _EarthColor, _RutColor, _GrassColor, _GrassDark, _BareColor, _PaintColor;
             float4 _Lanes;
             float _DirtLane;
-            half _WetScale;
+            half _WetScale, _Occlusion;
         CBUFFER_END
 
         // Origine des coordonnées de bruit : multiple de 960 m proche de la caméra (précision loin de l'origine).
@@ -440,7 +441,7 @@ Shader "ChillRoad/Road"
                 surface.metallic = 0;
                 surface.specular = half3(0, 0, 0);
                 surface.smoothness = rs.smoothness;
-                surface.occlusion = 1;
+                surface.occlusion = _Occlusion;          // tunnels : le ciel n'éclaire pas l'intérieur du tube
                 surface.normalTS = half3(0, 0, 1);
 
                 half4 color = UniversalFragmentPBR(inputData, surface);

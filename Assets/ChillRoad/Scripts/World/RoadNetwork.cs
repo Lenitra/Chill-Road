@@ -171,9 +171,13 @@ namespace ChillRoad
         static RoadKind KindOf(string k) => k == "main" ? RoadKind.Main : k == "mountain" ? RoadKind.Mountain : k == "street" ? RoadKind.Street
             : k == "lane" ? RoadKind.Lane : k == "highway" ? RoadKind.Highway : k == "ramp" ? RoadKind.Ramp : RoadKind.Track;
 
+        /// <summary>Part de la lumière du ciel reçue par la chaussée des tunnels.</summary>
+        const float TunnelAmbient = 0.4f;
+
         Material tunnelGlow, tunnelAmber, tunnelGreen, tunnelBlue, tunnelVault, tunnelTile, tunnelKerb, tunnelTrim, tunnelFan, tunnelOrange, tunnelPipe, tunnelPortal;
 
-        /// <summary>Chaussée à l'abri (tunnels) : le shader de route n'y applique pas l'humidité de la pluie.</summary>
+        /// <summary>Chaussée à l'abri (tunnels) : le shader de route n'y applique pas l'humidité de la pluie, et la lumière
+        /// du ciel n'y entre qu'en partie (_Occlusion : intérieur sombre, éclairé par les luminaires et les phares).</summary>
         static MaterialPropertyBlock dryBlock;
         static MaterialPropertyBlock DryBlock
         {
@@ -183,6 +187,7 @@ namespace ChillRoad
                 {
                     dryBlock = new MaterialPropertyBlock();
                     dryBlock.SetFloat("_WetScale", 0f);
+                    dryBlock.SetFloat("_Occlusion", TunnelAmbient);
                 }
                 return dryBlock;
             }
@@ -231,13 +236,14 @@ namespace ChillRoad
             tunnelAmber = Glow(a, "TunnelAmber", new Color(1f, 0.55f, 0.12f), 2.2f);
             tunnelGreen = Glow(a, "TunnelGreen", new Color(0.15f, 1f, 0.4f), 2f);
             tunnelBlue = Glow(a, "TunnelBlue", new Color(0.15f, 0.42f, 1f), 1.8f);
-            tunnelVault = Tint(a.concrete, "TunnelVault", new Color(0.46f, 0.48f, 0.52f), 0.32f);
-            tunnelTile = Tint(a.concrete, "TunnelTile", new Color(0.84f, 0.82f, 0.76f), 0.4f);
-            tunnelKerb = Tint(a.concrete, "TunnelKerb", new Color(0.64f, 0.64f, 0.62f), 0.32f);
-            tunnelTrim = Tint(a.concrete, "TunnelTrim", new Color(0.17f, 0.18f, 0.2f), 0.3f);
-            tunnelFan = Tint(a.metal, "TunnelFan", new Color(0.62f, 0.64f, 0.67f), 0.4f);
-            tunnelOrange = Tint(a.concrete, "TunnelOrange", new Color(0.95f, 0.48f, 0.1f), 0.5f);
-            tunnelPipe = Tint(a.concrete, "TunnelPipe", new Color(0.72f, 0.12f, 0.1f), 0.5f);
+            // Intérieur assombri (2026-11-17) : teintes plus sombres et peu d'émission propre, les luminaires ressortent
+            tunnelVault = Tint(a.concrete, "TunnelVault", new Color(0.3f, 0.315f, 0.345f), 0.16f);
+            tunnelTile = Tint(a.concrete, "TunnelTile", new Color(0.6f, 0.585f, 0.54f), 0.22f);
+            tunnelKerb = Tint(a.concrete, "TunnelKerb", new Color(0.44f, 0.44f, 0.43f), 0.16f);
+            tunnelTrim = Tint(a.concrete, "TunnelTrim", new Color(0.12f, 0.125f, 0.14f), 0.15f);
+            tunnelFan = Tint(a.metal, "TunnelFan", new Color(0.44f, 0.455f, 0.48f), 0.2f);
+            tunnelOrange = Tint(a.concrete, "TunnelOrange", new Color(0.85f, 0.42f, 0.08f), 0.35f);
+            tunnelPipe = Tint(a.concrete, "TunnelPipe", new Color(0.6f, 0.1f, 0.08f), 0.35f);
             tunnelPortal = Tint(a.concrete, "TunnelPortal", new Color(0.66f, 0.66f, 0.64f));
 
             foreach (var n in map.Json.nodes) Nodes[n.id] = new Node { id = n.id, pos = new Vector3(n.x, n.y, n.z), merge = n.merge != 0 };
