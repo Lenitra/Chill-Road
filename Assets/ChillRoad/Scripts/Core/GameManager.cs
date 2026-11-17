@@ -298,7 +298,7 @@ namespace ChillRoad
 
         /// <summary>
         /// Partie en réseau dès le lancement, sans passer par le salon (raccourci du bureau, essais à plusieurs
-        /// exemplaires) : « -host » héberge une partie (collisions selon le choix mémorisé du salon, ou « -nocollisions »)
+        /// exemplaires) : « -host » héberge une partie (nom, joueurs et collisions mémorisés au salon, ou « -nocollisions »)
         /// et demande son code d'invitation ; « -join CODE » ou « -join adresse » en rejoint une. En cas d'échec, le jeu
         /// reste à l'accueil et le motif est écrit dans le journal.
         /// </summary>
@@ -308,7 +308,7 @@ namespace ChillRoad
             if (HasArgument("-host"))
             {
                 bool collisions = NetLobby.HostCollisions && !HasArgument("-nocollisions");
-                if (!Net.Host(NetGame.PlayerName, NetProtocol.DefaultPort, NetProtocol.DefaultMaxPlayers, false, collisions, out string error))
+                if (!Net.Host(NetLobby.HostName, NetProtocol.DefaultPort, NetLobby.HostMaxPlayers, false, collisions, out string error))
                 {
                     Debug.LogWarning("[Net] " + error);
                     return;
