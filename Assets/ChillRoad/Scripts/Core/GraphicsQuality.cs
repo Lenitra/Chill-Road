@@ -93,23 +93,155 @@ namespace ChillRoad
             return cap == 0 ? Loc.T("Illimitée", "Unlimited") : Loc.T($"{cap} images/s", $"{cap} fps");
         }
 
+        // ------------------------------------------------------------------ flou de mouvement
+
+        /// <summary>Force du flou de mouvement une fois activé (léger : le décor file, l'image reste lisible).</summary>
+        const float MotionBlurIntensity = 0.25f;
+
+        static Volume volume;
+        static MotionBlur motionBlur;
+
+        /// <summary>
+        /// Flou de mouvement d'URP sur le volume global, caméra et objets : le décor file, la voiture suivie par la caméra
+        /// reste nette (passe MotionVectors du shader Toon).
+        /// </summary>
+        static void ApplyMotionBlur(int quality)
+        {
+            if (!motionBlur || !volume)
+            {
+                volume = Object.FindAnyObjectByType<Volume>();
+                if (!volume) return;
+                var profile = volume.profile; // instance propre à la partie (partagée avec DayNightCycle et ScreenFx)
+                if (!profile.TryGet(out motionBlur)) motionBlur = profile.Add<MotionBlur>(true);
+            }
+            bool on = GameSettings.MotionBlur;
+            motionBlur.active = on;
+            motionBlur.mode.Override(MotionBlurMode.CameraAndObjects);
+            motionBlur.quality.Override(quality <= Low ? MotionBlurQuality.Low : quality >= Ultra ? MotionBlurQuality.High : MotionBlurQuality.Medium);
+            motionBlur.intensity.Override(on ? MotionBlurIntensity : 0f);
+            motionBlur.clamp.Override(0.05f);
+        }
+
+        // ------------------------------------------------------------------ écran (ordinateur)
+
+        /// <summary>Synchro verticale, mode d'affichage et définition proposés (ni téléphone, ni tablette, ni navigateur).</summary>
+        public static bool HasDisplayOptions => !Application.isMobilePlatform && Application.platform != RuntimePlatform.WebGLPlayer;
+
+        /// <summary>Modes d'affichage proposés, dans l'ordre du curseur (GameSettings.WindowMode).</summary>
+        public static readonly FullScreenMode[] WindowModes = { FullScreenMode.Windowed, FullScreenMode.FullScreenWindow, FullScreenMode.ExclusiveFullScreen };
+        static readonly (string fr, string en)[] WindowNames = { ("Fenêtré", "Windowed"), ("Plein écran", "Borderless"), ("Plein écran exclusif", "Exclusive fullscreen") };
+
+        public static string WindowModeName(int index) { var n = WindowNames[Mathf.Clamp(index, 0, WindowModes.Length - 1)]; return Loc.T(n.fr, n.en); }
+
+        /// <summary>Définition de l'écran (celle du bureau, pas celle de la fenêtre du jeu).</summary>
+        public static Vector2Int NativeResolution
+        {
+            get
+            {
+                var d = Display.main;
+                int w = d != null ? d.systemWidth : 0, h = d != null ? d.systemHeight : 0;
+                if (w <= 0 || h <= 0) { w = Screen.currentResolution.width; h = Screen.currentResolution.height; }
+                return new Vector2Int(w, h);
+            }
+        }
+
+        static Vector2Int[] resolutions;
+
+        /// <summary>Définitions proposées, de la plus petite à celle de l'écran (une seule fois chaque taille, toutes fréquences confondues).</summary>
+        public static Vector2Int[] Resolutions
+        {
+            get
+            {
+                if (resolutions != null) return resolutions;
+                var native = NativeResolution;
+                var list = new System.Collections.Generic.List<Vector2Int>();
+                foreach (var r in Screen.resolutions)
+                {
+                    var v = new Vector2Int(r.width, r.height);
+                    if (v.x < 800 || v.y < 600 || v.x > native.x || v.y > native.y || list.Contains(v)) continue;
+                    list.Add(v);
+                }
+                if (!list.Contains(native)) list.Add(native);
+                list.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y.CompareTo(b.y));
+                return resolutions = list.ToArray();
+            }
+        }
+
+        /// <summary>Définition choisie (0 × 0 = celle de l'écran).</summary>
+        public static Vector2Int ChosenResolution =>
+            GameSettings.ScreenWidth > 0 && GameSettings.ScreenHeight > 0 ? new Vector2Int(GameSettings.ScreenWidth, GameSettings.ScreenHeight) : NativeResolution;
+
+        /// <summary>Rang de la définition choisie dans <see cref="Resolutions"/> (la plus proche si elle n'y est plus).</summary>
+        public static int ResolutionIndex
+        {
+            get
+            {
+                var list = Resolutions;
+                var want = ChosenResolution;
+                int best = list.Length - 1;
+                long bestGap = long.MaxValue;
+                for (int i = 0; i < list.Length; i++)
+                {
+                    long gap = System.Math.Abs((long)list[i].x * list[i].y - (long)want.x * want.y) + System.Math.Abs(list[i].x - want.x);
+                    if (gap < bestGap) { bestGap = gap; best = i; }
+                }
+                return best;
+            }
+        }
+
+        public static void SetResolutionIndex(int index)
+        {
+            var list = Resolutions;
+            var r = list[Mathf.Clamp(index, 0, list.Length - 1)];
+            if (r == NativeResolution) GameSettings.ScreenWidth = GameSettings.ScreenHeight = 0;
+            else { GameSettings.ScreenWidth = r.x; GameSettings.ScreenHeight = r.y; }
+        }
+
+        public static string ResolutionName(int index)
+        {
+            var list = Resolutions;
+            var r = list[Mathf.Clamp(index, 0, list.Length - 1)];
+            string size = $"{r.x} × {r.y}";
+            return r == NativeResolution ? Loc.T(size + " (écran)", size + " (native)") : size;
+        }
+
+        /// <summary>
+        /// Applique le mode d'affichage et la définition choisis (au lancement, puis depuis le menu Options, une fois le
+        /// curseur lâché). Rien dans l'éditeur : la vue Game garde sa taille.
+        /// </summary>
+        public static void ApplyDisplay()
+        {
+            if (!HasDisplayOptions || Application.isEditor) return;
+            var mode = WindowModes[Mathf.Clamp(GameSettings.WindowMode, 0, WindowModes.Length - 1)];
+            var size = ChosenResolution;
+            if (Screen.fullScreenMode == mode && Screen.width == size.x && Screen.height == size.y) return;
+            Screen.SetResolution(size.x, size.y, mode);
+        }
+
         /// <summary>Intervalle de mise à jour du reflet du ciel (s), lu par le cycle jour/nuit.</summary>
         public static float ReflectionInterval { get; private set; } = 0.5f;
 
         static UniversalRenderPipelineAsset runtimeAsset;
         static int applied = -1;
 
-        /// <summary>Applique les réglages de GameSettings (qualité, limite d'images). gm peut être nul (rendu seul).</summary>
+        /// <summary>
+        /// Applique les réglages de GameSettings (qualité, synchro verticale, limite d'images, flou de mouvement ; mode
+        /// d'affichage et définition au premier appel, ensuite par <see cref="ApplyDisplay"/>). gm peut être nul (rendu seul).
+        /// </summary>
         public static void Apply(GameManager gm)
         {
             int level = Mathf.Clamp(GameSettings.Quality, 0, Presets.Length - 1);
             var p = Presets[level];
 
-            // Limite d'images (le mobile garde 60 au plus) ; synchro verticale coupée pour que la limite s'applique
-            QualitySettings.vSyncCount = 0;
+            // Synchro verticale (ordinateur) : les images suivent l'écran, la limite ne s'applique plus. Sinon synchro
+            // coupée pour que la limite d'images s'applique (le mobile garde 60 au plus).
+            bool vsync = GameSettings.VSync && HasDisplayOptions;
+            QualitySettings.vSyncCount = vsync ? 1 : 0;
             int cap = FpsCaps[Mathf.Clamp(GameSettings.FpsCap, 0, FpsCaps.Length - 1)];
             if (Application.isMobilePlatform && (cap == 0 || cap > 60)) cap = 60;
-            Application.targetFrameRate = cap == 0 ? -1 : cap;
+            Application.targetFrameRate = vsync || cap == 0 ? -1 : cap;
+            if (applied < 0) ApplyDisplay();
+            ApplyMotionBlur(level);
 
             var asset = RuntimeAsset();
             if (asset)

@@ -11,7 +11,8 @@ namespace ChillRoad
     /// pause : voile sombre, plaque inclinée anthracite (<see cref="HudShape"/>), police du HUD, titre or, rubriques
     /// cyan, curseurs or.
     /// Rangé par onglets : Audio, Jeu (trafic, pluie, commandes tactiles si l'écran est tactile), Graphismes (qualité, distance des détails,
-    /// limite d'images), Carte (retour au départ). Tout s'applique tout de suite.
+    /// flou de mouvement), Écran (mode d'affichage, résolution et VSync sur ordinateur, limite d'images), Carte (retour
+    /// au départ). Tout s'applique tout de suite (mode d'affichage et résolution : une fois le curseur lâché).
     /// Manette : LB/RB (clavier : Tab, Maj+Tab) pour changer d'onglet, haut/bas pour choisir (la ligne choisie
     /// s'éclaire), gauche/droite pour régler.
     /// </summary>
@@ -44,6 +45,11 @@ namespace ChillRoad
         (Button button, Text text, Graphic mark)[] tabs;
         Button defaultsButton, backButton;
 
+        // Mode d'affichage et définition : appliqués à cet instant (0 = rien en attente), pour ne pas changer de mode
+        // d'écran à chaque cran quand on fait glisser le curseur
+        const float DisplayDelay = 0.6f;
+        float displayAt;
+
         public void Init(GameManager gm)
         {
             game = gm;
@@ -71,7 +77,7 @@ namespace ChillRoad
             th.spacing = 14;
             th.childControlWidth = true; th.childControlHeight = true;
             th.childForceExpandWidth = false; th.childForceExpandHeight = true;
-            var tabNames = new[] { ("AUDIO", "AUDIO"), ("JEU", "GAMEPLAY"), ("GRAPHISMES", "GRAPHICS"), ("CARTE", "MAP") };
+            var tabNames = new[] { ("AUDIO", "AUDIO"), ("JEU", "GAMEPLAY"), ("GRAPHISMES", "GRAPHICS"), ("ÉCRAN", "DISPLAY"), ("CARTE", "MAP") };
             TabGlyph(tabRow, "LB", TextAnchor.MiddleRight);
             tabs = new (Button, Text, Graphic)[tabNames.Length];
             pages = new RectTransform[tabNames.Length];
@@ -117,24 +123,44 @@ namespace ChillRoad
                 v => GraphicsQuality.Name(Mathf.RoundToInt(v)));
             var detail = AddSlider(gfx, "Distance des détails", "Detail distance", 0f, GraphicsQuality.DetailLevels - 1, GraphicsQuality.DetailLevels - 1,
                 () => GameSettings.DetailDistance, v => GameSettings.DetailDistance = Mathf.RoundToInt(v), v => GraphicsQuality.DetailName(Mathf.RoundToInt(v)));
-            var fps = AddSlider(gfx, "Limite d'images", "Frame rate limit", 0f, GraphicsQuality.FpsCaps.Length - 1, GraphicsQuality.FpsCaps.Length - 1,
-                () => GameSettings.FpsCap, v => GameSettings.FpsCap = Mathf.RoundToInt(v), v => GraphicsQuality.FpsName(Mathf.RoundToInt(v)));
-            Note(gfx, "Distance des détails : jusqu'où arbres, rochers, maisons et objets gardent leur modèle complet.",
-                      "Detail distance: how far trees, rocks, houses and props keep their full model.");
-            Note(gfx, "Plus loin = plus beau, mais moins d'images/s. Changer la qualité la remet au niveau conseillé.",
-                      "Further = nicer, but fewer fps. Changing the quality resets it to the suggested level.");
+            var blur = AddToggle(gfx, "Flou de mouvement", "Motion blur", () => GameSettings.MotionBlur, v => GameSettings.MotionBlur = v);
+            var shake = AddToggle(gfx, "Secousses de caméra", "Camera shake", () => GameSettings.CameraShake, v => GameSettings.CameraShake = v);
+
+            // Écran : mode d'affichage, définition et synchro verticale sur ordinateur seulement ; mode et définition
+            // appliqués une fois le curseur lâché (voir Update), pas à chaque cran
+            var screen = pages[3];
+            Section(screen, "ÉCRAN", "DISPLAY", "", "");
+            Slider window = null, resolution = null, vsync = null;
+            if (GraphicsQuality.HasDisplayOptions)
+            {
+                window = AddSlider(screen, "Mode d'affichage", "Display mode", 0f, GraphicsQuality.WindowModes.Length - 1, GraphicsQuality.WindowModes.Length - 1,
+                    () => GameSettings.WindowMode, v =>
+                    {
+                        int m = Mathf.RoundToInt(v);
+                        if (m == GameSettings.WindowMode) return;
+                        GameSettings.WindowMode = m;
+                        displayAt = Time.unscaledTime + DisplayDelay;
+                    },
+                    v => GraphicsQuality.WindowModeName(Mathf.RoundToInt(v)));
+                int resSteps = Mathf.Max(1, GraphicsQuality.Resolutions.Length - 1);
+                resolution = AddSlider(screen, "Résolution", "Resolution", 0f, resSteps, resSteps,
+                    () => GraphicsQuality.ResolutionIndex, v =>
+                    {
+                        int i = Mathf.RoundToInt(v);
+                        if (i == GraphicsQuality.ResolutionIndex) return;
+                        GraphicsQuality.SetResolutionIndex(i);
+                        displayAt = Time.unscaledTime + DisplayDelay;
+                    },
+                    v => GraphicsQuality.ResolutionName(Mathf.RoundToInt(v)));
+                vsync = AddToggle(screen, "Synchro verticale (VSync)", "Vertical sync (VSync)", () => GameSettings.VSync, v => GameSettings.VSync = v);
+            }
+            var fps = AddSlider(screen, "Limite d'images", "Frame rate limit", 0f, GraphicsQuality.FpsCaps.Length - 1, GraphicsQuality.FpsCaps.Length - 1,
+                () => GameSettings.FpsCap, v => GameSettings.FpsCap = Mathf.RoundToInt(v),
+                v => GameSettings.VSync && GraphicsQuality.HasDisplayOptions ? Loc.T("Suit l'écran (VSync)", "Follows display (VSync)") : GraphicsQuality.FpsName(Mathf.RoundToInt(v)));
 
             // Carte
-            var mapPage = pages[3];
+            var mapPage = pages[4];
             Section(mapPage, "LA CARTE", "THE MAP", "balade libre", "free roam");
-            foreach (var (fr, en) in new[]
-            {
-                ("Un massif alpin de 5 km : la vallée qui en fait le tour, le lac, les cols et les alpages.", "A 5 km alpine massif: the valley around it, the lake, the passes and the pastures."),
-                ("55 km de routes : autoroute en boucle, route de campagne, lacets de cols, chemins de terre.", "55 km of roads: motorway loop, country road, pass hairpins, dirt tracks."),
-                ("Y (ou R) : replacer la voiture sur la route la plus proche.", "Y (or R): put the car back on the nearest road."),
-                ("En course, Y (ou R) maintenu : abandonner.", "In a race, hold Y (or R): abandon."),
-            })
-                Note(mapPage, fr, en, 24, 44);
             var gap = Rect(mapPage, "Gap", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             Fixed(gap, 12);
             var apply = AddButton(mapPage, ApplyRoad);
@@ -142,7 +168,7 @@ namespace ChillRoad
             Loc.Bind(applyText, "Revenir au départ (route de la vallée)", "Back to the start (valley road)");
 
             var bottom = ButtonRow(panel, 62);
-            var defaults = AddButton(bottom, () => { GameSettings.ResetAll(); Changed(); RefreshAll(); });
+            var defaults = AddButton(bottom, () => { GameSettings.ResetAll(); displayAt = Time.unscaledTime + 0.01f; Changed(); RefreshAll(); });
             Loc.Bind(defaults.text, "Par défaut", "Defaults");
             var back = AddButton(bottom, Close);
             Loc.Bind(back.text, "Retour", "Back");
@@ -163,7 +189,8 @@ namespace ChillRoad
             {
                 new Selectable[] { music, effects },
                 touch ? new Selectable[] { traffic, rain, touch } : new Selectable[] { traffic, rain },
-                new Selectable[] { quality, detail, fps },
+                new Selectable[] { quality, detail, blur, shake },
+                window ? new Selectable[] { window, resolution, vsync, fps } : new Selectable[] { fps },
                 new Selectable[] { apply.button },
             };
             ShowTab(lastTab);
@@ -195,6 +222,7 @@ namespace ChillRoad
 
         public void Close()
         {
+            FlushDisplay();
             GameSettings.Save();
             root.SetActive(false);
             IsOpen = false;
@@ -226,8 +254,16 @@ namespace ChillRoad
             foreach (var r in refreshers) r();
         }
 
+        void FlushDisplay()
+        {
+            if (displayAt <= 0f) return;
+            displayAt = 0f;
+            GraphicsQuality.ApplyDisplay();
+        }
+
         void Update()
         {
+            if (displayAt > 0f && Time.unscaledTime >= displayAt) FlushDisplay();
             if (!IsOpen || Time.frameCount == openedFrame) return;
             if (GameInput.CancelPressed)
             {
@@ -342,14 +378,6 @@ namespace ChillRoad
             t.gameObject.AddComponent<LayoutElement>().preferredWidth = 44;
         }
 
-        /// <summary>Ligne de texte estompée (précisions sous les réglages).</summary>
-        void Note(RectTransform parent, string fr, string en, int size = 21, float height = 36)
-        {
-            var line = Label(parent, "", size, TextAnchor.MiddleLeft, Dim, FontStyle.Normal);
-            Loc.Bind(line, fr, en);
-            line.gameObject.AddComponent<LayoutElement>().preferredHeight = height;
-        }
-
         /// <summary>Rubrique : nom en cyan, précision estompée, filet cyan qui s'efface vers la droite.</summary>
         void Section(RectTransform parent, string fr, string en, string noteFr, string noteEn)
         {
@@ -375,6 +403,10 @@ namespace ChillRoad
             lrt.offsetMin = Vector2.zero;
             lrt.offsetMax = new Vector2(0f, 2f);
         }
+
+        /// <summary>Interrupteur : curseur à deux crans, Activé / Désactivé.</summary>
+        Slider AddToggle(RectTransform parent, string fr, string en, Func<bool> get, Action<bool> set) =>
+            AddSlider(parent, fr, en, 0f, 1f, 1, () => get() ? 1f : 0f, v => set(v > 0.5f), v => v > 0.5f ? Loc.T("Activé", "On") : Loc.T("Désactivé", "Off"));
 
         Slider AddSlider(RectTransform parent, string fr, string en, float min, float max, int steps, Func<float> get, Action<float> set, Func<float, string> format)
         {

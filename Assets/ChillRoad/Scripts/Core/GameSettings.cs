@@ -38,6 +38,16 @@ namespace ChillRoad
         // Distance des détails (index de GraphicsQuality.DetailLevels) : jusqu'où arbres, maisons et objets gardent leur
         // modèle complet ; remise au niveau conseillé quand la qualité change
         public static int DetailDistance = GraphicsQuality.DefaultDetail(GraphicsQuality.High);
+        // Flou de mouvement (léger) et secousses de caméra (chocs, vitesse)
+        public static bool MotionBlur = false;
+        public static bool CameraShake = true;
+
+        // Écran (ordinateur) : synchro verticale (la limite d'images ne s'applique plus), mode d'affichage
+        // (GraphicsQuality.WindowModes : 0 fenêtré, 1 plein écran sans bordure, 2 plein écran exclusif) et définition
+        // (0 × 0 = celle de l'écran)
+        public static bool VSync = false;
+        public static int WindowMode = 1;
+        public static int ScreenWidth, ScreenHeight;
 
         const string Prefix = "chillroad_opt_";
         static bool loaded;
@@ -63,6 +73,12 @@ namespace ChillRoad
             Quality = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "quality", Application.isMobilePlatform ? GraphicsQuality.Low : Quality), 0, 3);
             FpsCap = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "fpscap", FpsCap), 0, GraphicsQuality.FpsCaps.Length - 1);
             DetailDistance = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "detail", GraphicsQuality.DefaultDetail(Quality)), 0, GraphicsQuality.DetailLevels - 1);
+            MotionBlur = PlayerPrefs.GetInt(Prefix + "motionblur", MotionBlur ? 1 : 0) == 1;
+            CameraShake = PlayerPrefs.GetInt(Prefix + "camshake", CameraShake ? 1 : 0) == 1;
+            VSync = PlayerPrefs.GetInt(Prefix + "vsync", VSync ? 1 : 0) == 1;
+            WindowMode = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "window", WindowMode), 0, GraphicsQuality.WindowModes.Length - 1);
+            ScreenWidth = Mathf.Max(0, PlayerPrefs.GetInt(Prefix + "screenw", 0));
+            ScreenHeight = Mathf.Max(0, PlayerPrefs.GetInt(Prefix + "screenh", 0));
         }
 
         public static void Save()
@@ -84,6 +100,12 @@ namespace ChillRoad
             PlayerPrefs.SetInt(Prefix + "quality", Quality);
             PlayerPrefs.SetInt(Prefix + "fpscap", FpsCap);
             PlayerPrefs.SetInt(Prefix + "detail", DetailDistance);
+            PlayerPrefs.SetInt(Prefix + "motionblur", MotionBlur ? 1 : 0);
+            PlayerPrefs.SetInt(Prefix + "camshake", CameraShake ? 1 : 0);
+            PlayerPrefs.SetInt(Prefix + "vsync", VSync ? 1 : 0);
+            PlayerPrefs.SetInt(Prefix + "window", WindowMode);
+            PlayerPrefs.SetInt(Prefix + "screenw", ScreenWidth);
+            PlayerPrefs.SetInt(Prefix + "screenh", ScreenHeight);
             PlayerPrefs.Save();
         }
 
@@ -106,6 +128,11 @@ namespace ChillRoad
             Quality = Application.isMobilePlatform ? GraphicsQuality.Low : GraphicsQuality.High;
             FpsCap = 1;
             DetailDistance = GraphicsQuality.DefaultDetail(Quality);
+            MotionBlur = false;
+            CameraShake = true;
+            VSync = false;
+            WindowMode = 1;
+            ScreenWidth = ScreenHeight = 0;
         }
 
         /// <summary>Signature des réglages de route : sert à signaler qu'une nouvelle route est nécessaire.</summary>

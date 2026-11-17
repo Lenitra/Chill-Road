@@ -35,6 +35,7 @@ namespace ChillRoad
         {
             while (game.State != GameManager.Phase.Title && game.State != GameManager.Phase.Playing) yield return null;
             int quality = GameSettings.Quality, cap = GameSettings.FpsCap, detail = GameSettings.DetailDistance;
+            bool vsync = GameSettings.VSync;
             Application.runInBackground = true;
             if (game.State == GameManager.Phase.Title) game.StartCountdown();
             yield return new WaitForSeconds(4f);
@@ -42,6 +43,7 @@ namespace ChillRoad
             report.AppendLine("Chill Road - banc d'essai " + System.DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
             report.AppendLine(SystemInfo.processorType + " | " + SystemInfo.graphicsDeviceName + " | " + Screen.width + "x" + Screen.height);
             GameSettings.FpsCap = GraphicsQuality.FpsCaps.Length - 1;     // illimité pendant la mesure
+            GameSettings.VSync = false;
             for (int q = 0; q < 4; q++)
             {
                 GameSettings.Quality = q;
@@ -66,6 +68,7 @@ namespace ChillRoad
             }
             GameSettings.Quality = quality;
             GameSettings.FpsCap = cap;
+            GameSettings.VSync = vsync;
             GameSettings.DetailDistance = detail;
             GraphicsQuality.Apply(game);
             string text = report.ToString();
