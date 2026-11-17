@@ -104,14 +104,13 @@ namespace ChillRoad
         static int lastTab;
         int tab;
         Button backButton;
-        Text footerText;
 
         // Rejoindre
         readonly List<ServerRow> rows = new List<ServerRow>();
         readonly List<NetGame.ServerInfo> shown = new List<NetGame.ServerInfo>();
         readonly List<Selectable> activeRows = new List<Selectable>();
         GameObject emptyState;
-        Text emptyTitle, emptyNote, liveText;
+        Text emptyTitle, liveText;
         Image liveDot, radar;
         InputField codeField, addressField;
         Button codeButton, addressButton;
@@ -194,18 +193,14 @@ namespace ChillRoad
 
         // ------------------------------------------------------------------ construction
 
-        /// <summary>Titre et sous-titre à gauche ; carte du pilote (pseudo) à droite.</summary>
+        /// <summary>Titre à gauche ; carte du pilote (pseudo) à droite.</summary>
         void BuildHeader(RectTransform panel)
         {
             var header = Rect(panel, "Header", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            Fixed(header, 104);
-            var title = Label(header, "", 62, TextAnchor.LowerLeft, Accent, FontStyle.BoldAndItalic);
+            Fixed(header, 88);
+            var title = Label(header, "", 62, TextAnchor.MiddleLeft, Accent, FontStyle.BoldAndItalic);
             Loc.Bind(title, "MULTIJOUEUR", "MULTIPLAYER");
-            Place(title.rectTransform, new Vector2(0f, 0.4f), new Vector2(0.6f, 1f));
-            var subtitle = Label(header, "", 22, TextAnchor.UpperLeft, Dim, FontStyle.Italic);
-            Loc.Bind(subtitle, "Roule avec tes amis : par code d'invitation, sur ton réseau local ou par adresse IP.",
-                               "Drive with your friends: by invite code, on your local network or by IP address.");
-            Place(subtitle.rectTransform, new Vector2(0f, 0f), new Vector2(0.62f, 0.36f));
+            Place(title.rectTransform, Vector2.zero, new Vector2(0.6f, 1f));
 
             // Carte du pilote
             var card = Rect(header, "Driver", new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-520f, -40f), new Vector2(0f, 40f));
@@ -238,8 +233,10 @@ namespace ChillRoad
         /// <summary>Onglet « Rejoindre » : liste du réseau local à gauche, code et adresse à droite.</summary>
         void BuildJoin(RectTransform page)
         {
-            var left = Column(page, "Servers", 1.55f);
-            var right = Column(page, "Direct", 1f);
+            // La liste s'arrête au bord droit de l'onglet « Rejoindre » : largeur utile 1466, onglet terminé à 726
+            // (LB 44 + 14 + onglet 668), colonnes séparées de 44 -> 726 / 696.
+            var left = Column(page, "Servers", 726f);
+            var right = Column(page, "Direct", 696f);
 
             // Parties du réseau local
             var section = Section(left, "PARTIES SUR TON RÉSEAU LOCAL", "GAMES ON YOUR LOCAL NETWORK", "", "");
@@ -275,45 +272,39 @@ namespace ChillRoad
             radar.sprite = HudArt.Ring;
             radar.raycastTarget = false;
             var radarRt = radar.rectTransform;
-            radarRt.anchorMin = radarRt.anchorMax = new Vector2(0.5f, 0.62f);
+            radarRt.anchorMin = radarRt.anchorMax = new Vector2(0.5f, 0.58f);
             radarRt.sizeDelta = new Vector2(120f, 120f);
-            Dot(empty, new Vector2(0.5f, 0.62f), Vector2.zero, 14f, Info);
+            Dot(empty, new Vector2(0.5f, 0.58f), Vector2.zero, 14f, Info);
             emptyTitle = Label(empty, "", 27, TextAnchor.MiddleCenter, White, FontStyle.BoldAndItalic);
             Place(emptyTitle.rectTransform, new Vector2(0f, 0.3f), new Vector2(1f, 0.42f));
-            emptyNote = Label(empty, "", 21, TextAnchor.MiddleCenter, Dim, FontStyle.Normal);
-            emptyNote.horizontalOverflow = HorizontalWrapMode.Wrap;
-            Place(emptyNote.rectTransform, new Vector2(0.06f, 0.16f), new Vector2(0.94f, 0.3f));
             emptyState = empty.gameObject;
 
-            // Code d'invitation
-            Section(right, "CODE D'INVITATION", "INVITE CODE", "par Internet", "over the Internet");
-            codeField = MakeInput(right, 46, TextAnchor.MiddleCenter, Accent, FontStyle.BoldAndItalic, "CODE", "CODE", NetRelay.CodeMax);
-            codeField.gameObject.AddComponent<LayoutElement>().preferredHeight = 88;
+            // Code d'invitation et adresse IP : même format (champ + bouton sur une ligne), l'un sous l'autre
+            Section(right, "CODE D'INVITATION", "INVITE CODE", "", "");
+            (codeField, codeButton) = JoinRow(right, "CodeRow", "ex. K7Q2XM", "e.g. K7Q2XM", NetRelay.CodeMax, "Rejoindre", "Join", JoinByCode);
             codeField.onValidateInput = (text, index, c) => char.IsLetterOrDigit(c) ? char.ToUpperInvariant(c) : '\0';
-            codeField.onSubmit.AddListener(_ => JoinByCode());
-            AddMark(codeField.gameObject, (RectTransform)codeField.transform);
-            var code = AddButton(right, JoinByCode);
-            Loc.Bind(code.text, "Rejoindre avec ce code", "Join with this code");
-            Primary(code.button);
-            codeButton = code.button;
-            Note(right, "Le code que l'hôte voit en jeu (6 à 12 lettres et chiffres). Rien à régler sur la box.",
-                        "The code the host sees in game (6 to 12 letters and digits). No router setup needed.", 34);
+            codeField.textComponent.color = Accent;
 
             Gap(right, 14);
-            Section(right, "ADRESSE IP", "IP ADDRESS", "connexion directe", "direct connection");
-            var addressRow = Rect(right, "AddressRow", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            Fixed(addressRow, 58);
-            addressField = MakeInput(addressRow, 25, TextAnchor.MiddleLeft, White, FontStyle.Bold, "ex. 192.168.1.20", "e.g. 192.168.1.20", 60);
-            Place((RectTransform)addressField.transform, Vector2.zero, new Vector2(0.6f, 1f), 0f, 0f, 3f);
-            addressField.onSubmit.AddListener(_ => JoinAddress());
-            AddMark(addressField.gameObject, (RectTransform)addressField.transform);
-            var connect = AddButton(addressRow, JoinAddress);
-            Loc.Bind(connect.text, "Se connecter", "Connect");
-            connect.text.fontSize = 25;
-            Place((RectTransform)connect.button.transform, new Vector2(0.63f, 0f), Vector2.one, 0f, 0f, 3f);
-            addressButton = connect.button;
-            Note(right, $"Adresse du serveur, ou adresse:port (port UDP {NetProtocol.DefaultPort} par défaut).",
-                        $"Server address, or address:port (UDP port {NetProtocol.DefaultPort} by default).", 34);
+            Section(right, "ADRESSE IP", "IP ADDRESS", "", "");
+            (addressField, addressButton) = JoinRow(right, "AddressRow", "ex. 192.168.1.20", "e.g. 192.168.1.20", 60, "Se connecter", "Connect", JoinAddress);
+        }
+
+        /// <summary>Ligne « champ + bouton » de l'onglet Rejoindre ; Entrée dans le champ vaut le bouton.</summary>
+        (InputField field, Button button) JoinRow(RectTransform parent, string name, string hintFr, string hintEn, int max,
+                                                  string fr, string en, Action action)
+        {
+            var row = Rect(parent, name, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Fixed(row, 58);
+            var field = MakeInput(row, 25, TextAnchor.MiddleLeft, White, FontStyle.Bold, hintFr, hintEn, max);
+            Place((RectTransform)field.transform, Vector2.zero, new Vector2(0.6f, 1f), 0f, 0f, 3f);
+            field.onSubmit.AddListener(_ => action());
+            AddMark(field.gameObject, (RectTransform)field.transform);
+            var b = AddButton(row, () => action());
+            Loc.Bind(b.text, fr, en);
+            b.text.fontSize = 25;
+            Place((RectTransform)b.button.transform, new Vector2(0.63f, 0f), Vector2.one, 0f, 0f, 3f);
+            return (field, b.button);
         }
 
         /// <summary>Onglet « Héberger » : réglages de la partie à gauche, accès des amis et ouverture à droite.</summary>
@@ -391,8 +382,6 @@ namespace ChillRoad
             Place(line.rectTransform, new Vector2(0f, 1f), Vector2.one, 0f, 0f, 0f, 0f);
             line.rectTransform.offsetMin = new Vector2(0f, 6f);
             line.rectTransform.offsetMax = new Vector2(0f, 8f);
-            footerText = Label(footer, "", 20, TextAnchor.MiddleLeft, Dim, FontStyle.Normal);
-            Place(footerText.rectTransform, Vector2.zero, new Vector2(0.75f, 1f), 6f, 0f);
             var back = AddButton(footer, Close);
             Loc.Bind(back.text, "Retour", "Back");
             Place((RectTransform)back.button.transform, new Vector2(0.8f, 0f), Vector2.one, 0f, 0f, 2f);
@@ -647,9 +636,9 @@ namespace ChillRoad
                 for (int i = 0; i < activeRows.Count; i++)
                     Nav(activeRows[i], i == 0 ? (Selectable)nameField : activeRows[i - 1], i == activeRows.Count - 1 ? (Selectable)backButton : activeRows[i + 1], null, codeField);
                 Nav(nameField, null, codeField, null, null);
-                Nav(codeField, nameField, codeButton, firstRow, null);
-                Nav(codeButton, codeField, addressField, firstRow, null);
-                Nav(addressField, codeButton, backButton, firstRow, addressButton);
+                Nav(codeField, nameField, addressField, firstRow, codeButton);
+                Nav(codeButton, nameField, addressButton, codeField, null);
+                Nav(addressField, codeField, backButton, firstRow, addressButton);
                 Nav(addressButton, codeButton, backButton, addressField, null);
                 Nav(backButton, addressButton, null, firstRow, null);
             }
@@ -686,10 +675,6 @@ namespace ChillRoad
                 ? Loc.T($"Ton adresse : {ip}. Par Internet, ouvre le port UDP {NetProtocol.DefaultPort} sur ta box.",
                         $"Your address: {ip}. Over the Internet, forward UDP port {NetProtocol.DefaultPort} on your router.")
                 : Loc.T("Aucun réseau détecté sur cette machine.", "No network found on this computer.");
-            footerText.text = ip != null
-                ? Loc.T($"Ton adresse sur ce réseau : {ip}   ·   port UDP {NetProtocol.DefaultPort}   ·   protocole v{NetProtocol.Version}",
-                        $"Your address on this network: {ip}   ·   UDP port {NetProtocol.DefaultPort}   ·   protocol v{NetProtocol.Version}")
-                : Loc.T($"Aucun réseau détecté   ·   protocole v{NetProtocol.Version}", $"No network found   ·   protocol v{NetProtocol.Version}");
         }
 
         void Update()
@@ -807,10 +792,6 @@ namespace ChillRoad
                 radar.rectTransform.localScale = Vector3.one * Mathf.Lerp(0.2f, 1.6f, wave);
                 radar.color = new Color(Info.r, Info.g, Info.b, (1f - wave) * 0.8f);
                 emptyTitle.text = noNetwork ? Loc.T("Aucun réseau détecté", "No network found") : Loc.T("Aucune partie trouvée pour l'instant", "No game found yet");
-                emptyNote.text = noNetwork
-                    ? Loc.T("Branche-toi à une box ou à un Wi-Fi pour voir les parties proches.", "Connect to a router or Wi-Fi to see nearby games.")
-                    : Loc.T("Les parties ouvertes sur la même box ou le même Wi-Fi apparaissent ici d'elles-mêmes. Sinon : code d'invitation ou adresse IP.",
-                            "Games opened on the same router or Wi-Fi show up here by themselves. Otherwise: invite code or IP address.");
             }
             liveDot.color = new Color(Good.r, Good.g, Good.b, 0.45f + 0.55f * Mathf.Abs(Mathf.Sin(now * 2.4f)));
             liveText.text = shown.Count == 0 ? Loc.T("Recherche en cours", "Searching") + Dots()
