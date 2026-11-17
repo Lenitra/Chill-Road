@@ -89,7 +89,7 @@
   /* ---------- hero ---------- */
   .hero { position: relative; min-height: 100vh; min-height: 100svh; display: flex; align-items: flex-end; overflow: hidden; }
   .hero-bg { position: absolute; inset: 0; }
-  .hero-bg img { width: 100%; height: 100%; object-fit: cover; object-position: 62% 30%; }
+  .hero-bg img { width: 100%; height: 100%; object-fit: cover; object-position: 100% 50%; }
   .hero-bg::after {
     content: ""; position: absolute; inset: 0;
     background:
@@ -112,62 +112,39 @@
   .meta b { color: var(--text); font-weight: 500; }
 
   /* ---------- sections ---------- */
-  section { padding: 110px 0 0; }
-  .head { margin-bottom: 40px; }
-  .head h2 {
-    margin: 12px 0 0; font: italic 800 clamp(38px, 5vw, 56px)/1 "Barlow Semi Condensed", "Bahnschrift", sans-serif; text-transform: uppercase;
-  }
-  .head h2 span { color: var(--gold); }
-
-  .intro { display: grid; grid-template-columns: 1.1fr .9fr; gap: 56px; align-items: start; }
-  .intro p { margin: 0 0 18px; color: #cfd5df; font-size: 19px; }
-  .intro p:first-child { color: var(--text); font-size: 21px; }
-  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .stat { background: var(--plate); border-left: 4px solid var(--gold); padding: 18px 20px; clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
-  .stat b { display: block; font: italic 800 38px/1 "Barlow Semi Condensed", sans-serif; color: var(--gold); }
-  .stat span { display: block; margin-top: 6px; color: var(--muted); font-size: 15px; line-height: 1.35; }
-
-  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 56px; }
-  .feature { background: var(--plate); padding: 26px 26px 24px; border-top: 3px solid var(--line); transition: border-color .2s; }
-  .feature:hover { border-top-color: var(--cyan); }
-  .feature h3 { margin: 0 0 8px; font: italic 700 23px/1.15 "Barlow Semi Condensed", sans-serif; }
-  .feature p { margin: 0; color: var(--muted); font-size: 16px; }
+  section { padding: 90px 0 0; }
+  #jeu { padding-top: 70px; }
+  .pitch { margin: 0 0 30px; max-width: 760px; font: italic 600 clamp(22px, 2.6vw, 30px)/1.3 "Barlow Semi Condensed", sans-serif; color: var(--text); }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .stat { background: var(--plate); border-left: 4px solid var(--gold); padding: 16px 20px; clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
+  .stat b { display: block; font: italic 800 34px/1 "Barlow Semi Condensed", sans-serif; color: var(--gold); }
+  .stat span { display: block; margin-top: 6px; color: var(--muted); font-size: 15px; }
 
   /* ---------- gallery ---------- */
-  .gallery { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
-  .shot { position: relative; margin: 0; overflow: hidden; background: var(--plate); cursor: zoom-in; border: 0; padding: 0; text-align: left; color: inherit; font: inherit; }
+  .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .shot { position: relative; margin: 0; overflow: hidden; background: var(--plate); cursor: zoom-in; border: 0; padding: 0; text-align: left; color: inherit; font: inherit; aspect-ratio: 16 / 9; }
+  .shot.feat { grid-column: span 2; grid-row: span 2; aspect-ratio: auto; }
   .shot img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s ease; }
   .shot:hover img { transform: scale(1.04); }
   .shot figcaption {
-    position: absolute; left: 0; bottom: 0; right: 0; padding: 30px 18px 14px;
-    background: linear-gradient(0deg, rgba(8,10,14,.88), rgba(8,10,14,0));
-    font: italic 600 18px/1.2 "Barlow Semi Condensed", sans-serif;
+    position: absolute; left: 0; bottom: 0; right: 0; padding: 28px 16px 12px;
+    background: linear-gradient(0deg, rgba(8,10,14,.85), rgba(8,10,14,0));
+    font: italic 600 17px/1.2 "Barlow Semi Condensed", sans-serif;
+    opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s;
   }
-  .g-wide { grid-column: span 4; grid-row: span 2; aspect-ratio: auto; }
-  .g-side { grid-column: span 2; }
-  .g-third { grid-column: span 3; aspect-ratio: 16 / 9; }
-  .g-side { aspect-ratio: 16 / 9; }
+  .shot:hover figcaption, .shot:focus-visible figcaption, .shot.feat figcaption { opacity: 1; transform: none; }
 
   /* ---------- download ---------- */
   .dl {
-    position: relative; background: var(--plate); padding: 52px 56px; overflow: hidden;
-    display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center;
+    position: relative; background: var(--plate); padding: 40px 48px; overflow: hidden;
+    display: grid; grid-template-columns: 1fr auto; gap: 18px 40px; align-items: center;
   }
   .dl::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--gold); }
-  .dl h2 { margin: 12px 0 14px; font: italic 800 clamp(34px, 4vw, 48px)/1 "Barlow Semi Condensed", sans-serif; text-transform: uppercase; }
-  .dl p { margin: 0 0 26px; color: #cfd5df; }
-  .steps { list-style: none; margin: 0; padding: 0; counter-reset: s; }
-  .steps li { counter-increment: s; position: relative; padding: 0 0 18px 54px; color: #cfd5df; }
-  .steps li::before {
-    content: counter(s); position: absolute; left: 0; top: -2px; width: 36px; height: 32px;
-    display: grid; place-items: center; background: var(--plate-2); color: var(--gold);
-    font: italic 800 19px/1 "Barlow Semi Condensed", sans-serif;
-    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
-  }
-  .steps li:last-child { padding-bottom: 0; }
-  .steps b { color: var(--text); font-weight: 500; }
+  .dl h2 { margin: 0; font: italic 800 clamp(32px, 4vw, 44px)/1 "Barlow Semi Condensed", sans-serif; text-transform: uppercase; }
+  .dl-meta { margin: 10px 0 0; color: var(--muted); }
+  .dl .note { grid-column: 1 / -1; margin: 6px 0 0; font-size: 15px; color: var(--muted); }
+  .dl .note b { color: var(--text); font-weight: 500; }
   kbd { font: 600 14px/1 "Barlow Semi Condensed", sans-serif; background: var(--plate-2); border: 1px solid var(--line); border-radius: 4px; padding: 3px 7px; color: var(--text); }
-  .note { margin-top: 26px; font-size: 15px; color: var(--muted); }
 
   /* ---------- footer ---------- */
   footer { margin-top: 110px; border-top: 1px solid var(--line); padding: 34px 0 44px; color: var(--muted); font-size: 15px; }
@@ -186,22 +163,21 @@
 
   @media (max-width: 900px) {
     nav.links a:not(.cta) { display: none; }
-    .intro, .dl { grid-template-columns: 1fr; }
-    .dl { padding: 40px 28px; gap: 34px; }
-    .features { grid-template-columns: 1fr 1fr; }
+    .stats { grid-template-columns: 1fr 1fr; }
     .gallery { grid-template-columns: 1fr 1fr; }
-    .g-wide { grid-column: span 2; grid-row: auto; aspect-ratio: 16 / 9; }
-    .g-side { grid-column: span 2; aspect-ratio: 16 / 9; }
-    .g-third { grid-column: span 2; }
-    .hero-bg img { object-position: 64% 50%; }
+    .shot.feat { grid-row: auto; aspect-ratio: 16 / 9; }
+    .shot figcaption { opacity: 1; transform: none; }
+    .dl { grid-template-columns: 1fr; padding: 34px 26px; }
+    .hero-bg img { object-position: 70% 50%; }
     .hero-bg::after {
       background: linear-gradient(0deg, var(--bg) 6%, rgba(11,13,18,.8) 52%, rgba(11,13,18,.35) 100%);
     }
   }
   @media (max-width: 560px) {
     .wrap { padding: 0 16px; }
-    .features, .stats { grid-template-columns: 1fr; }
-    section { padding-top: 80px; }
+    .gallery { grid-template-columns: 1fr; }
+    .shot.feat { grid-column: auto; }
+    section { padding-top: 64px; }
     .btn { font-size: 19px; padding: 15px 24px; }
   }
 </style>
@@ -212,7 +188,6 @@
   <div class="wrap">
     <a class="brand" href="#">CHILL <b>ROAD</b></a>
     <nav class="links">
-      <a href="#jeu">Le jeu</a>
       <a href="#images">Images</a>
       <a class="cta" href="#telecharger">Télécharger</a>
     </nav>
@@ -221,7 +196,7 @@
 
 <main>
   <div class="hero">
-    <div class="hero-bg"><img src="img/hero.jpg" alt="Une Vision 74 blanche traverse un village de montagne aux chalets colorés, sommets enneigés au loin"></div>
+    <div class="hero-bg"><img src="img/hero.jpg" alt="Une Twingo jaune traverse un village de montagne aux façades colorées"></div>
     <div class="wrap">
       <div class="kicker">Balade alpine · Monde ouvert</div>
       <h1 class="logo display">CHILL <span>ROAD</span></h1>
@@ -232,7 +207,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
           Télécharger
         </a>
-        <a class="btn btn-ghost" href="#jeu">Découvrir <i class="chev">›</i></a>
+        <a class="btn btn-ghost" href="#images">Images <i class="chev">›</i></a>
       </div>
       <div class="meta"><b>Gratuit</b> · Windows 10/11 64 bits · zip de 85 Mo · en développement</div>
     </div>
@@ -240,78 +215,78 @@
 
   <section id="jeu">
     <div class="wrap">
-      <div class="head">
-        <div class="kicker">Le jeu</div>
-        <h2>Prends la <span>route</span></h2>
-      </div>
-      <div class="intro">
-        <div>
-          <p>Chill Road est un jeu de conduite low-poly en monde ouvert. Pas de chrono imposé ni de score à battre&nbsp;: tu choisis ta voiture et tu pars explorer une vallée alpine.</p>
-          <p>Autoroute en boucle avec viaduc et tunnels, route de campagne, cols en lacets, chemins de terre et station de ski. Le jour tombe, l’orage arrive, la route mouille. Et quand l’envie te prend, il y a des courses, des sauts et des amis à inviter.</p>
-        </div>
-        <div class="stats">
-          <div class="stat"><b>5 km</b><span>de vallée autour d’un massif central</span></div>
-          <div class="stat"><b>55 km</b><span>de routes, de l’autoroute à la piste</span></div>
-          <div class="stat"><b>441 m</b><span>d’altitude au sommet du col</span></div>
-          <div class="stat"><b>~25</b><span>types de véhicules dans le trafic</span></div>
-        </div>
-      </div>
-
-      <div class="features">
-        <div class="feature">
-          <h3>Un garage varié</h3>
-          <p>De la microcar à trois roues de 49&nbsp;cm³ à l’hypercar V12 du Mans, à acheter, peindre et régler.</p>
-        </div>
-        <div class="feature">
-          <h3>Une conduite qui a du poids</h3>
-          <p>Suspensions, modèle de pneus, boîtes de 3 à 9 rapports. Les dérives viennent d’une vraie glisse.</p>
-        </div>
-        <div class="feature">
-          <h3>Jour, nuit et orages</h3>
-          <p>Cycle complet, pluie et éclairs, route qui se mouille et perd du grip. Neige en altitude.</p>
-        </div>
-        <div class="feature">
-          <h3>À plusieurs</h3>
-          <p>Héberge une partie et donne ton code d’invitation&nbsp;: tes amis te rejoignent par Internet, sans rien régler.</p>
-        </div>
-        <div class="feature">
-          <h3>Courses et sauts</h3>
-          <p>Sprints et circuits dans la vallée, fantôme de ton meilleur temps, tremplins à trouver.</p>
-        </div>
-        <div class="feature">
-          <h3>Tout est synthétisé</h3>
-          <p>Moteurs et musique sont générés en direct. Le jeu ne contient aucun fichier audio.</p>
-        </div>
+      <p class="pitch">Un jeu de conduite low-poly en monde ouvert&nbsp;: choisis ta voiture et pars explorer une vallée alpine, seul ou entre amis.</p>
+      <div class="stats">
+        <div class="stat"><b>55 km</b><span>de routes</span></div>
+        <div class="stat"><b>12</b><span>voitures</span></div>
+        <div class="stat"><b>24 h</b><span>jour, nuit, orages</span></div>
+        <div class="stat"><b>En ligne</b><span>courses entre amis</span></div>
       </div>
     </div>
   </section>
 
   <section id="images">
     <div class="wrap">
-      <div class="head">
-        <div class="kicker">Images</div>
-        <h2>En <span>jeu</span></h2>
-      </div>
       <div class="gallery">
-        <button class="shot g-wide" data-full="img/village.jpg" data-cap="La traversée du village">
-          <img src="img/village_s.jpg" srcset="img/village_s.jpg 800w, img/village.jpg 1600w" sizes="(max-width: 900px) 100vw, 780px" alt="Voiture blanche dans la rue principale d'un village alpin" loading="lazy">
-          <figcaption>La traversée du village</figcaption>
+        <button class="shot feat" data-full="img/village.jpg" data-cap="Le village du Plan">
+          <img src="img/village_s.jpg" srcset="img/village_s.jpg 800w, img/village.jpg 1600w" sizes="(max-width: 900px) 100vw, 780px" alt="Twingo jaune dans la rue d'un village alpin" loading="lazy">
+          <figcaption>Le village du Plan</figcaption>
         </button>
-        <button class="shot g-side" data-full="img/carte.jpg" data-cap="Le Tour du massif : autoroute, vallée, cols et lac">
-          <img src="img/carte_s.jpg" alt="Carte de la vallée vue du dessus, avec l'autoroute en boucle, le lac et les routes de col" loading="lazy">
-          <figcaption>La carte du massif</figcaption>
+        <button class="shot" data-full="img/tunnel.jpg" data-cap="Les tunnels de l’autoroute">
+          <img src="img/tunnel_s.jpg" srcset="img/tunnel_s.jpg 800w, img/tunnel.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Hypercar verte devant un double tunnel" loading="lazy">
+          <figcaption>Les tunnels de l’autoroute</figcaption>
         </button>
-        <button class="shot g-side" data-full="img/station.jpg" data-cap="La station de ski des Combes">
-          <img src="img/station_s.jpg" alt="Route enneigée qui monte vers des chalets, sapins sur la pente" loading="lazy">
+        <button class="shot" data-full="img/lacets.jpg" data-cap="La route du col">
+          <img src="img/lacets_s.jpg" srcset="img/lacets_s.jpg 800w, img/lacets.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Voiture blanche sur une route sinueuse dans les alpages, vue du ciel" loading="lazy">
+          <figcaption>La route du col</figcaption>
+        </button>
+        <button class="shot" data-full="img/orage.jpg" data-cap="Orage sur l’autoroute">
+          <img src="img/orage_s.jpg" srcset="img/orage_s.jpg 800w, img/orage.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Supercar sous la pluie sur l’autoroute, compteur à 140 km/h" loading="lazy">
+          <figcaption>Orage sur l’autoroute</figcaption>
+        </button>
+        <button class="shot" data-full="img/alpage.jpg" data-cap="Pistes d’alpage">
+          <img src="img/alpage_s.jpg" srcset="img/alpage_s.jpg 800w, img/alpage.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Petite sportive blanche sur un chemin de terre entre les sapins" loading="lazy">
+          <figcaption>Pistes d’alpage</figcaption>
+        </button>
+        <button class="shot" data-full="img/station.jpg" data-cap="Station des Combes">
+          <img src="img/station_s.jpg" srcset="img/station_s.jpg 800w, img/station.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Voiture blanche sur une route enneigée devant des chalets" loading="lazy">
           <figcaption>Station des Combes</figcaption>
         </button>
-        <button class="shot g-third" data-full="img/titre.jpg" data-cap="L’écran titre">
-          <img src="img/titre_s.jpg" srcset="img/titre_s.jpg 800w, img/titre.jpg 1600w" sizes="(max-width: 900px) 100vw, 580px" alt="Menu principal du jeu devant une route de vallée et une voiture blanche" loading="lazy">
-          <figcaption>L’écran titre</figcaption>
+        <button class="shot" data-full="img/couchant.jpg" data-cap="Fin de journée aux Granges">
+          <img src="img/couchant_s.jpg" srcset="img/couchant_s.jpg 800w, img/couchant.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Muscle car noire sur une route de vallée en fin de journée" loading="lazy">
+          <figcaption>Fin de journée aux Granges</figcaption>
         </button>
-        <button class="shot g-third" data-full="img/chargement.jpg" data-cap="Le chargement, en route vers la vallée">
-          <img src="img/chargement_s.jpg" srcset="img/chargement_s.jpg 800w, img/chargement.jpg 1600w" sizes="(max-width: 900px) 100vw, 580px" alt="Écran de chargement avec la voiture sur une route de montagne" loading="lazy">
-          <figcaption>Le chargement</figcaption>
+        <button class="shot" data-full="img/peel.jpg" data-cap="Peel P50, 49 cm³">
+          <img src="img/peel_s.jpg" srcset="img/peel_s.jpg 800w, img/peel.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Minuscule voiture bleue à trois roues sur une route de campagne" loading="lazy">
+          <figcaption>Peel P50, 49 cm³</figcaption>
+        </button>
+        <button class="shot" data-full="img/col.jpg" data-cap="En montée vers le col">
+          <img src="img/col_s.jpg" srcset="img/col_s.jpg 800w, img/col.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Coupé orange dans un virage de montagne, compteur à 60 km/h" loading="lazy">
+          <figcaption>En montée vers le col</figcaption>
+        </button>
+        <button class="shot" data-full="img/delorean.jpg" data-cap="Balade en DeLorean">
+          <img src="img/delorean_s.jpg" srcset="img/delorean_s.jpg 800w, img/delorean.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="DeLorean sur une route de montagne" loading="lazy">
+          <figcaption>Balade en DeLorean</figcaption>
+        </button>
+        <button class="shot" data-full="img/lac.jpg" data-cap="Le viaduc du lac">
+          <img src="img/lac_s.jpg" srcset="img/lac_s.jpg 800w, img/lac.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Long viaduc d’autoroute au-dessus d’un lac bleu" loading="lazy">
+          <figcaption>Le viaduc du lac</figcaption>
+        </button>
+        <button class="shot" data-full="img/soir.jpg" data-cap="Le village le soir">
+          <img src="img/soir_s.jpg" srcset="img/soir_s.jpg 800w, img/soir.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Twingo dans une rue de village éclairée à la tombée de la nuit" loading="lazy">
+          <figcaption>Le village le soir</figcaption>
+        </button>
+        <button class="shot" data-full="img/ami.jpg" data-cap="Citroën Ami">
+          <img src="img/ami_s.jpg" srcset="img/ami_s.jpg 800w, img/ami.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Petite voiture électrique bleu clair devant la concession" loading="lazy">
+          <figcaption>Citroën Ami</figcaption>
+        </button>
+        <button class="shot" data-full="img/echangeur.jpg" data-cap="Un échangeur vu du ciel">
+          <img src="img/echangeur_s.jpg" srcset="img/echangeur_s.jpg 800w, img/echangeur.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Échangeur d’autoroute vu du dessus" loading="lazy">
+          <figcaption>Un échangeur vu du ciel</figcaption>
+        </button>
+        <button class="shot" data-full="img/carte.jpg" data-cap="La carte du massif">
+          <img src="img/carte_s.jpg" srcset="img/carte_s.jpg 800w, img/carte.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Carte de la vallée avec l’autoroute en boucle, le lac et les cols" loading="lazy">
+          <figcaption>La carte du massif</figcaption>
         </button>
       </div>
     </div>
@@ -321,20 +296,14 @@
     <div class="wrap">
       <div class="dl">
         <div>
-          <div class="kicker">Télécharger</div>
           <h2>Gratuit, pour Windows</h2>
-          <p>Le jeu est en cours de développement&nbsp;: attends-toi à quelques imperfections, et à des nouveautés régulières.</p>
-          <a class="btn btn-gold" href="https://github.com/Lenitra/Chill-Road/releases/latest/download/ChillRoad-Windows.zip">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
-            Chill Road pour Windows
-          </a>
+          <p class="dl-meta">Version 0.1.0 · 85 Mo · Windows 10/11 64 bits</p>
         </div>
-        <ol class="steps">
-          <li><b>Décompresse</b> le zip où tu veux (clic droit → Extraire tout).</li>
-          <li><b>Lance</b> <kbd>Chill Road.exe</kbd> dans le dossier «&nbsp;Chill Road&nbsp;».</li>
-          <li>Si Windows affiche «&nbsp;Windows a protégé votre ordinateur&nbsp;», clique sur <b>Informations complémentaires</b> puis <b>Exécuter quand même</b>&nbsp;: le jeu n’est pas signé.</li>
-          <li>Une <b>manette</b> est conseillée. Le clavier marche aussi, en AZERTY comme en QWERTY.</li>
-        </ol>
+        <a class="btn btn-gold" href="https://github.com/Lenitra/Chill-Road/releases/latest/download/ChillRoad-Windows.zip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
+          Télécharger
+        </a>
+        <p class="note">Décompresse le zip et lance <kbd>Chill Road.exe</kbd>. Si Windows bloque le lancement&nbsp;: <b>Informations complémentaires</b> → <b>Exécuter quand même</b>.</p>
       </div>
     </div>
   </section>
