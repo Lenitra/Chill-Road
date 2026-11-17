@@ -189,6 +189,10 @@ namespace ChillRoad
         bool clutchOut;
         // Pneus : glissement au pic et adhérence en glisse de la surface courante
         float sPeak = 0.13f, slideMu = 0.8f;
+        // Réglages de la voiture montée : suspension et pneus choisis au garage (CarTuning) appliqués aux réglages de base
+        float travel = 0.3f, sag = 0.055f, arb = 1.6f, drop;
+        CarTuning.TireProfile tire;
+        CarTuning.SuspensionProfile susp;
         float lastSlipAngle, slipRate;
         float airTime;
 
@@ -209,6 +213,12 @@ namespace ChillRoad
         public void Setup(VehicleSpec spec)
         {
             Spec = spec;
+            tire = CarTuning.TireOf(spec);
+            susp = CarTuning.SuspensionOf(spec);
+            travel = suspensionTravel * susp.travel;
+            sag = staticSag * susp.sag;
+            arb = antiRoll * susp.arb;
+            drop = susp.drop;
             if (model) { model.gameObject.SetActive(false); Destroy(model.gameObject); }
             var pivot = new GameObject("Model").transform;
             pivot.SetParent(transform, false);
@@ -286,7 +296,7 @@ namespace ChillRoad
             yf /= Mathf.Max(1, nf);
             zr /= Mathf.Max(1, nr);
             frontAxleZ = zf;
-            rb.centerOfMass = new Vector3(0f, yf - suspensionTravel * 0.2f, (zf + zr) * 0.5f) + centerOfMassOffset;
+            rb.centerOfMass = new Vector3(0f, yf - travel * 0.2f, (zf + zr) * 0.5f) + centerOfMassOffset;
             float L = Mathf.Max(3.8f, size.z), Wd = Mathf.Max(1.7f, size.x), H = 1.3f;
             rb.inertiaTensor = new Vector3(spec.mass / 12f * (H * H + L * L), spec.mass / 12f * (Wd * Wd + L * L) * 1.1f * yawInertia, spec.mass / 12f * (Wd * Wd + H * H));
             rb.inertiaTensorRotation = Quaternion.identity;
@@ -297,8 +307,8 @@ namespace ChillRoad
             {
                 int onAxle = Mathf.Max(1, w.front ? nf : nr);
                 float cornerMass = spec.mass * 0.5f / onAxle;
-                w.springK = cornerMass * 9.81f / staticSag;
-                w.damperC = 2f * dampingRatio * Mathf.Sqrt(w.springK * cornerMass);
+                w.springK = cornerMass * 9.81f / sag;
+                w.damperC = 2f * dampingRatio * susp.damp * Mathf.Sqrt(w.springK * cornerMass);
                 w.brakeShare = (w.front ? 0.64f : 0.36f) / onAxle;
                 w.nominalLoad = cornerMass * 9.81f;
                 w.driven = IsDriven(w.front);
@@ -327,9 +337,10 @@ namespace ChillRoad
                 var mf = visual.GetComponentInChildren<MeshFilter>();
                 if (mf && mf.sharedMesh) w.radius = Mathf.Max(0.1f, mf.sharedMesh.bounds.extents.y * mf.transform.lossyScale.y);
             }
-            // L'ancrage est au-dessus du centre de roue : à l'enfoncement statique la roue retombe à sa place
-            w.mount = center + Vector3.up * (suspensionTravel - staticSag);
-            w.compression = w.prevCompression = staticSag;
+            // L'ancrage est au-dessus du centre de roue : à l'enfoncement statique la roue retombe à sa place (plus haut
+            // dans la caisse si la suspension l'abaisse : la caisse descend d'autant)
+            w.mount = center + Vector3.up * (travel - sag + drop);
+            w.compression = w.prevCompression = sag;
             wheels.Add(w);
         }
 
@@ -596,8 +607,9 @@ namespace ChillRoad
 
             // Surface : pic d'adhérence plus tardif et glisse plus progressive sur la terre
             float dirt = OnRoad ? SurfaceDirt : 1f;
-            sPeak = Mathf.Lerp(peakSlip, peakSlipDirt, dirt);
-            slideMu = Mathf.Lerp(slideGrip, slideGripDirt, dirt) * Mathf.Lerp(1f, 0.92f, Wetness);
+            // Pneus montés : pic plus ou moins progressif, adhérence gardée en glisse
+            sPeak = Mathf.Lerp(peakSlip, peakSlipDirt, dirt) * tire.peak;
+            slideMu = Mathf.Lerp(slideGrip, slideGripDirt, dirt) * Mathf.Lerp(1f, 0.92f, Wetness) * tire.slide;
 
             // Embrayage : débrayé au frein à main quand il bloque les roues motrices (comme un pilote) ;
             // au relâchement, le moteur lancé entraîne d'un coup les roues (coup d'embrayage)
@@ -629,10 +641,10 @@ namespace ChillRoad
             foreach (var w in wheels)
             {
                 Vector3 origin = transform.TransformPoint(w.mount);
-                float length = suspensionTravel + w.radius;
+                float length = travel + w.radius;
                 w.prevCompression = w.compression;
                 w.grounded = Physics.Raycast(origin, -up, out w.hit, length, layerMask, QueryTriggerInteraction.Ignore);
-                w.compression = w.grounded ? Mathf.Clamp(length - w.hit.distance - SnowSink, 0f, suspensionTravel) : 0f;
+                w.compression = w.grounded ? Mathf.Clamp(length - w.hit.distance - SnowSink, 0f, travel) : 0f;
                 if (w.grounded) GroundedWheels++;
             }
             foreach (var w in wheels)
@@ -641,10 +653,10 @@ namespace ChillRoad
                 float spring = w.compression * w.springK;
                 float damper = (w.compression - w.prevCompression) / dt * w.damperC;
                 // Barre antiroulis avec la roue opposée de l'essieu (aucune pour une roue centrale)
-                float arb = w.mate != null ? (w.compression - w.mate.compression) * w.springK * antiRoll : 0f;
-                w.load = Mathf.Max(0f, spring + damper + arb);
+                float bar = w.mate != null ? (w.compression - w.mate.compression) * w.springK * arb : 0f;
+                w.load = Mathf.Max(0f, spring + damper + bar);
                 // Butée de fin de course : empêche de talonner
-                if (w.compression > suspensionTravel * 0.95f) w.load += (w.compression - suspensionTravel * 0.95f) * w.springK * 8f;
+                if (w.compression > travel * 0.95f) w.load += (w.compression - travel * 0.95f) * w.springK * 8f;
                 rb.AddForceAtPosition(up * w.load, transform.TransformPoint(w.mount));
             }
 
@@ -654,11 +666,14 @@ namespace ChillRoad
 
             // --- Contact de chaque roue : repère, vitesses de glissement, adhérence disponible, freins
             float surface = OnRoad ? RoadGrip : offRoadGrip;
+            // Pneus et suspension montés : terre, hors route et neige (sol meuble ou accidenté) contre goudron lisse
+            float rough = Mathf.Max(dirt, SurfaceSnow);
+            surface *= Mathf.Lerp(1f, tire.dirt, dirt) * Mathf.Lerp(1f, tire.snow, SurfaceSnow) * Mathf.Lerp(susp.smooth, susp.rough, rough);
             if (Wetness > 0f)
             {
-                // Pluie : l'enrobé perd ~30 % d'adhérence, la terre détrempée et l'herbe ~20 % ; au-delà de 150 km/h,
-                // le film d'eau en retire encore jusqu'à 15 % (aquaplaning)
-                float wetGrip = OnRoad ? Mathf.Lerp(0.7f, 0.8f, SurfaceDirt) : 0.8f;
+                // Pluie : l'enrobé perd ~30 % d'adhérence, la terre détrempée et l'herbe ~20 % (plus ou moins selon les
+                // pneus) ; au-delà de 150 km/h, le film d'eau en retire encore jusqu'à 15 % (aquaplaning)
+                float wetGrip = Mathf.Max(0.3f, 1f - (1f - (OnRoad ? Mathf.Lerp(0.7f, 0.8f, SurfaceDirt) : 0.8f)) * tire.wetLoss);
                 float aquaplaning = Mathf.Lerp(1f, 0.85f, Mathf.InverseLerp(42f, 75f, Speed));
                 surface *= Mathf.Lerp(1f, wetGrip * aquaplaning, Wetness);
             }
@@ -690,7 +705,7 @@ namespace ChillRoad
                 w.slip = w.vLat / w.denom;
                 // Sensibilité à la charge : la roue extérieure, très chargée, n'adhère pas proportionnellement plus
                 float sensitivity = Mathf.Clamp(1f - loadSensitivity * (w.load / w.nominalLoad - 1f), 0.75f, 1.15f);
-                w.cap = Spec.tireGrip * surface * w.load * sensitivity * (w.front ? 1f : rearGripBias);
+                w.cap = Spec.tireGrip * surface * w.load * sensitivity * (w.front ? 1f : rearGripBias * tire.rear);
                 // ESP : freine la roue avant extérieure au virage (couple qui ramène le nez dans la trajectoire)
                 if (EspIntervention > 0f && w.front && !w.center && Mathf.Sign(w.mount.x) == espSide)
                 {
@@ -864,8 +879,8 @@ namespace ChillRoad
             {
                 if (!w.visual) continue;
                 Vector3 origin = transform.TransformPoint(w.mount);
-                float drop = suspensionTravel - w.compression;
-                w.visual.position = origin - transform.up * drop;
+                float down = travel - w.compression;
+                w.visual.position = origin - transform.up * down;
                 // Rotation réelle de la roue : patine, bloque au frein à main
                 w.spin += w.omegaR / w.radius * Mathf.Rad2Deg * dt;
                 w.visual.localRotation = Quaternion.Euler(w.spin, w.front ? steerAngle : 0f, 0f);
@@ -879,7 +894,7 @@ namespace ChillRoad
             if (Remote)
             {
                 // Voiture d'un autre joueur : roue à sa place de repos, glisse de son essieu reçue du réseau
-                point = transform.TransformPoint(w.mount) - transform.up * (suspensionTravel - staticSag + w.radius);
+                point = transform.TransformPoint(w.mount) - transform.up * (travel - sag + drop + w.radius);
                 normal = transform.up;
                 skid = remoteGrounded ? (w.front ? SkidFront : SkidRear) : 0f;
                 return remoteGrounded;

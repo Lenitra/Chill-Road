@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace ChillRoad
@@ -20,6 +21,10 @@ namespace ChillRoad
         GameObject carPrefab;
         Bounds car = new Bounds(new Vector3(0f, 0.65f, 0f), new Vector3(1.8f, 1.3f, 4.2f));
         Vector3 wheelL, wheelR;
+        // Hauteur de caisse montrée (suspension) : la caisse descend, les roues restent au sol
+        readonly List<(Transform t, Vector3 local)> carWheels = new List<(Transform, Vector3)>();
+        Vector3 pivotBase;
+        float ride;
         Light spotA, spotB;
         int focus = -1;
         float angle = 35f, angleVel, radius = 6f, radiusVel, height = 1.7f, heightVel, orbit, orbitIdle, drift, time;
@@ -119,13 +124,18 @@ namespace ChillRoad
             root.gameObject.SetActive(true);
             carPrefab = spec.prefab;
             carPivot = PlaceCar(spec, root, new Vector3(0f, lift, 0f), out car);
+            pivotBase = carPivot.localPosition;
+            carWheels.Clear();
+            ride = 0f;
             foreach (var r in carPivot.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
             float ex = car.extents.x, ez = car.extents.z;
             wheelL = new Vector3(-ex * 0.9f, 0.33f, ez * 0.62f);
             wheelR = new Vector3(ex * 0.9f, 0.33f, ez * 0.62f);
             foreach (var t in carPivot.GetComponentsInChildren<Transform>())
             {
-                if (!t.name.StartsWith("wheel") || !t.name.Contains("front")) continue;
+                if (!t.name.StartsWith("wheel")) continue;
+                carWheels.Add((t, t.localPosition));
+                if (!t.name.Contains("front")) continue;
                 Vector3 p = carPivot.InverseTransformPoint(t.position);
                 if (p.x < -0.1f) wheelL = p; else if (p.x > 0.1f) wheelR = p;
             }
@@ -134,6 +144,16 @@ namespace ChillRoad
 
         /// <summary>Peint la voiture sur le pont (couleur du nuancier de <see cref="CarPaint"/> : essai ou couleur achetée).</summary>
         public void Paint(int swatch) => CarPaint.Apply(carPivot, swatch);
+
+        /// <summary>Caisse abaissée de drop mètres (négatif : relevée), roues au sol : la suspension essayée ou montée.</summary>
+        public void RideHeight(float drop)
+        {
+            if (!carPivot || Mathf.Abs(drop - ride) < 1e-4f) return;
+            ride = drop;
+            carPivot.localPosition = pivotBase - Vector3.up * drop;
+            foreach (var (t, local) in carWheels)
+                if (t) t.localPosition = local + t.parent.InverseTransformVector(carPivot.up * drop);
+        }
 
         /// <summary>Pièce cadrée (indice de <see cref="CarTuning.Part"/>, -1 : vue d'ensemble). snap : sans transition.</summary>
         public void Focus(int part, bool snap = false)
@@ -171,6 +191,9 @@ namespace ChillRoad
                     p = wheelR + new Vector3(1.7f, 0.15f, -1.5f); l = wheelR; break;
                 case (int)CarTuning.Part.Weight:
                     p = new Vector3(-(ex + 2.4f), 3.3f, -(ez + 0.8f)); l = new Vector3(0f, top * 0.45f, 0f); break;
+                case (int)CarTuning.Part.Suspension:
+                    // De profil, au ras du sol : la hauteur de caisse se voit
+                    p = new Vector3(-(ex + 3.4f), 0.45f, -0.3f); l = new Vector3(0f, 0.4f, 0f); break;
                 case (int)CarTuning.Part.Aero:
                     p = new Vector3(1.3f, top + 0.55f, -(ez + 2.9f)); l = new Vector3(0f, top * 0.7f, -ez * 0.7f); break;
                 default:

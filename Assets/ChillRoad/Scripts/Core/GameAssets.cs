@@ -32,6 +32,8 @@ namespace ChillRoad
         [Tooltip("Position de la caméra pare-chocs (repère voiture, m). Zéro = position par défaut")] public Vector3 bumperCamera;
         [Tooltip("Son moteur (Auto : V8 pour la Mustang, 4 cylindres pour la MX-5, électrique pour la Vision 74, 6 cylindres turbo sinon)")]
         public EngineVoice engineVoice = EngineVoice.Auto;
+        /// <summary>Monte de pneus et suspension choisies au garage (<see cref="CarTuning"/>, 0 = d'origine). Jamais sauvegardés ici.</summary>
+        [NonSerialized] public int tires, suspension;
 
         /// <summary>Voix moteur effective (résout Auto d'après l'identifiant).</summary>
         /// <summary>Vitesse de pointe (m/s) : rupteur sur le dernier rapport.</summary>

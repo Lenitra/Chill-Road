@@ -8,10 +8,12 @@ namespace ChillRoad
     /// <summary>
     /// Garage de tuning (lieu « tuning » de la carte) : à l'arrêt dans la zone, A / E / Entrée (ou l'invite du HUD)
     /// fait entrer la voiture que l'on conduit dans l'atelier (<see cref="WorkshopStage"/>). Menu à deux étages, en
-    /// haut à gauche : les six pièces (<see cref="CarTuning"/>), puis les niveaux de la pièce ouverte (série, 1, 2, 3)
-    /// avec leur prix ; la caméra de l'atelier vient cadrer la pièce, la fiche montre ce que le niveau regardé apporte.
-    /// Chaque niveau s'achète seul (le niveau 3 ne donne pas les niveaux 1 et 2) ; un niveau acheté, comme la pièce de
-    /// série, se remonte ensuite gratuitement, autant de fois que l'on veut. Dernière entrée, la peinture : le nuancier de
+    /// haut à gauche : les pièces (<see cref="CarTuning"/>), puis les options de la pièce ouverte avec leur prix : niveaux
+    /// (série, 1, 2, 3) ou types pour les pneus et les suspensions (origine, rallye, slick…). La caméra de l'atelier
+    /// vient cadrer la pièce ; la fiche montre ce que l'option regardée change (performances, adhérence par surface
+    /// pour les pneus, réglages pour les suspensions, dont la hauteur de caisse essayée en direct sur la voiture).
+    /// Chaque option s'achète seule (le niveau 3 ne donne pas les niveaux 1 et 2) ; une option achetée, comme la pièce
+    /// de série, se remonte ensuite gratuitement, autant de fois que l'on veut. Dernière entrée, la peinture : le nuancier de
     /// <see cref="CarPaint"/>, essayé en direct sur la voiture de l'atelier ; une couleur achetée se remet gratuitement.
     /// En réseau, le monde continue pendant ce temps.
     /// </summary>
@@ -36,7 +38,7 @@ namespace ChillRoad
         /// <summary>Vitesse au-dessous de laquelle on peut entrer (m/s).</summary>
         const float EnterSpeed = 5.5f;
         const int Stats = 6;
-        /// <summary>Entrée « Peinture » de la liste des pièces (après les six pièces).</summary>
+        /// <summary>Entrée « Peinture » de la liste des pièces (après les pièces).</summary>
         const int PaintRow = CarTuning.PartCount;
 
         public static bool IsOpen { get; private set; }
@@ -67,7 +69,8 @@ namespace ChillRoad
         Text carText, cashText, crumbText, countText, nameText, subText, levelText, actionText, hintText, leaveText;
         readonly List<Row> rows = new List<Row>();
         readonly List<(RectTransform fill, RectTransform gain, Text label, Text value)> bars = new List<(RectTransform, RectTransform, Text, Text)>();
-        readonly float[] scale = new float[Stats];
+        /// <summary>Échelle des barres, par fiche (<see cref="CardMode"/>).</summary>
+        readonly float[,] scale = new float[3, Stats];
         /// <summary>Pièce ouverte (ses niveaux sont listés) ; -1 : liste des pièces.</summary>
         int part = -1;
         int openedFrame, shown = -1;
@@ -93,8 +96,8 @@ namespace ChillRoad
         /// <summary>Le nuancier est ouvert.</summary>
         bool InPaint => part == PaintRow;
 
-        /// <summary>Lignes de la liste affichée : pièces et peinture, niveaux de la pièce ouverte (série comprise), ou nuancier.</summary>
-        int RowCount => part < 0 ? CarTuning.PartCount + 1 : InPaint ? CarPaint.Count : CarTuning.MaxLevel + 1;
+        /// <summary>Lignes de la liste affichée : pièces et peinture, options de la pièce ouverte (série comprise), ou nuancier.</summary>
+        int RowCount => part < 0 ? CarTuning.PartCount + 1 : InPaint ? CarPaint.Count : CarTuning.Options((CarTuning.Part)part);
 
         void Update()
         {
@@ -178,10 +181,10 @@ namespace ChillRoad
             stage.Focus(-1, true);
             stage.Show();
             ShopFade.Cut(0.5f);
-            // Première pièce que l'on peut encore améliorer
+            // Première pièce à niveaux que l'on peut encore améliorer
             int first = 0;
             for (int i = 0; i < CarTuning.PartCount; i++)
-                if (CarTuning.Level(BaseSpec, (CarTuning.Part)i) < CarTuning.MaxLevel) { first = i; break; }
+                if (!CarTuning.IsTyped((CarTuning.Part)i) && CarTuning.Level(BaseSpec, (CarTuning.Part)i) < CarTuning.MaxLevel) { first = i; break; }
             Select(first);
             Refresh();
         }
@@ -222,8 +225,10 @@ namespace ChillRoad
             message = null;
             Arrange();
             stage.Focus(p);
-            // Sur le prochain niveau à acheter
-            Select(Mathf.Min(CarTuning.Level(BaseSpec, (CarTuning.Part)p) + 1, CarTuning.MaxLevel));
+            // Sur le prochain niveau à acheter, ou sur le type monté
+            var cp = (CarTuning.Part)p;
+            int lv = CarTuning.Level(BaseSpec, cp);
+            Select(CarTuning.IsTyped(cp) ? lv : Mathf.Min(lv + 1, CarTuning.MaxLevel));
         }
 
         /// <summary>Retour : des niveaux à la liste des pièces, puis de la liste à la route.</summary>
@@ -245,7 +250,7 @@ namespace ChillRoad
             for (int i = 0; i < rows.Count; i++)
             {
                 rows[i].button.gameObject.SetActive(i < count);
-                foreach (var pip in rows[i].pips) pip.gameObject.SetActive(part < 0 && i < CarTuning.PartCount);
+                foreach (var pip in rows[i].pips) pip.gameObject.SetActive(part < 0 && i < CarTuning.PartCount && !CarTuning.IsTyped((CarTuning.Part)i));
                 if (rows[i].swatch) rows[i].swatch.gameObject.SetActive((part < 0 && i == PaintRow) || InPaint);
                 if (i >= count) continue;
                 rows[i].button.navigation = new Navigation
@@ -257,7 +262,7 @@ namespace ChillRoad
             }
         }
 
-        /// <summary>Validation d'une ligne : ouvrir la pièce, ou monter le niveau (gratuit s'il est acheté, sinon s'il y a l'argent).</summary>
+        /// <summary>Validation d'une ligne : ouvrir la pièce, ou monter l'option (gratuit si elle est achetée, sinon s'il y a l'argent).</summary>
         void Choose(int i)
         {
             // L'appui qui a ouvert l'écran ne doit pas valider une ligne
@@ -281,9 +286,8 @@ namespace ChillRoad
             game.ShowCar(game.Local.CarIndex);
             if (game.Local.Audio) game.Local.Audio.Chime();
             stage.Punch();
-            if (i == 0) Say(Loc.T($"{CarTuning.Name(p)} de série remis", $"Stock {CarTuning.Name(p).ToLowerInvariant()} refitted"), Money);
-            else Say(owned ? Loc.T($"{CarTuning.Name(p)} niveau {i} remonté", $"{CarTuning.Name(p)} level {i} refitted")
-                           : Loc.T($"{CarTuning.Name(p)} niveau {i} installé !", $"{CarTuning.Name(p)} level {i} fitted!"), Money);
+            string what = $"{CarTuning.Name(p)} : {CarTuning.OptionName(p, i)}";
+            Say(owned ? Loc.T($"{what}, remonté", $"{what}, refitted") : Loc.T($"{what}, installé !", $"{what}, fitted!"), Money);
         }
 
         /// <summary>Validation d'une couleur : la remettre si elle est achetée, sinon l'acheter si l'argent suffit.</summary>
@@ -366,7 +370,15 @@ namespace ChillRoad
                 {
                     var p = (CarTuning.Part)i;
                     row.name.text = CarTuning.Name(p);
-                    int level = CarTuning.Level(spec, p), price = CarTuning.NextPrice(spec, p);
+                    int level = CarTuning.Level(spec, p);
+                    if (CarTuning.IsTyped(p))
+                    {
+                        // Pneus, suspensions : le type monté, comme la couleur de la peinture
+                        row.status.text = CarTuning.OptionName(p, level).ToUpperInvariant();
+                        row.status.color = on ? InkDim : Dim;
+                        continue;
+                    }
+                    int price = CarTuning.NextPrice(spec, p);
                     for (int k = 0; k < row.pips.Length; k++)
                         row.pips[k].color = k < level ? (on ? InkBrand : Brand) : on ? new Color(0f, 0f, 0f, 0.18f) : PipOff;
                     bool bought = price >= 0 && CarTuning.Owns(spec, p, level + 1);
@@ -375,17 +387,22 @@ namespace ChillRoad
                 }
                 else
                 {
-                    row.name.text = i == 0 ? Loc.T("Série", "Stock") : Loc.T($"Niveau {i}", $"Level {i}");
+                    var cp = (CarTuning.Part)part;
+                    row.name.text = CarTuning.OptionName(cp, i);
                     if (i == current) { row.status.text = Loc.T("INSTALLÉ", "FITTED"); row.status.color = on ? InkMoney : Money; }
-                    else if (CarTuning.Owns(spec, (CarTuning.Part)part, i)) { row.status.text = i == 0 ? Loc.T("D'ORIGINE", "STOCK") : Loc.T("ACHETÉ", "OWNED"); row.status.color = on ? InkDim : Dim; }
+                    else if (CarTuning.Owns(spec, cp, i)) { row.status.text = i == 0 ? Loc.T("D'ORIGINE", "STOCK") : Loc.T("ACHETÉ", "OWNED"); row.status.color = on ? InkDim : Dim; }
                     else
                     {
-                        int price = CarTuning.Price(spec, (CarTuning.Part)part, i);
+                        int price = CarTuning.Price(spec, cp, i);
                         row.status.text = PriceText(price);
                         row.status.color = cash >= price ? (on ? InkAccent : Accent) : on ? InkDanger : new Color(1f, 0.45f, 0.4f, 0.85f);
                     }
                 }
             }
+
+            // Hauteur de caisse de la voiture de l'atelier : la suspension regardée, sinon celle montée
+            int suspLook = part == (int)CarTuning.Part.Suspension && shown >= 0 ? shown : CarTuning.Level(spec, CarTuning.Part.Suspension);
+            stage.RideHeight(CarTuning.SuspensionOf(new VehicleSpec { suspension = suspLook }).drop);
 
             if (shown < 0) return;
             bool pad = GameInput.UsingGamepad;
@@ -394,27 +411,30 @@ namespace ChillRoad
             string back = pad ? "B" : Loc.T("Échap", "Esc");
             if (InPaint || (part < 0 && shown == PaintRow)) { RefreshPaint(spec, cash, ok, back, turn); return; }
 
-            // Fiche : la pièce regardée (ou ouverte), et ce qu'apporte le niveau visé
+            // Fiche : la pièce regardée (ou ouverte), et ce qu'apporte l'option visée
             var sel = (CarTuning.Part)(part < 0 ? shown : part);
+            bool typed = CarTuning.IsTyped(sel);
             int lv = CarTuning.Level(spec, sel);
-            int target = part < 0 ? Mathf.Min(lv + 1, CarTuning.MaxLevel) : shown;
+            int target = part >= 0 ? shown : typed ? lv : Mathf.Min(lv + 1, CarTuning.MaxLevel);
+            string option = CarTuning.OptionName(sel, target);
             nameText.text = CarTuning.Name(sel);
-            subText.text = CarTuning.Effect(sel);
-            levelText.text = Loc.F($"Niveau {lv} / {CarTuning.MaxLevel}", $"Level {lv} / {CarTuning.MaxLevel}");
+            subText.text = part >= 0 && typed ? CarTuning.OptionEffect(sel, target) : CarTuning.Effect(sel);
+            levelText.text = typed ? CarTuning.OptionName(sel, lv) : Loc.F($"Niveau {lv} / {CarTuning.MaxLevel}", $"Level {lv} / {CarTuning.MaxLevel}");
 
             var now = CarTuning.Apply(spec);
-            ShowBars(now, target != lv ? CarTuning.Preview(spec, sel, target) : now);
+            ShowBars(CardMode(sel), now, target != lv ? CarTuning.Preview(spec, sel, target) : now);
 
             int cost = CarTuning.Price(spec, sel, target);
             bool has = CarTuning.Owns(spec, sel, target);
             if (message != null) { actionText.text = message; actionText.color = messageColor; }
+            else if (part < 0 && typed) { actionText.text = Loc.T($"{ok} : voir les {CarTuning.Options(sel)} types", $"{ok}: see the {CarTuning.Options(sel)} types"); actionText.color = White; }
             else if (part < 0 && lv >= CarTuning.MaxLevel) { actionText.text = Loc.T($"{ok} : voir les niveaux  ·  pièce au maximum", $"{ok}: see the levels  ·  part fully upgraded"); actionText.color = Money; }
             else if (part < 0) { actionText.text = Loc.T($"{ok} : voir les niveaux  ·  suivant {(has ? "acheté" : PriceText(cost))}", $"{ok}: see the levels  ·  next {(has ? "owned" : PriceText(cost))}"); actionText.color = White; }
-            else if (target == lv) { actionText.text = Loc.T("Niveau installé", "Level fitted"); actionText.color = Money; }
-            else if (target == 0) { actionText.text = Loc.T($"{ok} : remettre la pièce de série  ·  gratuit", $"{ok}: refit the stock part  ·  free"); actionText.color = White; }
-            else if (has) { actionText.text = Loc.T($"{ok} : remonter le niveau {target}  ·  déjà acheté", $"{ok}: refit level {target}  ·  already owned"); actionText.color = White; }
+            else if (target == lv) { actionText.text = typed ? Loc.T("Monté sur la voiture", "On the car") : Loc.T("Niveau installé", "Level fitted"); actionText.color = Money; }
+            else if (target == 0) { actionText.text = Loc.T($"{ok} : remettre d'origine  ·  gratuit", $"{ok}: back to stock  ·  free"); actionText.color = White; }
+            else if (has) { actionText.text = Loc.T($"{ok} : remonter {option}  ·  déjà acheté", $"{ok}: refit {option}  ·  already owned"); actionText.color = White; }
             else if (cash < cost) { actionText.text = Loc.T($"Il te manque {Wallet.Format(cost - cash)}", $"You need {Wallet.Format(cost - cash)} more"); actionText.color = Danger; }
-            else { actionText.text = Loc.T($"{ok} : installer le niveau {target}  ·  {PriceText(cost)}", $"{ok}: fit level {target}  ·  {PriceText(cost)}"); actionText.color = White; }
+            else { actionText.text = Loc.T($"{ok} : installer {option}  ·  {PriceText(cost)}", $"{ok}: fit {option}  ·  {PriceText(cost)}"); actionText.color = White; }
 
             hintText.text = part < 0
                 ? Loc.T($"↑ ↓ choisir  ·  {ok} ouvrir  ·  {back} sortir  ·  {turn}", $"↑ ↓ browse  ·  {ok} open  ·  {back} leave  ·  {turn}")
@@ -430,7 +450,7 @@ namespace ChillRoad
             subText.text = Loc.T("Couleur de carrosserie : sans effet sur la conduite", "Body colour: no effect on handling");
             levelText.text = can ? Loc.F($"{CarPaint.OwnedCount(spec)} / {CarPaint.Count} couleurs", $"{CarPaint.OwnedCount(spec)} / {CarPaint.Count} colours") : "";
             var now = CarTuning.Apply(spec);
-            ShowBars(now, now);
+            ShowBars(0, now, now);
 
             int price = InPaint ? CarPaint.Price(spec, shown) : 0;
             if (message != null) { actionText.text = message; actionText.color = messageColor; }
@@ -446,23 +466,58 @@ namespace ChillRoad
                 : Loc.T($"↑ ↓ choisir  ·  {ok} ouvrir  ·  {back} sortir  ·  {turn}", $"↑ ↓ browse  ·  {ok} open  ·  {back} leave  ·  {turn}");
         }
 
-        /// <summary>Barres de la fiche : valeurs actuelles, et le gain du niveau visé en surbrillance.</summary>
-        void ShowBars(VehicleSpec now, VehicleSpec after)
+        /// <summary>Fiche montrée : 0 performances, 1 adhérence par surface (pneus), 2 réglages (suspensions).</summary>
+        static int CardMode(CarTuning.Part p) => p == CarTuning.Part.Tires ? 1 : p == CarTuning.Part.Suspension ? 2 : 0;
+
+        static readonly string[,,] StatLabels =
+        {
+            {
+                { "Puissance", "Power" }, { "Vitesse max", "Top speed" }, { "Rapport poids/puissance", "Power to weight" },
+                { "Adhérence", "Grip" }, { "Freinage", "Braking" }, { "Appui à 200 km/h", "Downforce at 200 km/h" },
+            },
+            {
+                { "Goudron sec", "Dry tarmac" }, { "Pluie", "Wet" }, { "Terre", "Dirt" },
+                { "Neige", "Snow" }, { "Hors route", "Off-road" }, { "Tenue en glisse", "Grip while sliding" },
+            },
+            {
+                { "Raideur des ressorts", "Spring rate" }, { "Amortissement", "Damping" }, { "Antiroulis", "Anti-roll" },
+                { "Débattement", "Travel" }, { "Hauteur de caisse", "Ride height" }, { "Braquage", "Steering lock" },
+            },
+        };
+
+        /// <summary>Barres de la fiche : valeurs actuelles, et le changement de l'option visée en surbrillance.</summary>
+        void ShowBars(int mode, VehicleSpec now, VehicleSpec after)
         {
             for (int i = 0; i < Stats; i++)
             {
-                float a = Stat(now, i), b = Stat(after, i);
-                bool better = Mathf.Abs(b - a) > 1e-3f;
-                bars[i].fill.localScale = new Vector3(Mathf.Clamp01(a / scale[i]), 1f, 1f);
-                bars[i].gain.localScale = new Vector3(Mathf.Clamp01(b / scale[i]), 1f, 1f);
-                bars[i].label.color = better ? Brand : White;
-                bars[i].value.text = better ? Format(i, a) + "  →  " + Format(i, b) : Format(i, a);
-                bars[i].value.color = better ? Brand : Accent;
+                float a = Stat(mode, now, i), b = Stat(mode, after, i);
+                bool changed = Mathf.Abs(b - a) > 1e-3f;
+                bars[i].label.text = Loc.T(StatLabels[mode, i, 0], StatLabels[mode, i, 1]);
+                bars[i].fill.localScale = new Vector3(Mathf.Clamp01(Bar(mode, i, a) / scale[mode, i]), 1f, 1f);
+                bars[i].gain.localScale = new Vector3(Mathf.Clamp01(Bar(mode, i, b) / scale[mode, i]), 1f, 1f);
+                bars[i].label.color = changed ? Brand : White;
+                bars[i].value.text = changed ? Format(mode, i, a) + "  →  " + Format(mode, i, b) : Format(mode, i, a);
+                bars[i].value.color = changed ? Brand : Accent;
             }
         }
 
-        static float Stat(VehicleSpec s, int i)
+        static float Stat(int mode, VehicleSpec s, int i)
         {
+            if (mode == 1)
+                return i < 5 ? CarTuning.GripOn(s, (CarTuning.Ground)i) : CarTuning.SlideHold(s);
+            if (mode == 2)
+            {
+                var u = CarTuning.SuspensionOf(s);
+                switch (i)
+                {
+                    case 0: return 100f / u.sag;
+                    case 1: return 100f * u.damp;
+                    case 2: return 100f * u.arb;
+                    case 3: return 30f * u.travel;                 // débattement de base : 30 cm
+                    case 4: return -u.drop * 100f;                 // cm, par rapport à l'origine
+                    default: return s.steerLock;
+                }
+            }
             switch (i)
             {
                 case 0: return CarTuning.Power(s);
@@ -474,8 +529,20 @@ namespace ChillRoad
             }
         }
 
-        static string Format(int i, float v)
+        /// <summary>Longueur de barre d'une valeur : la hauteur de caisse (écart, négatif possible) part de 6 cm.</summary>
+        static float Bar(int mode, int i, float v) => mode == 2 && i == 4 ? 6f + v : v;
+
+        static string Format(int mode, int i, float v)
         {
+            if (mode == 1) return Loc.F($"{v:0.00}");
+            if (mode == 2)
+                switch (i)
+                {
+                    case 3: return Loc.F($"{v:0} cm");
+                    case 4: return Mathf.Abs(v) < 0.05f ? Loc.T("d'origine", "stock") : Loc.F($"{v:+0.0;-0.0} cm");
+                    case 5: return Loc.F($"{v:0}°");
+                    default: return Loc.F($"{v:0} %");
+                }
             switch (i)
             {
                 case 0: return Loc.F($"{v:0} ch", $"{v:0} hp");
@@ -491,11 +558,22 @@ namespace ChillRoad
 
         void Build()
         {
-            // Échelle des barres : la meilleure voiture du jeu, entièrement améliorée
+            // Échelle des barres : la meilleure voiture du jeu, entièrement améliorée ; pneus et suspensions : le meilleur
+            // type sur chaque ligne
             foreach (var c in game.assets.playerCars)
             {
                 var m = CarTuning.Maxed(c);
-                for (int i = 0; i < Stats; i++) scale[i] = Mathf.Max(scale[i], Stat(m, i), 1e-3f);
+                for (int i = 0; i < Stats; i++) scale[0, i] = Mathf.Max(scale[0, i], Stat(0, m, i), 1e-3f);
+                for (int k = 0; k < CarTuning.TypeCount; k++)
+                {
+                    var t = CarTuning.Preview(c, CarTuning.Part.Tires, k);
+                    var u = CarTuning.Preview(c, CarTuning.Part.Suspension, k);
+                    for (int i = 0; i < Stats; i++)
+                    {
+                        scale[1, i] = Mathf.Max(scale[1, i], Stat(1, t, i), 1e-3f);
+                        scale[2, i] = Mathf.Max(scale[2, i], Bar(2, i, Stat(2, u, i)), 1e-3f);
+                    }
+                }
             }
             stage = gameObject.AddComponent<WorkshopStage>();
             stage.Build(game);
@@ -538,7 +616,7 @@ namespace ChillRoad
             countText = Label(crumb, "", 22, TextAnchor.MiddleRight, Dim, FontStyle.Bold);
             Stretch(countText.rectTransform, 300f, 24f);
 
-            int count = Mathf.Max(CarTuning.PartCount + 1, Mathf.Max(CarTuning.MaxLevel + 1, CarPaint.Count));
+            int count = Mathf.Max(CarTuning.PartCount + 1, Mathf.Max(CarTuning.MaxOptions, CarPaint.Count));
             for (int i = 0; i < count; i++)
             {
                 int index = i;
@@ -573,16 +651,11 @@ namespace ChillRoad
             nameText = Place(Label(card, "", 40, TextAnchor.UpperLeft, White, FontStyle.BoldAndItalic), new Vector2(34f, -20f), new Vector2(460f, 50f));
             levelText = Place(Label(card, "", 24, TextAnchor.UpperRight, Brand, FontStyle.BoldAndItalic), new Vector2(480f, -28f), new Vector2(200f, 40f));
             subText = Place(Label(card, "", 22, TextAnchor.UpperLeft, Dim, FontStyle.Bold), new Vector2(34f, -70f), new Vector2(640f, 30f));
-            string[,] labels =
-            {
-                { "Puissance", "Power" }, { "Vitesse max", "Top speed" }, { "Rapport poids/puissance", "Power to weight" },
-                { "Adhérence", "Grip" }, { "Freinage", "Braking" }, { "Appui à 200 km/h", "Downforce at 200 km/h" },
-            };
             for (int i = 0; i < Stats; i++)
             {
                 float y = -118f - i * 52f;
                 var label = Place(Label(card, "", 21, TextAnchor.MiddleLeft, White, FontStyle.Normal), new Vector2(34f, y), new Vector2(250f, 30f));
-                Loc.Bind(label, labels[i, 0], labels[i, 1]);
+                label.text = Loc.T(StatLabels[0, i, 0], StatLabels[0, i, 1]);
                 var bg = Rect(card, "Bar", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(290f, y - 19f), new Vector2(470f, y - 11f));
                 bg.gameObject.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.12f);
                 var gain = Rect(bg, "Gain", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
