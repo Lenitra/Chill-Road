@@ -1,0 +1,245 @@
+{
+"shots": [
+{
+"name": "01_viaduc_lac",
+"car": "supra",
+"kind": "Highway",
+"span": "bridge",
+"x": 1700,
+"z": -1500,
+"spanOffset": 713,
+"hour": 17.4,
+"speed": 110,
+"drive": 6,
+"traffic": 1.6,
+"useEye": true,
+"eye": {
+"x": 1617,
+"y": 7,
+"z": -1446
+},
+"look": {
+"x": 0,
+"y": -2,
+"z": 0
+},
+"fov": 34
+},
+{
+"name": "01b_viaduc_lac_large",
+"car": "supra",
+"kind": "Highway",
+"span": "bridge",
+"x": 1700,
+"z": -1500,
+"spanOffset": 713,
+"hour": 17.4,
+"speed": 110,
+"drive": 6,
+"traffic": 1.6,
+"useEye": true,
+"eye": {
+"x": 1560,
+"y": 14,
+"z": -1390
+},
+"look": {
+"x": 0,
+"y": -6,
+"z": 0
+},
+"fov": 55
+},
+{
+"name": "04_village_twingo",
+"car": "twingo",
+"x": 300,
+"z": -1810,
+"hour": 11,
+"speed": 30,
+"drive": 4,
+"cam": {
+"x": 3.2,
+"y": 1.2,
+"z": 7.5
+},
+"look": {
+"x": 0,
+"y": 0.7,
+"z": 0
+},
+"fov": 40
+},
+{
+"name": "05_granges_couchant",
+"car": "mustang",
+"kind": "Main",
+"x": 1790,
+"z": 120,
+"hour": 18.3,
+"speed": 70,
+"drive": 5,
+"cam": {
+"x": 4.5,
+"y": 1.3,
+"z": 8.5
+},
+"look": {
+"x": 0,
+"y": 0.7,
+"z": 0
+},
+"fov": 38
+},
+{
+"name": "05b_granges_couchant_arriere",
+"car": "mustang",
+"kind": "Main",
+"x": 1790,
+"z": 120,
+"hour": 18.6,
+"speed": 70,
+"drive": 5,
+"cam": {
+"x": -3.5,
+"y": 1.6,
+"z": -8
+},
+"look": {
+"x": 0,
+"y": 0.9,
+"z": 6
+},
+"fov": 45
+},
+{
+"name": "08_port_lac",
+"car": "mx-5",
+"x": 1190,
+"z": -1470,
+"hour": 17.8,
+"speed": 40,
+"drive": 4,
+"useEye": true,
+"eye": {
+"x": 1300,
+"y": 5,
+"z": -1500
+},
+"look": {
+"x": 0,
+"y": 0,
+"z": 0
+},
+"fov": 35
+},
+{
+"name": "11_village_soir",
+"car": "mustang",
+"x": 250,
+"z": -1780,
+"hour": 19.7,
+"speed": 30,
+"drive": 4,
+"cam": {
+"x": -3.5,
+"y": 1.4,
+"z": -7
+},
+"look": {
+"x": 0,
+"y": 0.9,
+"z": 6
+},
+"fov": 45
+},
+{
+"name": "14_ami_village",
+"car": "ami",
+"x": 330,
+"z": -1840,
+"hour": 14,
+"speed": 35,
+"drive": 4,
+"cam": {
+"x": -3,
+"y": 1.1,
+"z": 5
+},
+"look": {
+"x": 0,
+"y": 0.6,
+"z": 0
+},
+"fov": 42
+},
+{
+"name": "15_col_delorean",
+"car": "delorean",
+"kind": "Mountain",
+"x": 50,
+"z": 600,
+"hour": 16.5,
+"speed": 50,
+"drive": 5,
+"cam": {
+"x": 5,
+"y": 2.5,
+"z": 9
+},
+"look": {
+"x": 0,
+"y": 0.7,
+"z": 0
+},
+"fov": 42
+},
+{
+"name": "02_tunnel",
+"car": "valkyrie",
+"kind": "Highway",
+"span": "tunnel",
+"x": 0,
+"z": 0,
+"spanOffset": -45,
+"hour": 15.5,
+"speed": 120,
+"drive": 6,
+"cam": {
+"x": 1.8,
+"y": 1.7,
+"z": -9
+},
+"look": {
+"x": 0,
+"y": 1.2,
+"z": 30
+},
+"fov": 52
+},
+{
+"name": "06_orage_autoroute",
+"car": "jesko",
+"kind": "Highway",
+"x": 2135,
+"z": -150,
+"hour": 17,
+"storm": true,
+"speed": 140,
+"drive": 6,
+"traffic": 1.8,
+"hud": true
+},
+{
+"name": "13_col_hud",
+"car": "supra",
+"kind": "Mountain",
+"x": -200,
+"z": -300,
+"hour": 18.2,
+"speed": 60,
+"drive": 5,
+"hud": true
+}
+]
+}

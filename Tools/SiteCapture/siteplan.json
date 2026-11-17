@@ -1,0 +1,15 @@
+{"shots":[
+{"name":"01_viaduc_lac","car":"supra","kind":"Highway","span":"bridge","x":1700,"z":-1500,"spanOffset":120,"hour":17.6,"speed":110,"drive":6,"cam":{"x":-24,"y":5,"z":20},"look":{"x":0,"y":0,"z":4},"fov":42},
+{"name":"02_tunnel","car":"valkyrie","kind":"Highway","span":"tunnel","x":0,"z":0,"spanOffset":-45,"hour":15.5,"speed":120,"drive":6,"cam":{"x":-2.6,"y":1.3,"z":-8},"look":{"x":0,"y":1.2,"z":30},"fov":55},
+{"name":"03_lacets_col","car":"ae86","kind":"Mountain","x":60,"z":200,"hour":16.2,"speed":50,"drive":5,"cam":{"x":-6,"y":34,"z":-38},"look":{"x":0,"y":0,"z":22},"fov":50},
+{"name":"04_village_twingo","car":"twingo","kind":"Street","x":300,"z":-1810,"hour":11,"speed":30,"drive":4,"cam":{"x":3.2,"y":1.2,"z":7.5},"look":{"x":0,"y":0.7,"z":0},"fov":40},
+{"name":"05_granges_couchant","car":"mustang","kind":"Main","x":1790,"z":120,"hour":19.1,"speed":70,"drive":5,"cam":{"x":4.5,"y":1.3,"z":8.5},"look":{"x":0,"y":0.7,"z":0},"fov":38},
+{"name":"06_orage_autoroute","car":"jesko","kind":"Highway","x":2135,"z":-150,"hour":17,"storm":true,"speed":140,"drive":6,"traffic":1.8,"hud":true},
+{"name":"07_piste_alpage","car":"yaris","kind":"Track","x":-1740,"z":120,"hour":14,"speed":45,"drive":5,"cam":{"x":-4,"y":2,"z":-9},"look":{"x":0,"y":1,"z":8},"fov":45},
+{"name":"08_port_lac","car":"mx-5","x":1190,"z":-1470,"hour":18.4,"speed":40,"drive":4,"cam":{"x":6,"y":1.6,"z":2},"look":{"x":0,"y":0.7,"z":0.5},"fov":40},
+{"name":"09_station","car":"vision","x":-1000,"z":230,"hour":13,"speed":40,"drive":4,"cam":{"x":4,"y":1.6,"z":8},"look":{"x":0,"y":0.8,"z":0},"fov":40},
+{"name":"10_echangeur","car":"delorean","kind":"Highway","x":350,"z":-2130,"hour":15,"speed":110,"drive":5,"traffic":1.6,"world":true,"cam":{"x":70,"y":110,"z":-80},"look":{"x":0,"y":0,"z":0},"fov":55},
+{"name":"11_village_soir","car":"mustang","kind":"Street","x":250,"z":-1780,"hour":20.3,"speed":30,"drive":4,"cam":{"x":-3.5,"y":1.4,"z":-7},"look":{"x":0,"y":0.9,"z":6},"fov":45},
+{"name":"12_peel","car":"peel","kind":"Main","x":700,"z":-1700,"hour":15,"speed":45,"drive":4,"traffic":1.6,"cam":{"x":2.4,"y":1.0,"z":4.5},"look":{"x":0,"y":0.5,"z":0},"fov":40},
+{"name":"13_col_hud","car":"supra","kind":"Mountain","x":-200,"z":-300,"hour":18.2,"speed":60,"drive":5,"hud":true}
+]}
