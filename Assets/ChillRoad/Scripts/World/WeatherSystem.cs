@@ -288,7 +288,7 @@ namespace ChillRoad
             }
 
             bool paused = Time.timeScale < 0.01f;
-            float master = audioFx ? audioFx.masterVolume : 0.8f;
+            float master = GameSettings.AmbienceVolume;
             if (rainSource) rainSource.volume = paused ? 0f : master * Rain * 0.42f * (1f - 0.75f * Shelter);
             if (bolt)
             {
@@ -316,7 +316,7 @@ namespace ChillRoad
             // Sous un tunnel, l'éclair n'illumine pas l'intérieur (il éclaire ciel, soleil et ambiante de toute la scène)
             Flash = flashT > 1.2f ? 0f : f * flashPeak * (1f - Shelter);
 
-            float master = audioFx ? audioFx.masterVolume : 0.8f;
+            float master = GameSettings.AmbienceVolume;
             for (int i = pendingThunder.Count - 1; i >= 0; i--)
             {
                 var (at, clip, volume) = pendingThunder[i];

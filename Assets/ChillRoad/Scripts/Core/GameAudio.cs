@@ -9,7 +9,11 @@ namespace ChillRoad
     public class GameAudio : MonoBehaviour
     {
         const int Rate = 44100;
-        [Range(0f, 1f)] public float masterVolume = 0.8f;
+        // Volumes : voies du menu Options (GameSettings), lues à chaque image
+        static float EngineVol => GameSettings.EngineVolume;
+        static float Fx => GameSettings.EffectsVolume;
+        static float Ambience => GameSettings.AmbienceVolume;
+        static float Ui => GameSettings.UiVolume;
 
         AudioSource wind, skid, siren, horn;
         /// <summary>Klaxon tenu (R3 / H) : réglé par <see cref="GameManager"/> chaque image de conduite.</summary>
@@ -43,18 +47,18 @@ namespace ChillRoad
             lose = Tones(new[] { 330f, 247f, 196f }, 0.12f, 0.3f, 0.35f);
             pop = Pop();
 
-            car.GearChanged += g => Play(blip, 0.1f, g > 1 ? 0.5f : 0.4f);
-            car.Impacted += (col, impact) => { if (impact > 3f) Play(crash, Mathf.Clamp01(impact / 15f), Random.Range(0.85f, 1.1f)); };
-            score.NearMiss += (pts, gap) => Play(whoosh, 0.8f, Random.Range(0.9f, 1.2f));
-            score.Bonus += (pts, label) => Play(blip, 0.18f, 1.4f);       // vitesse : petite note, toutes les 5 s
-            score.Banked += cash => Play(bonus, 0.5f, 1f);
-            score.Lost += (pts, why) => Play(lose, 0.6f, 1f);
-            score.DriftLost += pts => Play(lose, 0.45f, 1.1f);
-            score.JumpScored += (pts, air, dist) => Play(bonus, 0.35f, 1.3f);   // réception d'un saut
+            car.GearChanged += g => Play(blip, 0.1f * Ui, g > 1 ? 0.5f : 0.4f);
+            car.Impacted += (col, impact) => { if (impact > 3f) Play(crash, Mathf.Clamp01(impact / 15f) * Fx, Random.Range(0.85f, 1.1f)); };
+            score.NearMiss += (pts, gap) => Play(whoosh, 0.8f * Ui, Random.Range(0.9f, 1.2f));
+            score.Bonus += (pts, label) => Play(blip, 0.18f * Ui, 1.4f);       // vitesse : petite note, toutes les 5 s
+            score.Banked += cash => Play(bonus, 0.5f * Ui, 1f);
+            score.Lost += (pts, why) => Play(lose, 0.6f * Ui, 1f);
+            score.DriftLost += pts => Play(lose, 0.45f * Ui, 1.1f);
+            score.JumpScored += (pts, air, dist) => Play(bonus, 0.35f * Ui, 1.3f);   // réception d'un saut
         }
 
         /// <summary>Carillon (achat à la concession).</summary>
-        public void Chime() => Play(bonus, 0.55f, 1.12f);
+        public void Chime() => Play(bonus, 0.55f * Ui, 1.12f);
 
         void Update()
         {
@@ -82,17 +86,17 @@ namespace ChillRoad
                 }
             }
             bool limiter = car.Spec != null && car.Rpm >= car.Spec.redline * 0.985f && car.Throttle > 0.5f;
-            engine.SetState(rpm, load, r, limiter, paused ? 0f : masterVolume * 0.3f, Time.unscaledDeltaTime);
+            engine.SetState(rpm, load, r, limiter, paused ? 0f : EngineVol * 0.3f, Time.unscaledDeltaTime);
             // Soupape de décharge du turbo au lever de pied sous pression
             if ((engine.Voice == EngineVoice.Inline6Turbo || engine.Voice == EngineVoice.FlatPlaneV8Turbo) && lastThrottle > 0.6f && car.Throttle < 0.2f && engine.Boost > 0.35f) engine.BlowOff();
             lastThrottle = car.Throttle;
             float speed01 = Mathf.Clamp01(car.Speed / 80f);
-            wind.volume = paused ? 0f : masterVolume * speed01 * speed01 * 0.35f;
+            wind.volume = paused ? 0f : Ambience * speed01 * speed01 * 0.35f;
             wind.pitch = 0.7f + speed01 * 0.6f;
             float skidTarget = car.GroundedWheels > 0 && car.Speed > 4f ? Mathf.Clamp01((car.SkidAmount - 0.25f) * 1.6f) : 0f;
-            skid.volume = Mathf.Lerp(skid.volume, paused ? 0f : masterVolume * skidTarget * 0.35f, Time.unscaledDeltaTime * 10f);
+            skid.volume = Mathf.Lerp(skid.volume, paused ? 0f : Fx * skidTarget * 0.35f, Time.unscaledDeltaTime * 10f);
             // Klaxon : attaque franche, relâchement très court
-            float hornTarget = Horn && !paused ? masterVolume * HornVolume : 0f;
+            float hornTarget = Horn && !paused ? Fx * HornVolume : 0f;
             horn.volume = HornFade(horn.volume, hornTarget, Time.unscaledDeltaTime);
             bool chase = false;
             siren.volume = paused || !chase ? 0f : 0f;
@@ -119,15 +123,16 @@ namespace ChillRoad
                 : engine.Voice == EngineVoice.Inline4 ? 1.25f : 0.95f;
             float volume = (engine.Voice == EngineVoice.V8 ? 0.7f : 0.55f) * loud;
             pitch /= Mathf.Lerp(1f, 1.25f, Mathf.Clamp01(loud - 1f));
-            Play(pop, volume, pitch * Random.Range(0.9f, 1.1f));
+            Play(pop, volume * Fx, pitch * Random.Range(0.9f, 1.1f));
         }
 
+        /// <summary>Son ponctuel ; volume déjà multiplié par sa voie (effets ou sons du score).</summary>
         void Play(AudioClip clip, float volume, float pitch)
         {
             var s = oneShots[next];
             next = (next + 1) % oneShots.Length;
             s.pitch = pitch;
-            s.PlayOneShot(clip, volume * masterVolume);
+            s.PlayOneShot(clip, volume);
         }
 
         AudioSource Loop(AudioClip clip)

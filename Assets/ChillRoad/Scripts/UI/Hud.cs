@@ -231,7 +231,7 @@ namespace ChillRoad
                 Feed(Loc.F($"{label} · {air:0.0} s · {dist:0} m"), pts);
             };
             slot.Score.Lost += (pts, why) => Flash(new Color(1f, 0.1f, 0.05f), 0.35f);
-            if (game.Music) game.Music.TrackChanged += name => { musicText.text = "♪  " + name; musicTimer = 5f; };
+            if (game.Music) game.Music.TrackChanged += name => { if (!GameSettings.TrackNames) return; musicText.text = "♪  " + name; musicTimer = 5f; };
         }
 
         // ------------------------------------------------------------------ construction

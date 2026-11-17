@@ -192,7 +192,7 @@ namespace ChillRoad
             float near = 1f / (1f + d * d / (16f * 16f));
             float fade = Mathf.Clamp01((EngineRange - d) / 30f);
             bool silent = Time.timeScale < 0.01f || game.State == GameManager.Phase.Loading;
-            engine.SetState(Car.Rpm, Car.Throttle, Car.Rpm01, false, silent ? 0f : GameSettings.EffectsVolume * 0.3f * near * fade, Time.unscaledDeltaTime);
+            engine.SetState(Car.Rpm, Car.Throttle, Car.Rpm01, false, silent ? 0f : GameSettings.EngineVolume * 0.3f * near * fade, Time.unscaledDeltaTime);
         }
 
         /// <summary>Volume du klaxon d'une voiture à cette distance de la caméra, par rapport à celui de sa propre voiture (0-1).</summary>

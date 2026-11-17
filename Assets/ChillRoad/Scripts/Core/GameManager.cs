@@ -201,8 +201,26 @@ namespace ChillRoad
             Traffic.density = GameSettings.TrafficDensity;
             // Partie rejointe : la météo est celle du serveur
             if (Weather && !(Net && Net.IsClient)) Weather.SetChance(GameSettings.RainChance);
-            if (local.Audio) local.Audio.masterVolume = GameSettings.EffectsVolume;
+            ApplyListenerVolume();
             GraphicsQuality.Apply(this);
+        }
+
+        bool appFocused = true;
+
+        /// <summary>
+        /// Volume général (tout le son du jeu) ; muet sur un serveur dédié, et quand la fenêtre n'est plus active si
+        /// l'option « son en arrière-plan » est coupée.
+        /// </summary>
+        void ApplyListenerVolume()
+        {
+            bool muted = DedicatedServer || (!appFocused && !GameSettings.BackgroundAudio && !Application.isEditor);
+            AudioListener.volume = muted ? 0f : GameSettings.MasterVolume;
+        }
+
+        void OnApplicationFocus(bool focus)
+        {
+            appFocused = focus;
+            ApplyListenerVolume();
         }
 
         void Start()
@@ -226,7 +244,7 @@ namespace ChillRoad
             Races.Init(this);
             menus = gameObject.AddComponent<MenuScreens>();
             menus.Init(this);
-            if (DedicatedServer) AudioListener.volume = 0f;
+            ApplyListenerVolume();
             GraphicsQuality.Apply(this);
             StartCoroutine(Load());
             // Banc d'essai des performances : « Chill Road.exe -benchmark »

@@ -11,9 +11,15 @@ namespace ChillRoad
         /// <summary>Langue de l'interface (anglais par défaut, changée depuis l'écran d'accueil).</summary>
         public static Language Language = Language.English;
 
-        // Audio
+        // Audio : volume général (multiplie tout), puis une voie par famille de sons
+        public static float MasterVolume = 1f;
         public static float MusicVolume = 0.6f;
-        public static float EffectsVolume = 0.8f;
+        public static float EngineVolume = 0.8f;   // moteur (sa voiture et celles des autres joueurs)
+        public static float EffectsVolume = 0.8f;  // chocs, crissements, klaxon, retours de flamme
+        public static float AmbienceVolume = 0.8f; // vent, pluie, tonnerre
+        public static float UiVolume = 0.8f;       // sons du score (frôlement, bonus, combo perdu), rapports, achats
+        public static bool TrackNames = true;      // titre du morceau annoncé dans le HUD
+        public static bool BackgroundAudio = true; // son gardé quand la fenêtre n'est plus active (ordinateur)
 
         // Génération de route (multiplicateurs, 1 = réglage d'origine)
         public static float HighwayShare = 1f;   // part d'autoroute (0 = aucune)
@@ -59,6 +65,13 @@ namespace ChillRoad
             Language = PlayerPrefs.GetInt(Prefix + "lang", 0) == 1 ? Language.French : Language.English;
             MusicVolume = PlayerPrefs.GetFloat(Prefix + "music", MusicVolume);
             EffectsVolume = PlayerPrefs.GetFloat(Prefix + "sfx", EffectsVolume);
+            MasterVolume = PlayerPrefs.GetFloat(Prefix + "master", MasterVolume);
+            // (avant ces voies, moteur, ambiance et sons du score suivaient le volume des effets)
+            EngineVolume = PlayerPrefs.GetFloat(Prefix + "engine", EffectsVolume);
+            AmbienceVolume = PlayerPrefs.GetFloat(Prefix + "ambience", EffectsVolume);
+            UiVolume = PlayerPrefs.GetFloat(Prefix + "uisfx", EffectsVolume);
+            TrackNames = PlayerPrefs.GetInt(Prefix + "tracknames", TrackNames ? 1 : 0) == 1;
+            BackgroundAudio = PlayerPrefs.GetInt(Prefix + "bgaudio", BackgroundAudio ? 1 : 0) == 1;
             HighwayShare = PlayerPrefs.GetFloat(Prefix + "highway", HighwayShare);
             DirtShare = PlayerPrefs.GetFloat(Prefix + "dirt", DirtShare);
             Curviness = PlayerPrefs.GetFloat(Prefix + "curves", Curviness);
@@ -86,6 +99,12 @@ namespace ChillRoad
             PlayerPrefs.SetInt(Prefix + "lang", Language == Language.French ? 1 : 0);
             PlayerPrefs.SetFloat(Prefix + "music", MusicVolume);
             PlayerPrefs.SetFloat(Prefix + "sfx", EffectsVolume);
+            PlayerPrefs.SetFloat(Prefix + "master", MasterVolume);
+            PlayerPrefs.SetFloat(Prefix + "engine", EngineVolume);
+            PlayerPrefs.SetFloat(Prefix + "ambience", AmbienceVolume);
+            PlayerPrefs.SetFloat(Prefix + "uisfx", UiVolume);
+            PlayerPrefs.SetInt(Prefix + "tracknames", TrackNames ? 1 : 0);
+            PlayerPrefs.SetInt(Prefix + "bgaudio", BackgroundAudio ? 1 : 0);
             PlayerPrefs.SetFloat(Prefix + "highway", HighwayShare);
             PlayerPrefs.SetFloat(Prefix + "dirt", DirtShare);
             PlayerPrefs.SetFloat(Prefix + "curves", Curviness);
@@ -119,8 +138,10 @@ namespace ChillRoad
         public static void ResetAll()
         {
             ResetRoad();
+            MasterVolume = 1f;
             MusicVolume = 0.6f;
-            EffectsVolume = 0.8f;
+            EngineVolume = EffectsVolume = AmbienceVolume = UiVolume = 0.8f;
+            TrackNames = BackgroundAudio = true;
             TrafficDensity = EventFrequency = 1f;
             RelayKm = 2;
             RainChance = WeatherSystem.StormShare;
