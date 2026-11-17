@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace ChillRoad
@@ -11,8 +12,9 @@ namespace ChillRoad
     /// pause : voile sombre, plaque inclinée anthracite (<see cref="HudShape"/>), police du HUD, titre or, rubriques
     /// cyan, curseurs or.
     /// Rangé par onglets : Audio, Jeu (trafic, pluie, commandes tactiles si l'écran est tactile), Graphismes (qualité, distance des détails,
-    /// flou de mouvement), Écran (mode d'affichage, résolution et VSync sur ordinateur, limite d'images), Carte (retour
-    /// au départ). Tout s'applique tout de suite (mode d'affichage et résolution : une fois le curseur lâché).
+    /// flou de mouvement, secousses), Écran (mode d'affichage, résolution et VSync sur ordinateur, limite d'images),
+    /// Touches (deux touches et deux boutons de manette par commande, <see cref="GameInput.Bind"/>), Carte (retour au
+    /// départ). Tout s'applique tout de suite (mode d'affichage et résolution : une fois le curseur lâché).
     /// Manette : LB/RB (clavier : Tab, Maj+Tab) pour changer d'onglet, haut/bas pour choisir (la ligne choisie
     /// s'éclaire), gauche/droite pour régler.
     /// </summary>
@@ -50,6 +52,18 @@ namespace ChillRoad
         const float DisplayDelay = 0.6f;
         float displayAt;
 
+        // Onglet Touches : grille commandes × emplacements (clavier 1, clavier 2, manette 1, manette 2) ; un clic sur un
+        // emplacement attend la touche ou le bouton suivant (Échap / Start : annuler, Suppr / Retour arrière : vider).
+        // Pendant l'attente, la navigation des menus est coupée ; elle revient deux images après, pour que la touche
+        // choisie (A, Entrée, B…) n'agisse pas aussi sur le menu.
+        const int KeysTab = 4;
+        static readonly (float min, float max)[] SlotColumns = { (0.37f, 0.515f), (0.525f, 0.67f), (0.705f, 0.85f), (0.86f, 1f) };
+        Button[,] keyGrid;
+        bool capturing, navBlocked;
+        GameInput.Bind captureBind;
+        int captureSlot, captureFrame, captureEndFrame = -10;
+        bool capturePad;
+
         public void Init(GameManager gm)
         {
             game = gm;
@@ -67,7 +81,7 @@ namespace ChillRoad
             // Voile sombre de la pause, puis une plaque : titre, onglets, page de l'onglet, boutons du bas
             var shade = Rect(cgo.transform, "Shade", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             shade.gameObject.AddComponent<Image>().color = new Color(0.01f, 0.01f, 0.03f, 0.62f);
-            var panel = Panel(shade, "Options", new Vector2(-720, -372), new Vector2(720, 400));
+            var panel = Panel(shade, "Options", new Vector2(-720, -410), new Vector2(720, 430));
 
             var title = Label(panel, "OPTIONS", 64, TextAnchor.MiddleLeft, Accent, FontStyle.BoldAndItalic);
             title.gameObject.AddComponent<LayoutElement>().preferredHeight = 84;
@@ -77,7 +91,7 @@ namespace ChillRoad
             th.spacing = 14;
             th.childControlWidth = true; th.childControlHeight = true;
             th.childForceExpandWidth = false; th.childForceExpandHeight = true;
-            var tabNames = new[] { ("AUDIO", "AUDIO"), ("JEU", "GAMEPLAY"), ("GRAPHISMES", "GRAPHICS"), ("ÉCRAN", "DISPLAY"), ("CARTE", "MAP") };
+            var tabNames = new[] { ("AUDIO", "AUDIO"), ("JEU", "GAMEPLAY"), ("GRAPHISMES", "GRAPHICS"), ("ÉCRAN", "DISPLAY"), ("TOUCHES", "CONTROLS"), ("CARTE", "MAP") };
             TabGlyph(tabRow, "LB", TextAnchor.MiddleRight);
             tabs = new (Button, Text, Graphic)[tabNames.Length];
             pages = new RectTransform[tabNames.Length];
@@ -158,8 +172,11 @@ namespace ChillRoad
                 () => GameSettings.FpsCap, v => GameSettings.FpsCap = Mathf.RoundToInt(v),
                 v => GameSettings.VSync && GraphicsQuality.HasDisplayOptions ? Loc.T("Suit l'écran (VSync)", "Follows display (VSync)") : GraphicsQuality.FpsName(Mathf.RoundToInt(v)));
 
+            // Touches
+            BuildKeys(pages[KeysTab]);
+
             // Carte
-            var mapPage = pages[4];
+            var mapPage = pages[5];
             Section(mapPage, "LA CARTE", "THE MAP", "balade libre", "free roam");
             var gap = Rect(mapPage, "Gap", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             Fixed(gap, 12);
@@ -168,7 +185,7 @@ namespace ChillRoad
             Loc.Bind(applyText, "Revenir au départ (route de la vallée)", "Back to the start (valley road)");
 
             var bottom = ButtonRow(panel, 62);
-            var defaults = AddButton(bottom, () => { GameSettings.ResetAll(); displayAt = Time.unscaledTime + 0.01f; Changed(); RefreshAll(); });
+            var defaults = AddButton(bottom, () => { GameSettings.ResetAll(); GameInput.ResetBindings(); displayAt = Time.unscaledTime + 0.01f; Changed(); RefreshAll(); });
             Loc.Bind(defaults.text, "Par défaut", "Defaults");
             var back = AddButton(bottom, Close);
             Loc.Bind(back.text, "Retour", "Back");
@@ -179,7 +196,7 @@ namespace ChillRoad
             var hint = Label(shade, "", 21, TextAnchor.MiddleCenter, Dim, FontStyle.Normal);
             var hintRt = hint.rectTransform;
             hintRt.anchorMin = hintRt.anchorMax = new Vector2(0.5f, 0.5f);
-            hintRt.anchoredPosition = new Vector2(0f, -414f);
+            hintRt.anchoredPosition = new Vector2(0f, -452f);
             hintRt.sizeDelta = new Vector2(1600f, 40f);
             Loc.Bind(hint, "LB RB / Tab  catégorie   ·   ↑ ↓  choisir   ·   ← →  régler   ·   B / Échap  retour",
                            "LB RB / Tab  category   ·   ↑ ↓  select   ·   ← →  adjust   ·   B / Esc  back");
@@ -191,6 +208,7 @@ namespace ChillRoad
                 touch ? new Selectable[] { traffic, rain, touch } : new Selectable[] { traffic, rain },
                 new Selectable[] { quality, detail, blur, shake },
                 window ? new Selectable[] { window, resolution, vsync, fps } : new Selectable[] { fps },
+                KeyColumn(),
                 new Selectable[] { apply.button },
             };
             ShowTab(lastTab);
@@ -222,6 +240,8 @@ namespace ChillRoad
 
         public void Close()
         {
+            if (capturing) EndCapture();
+            RestoreNavigation();
             FlushDisplay();
             GameSettings.Save();
             root.SetActive(false);
@@ -265,6 +285,9 @@ namespace ChillRoad
         {
             if (displayAt > 0f && Time.unscaledTime >= displayAt) FlushDisplay();
             if (!IsOpen || Time.frameCount == openedFrame) return;
+            if (capturing) { UpdateCapture(); return; }
+            if (Time.frameCount <= captureEndFrame + 1) { HighlightRows(); return; }
+            RestoreNavigation();
             if (GameInput.CancelPressed)
             {
                 Close();
@@ -308,6 +331,8 @@ namespace ChillRoad
             Nav(defaultsButton, last, first, null, backButton);
             Nav(backButton, last, first, defaultsButton, null);
 
+            if (tab == KeysTab) WireKeyGrid();
+
             if (IsOpen && EventSystem.current) EventSystem.current.SetSelectedGameObject(first.gameObject);
             HighlightRows();
         }
@@ -316,12 +341,152 @@ namespace ChillRoad
         void HighlightRows()
         {
             var selected = EventSystem.current ? EventSystem.current.currentSelectedGameObject : null;
+            // (une ligne de l'onglet Touches a quatre cibles pour la même plaque : éteindre tout, puis allumer)
+            foreach (var r in rows) r.plate.enabled = r.bar.enabled = false;
             foreach (var r in rows)
+                if (r.target == selected) r.plate.enabled = r.bar.enabled = true;
+        }
+
+        // ------------------------------------------------------------------ touches
+
+        /// <summary>Onglet Touches : en-tête (commande, clavier, manette) puis une ligne par commande, quatre emplacements.</summary>
+        void BuildKeys(RectTransform page)
+        {
+            page.GetComponent<VerticalLayoutGroup>().spacing = 2;
+            var head = Rect(page, "Head", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Fixed(head, 40);
+            HeadLabel(head, "COMMANDE", "ACTION", 0f, 0.35f, TextAnchor.LowerLeft);
+            HeadLabel(head, "CLAVIER", "KEYBOARD", SlotColumns[0].min, SlotColumns[1].max, TextAnchor.LowerCenter);
+            HeadLabel(head, "MANETTE", "GAMEPAD", SlotColumns[2].min, SlotColumns[3].max, TextAnchor.LowerCenter);
+            var line = Shape(head, "Line", new Color(Info.r, Info.g, Info.b, 0.4f)).Set(0f, 0f, 260f);
+            var lrt = line.rectTransform;
+            lrt.anchorMin = Vector2.zero;
+            lrt.anchorMax = new Vector2(1f, 0f);
+            lrt.offsetMin = new Vector2(0f, -3f);
+            lrt.offsetMax = new Vector2(0f, -1f);
+
+            keyGrid = new Button[GameInput.BindCount, 4];
+            for (int b = 0; b < GameInput.BindCount; b++)
             {
-                bool on = r.target == selected;
-                r.plate.enabled = on;
-                r.bar.enabled = on;
+                var bind = (GameInput.Bind)b;
+                var row = Rect(page, bind.ToString(), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+                Fixed(row, 32);
+                var plate = Shape(row, "Selected", RowOn).Set(12f, 0f, 0f);
+                Fill(plate.rectTransform, new Vector2(-18, 0), new Vector2(14, 0));
+                var bar = Shape(row, "Mark", Accent).Set(6f, 0f, 0f);
+                var barRt = bar.rectTransform;
+                barRt.anchorMin = Vector2.zero;
+                barRt.anchorMax = new Vector2(0f, 1f);
+                barRt.offsetMin = new Vector2(-18, 5);
+                barRt.offsetMax = new Vector2(-13, -5);
+                plate.enabled = bar.enabled = false;
+                var name = Label(row, "", 22, TextAnchor.MiddleLeft, White, FontStyle.Normal);
+                Stretch(name.rectTransform, 0f, 0.36f, 6f, 0f);
+                refreshers.Add(() => name.text = GameInput.BindName(bind));
+                for (int c = 0; c < 4; c++)
+                {
+                    var slot = KeySlot(row, bind, c);
+                    keyGrid[b, c] = slot;
+                    rows.Add((slot.gameObject, plate, bar));
+                }
             }
+        }
+
+        void HeadLabel(RectTransform parent, string fr, string en, float xMin, float xMax, TextAnchor align)
+        {
+            var t = Loc.Bind(Label(parent, "", 21, align, Info, FontStyle.BoldAndItalic), fr, en);
+            Stretch(t.rectTransform, xMin, xMax, align == TextAnchor.LowerLeft ? 6f : 0f, 0f);
+            t.rectTransform.offsetMin = new Vector2(t.rectTransform.offsetMin.x, 6f);
+        }
+
+        /// <summary>Emplacement : petit bouton incliné portant la touche ou le bouton choisi (« … » pendant l'attente).</summary>
+        Button KeySlot(RectTransform row, GameInput.Bind bind, int column)
+        {
+            bool pad = column >= 2;
+            int slot = column % 2;
+            var (button, text) = AddButton(row, () => StartCapture(bind, slot, pad));
+            button.GetComponent<HudShape>().Set(10f, 0f, 0f);
+            var rt = (RectTransform)button.transform;
+            rt.anchorMin = new Vector2(SlotColumns[column].min, 0f);
+            rt.anchorMax = new Vector2(SlotColumns[column].max, 1f);
+            rt.offsetMin = new Vector2(0f, 2f);
+            rt.offsetMax = new Vector2(0f, -2f);
+            text.fontSize = 20;
+            text.fontStyle = FontStyle.Bold;
+            refreshers.Add(() =>
+            {
+                bool waiting = capturing && captureBind == bind && captureSlot == slot && capturePad == pad;
+                text.text = waiting ? "…" : pad ? GameInput.PadName(GameInput.GetPad(bind, slot)) : GameInput.KeyName(GameInput.GetKey(bind, slot));
+                text.color = waiting ? Accent : White;
+            });
+            return button;
+        }
+
+        /// <summary>Première colonne de la grille (chaîne haut/bas générique de ShowTab, complétée par WireKeyGrid).</summary>
+        Selectable[] KeyColumn()
+        {
+            var column = new Selectable[GameInput.BindCount];
+            for (int b = 0; b < column.Length; b++) column[b] = keyGrid[b, 0];
+            return column;
+        }
+
+        /// <summary>Navigation en grille : haut/bas dans la colonne (« Par défaut » aux deux bouts), gauche/droite entre emplacements.</summary>
+        void WireKeyGrid()
+        {
+            int n = GameInput.BindCount;
+            for (int b = 0; b < n; b++)
+                for (int c = 0; c < 4; c++)
+                    Nav(keyGrid[b, c], b > 0 ? keyGrid[b - 1, c] : defaultsButton, b < n - 1 ? keyGrid[b + 1, c] : defaultsButton,
+                        c > 0 ? keyGrid[b, c - 1] : null, c < 3 ? keyGrid[b, c + 1] : null);
+        }
+
+        void StartCapture(GameInput.Bind bind, int slot, bool pad)
+        {
+            capturing = true;
+            captureBind = bind;
+            captureSlot = slot;
+            capturePad = pad;
+            captureFrame = Time.frameCount;
+            if (EventSystem.current) { EventSystem.current.sendNavigationEvents = false; navBlocked = true; }
+            RefreshAll();
+        }
+
+        void UpdateCapture()
+        {
+            if (Time.frameCount == captureFrame) return;
+            var kb = Keyboard.current;
+            bool cancel = kb != null && kb.escapeKey.wasPressedThisFrame;
+            foreach (var p in Gamepad.all) if (p.startButton.wasPressedThisFrame) cancel = true;
+            if (cancel) { EndCapture(); return; }
+            bool clear = kb != null && (kb.deleteKey.wasPressedThisFrame || kb.backspaceKey.wasPressedThisFrame);
+            if (capturePad)
+            {
+                if (clear) { GameInput.SetPad(captureBind, captureSlot, ""); EndCapture(); return; }
+                string control = GameInput.PressedPadControl();
+                if (control != null) { GameInput.SetPad(captureBind, captureSlot, control); EndCapture(); }
+            }
+            else
+            {
+                if (clear) { GameInput.SetKey(captureBind, captureSlot, Key.None); EndCapture(); return; }
+                Key key = GameInput.PressedKey();
+                if (key != Key.None) { GameInput.SetKey(captureBind, captureSlot, key); EndCapture(); return; }
+                // Manette pendant l'attente d'une touche : B annule
+                foreach (var p in Gamepad.all) if (p.buttonEast.wasPressedThisFrame) { EndCapture(); return; }
+            }
+        }
+
+        void EndCapture()
+        {
+            capturing = false;
+            captureEndFrame = Time.frameCount;
+            RefreshAll();
+        }
+
+        void RestoreNavigation()
+        {
+            if (!navBlocked) return;
+            navBlocked = false;
+            if (EventSystem.current) EventSystem.current.sendNavigationEvents = true;
         }
 
         // ------------------------------------------------------------------ lignes

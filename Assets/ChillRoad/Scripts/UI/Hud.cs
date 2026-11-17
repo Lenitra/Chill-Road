@@ -51,6 +51,14 @@ namespace ChillRoad
             new[] { "Pause", "Pause", "Start", "Échap / P", "Esc / P", "II", "II" },
         };
 
+        // Commande réglable (GameInput.Bind) de chaque ligne de Controls : -1 = fixe (colonnes ci-dessus), -2 = direction
+        static readonly int[] ControlBinds =
+        {
+            (int)GameInput.Bind.Throttle, (int)GameInput.Bind.Brake, -2, (int)GameInput.Bind.Handbrake, (int)GameInput.Bind.Lights,
+            (int)GameInput.Bind.Flash, -1, (int)GameInput.Bind.Camera, (int)GameInput.Bind.Horn, (int)GameInput.Bind.LookBack,
+            (int)GameInput.Bind.Reset, (int)GameInput.Bind.Music, (int)GameInput.Bind.Map, -1,
+        };
+
         GameManager game;
         PlayerSlot slot;
         Font font;
@@ -105,6 +113,7 @@ namespace ChillRoad
         RectTransform musicRt;
         float hintTimer = 12f, musicTimer;
         bool hintPad, hintTouch;
+        int hintBuilt = -1;   // appareil + langue + version des commandes de l'aide affichée
         int gaugeSlide = -1;
         bool gaugeTouch;
         static readonly Vector2 GaugeTouchHome = new Vector2(-140f, 478f);
@@ -610,17 +619,32 @@ namespace ChillRoad
             // Aide : au départ, puis de nouveau quelques secondes quand on change d'appareil
             bool pad = GameInput.UsingGamepad, touch = TouchInput.Showing;
             if (pad != hintPad || touch != hintTouch) { hintPad = pad; hintTouch = touch; hintTimer = Mathf.Max(hintTimer, 6f); }
-            if (touch)
-                hintText.text = Loc.T("Gauche : diriger · droite : pédales · glisser sur l'écran : regarder autour · REPLACER : retour sur la route · II : pause",
-                                      "Left: steer · right: pedals · drag on screen: look around · RESET: back on the road · II: pause");
-            else hintText.text = pad
-                ? Loc.T("RT gaz · LT frein · B frein à main · L3 phares · R3 klaxon · X vue · LB regarder derrière · Y replacer · ↑ musique · Start pause",
-                        "RT throttle · LT brake · B handbrake · L3 lights · R3 horn · X camera · LB look back · Y reset · ↑ music · Start pause")
-                : Loc.T("Z/W gaz · S frein · Q/A D direction · Espace frein à main · L phares · H klaxon · C vue · B regarder derrière · R replacer · M musique · Échap pause",
-                        "W/Z throttle · S brake · A/Q D steer · Space handbrake · L lights · H horn · C camera · B look back · R reset · M music · Esc pause");
+            int hintKey = (touch ? 2 : pad ? 1 : 0) + (Loc.French ? 4 : 0) + GameInput.BindingsVersion * 8;
+            if (hintKey != hintBuilt)
+            {
+                hintBuilt = hintKey;
+                hintText.text = touch
+                    ? Loc.T("Gauche : diriger · droite : pédales · glisser sur l'écran : regarder autour · REPLACER : retour sur la route · II : pause",
+                            "Left: steer · right: pedals · drag on screen: look around · RESET: back on the road · II: pause")
+                    : DrivingHint(pad);
+            }
             bool visible = hintTimer > 0f && !Paused && !game.Demo && game.State == GameManager.Phase.Playing;
             if (visible) hintTimer -= dt;
             hintGroup.alpha = Mathf.MoveTowards(hintGroup.alpha, visible ? 1f : 0f, dt * 2f);
+        }
+
+        /// <summary>Aide d'une ligne pendant la conduite, d'après les commandes choisies dans les options (onglet Touches).</summary>
+        static string DrivingHint(bool pad)
+        {
+            string K(GameInput.Bind b) => GameInput.Short(b, pad);
+            string steer = pad ? "" : Loc.T($"{K(GameInput.Bind.Left)} {K(GameInput.Bind.Right)} direction · ", $"{K(GameInput.Bind.Left)} {K(GameInput.Bind.Right)} steer · ");
+            return Loc.T(
+                $"{K(GameInput.Bind.Throttle)} gaz · {K(GameInput.Bind.Brake)} frein · {steer}{K(GameInput.Bind.Handbrake)} frein à main · {K(GameInput.Bind.Lights)} phares · " +
+                $"{K(GameInput.Bind.Horn)} klaxon · {K(GameInput.Bind.Camera)} vue · {K(GameInput.Bind.LookBack)} regarder derrière · {K(GameInput.Bind.Reset)} replacer · " +
+                $"{K(GameInput.Bind.Music)} musique · {(pad ? "Start" : "Échap")} pause",
+                $"{K(GameInput.Bind.Throttle)} throttle · {K(GameInput.Bind.Brake)} brake · {steer}{K(GameInput.Bind.Handbrake)} handbrake · {K(GameInput.Bind.Lights)} lights · " +
+                $"{K(GameInput.Bind.Horn)} horn · {K(GameInput.Bind.Camera)} camera · {K(GameInput.Bind.LookBack)} look back · {K(GameInput.Bind.Reset)} reset · " +
+                $"{K(GameInput.Bind.Music)} music · {(pad ? "Start" : "Esc")} pause");
         }
 
         /// <summary>
@@ -774,6 +798,8 @@ namespace ChillRoad
             // L'heure d'une partie rejointe est celle du serveur
             timeTile = Tile(mid, MidH, HudIcon.Kind.Clock, "Heure", "Time", false, 1f,
                 () => { if (!(game.Net && game.Net.IsClient)) game.DayNight.Advance(3f); RefreshPause(); });
+            var map = Tile(mid, MidH, HudIcon.Kind.Map, "Carte", "Map", false, 1f, OpenMap);
+            Loc.Bind(map.sub, "Lieux, courses, GPS", "Places, races, GPS");
             var options = Tile(mid, MidH, HudIcon.Kind.Gear, "Options", "Options", false, 1f, OpenOptions);
             Loc.Bind(options.sub, "Son, jeu, graphismes", "Sound, game, graphics");
 
@@ -950,7 +976,7 @@ namespace ChillRoad
             bool touch = TouchInput.InUse && GameSettings.TouchSteer != 0;
             bool pad = !touch && GameInput.UsingGamepad;
             bool online = game.Online;
-            int shown = (touch ? 2 : pad ? 1 : 0) + (Loc.French ? 3 : 0) + GameSettings.TouchSteer * 6 + (online ? 100 : 0);
+            int shown = (touch ? 2 : pad ? 1 : 0) + (Loc.French ? 3 : 0) + GameSettings.TouchSteer * 6 + (online ? 100 : 0) + GameInput.BindingsVersion * 1000;
             if (shown == controlsShown) return;
             controlsShown = shown;
             controlsTitle.text = touch ? Loc.T("CONTRÔLES  ·  TACTILE", "CONTROLS  ·  TOUCH")
@@ -964,6 +990,14 @@ namespace ChillRoad
                 var c = Controls[i];
                 controlRows[i].action.text = Loc.T(c[0], c[1]);
                 string key = touch ? Loc.T(c[5], c[6]) : pad ? c[2] : Loc.T(c[3], c[4]);
+                int bind = ControlBinds[i];
+                if (!touch && bind >= 0)
+                {
+                    key = GameInput.Describe((GameInput.Bind)bind, pad);
+                    if (key == "—" && bind == (int)GameInput.Bind.Map) key = Loc.T("Menu pause", "Pause menu");
+                }
+                else if (!touch && !pad && bind == -2)
+                    key = GameInput.Describe(GameInput.Bind.Left, false) + "  ·  " + GameInput.Describe(GameInput.Bind.Right, false);
                 if (key == "@LS") key = Loc.T("Joystick gauche", "Left stick");
                 else if (key == "@RS") key = Loc.T("Joystick droit", "Right stick");
                 else if (key == "@DU") key = Loc.T("Croix ↑", "D-pad ↑");
@@ -1071,6 +1105,13 @@ namespace ChillRoad
                 AnimateTiles(0f);
                 EventSystem.current?.SetSelectedGameObject(firstButton.gameObject);
             }
+        }
+
+        /// <summary>Carte globale depuis la pause : la pause se ferme, la carte s'ouvre (on la referme pour reprendre la route).</summary>
+        void OpenMap()
+        {
+            SetPaused(false);
+            WorldMap.Toggle();
         }
 
         /// <summary>Options depuis la pause : le panneau de pause revient à la fermeture.</summary>

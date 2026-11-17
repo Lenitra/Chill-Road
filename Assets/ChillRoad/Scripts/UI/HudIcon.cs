@@ -12,7 +12,7 @@ namespace ChillRoad
     /// </summary>
     public class HudIcon : MaskableGraphic
     {
-        public enum Kind { Play, Car, Clock, Gear, Home, Power, Invite, Back }
+        public enum Kind { Play, Car, Clock, Gear, Home, Power, Invite, Back, Map }
 
         Kind kind;
         Color cut = Color.black;
@@ -102,6 +102,16 @@ namespace ChillRoad
                     }
                     Line(fg, new Vector2(0.8f, 0.36f), new Vector2(0.8f, 0.72f), 0.085f);
                     Line(fg, new Vector2(0.62f, 0.54f), new Vector2(0.98f, 0.54f), 0.085f);
+                    break;
+
+                case Kind.Map:
+                    // Carte dépliée en trois volets, plis en zigzag, repère sur le volet du milieu
+                    Poly(fg, new Vector2(0.06f, 0.24f), new Vector2(0.34f, 0.13f), new Vector2(0.34f, 0.77f), new Vector2(0.06f, 0.88f));
+                    Poly(fg, new Vector2(0.37f, 0.13f), new Vector2(0.63f, 0.24f), new Vector2(0.63f, 0.88f), new Vector2(0.37f, 0.77f));
+                    Poly(fg, new Vector2(0.66f, 0.24f), new Vector2(0.94f, 0.13f), new Vector2(0.94f, 0.77f), new Vector2(0.66f, 0.88f));
+                    Disc(bg, new Vector2(0.5f, 0.58f), 0.09f);
+                    Poly(bg, new Vector2(0.43f, 0.55f), new Vector2(0.57f, 0.55f), new Vector2(0.5f, 0.36f));
+                    Disc(fg, new Vector2(0.5f, 0.58f), 0.035f);
                     break;
 
                 case Kind.Back:
