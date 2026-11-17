@@ -32,7 +32,10 @@ function Step($text) { Write-Host "`n== $text" -ForegroundColor Cyan }
 function Warn($text) { Write-Host "Attention : $text" -ForegroundColor Yellow }
 function Fail($text) { Write-Host "ERREUR : $text" -ForegroundColor Red; exit 1 }
 function GitIn($dir) {
-    $out = & git -C $dir @args
+    # git écrit sa progression sur stderr ; si la sortie du script est redirigée, PS 5.1 en ferait une erreur
+    # bloquante sous ErrorActionPreference=Stop : seul le code de sortie fait foi.
+    $ErrorActionPreference = 'Continue'
+    $out = & git -C $dir @args 2>$null
     if ($LASTEXITCODE -ne 0) { Fail "git $($args -join ' ') (dans $dir)" }
     return $out
 }
@@ -123,10 +126,11 @@ $notesFile = Join-Path $env:TEMP "chillroad_notes_$Version.md"
 [IO.File]::WriteAllText($notesFile, ($body -join "`n"), (New-Object Text.UTF8Encoding($false)))
 
 Push-Location $repo
+$ErrorActionPreference = 'Continue'   # gh écrit sur stderr : seul le code de sortie fait foi
 try {
     & gh release create $tag $zip --target $sha --title "Chill Road $Version" --notes-file $notesFile --latest
     if ($LASTEXITCODE -ne 0) { Fail "création de la release refusée par gh." }
-} finally { Pop-Location; Remove-Item $notesFile -ErrorAction SilentlyContinue }
+} finally { Pop-Location; Remove-Item $notesFile -ErrorAction SilentlyContinue; $ErrorActionPreference = 'Stop' }
 
 # ---------------------------------------------------------------- Site
 Step "Site docs/index.html"
@@ -145,7 +149,9 @@ foreach ($r in $replacements) {
 [IO.File]::WriteAllText($siteFile, $html, $utf8)
 
 GitIn $repo commit --quiet -m "Site: version $Version ($sizeMo Mo)" -- docs/index.html | Out-Null
+$ErrorActionPreference = 'Continue'
 & git -C $repo push --quiet origin HEAD:main
+$ErrorActionPreference = 'Stop'
 if ($LASTEXITCODE -ne 0) {
     Warn "push refusé (la branche locale est sans doute en retard) : faire « git pull --rebase --autostash » puis « git push »."
 } else {
