@@ -344,16 +344,28 @@ sign("sign_hiking", "Sign_Hiking", sign_hiking, tags=["info", "hiking"], fp=(1.8
 
 
 def chevron(g):
-    """Balise de virage : panneau blanc à chevrons rouges pointant vers +X (retourner pour l'autre sens)."""
-    mast(g, 1.5)
-    z = 1.2
-    f = plate(g, rect(0, z, 0.6, 0.6), "sign_white", rivets=False)
-    for k, x in enumerate((-0.2, 0.0)):
-        relief(f, [(x, z + 0.24), (x + 0.12, z + 0.24), (x + 0.32, z), (x + 0.12, z - 0.24), (x, z - 0.24), (x + 0.2, z)][::-1],
-               "sign_red", k % 2)
+    """Balise de virage : panneau blanc à coins arrondis, deux chevrons rouges en relief pointant vers +X (retourner pour
+    l'autre sens). Niveau détaillé : mât rond à platine et bouchon, brides et colliers au dos, chevrons biseautés."""
+    z, half = 1.2, 0.3
+    mast(g, z + half - 0.04)                          # bouchon caché derrière le haut de la plaque
+    if g.hd:
+        out = round_ngon(half * math.sqrt(2), 4, math.pi / 4, (0, z), 0.05, 3)
+    else:
+        out = rect(0, z, 2 * half, 2 * half)
+    f = plate(g, out, "sign_white", rivets=False)
+    if g.hd:                                          # brides au dos, serrées sur le mât par des colliers
+        for dz in (-0.16, 0.16):
+            g.box((0, 0.017, z + dz), (0.2, 0.03, 0.045), "metal_dark")
+            g.frustum((0, 0.04, z + dz - 0.03), 0.047, 0.047, 0.06, 10, "metal_dark", auto=False)
+            for sx in (-1, 1):
+                g.octa((sx * 0.075, 0.045, z + dz), 0.012, "metal")
+    t, d, hh = 0.1, 0.16, 0.22                        # épaisseur, flèche et demi-hauteur d'un chevron
+    for k, x in enumerate((-0.21, 0.0)):
+        pts = [(x, z + hh), (x + t, z + hh), (x + t + d, z), (x + t, z - hh), (x, z - hh), (x + d, z)]
+        relief(f, pts[::-1], "sign_red", k % 2)
 
 
-sign("chevron", "Chevron", chevron, tags=["curve", "small"], lods=1)
+sign("chevron", "Chevron", chevron, tags=["curve", "small"], lods=2)
 
 
 def delineator(g):

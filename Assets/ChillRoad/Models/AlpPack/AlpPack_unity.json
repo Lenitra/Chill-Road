@@ -1999,10 +1999,10 @@
     "curve",
     "small"
    ],
-   "sx": 0.62,
-   "sy": 1.52,
+   "sx": 0.6,
+   "sy": 1.5,
    "sz": 0.22,
-   "fw": 0.62,
+   "fw": 0.6,
    "fd": 0.22,
    "collider": "capsule",
    "radius": 0.06,

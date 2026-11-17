@@ -1283,8 +1283,8 @@ MonoBehaviour:
     - curve
     - small
     prefab: {fileID: 919132149155446097, guid: fc29fd919cfb36844b15e17e789cc9d3, type: 3}
-    size: {x: 0.62, y: 1.52, z: 0.22}
-    footprint: {x: 0.62, y: 0.22}
+    size: {x: 0.6, y: 1.5, z: 0.22}
+    footprint: {x: 0.6, y: 0.22}
     collider: capsule
     radius: 0.06
     module: 0

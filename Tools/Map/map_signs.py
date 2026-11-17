@@ -170,7 +170,7 @@ class Signs:
                     sign = 1.0 if curv[mid] > 0 else -1.0          # courbure positive = virage à gauche
                     if peak > 1.0 / 30.0 and S[i] > 30.0 and S[j] < Ltot - 30.0:
                         for q in range(i, j + 1, 3):
-                            self.roadside("chevron", e, S[q], -sign, hw + 1.2, face="road", flags=INSTANCED)
+                            self.roadside("chevron", e, S[q], -sign, hw + 1.2, face="road")  # cassable : vrai objet
                         hair = peak > 1.0 / 22.0
                         if S[i] > 90.0:
                             self.roadside("sign_hairpin" if hair else ("sign_curve_l" if sign > 0 else "sign_curve_r"),

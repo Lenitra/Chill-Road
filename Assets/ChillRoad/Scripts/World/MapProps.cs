@@ -40,7 +40,10 @@ namespace ChillRoad
                 float scale = p.scale > 0f ? p.scale : 1f;
                 var cell = new Vector2Int(Mathf.FloorToInt(p.x / CellSize), Mathf.FloorToInt(p.z / CellSize));
                 Count++;
-                if ((p.flags & Instanced) != 0)
+                // Panneaux cassables (balises de virage comprises) : vrais objets avec collision, même si la carte les
+                // marque « instanciés »
+                bool breakable = BreakableProp.Fits(item);
+                if ((p.flags & Instanced) != 0 && !breakable)
                 {
                     var bounds = new Bounds(new Vector3((cell.x + 0.5f) * CellSize, p.y, (cell.y + 0.5f) * CellSize), new Vector3(CellSize + 40f, 400f, CellSize + 40f));
                     instancer.AddPrefab(new Vector2Int(cell.x + 20000, cell.y), bounds, item.prefab, Matrix4x4.TRS(pos, rot, Vector3.one * scale), (p.flags & Detail) != 0);
@@ -57,7 +60,7 @@ namespace ChillRoad
                 go.transform.localScale = Vector3.one * scale;
                 TuneLods(go);
                 AddCollider(go, item);
-                if (BreakableProp.Fits(item)) go.AddComponent<BreakableProp>().Init(go.GetComponent<Collider>(), item.size * scale);
+                if (breakable) go.AddComponent<BreakableProp>().Init(go.GetComponent<Collider>(), item.size * scale);
                 if (item.lights != null && item.lights.Length > 0) road.RegisterLamp(go.transform, item.lights);
                 if (Time.realtimeSinceStartup - last > 0.03f)
                 {
