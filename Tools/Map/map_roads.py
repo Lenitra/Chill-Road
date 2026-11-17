@@ -864,21 +864,31 @@ def carve(g, H, nodes, edges, pads=(), strips=()):
         tun = tunnel_mask(e)
         # têtes de tunnel : point et direction vers l'intérieur ; rien n'est terrassé au-delà de leur plan
         T = L.tangents(P)
-        portals = []
+        # têtes regroupées par tunnel (entrée puis sortie) : une maille n'est épargnée que si elle est du côté
+        # intérieur de TOUTES les têtes de son tunnel. (Avec un « et » sur toutes les têtes, un tunnel court, dont les
+        # deux têtes sont à portée, interdisait aussi le déblai devant chaque entrée : le remblai de la route du
+        # dessus enterrait les abords du passage inférieur.)
+        tunnels = []
         for i in range(len(P) - 1):
             if tun[i + 1] and not tun[i]:
-                portals.append((i + 1, T[i + 1, 0], T[i + 1, 1]))
+                tunnels.append([(i + 1, T[i + 1, 0], T[i + 1, 1])])
             if tun[i] and not tun[i + 1]:
-                portals.append((i, -T[i, 0], -T[i, 1]))
+                if not tunnels or len(tunnels[-1]) == 2:
+                    tunnels.append([])
+                tunnels[-1].append((i, -T[i, 0], -T[i, 1]))
 
-        def fn(sz, sx, d, t, i, P=P, hw=hw, bridge=bridge, tun=tun, portals=portals, s=s, radius=radius):
+        def fn(sz, sx, d, t, i, P=P, hw=hw, bridge=bridge, tun=tun, tunnels=tunnels, s=s, radius=radius):
             if tun[i] and tun[i + 1]:
                 return                      # en tunnel : le relief reste intact au-dessus
             ok = None
-            for (ip, tx, tz) in portals:
-                if abs(s[ip] - s[i]) < radius + 12.0:
-                    side = (g.X[sz, sx] - P[ip, 0]) * tx + (g.Z[sz, sx] - P[ip, 1]) * tz < 0.0
-                    ok = side if ok is None else ok & side
+            for heads in tunnels:
+                inside = None
+                for (ip, tx, tz) in heads:
+                    if abs(s[ip] - s[i]) < radius + 12.0:
+                        behind = (g.X[sz, sx] - P[ip, 0]) * tx + (g.Z[sz, sx] - P[ip, 1]) * tz >= 0.0
+                        inside = behind if inside is None else inside & behind
+                if inside is not None:
+                    ok = ~inside if ok is None else ok & ~inside
             ed = d - (hw[i] + t * (hw[i + 1] - hw[i]))
             if ok is not None:
                 ed = np.where(ok, ed, 1e9)
