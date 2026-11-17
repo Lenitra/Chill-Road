@@ -392,17 +392,17 @@ namespace ChillRoad
             root.SetParent(model, false);
 
             // Flaque de lumière au sol, façon GTA : elle épouse le contour de la caisse (rectangle arrondi), pleine
-            // dessous, et déborde d'environ un mètre tout autour en s'éteignant doucement
+            // dessous, et déborde d'un mètre et demi environ tout autour en s'éteignant très progressivement (diffuse)
             var pool = Piece(root, "Pool", new Vector3(b.center.x, ground + 0.035f, b.center.z), Quaternion.identity, Vector3.one, mats.pool, layer);
-            pool.GetComponent<MeshFilter>().sharedMesh = PoolMesh(halfW * 0.94f, len * 0.47f, Mathf.Clamp(halfW * 0.6f + 0.55f, 0.9f, 1.3f));
+            pool.GetComponent<MeshFilter>().sharedMesh = PoolMesh(halfW * 0.9f, len * 0.45f, Mathf.Clamp(halfW * 0.8f + 0.75f, 1.2f, 1.7f));
             // Tubes sous les bas de caisse, entre les roues (croix de deux plans : visibles de côté comme d'en haut)
             float zMid = (front + rear) * 0.5f, tubeLen = Mathf.Max(0.4f, front - rear - wheelR * 2.2f);
             float x = Mathf.Max(0.2f, track - 0.22f), y = ground + Mathf.Clamp(wheelR * 0.45f, 0.08f, 0.16f);
             foreach (float s in new[] { -1f, 1f })
             {
                 var pos = new Vector3(s * x, y, zMid);
-                Piece(root, "Tube", pos, Quaternion.Euler(90f, 0f, 0f), new Vector3(0.11f, tubeLen, 1f), mats.tube, layer);
-                Piece(root, "Tube", pos, Quaternion.Euler(0f, 90f, 0f), new Vector3(tubeLen, 0.11f, 1f), mats.tube, layer);
+                Piece(root, "Tube", pos, Quaternion.Euler(90f, 0f, 0f), new Vector3(0.15f, tubeLen, 1f), mats.tube, layer);
+                Piece(root, "Tube", pos, Quaternion.Euler(0f, 90f, 0f), new Vector3(tubeLen, 0.15f, 1f), mats.tube, layer);
             }
 
             // Trois lumières dans le volume de la caisse, le long de l'axe : assez hautes pour éclairer la route loin
@@ -415,7 +415,7 @@ namespace ChillRoad
                 var light = lightGo.AddComponent<Light>();
                 light.type = LightType.Point;
                 light.color = color;
-                light.range = halfW * 2f + 1.8f;
+                light.range = halfW * 2f + 2.8f;
                 light.intensity = 3.2f;
                 light.shadows = LightShadows.None;
             }
@@ -432,8 +432,8 @@ namespace ChillRoad
         {
             int key = Mathf.RoundToInt(hw * 50f) * 1000000 + Mathf.RoundToInt(hl * 50f) * 1000 + Mathf.RoundToInt(spread * 50f);
             if (poolMeshes.TryGetValue(key, out var cached) && cached) return cached;
-            const int perCorner = 8, rings = 7;
-            float r0 = Mathf.Min(hw, hl) * 0.45f;
+            const int perCorner = 8, rings = 10;
+            float r0 = Mathf.Min(hw, hl) * 0.6f;
             int ringVerts = perCorner * 4;
             var verts = new List<Vector3> { Vector3.zero };
             var cols = new List<Color32> { new Color32(255, 255, 255, 255) };
@@ -441,8 +441,8 @@ namespace ChillRoad
             for (int ring = 0; ring <= rings; ring++)
             {
                 float k = ring / (float)rings, d = spread * k;
-                // Cloche : forte près de la caisse, longue traîne, zéro au bord
-                float a = Mathf.Pow(1f - k, 2.2f);
+                // Dégradé doux (inverse d'un smoothstep) : pas de plateau saturé ni de bord net, s'éteint en douceur
+                float a = 1f - k * k * (3f - 2f * k);
                 for (int c = 0; c < 4; c++)
                 {
                     float cx = (c == 0 || c == 3 ? 1f : -1f) * (hw - r0), cz = (c < 2 ? 1f : -1f) * (hl - r0);
@@ -504,8 +504,8 @@ namespace ChillRoad
             if (neonMaterials.TryGetValue(neon, out var m) && m.pool && m.tube) return m;
             var c = NeonColor(neon);
             // Flaque : couleur saturée (les sommets portent la forme) ; tubes : très lumineux, le bloom les fait briller
-            m.pool = Glow(spark, "NeonPool", c * 1.7f, Texture2D.whiteTexture);
-            m.tube = Glow(spark, "NeonTube", c * 8f, SoftTexture);
+            m.pool = Glow(spark, "NeonPool", c * 1.05f, Texture2D.whiteTexture);
+            m.tube = Glow(spark, "NeonTube", c * 6.5f, SoftTexture);
             neonMaterials[neon] = m;
             return m;
         }
