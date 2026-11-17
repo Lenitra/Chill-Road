@@ -266,7 +266,7 @@ def _cn(g):
 
 def _wd(g):
     """Vent (2026-11-16) : par coin de face, (frémissement en m à la pointe, phase 0-1, 1). Converti en UV1/UV2 par
-    alp_lib.finish pour les fiches marquées `wind` ; le shader NoHesi/Toon déplace ces sommets."""
+    alp_lib.finish pour les fiches marquées `wind` ; le shader ChillRoad/Toon déplace ces sommets."""
     lay = g.bm.loops.layers.float_vector.get("wd")
     return lay if lay is not None else g.bm.loops.layers.float_vector.new("wd")
 

@@ -1,4 +1,4 @@
-"""Masques du sol, données annexes et export de la carte vers Unity (Assets/NoHesi/Resources/Map)."""
+"""Masques du sol, données annexes et export de la carte vers Unity (Assets/ChillRoad/Resources/Map)."""
 import json
 import math
 import os
@@ -8,7 +8,7 @@ import map_lib as L
 import map_roads as R
 from map_terrain import stamp_polyline
 
-OUT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Assets", "NoHesi",
+OUT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Assets", "ChillRoad",
                                     "Resources", "Map"))
 
 

@@ -2,7 +2,7 @@
 rend des aperçus. Ne sauvegarde aucun .blend (CarPack.blend peut être ouvert ailleurs).
 
 E:\\blender\\blender.exe -b --factory-startup --python run_cars.py -- [options] [ids...]
-  --export        exporte les FBX (Assets/NoHesi/Models/CarPack ou PlayerCars) + la palette
+  --export        exporte les FBX (Assets/ChillRoad/Models/CarPack ou PlayerCars) + la palette
   --render DIR    rend un aperçu 3/4 avant + arrière par véhicule dans DIR
   --sheet DIR     planche de tous les véhicules demandés (une image)
   ids             identifiants (défaut : tout le trafic + les voitures jouables)
@@ -61,13 +61,13 @@ for cid in ids:
 
 if opts["export"]:
     for cid in ids:
-        folder = os.path.join(ROOT, "Assets", "NoHesi", "Models", "PlayerCars" if cid in PLAYABLE else "CarPack")
+        folder = os.path.join(ROOT, "Assets", "ChillRoad", "Models", "PlayerCars" if cid in PLAYABLE else "CarPack")
         path, stats = P.export(cid, folder)
         print("[run_cars] export", path, flush=True)
-    P.palette_image(os.path.join(ROOT, "Assets", "NoHesi", "Models", "CarPack", "CarPack_Palette.png"))
+    P.palette_image(os.path.join(ROOT, "Assets", "ChillRoad", "Models", "CarPack", "CarPack_Palette.png"))
 
 def toon_preview():
-    """Aperçu proche du shader NoHesi/Toon : rampe à deux tons (ombre bleutée), émission = couleur finale,
+    """Aperçu proche du shader ChillRoad/Toon : rampe à deux tons (ombre bleutée), émission = couleur finale,
     contours Freestyle. Ne concerne que le rendu de prévisualisation (les FBX gardent leurs matériaux)."""
     for name in ("PK_Palette", "PK_Paint"):
         m = bpy.data.materials.get(name)

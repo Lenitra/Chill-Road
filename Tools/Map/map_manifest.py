@@ -4,7 +4,7 @@ import json
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PACK = os.path.normpath(os.path.join(HERE, "..", "..", "Assets", "NoHesi", "Models", "AlpPack"))
+PACK = os.path.normpath(os.path.join(HERE, "..", "..", "Assets", "ChillRoad", "Models", "AlpPack"))
 
 
 def load():

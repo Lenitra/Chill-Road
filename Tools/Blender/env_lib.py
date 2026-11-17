@@ -1,4 +1,4 @@
-"""Pack d'environnement NoHesi (nature, mobilier routier, bâtiments), même direction artistique que les voitures.
+"""Pack d'environnement ChillRoad (nature, mobilier routier, bâtiments), même direction artistique que les voitures.
 
 Low poly à facettes, une palette de dégradés verticaux (bas sombre -> haut clair) partagée par tout le pack.
 Chaque objet est construit directement en bmesh avec une couleur de palette par face ; la finition écrit les UV

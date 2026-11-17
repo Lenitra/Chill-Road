@@ -7,7 +7,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-namespace NoHesi.DebugTools
+namespace ChillRoad.DebugTools
 {
     // Build de capture uniquement (copie du projet) : prises de vues automatiques pour la page itch.io.
     // Lancement : Capture.exe -shots <dossier> -plan <plan.json> [-seed N]
@@ -93,12 +93,12 @@ namespace NoHesi.DebugTools
             if (outDir == null || planPath == null) return;
             var plan = JsonUtility.FromJson<ShotPlan>(File.ReadAllText(planPath));
             // Réglages de partie : graine fixe, pas d'événements aléatoires ni de relais
-            PlayerPrefs.SetInt("nohesi_opt_seed", plan.seed);
-            PlayerPrefs.SetFloat("nohesi_opt_events", 0f);
-            PlayerPrefs.SetInt("nohesi_opt_relay", 0);
-            PlayerPrefs.SetFloat("nohesi_opt_music", 0f);
-            PlayerPrefs.SetFloat("nohesi_opt_sfx", 0f);
-            PlayerPrefs.SetInt("nohesi_car", 0);
+            PlayerPrefs.SetInt("chillroad_opt_seed", plan.seed);
+            PlayerPrefs.SetFloat("chillroad_opt_events", 0f);
+            PlayerPrefs.SetInt("chillroad_opt_relay", 0);
+            PlayerPrefs.SetFloat("chillroad_opt_music", 0f);
+            PlayerPrefs.SetFloat("chillroad_opt_sfx", 0f);
+            PlayerPrefs.SetInt("chillroad_car", 0);
             Application.runInBackground = true;
             var go = new GameObject("ShotDirector");
             DontDestroyOnLoad(go);
@@ -352,7 +352,7 @@ namespace NoHesi.DebugTools
             gm.Events.relayInterval = 0f;
             if (spec.car >= 0)
             {
-                int cur = PlayerPrefs.GetInt("nohesi_car", 0);
+                int cur = PlayerPrefs.GetInt("chillroad_car", 0);
                 int n = gm.assets.playerCars.Length;
                 int delta = ((spec.car - cur) % n + n) % n;
                 if (delta != 0) gm.CycleCar(delta, true);

@@ -1,0 +1,380 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a6c84f5e47e54e48bbfaeeba392c4de, type: 3}
+  m_Name: GameAssets
+  m_EditorClassIdentifier: Assembly-CSharp::ChillRoad.GameAssets
+  playerCars:
+  - id: vision74
+    displayName: Vision 74
+    prefab: {fileID: 919132149155446097, guid: 002bdb4d119e0d446b7fd00360a3e4af, type: 3}
+    modelScale: 1
+    drivetrain: 0
+    mass: 1650
+    maxTorque: 720
+    redline: 8000
+    gearRatios:
+    - 3.3
+    - 2.2
+    - 1.62
+    - 1.28
+    - 1.04
+    - 0.86
+    finalDrive: 3.45
+    wheelRadius: 0.355
+    tireGrip: 1.5
+    dragArea: 0.66
+    downforceArea: 0.95
+    steerLock: 34
+    brakeForce: 18975
+    hoodCamera: {x: 0, y: 1.1, z: 0.9}
+    bumperCamera: {x: 0, y: 0.48, z: 2.6}
+    engineVoice: 0
+  - id: supra
+    displayName: Toyota Supra
+    prefab: {fileID: 919132149155446097, guid: bc05dd5e89d2068499152c2abfea8b9b, type: 3}
+    modelScale: 1
+    drivetrain: 0
+    mass: 1570
+    maxTorque: 431
+    redline: 6800
+    gearRatios:
+    - 3.827
+    - 2.36
+    - 1.685
+    - 1.312
+    - 1
+    - 0.793
+    finalDrive: 3.13
+    wheelRadius: 0.32
+    tireGrip: 1.3
+    dragArea: 0.62
+    downforceArea: 0.3
+    steerLock: 34
+    brakeForce: 16485
+    hoodCamera: {x: 0, y: 1.1, z: 0.98}
+    bumperCamera: {x: 0, y: 0.45, z: 2.4}
+    engineVoice: 0
+  - id: miata
+    displayName: Mazda MX-5
+    prefab: {fileID: 919132149155446097, guid: c0f075dacc44bde47b711359d6e29b4f, type: 3}
+    modelScale: 1
+    drivetrain: 0
+    mass: 990
+    maxTorque: 155
+    redline: 7000
+    gearRatios:
+    - 3.136
+    - 1.888
+    - 1.33
+    - 1
+    - 0.814
+    finalDrive: 4.1
+    wheelRadius: 0.289
+    tireGrip: 1.2
+    dragArea: 0.66
+    downforceArea: 0.15
+    steerLock: 36
+    brakeForce: 9900
+    hoodCamera: {x: 0, y: 1, z: 0.62}
+    bumperCamera: {x: 0, y: 0.42, z: 1.98}
+    engineVoice: 0
+  - id: mustang
+    displayName: Ford Mustang 1969
+    prefab: {fileID: 919132149155446097, guid: 4a701bad34fed484a9b1004cd1ec32fc, type: 3}
+    modelScale: 1
+    drivetrain: 0
+    mass: 1600
+    maxTorque: 610
+    redline: 6000
+    gearRatios:
+    - 2.32
+    - 1.69
+    - 1.29
+    - 1
+    finalDrive: 3.5
+    wheelRadius: 0.34
+    tireGrip: 1.1
+    dragArea: 0.84
+    downforceArea: 0.1
+    steerLock: 32
+    brakeForce: 13600
+    hoodCamera: {x: 0, y: 1.12, z: 0.85}
+    bumperCamera: {x: 0, y: 0.5, z: 2.42}
+    engineVoice: 0
+  - id: p50
+    displayName: Peel P50
+    prefab: {fileID: 919132149155446097, guid: 552244eb08330cd4a8fa257e8550cf19, type: 3}
+    modelScale: 1
+    drivetrain: 0
+    mass: 135
+    maxTorque: 5
+    redline: 6500
+    gearRatios:
+    - 3
+    - 1.7
+    - 1
+    finalDrive: 6.4
+    wheelRadius: 0.16
+    tireGrip: 0.95
+    dragArea: 0.5
+    downforceArea: 0
+    steerLock: 38
+    brakeForce: 945
+    hoodCamera: {x: 0, y: 0.98, z: 0.4}
+    bumperCamera: {x: 0, y: 0.3, z: 0.72}
+    engineVoice: 0
+  - id: ae86
+    displayName: Toyota AE86 Trueno
+    prefab: {fileID: 919132149155446097, guid: f3ad7ce0614669b4ebf72532265ea8ee, type: 3}
+    modelScale: 1
+    drivetrain: 0
+    mass: 940
+    maxTorque: 149
+    redline: 7600
+    gearRatios:
+    - 3.587
+    - 2.022
+    - 1.384
+    - 1
+    - 0.861
+    finalDrive: 4.3
+    wheelRadius: 0.289
+    tireGrip: 1.1
+    dragArea: 0.62
+    downforceArea: 0.1
+    steerLock: 36
+    brakeForce: 9400
+    hoodCamera: {x: 0, y: 1.1, z: 0.8}
+    bumperCamera: {x: 0, y: 0.42, z: 2.1}
+    engineVoice: 3
+  - id: dmc12
+    displayName: DeLorean (Retour vers le futur)
+    prefab: {fileID: 919132149155446097, guid: 9aec0f41fe677ee488265f7d04ada98b, type: 3}
+    modelScale: 1
+    drivetrain: 0
+    mass: 1233
+    maxTorque: 207
+    redline: 6000
+    gearRatios:
+    - 3.36
+    - 2.06
+    - 1.38
+    - 1.03
+    - 0.82
+    finalDrive: 3.44
+    wheelRadius: 0.332
+    tireGrip: 1.1
+    dragArea: 0.62
+    downforceArea: 0.1
+    steerLock: 34
+    brakeForce: 11713.5
+    hoodCamera: {x: 0, y: 0.98, z: 0.7}
+    bumperCamera: {x: 0, y: 0.4, z: 2.08}
+    engineVoice: 0
+  - id: jesko
+    displayName: Koenigsegg Jesko Attack
+    prefab: {fileID: 919132149155446097, guid: f1c937395cc51c64fac15f8f030e7dcb, type: 3}
+    modelScale: 1
+    drivetrain: 0
+    mass: 1420
+    maxTorque: 1500
+    redline: 8500
+    gearRatios:
+    - 2.9
+    - 2.2
+    - 1.72
+    - 1.39
+    - 1.15
+    - 0.98
+    - 0.85
+    - 0.75
+    - 0.67
+    finalDrive: 4.3
+    wheelRadius: 0.364
+    tireGrip: 1.5
+    dragArea: 0.9
+    downforceArea: 2.6
+    steerLock: 32
+    brakeForce: 19880
+    hoodCamera: {x: 0, y: 1, z: 0.95}
+    bumperCamera: {x: 0, y: 0.36, z: 2.4}
+    engineVoice: 0
+  - id: valkyrie
+    displayName: Aston Martin Valkyrie
+    prefab: {fileID: 919132149155446097, guid: 16054e88e0275ce4cbdcbee0468436ea, type: 3}
+    modelScale: 1
+    drivetrain: 0
+    mass: 1110
+    maxTorque: 620
+    redline: 10500
+    gearRatios:
+    - 3
+    - 2.3
+    - 1.85
+    - 1.52
+    - 1.28
+    - 1.1
+    - 0.96
+    finalDrive: 4.2
+    wheelRadius: 0.355
+    tireGrip: 1.6
+    dragArea: 0.55
+    downforceArea: 3.5
+    steerLock: 28
+    brakeForce: 16650
+    hoodCamera: {x: 0, y: 0.92, z: 1.05}
+    bumperCamera: {x: 0, y: 0.3, z: 2.55}
+    engineVoice: 0
+  - id: twingo
+    displayName: Renault Twingo
+    prefab: {fileID: 919132149155446097, guid: 50188a712d0af7d45804b088c5b92de7, type: 3}
+    modelScale: 1
+    drivetrain: 1
+    mass: 860
+    maxTorque: 90
+    redline: 6000
+    gearRatios:
+    - 3.73
+    - 2.05
+    - 1.32
+    - 0.97
+    - 0.79
+    finalDrive: 4.21
+    wheelRadius: 0.267
+    tireGrip: 1
+    dragArea: 0.69
+    downforceArea: 0
+    steerLock: 38
+    brakeForce: 7740
+    hoodCamera: {x: 0, y: 1.18, z: 1.15}
+    bumperCamera: {x: 0, y: 0.42, z: 1.78}
+    engineVoice: 3
+  - id: ami
+    displayName: "Citro\xEBn Ami"
+    prefab: {fileID: 919132149155446097, guid: 01ddebaad0983a74a9a84184b7733980, type: 3}
+    modelScale: 1
+    drivetrain: 1
+    mass: 560
+    maxTorque: 28
+    redline: 7000
+    gearRatios:
+    - 1
+    finalDrive: 16.36
+    wheelRadius: 0.279
+    tireGrip: 0.95
+    dragArea: 0.85
+    downforceArea: 0
+    steerLock: 40
+    brakeForce: 4760
+    hoodCamera: {x: 0, y: 1.18, z: 1.02}
+    bumperCamera: {x: 0, y: 0.42, z: 1.3}
+    engineVoice: 4
+  trafficCars:
+  - {fileID: 919132149155446097, guid: ac7755cbef5a46241a35e49a8c1c8aa8, type: 3}
+  - {fileID: 919132149155446097, guid: 197741a7d4478e449abdd8c6c24b932b, type: 3}
+  - {fileID: 919132149155446097, guid: b4a8502cf28902b49a77847dee5c9da8, type: 3}
+  - {fileID: 919132149155446097, guid: 32f86229b9a693e44af1e9ea2170c5f7, type: 3}
+  - {fileID: 919132149155446097, guid: 66038784368403747853f1df7949e3b7, type: 3}
+  - {fileID: 919132149155446097, guid: 2b3de37afc0f6b64ea3ecd0eed64b531, type: 3}
+  - {fileID: 919132149155446097, guid: 82626bc8a720d2b48a1f8fe735e32cde, type: 3}
+  - {fileID: 919132149155446097, guid: 91fc67992f1ccc745bf7c138e1466290, type: 3}
+  - {fileID: 919132149155446097, guid: cdcf6642a2146ab4f8f27593e9549465, type: 3}
+  - {fileID: 919132149155446097, guid: a48b2ac6578e5b14b858d11cfdb21da4, type: 3}
+  - {fileID: 919132149155446097, guid: 8ecd6973dafeb8541abf9d55cd28b591, type: 3}
+  - {fileID: 919132149155446097, guid: 46c8c08259e9c46459fcb9a62d5bdbf6, type: 3}
+  trafficTrucks:
+  - {fileID: 919132149155446097, guid: 379397321ada4d444818883262aac2c3, type: 3}
+  - {fileID: 919132149155446097, guid: e11d3993d463bf24e8de12d576f78f7f, type: 3}
+  - {fileID: 919132149155446097, guid: cd06c282cc5a77048b20282a4a09e3c4, type: 3}
+  - {fileID: 919132149155446097, guid: 2bf2f9d67cbacd14b8f6189e8a4842f1, type: 3}
+  - {fileID: 919132149155446097, guid: b5d7f52acc4d52543947bc3f3fa3ae0b, type: 3}
+  - {fileID: 919132149155446097, guid: afd1f9e57ec5b2641a20e3b5dd7bd170, type: 3}
+  - {fileID: 919132149155446097, guid: f957baf9eb75bb14f9df191b8040cf7a, type: 3}
+  - {fileID: 919132149155446097, guid: b08b8d99c9791a847929fb7c765e4fd7, type: 3}
+  - {fileID: 919132149155446097, guid: 9ecf25fed5520d84990e0453818a5404, type: 3}
+  trafficBikes:
+  - {fileID: 919132149155446097, guid: 46dfbf9e2f7cf7f48ae03d9592cc2b97, type: 3}
+  - {fileID: 919132149155446097, guid: 9f376ccc36621e247998b23384509ad0, type: 3}
+  bikeShare: 0.06
+  trafficFarm:
+  - {fileID: 919132149155446097, guid: 547133b6a0f4e78498b7c627bc872408, type: 3}
+  farmShare: 0.07
+  policeCar: {fileID: 919132149155446097, guid: 9fd162dc91a348e49b67a32c935872ef, type: 3}
+  trafficCarScale: 1
+  trafficTruckScale: 1
+  policeCarScale: 1
+  buildings:
+  - {fileID: 919132149155446097, guid: 392ac4a57c23adf479b59e9051a9086f, type: 3}
+  - {fileID: 919132149155446097, guid: 08f24ded1f29ffc4b865e0ba80e20463, type: 3}
+  - {fileID: 919132149155446097, guid: 39c5ecd87472df34787d9d3070741f2e, type: 3}
+  - {fileID: 919132149155446097, guid: 3215fb53758e52f498ad8b5e63ea386d, type: 3}
+  - {fileID: 919132149155446097, guid: a2a439e266f473a42a2ba5f47be7f09f, type: 3}
+  streetLight: {fileID: 919132149155446097, guid: 3178c22aafeaf2f4fb6ad602368735f7, type: 3}
+  streetLightSingle: {fileID: 919132149155446097, guid: 483eeb8f4eb24aa49a37d6225a4f8dc9, type: 3}
+  stopSign: {fileID: 919132149155446097, guid: 4d2faaac498613947874decf4a49b18c, type: 3}
+  warningSign: {fileID: 919132149155446097, guid: f1403382118d1024997df9433e587a09, type: 3}
+  cone: {fileID: 919132149155446097, guid: 40c683a9cf9609947b776b2fbe1e81c9, type: 3}
+  constructionBarrier: {fileID: 919132149155446097, guid: fcded8efd34e64345b6308e183b368d0, type: 3}
+  constructionLight: {fileID: 919132149155446097, guid: a9a1c00da06a73046ac5f820b1a7fae9, type: 3}
+  pines:
+  - {fileID: 919132149155446097, guid: b4f03bc14868ec0459f01d700286e1c9, type: 3}
+  - {fileID: 919132149155446097, guid: a25faa6de56e0d84c9610d2ec0effe2d, type: 3}
+  - {fileID: 919132149155446097, guid: 8d5e080cd4378b74685a24ef6b9af45a, type: 3}
+  deadTrees:
+  - {fileID: 919132149155446097, guid: ad7b64d456d5ccc48b447f8d699e793f, type: 3}
+  - {fileID: 919132149155446097, guid: 263753abf49f4b64ca395c240424958e, type: 3}
+  fruitTrees:
+  - {fileID: 919132149155446097, guid: 14180d13ab800bd41a353c6082c5ce30, type: 3}
+  - {fileID: 919132149155446097, guid: 58019a17fed325e41b54587bb988e491, type: 3}
+  - {fileID: 919132149155446097, guid: a7c6761e6011cba4ca7ec5700886f5df, type: 3}
+  - {fileID: 919132149155446097, guid: c745d0c67ca28b748be00924eeb39fc2, type: 3}
+  shrubs:
+  - {fileID: 919132149155446097, guid: aea299806ffa42940aa4ab0923b1a2f0, type: 3}
+  - {fileID: 919132149155446097, guid: 41add7e89a9685347aab288ca58be6d5, type: 3}
+  - {fileID: 919132149155446097, guid: 98e137cda3ead1e4f844cedd095d20b8, type: 3}
+  grass:
+  - {fileID: 919132149155446097, guid: 8b37066e0a37e644b89769a4b576ece1, type: 3}
+  flowers:
+  - {fileID: 919132149155446097, guid: b095755a4102b6c4ca2be92d75d39093, type: 3}
+  smallRocks:
+  - {fileID: 919132149155446097, guid: cffdf8df70571c04c98525d54f4d7e20, type: 3}
+  - {fileID: 919132149155446097, guid: d383bd6471a69a8459dc8dd97ac826b9, type: 3}
+  bigRocks:
+  - {fileID: 919132149155446097, guid: a9e85cea116f06845a144c5bcdb7c177, type: 3}
+  logsAndStumps:
+  - {fileID: 919132149155446097, guid: f891831a87782d74f8571b11108f51e7, type: 3}
+  - {fileID: 919132149155446097, guid: 0565ff19af26cd448bf71f8a230c6d20, type: 3}
+  - {fileID: 919132149155446097, guid: bc572a819c0067148b07f93d33dfb402, type: 3}
+  - {fileID: 919132149155446097, guid: faab7c15a14fd194caae885736436b5d, type: 3}
+  mushrooms:
+  - {fileID: 919132149155446097, guid: 56ae6e9d7183e45498b79d3d66bf02ba, type: 3}
+  fence: {fileID: 919132149155446097, guid: b128d87b390628a4f8f77ee8eadeaee0, type: 3}
+  alp: {fileID: 11400000, guid: 8f9c561c41d7c854fb94476988ec7e50, type: 2}
+  asphalt: {fileID: 2100000, guid: 9c11f80707cd2ef41a467b72e882c984, type: 2}
+  roadMarking: {fileID: 2100000, guid: d15563f65f2659342b36a51719777b7b, type: 2}
+  terrain: {fileID: 2100000, guid: 830a1061c614d1440b70ca5953b4e588, type: 2}
+  dirt: {fileID: 2100000, guid: 0b5f3f43cefa6154a9f8dca35bf133f5, type: 2}
+  dirtRoad: {fileID: 2100000, guid: a37919fa732025f4aa07620f01860d3d, type: 2}
+  verge: {fileID: 2100000, guid: f0f8e1f0642256a4983e8fff7f8c630a, type: 2}
+  water: {fileID: 2100000, guid: 064c8e881a9607c45af564e6a9353dc0, type: 2}
+  concrete: {fileID: 2100000, guid: 26b915a839a8f4b4fa554cd0a76d49e2, type: 2}
+  metal: {fileID: 2100000, guid: cb4a6e5575e998643b4cfd21706414f9, type: 2}
+  signBlue: {fileID: 2100000, guid: 20f8c162e0576b3408248168e8219963, type: 2}
+  signRed: {fileID: 2100000, guid: bb509c50aea2d6544aa70eefdc23ee55, type: 2}
+  emissiveWhite: {fileID: 2100000, guid: 006078c98d5151849b40c811faf9358b, type: 2}
+  emissiveRed: {fileID: 2100000, guid: 859842f0fed2c9348bdcd665de6a21cf, type: 2}
+  emissiveBlue: {fileID: 2100000, guid: f73fdecbeba459143997cf97c6b725a7, type: 2}
+  particle: {fileID: 2100000, guid: 941ddd0bbd218a341be294eab3df6051, type: 2}
+  spark: {fileID: 2100000, guid: 7e541a876ee490c4fbff095354053862, type: 2}
+  skidMark: {fileID: 2100000, guid: 81b4e50a9cf68604cb16f1737573022c, type: 2}
+  gateFx: {fileID: 4800000, guid: 9b9364bb60e1b844c8771abc80727673, type: 3}
+  ghost: {fileID: 4800000, guid: 1201a02ae6363ee48b0dd8e6817037af, type: 3}

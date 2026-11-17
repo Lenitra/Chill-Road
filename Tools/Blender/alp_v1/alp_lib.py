@@ -1,4 +1,4 @@
-"""Pack alpin NoHesi « AlpPack » : bâtiments, décors, infrastructures, nature et animaux d'une ville de montagne.
+"""Pack alpin ChillRoad « AlpPack » : bâtiments, décors, infrastructures, nature et animaux d'une ville de montagne.
 
 Même direction artistique que env_lib (low poly à facettes, palette de dégradés verticaux), mais :
 - échelle réelle 1:1 en mètres, origine au sol au centre de l'emprise, façade avant = -Y (Unity +Z) ;
@@ -18,7 +18,7 @@ from mathutils import Vector, Matrix
 
 SCENE = "AlpPack"
 ROOT = "AP_Items"
-OUT = r"E:\ChillRoad\Assets\NoHesi\Models\AlpPack"
+OUT = r"E:\ChillRoad\Assets\ChillRoad\Models\AlpPack"
 RENDERS = r"E:\ChillRoad\Tools\Blender\Rendus\AlpPack"
 NCOL = 128
 PAL_W = 8

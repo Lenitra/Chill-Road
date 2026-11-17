@@ -1,5 +1,5 @@
 """Végétation au sol « Flora » (v4) : herbes, fleurs, fougères, buissons bas et plantes de lac, dans la direction
-artistique du champ d'herbe (shader NoHesi/Grass) : formes larges et simples, cartoon, qui se fondent dans le pré.
+artistique du champ d'herbe (shader ChillRoad/Grass) : formes larges et simples, cartoon, qui se fondent dans le pré.
 - brins et feuilles larges (4 à 6 cm), même profil arrondi que les brins du champ ; tiges épaisses ;
 - fleurs à grosses têtes simples qui dépassent de l'herbe ; au loin, quelques taches de couleur élargies ;
 - les parties vertes prennent la couleur du pré (UV2.x), les plantes s'éclairent comme lui, d'une nappe (UV2.y).
@@ -10,8 +10,8 @@ Chaîne propre, indépendante de la palette du pack alpin (AP_Palette) :
 - UV1 = (souplesse au vent en m : flex × s², s = longueur depuis le sol le long de la tige ; phase 0-1) ;
 - UV2 = (sol : part de la couleur du champ d'herbe ; vol : part de la normale propre dans l'éclairage) ;
 - normales douces (dômes, sphères des buissons) écrites en normales personnalisées : aucun facettage ;
-- faces simples : le shader NoHesi/Foliage dessine les deux côtés ;
-- matériau AP_Flora → Unity : NoHesi/Foliage (aplats cartoon, couleur du pré, vent du champ d'herbe, fondu).
+- faces simples : le shader ChillRoad/Foliage dessine les deux côtés ;
+- matériau AP_Flora → Unity : ChillRoad/Foliage (aplats cartoon, couleur du pré, vent du champ d'herbe, fondu).
 Mêmes ids et fichiers que le pack alpin (Models/AlpPack/<File>.fbx avec <File>_LOD0..2), plus de nouvelles plantes.
 
 Usage (Blender, aussi en arrière-plan : blender -b --python ...) :
@@ -22,7 +22,7 @@ Usage (Blender, aussi en arrière-plan : blender -b --python ...) :
 import bpy, bmesh, math, os, random, json, zlib
 from mathutils import Vector, Matrix
 
-OUT = r"E:\ChillRoad\Assets\NoHesi\Models\AlpPack"
+OUT = r"E:\ChillRoad\Assets\ChillRoad\Models\AlpPack"
 RENDERS = r"E:\ChillRoad\Tools\Blender\Rendus\Flora"
 PALETTE_FILE = "AlpFlora_Palette.png"
 MATERIAL = "AP_Flora"
@@ -34,7 +34,7 @@ TAU = 6.283185307
 
 # colonnes : (nom, base sRGB, pointe sRGB). NE JAMAIS réordonner : ajouter à la fin.
 PALETTE = [
-    ("grass", (0.15, 0.33, 0.10), (0.47, 0.62, 0.25)),          # pied et pointe des brins du champ (NoHesi/Grass)
+    ("grass", (0.15, 0.33, 0.10), (0.47, 0.62, 0.25)),          # pied et pointe des brins du champ (ChillRoad/Grass)
     ("grass_lush", (0.12, 0.28, 0.10), (0.40, 0.57, 0.24)),
     ("grass_yellow", (0.20, 0.35, 0.10), (0.60, 0.70, 0.28)),
     ("grass_dry", (0.33, 0.37, 0.16), (0.80, 0.80, 0.42)),
@@ -659,7 +659,7 @@ class FGeo:
 # ----------------------------------------------------------------- éléments composés
 # Styles (UV2 = sol, vol) :
 # - sol : part de la couleur du champ d'herbe (dégradé pied → pointe que le shader calcule à partir de la couleur du
-#   sol, comme NoHesi/Grass) ; 0 = couleur de la palette seule (pétales, buissons, plantes de lac) ;
+#   sol, comme ChillRoad/Grass) ; 0 = couleur de la palette seule (pétales, buissons, plantes de lac) ;
 # - vol : part de la normale propre dans l'éclairage ; 0 = la plante s'éclaire comme le pré, d'une seule nappe.
 S_HERBE = (1.0, 0.15)
 S_FEUILLE = (0.7, 0.25)
@@ -688,7 +688,7 @@ def sur_boule(g, rs, k, out=1.0, up=0.6):
 
 def touffe(g, n, radius, lmin, lmax, wmin, wmax, cols, seed, keep=(1.0, 0.46, 0.22), rows=(4, 2, 1),
            widen=(1.0, 1.5, 2.4), flex=2.6, spread=0.5, arch=(0.2, 0.75), z=-0.02, twist=0.5):
-    """Touffe de brins larges ouverte vers l'extérieur, comme les touffes du champ d'herbe (NoHesi/Grass) : plus
+    """Touffe de brins larges ouverte vers l'extérieur, comme les touffes du champ d'herbe (ChillRoad/Grass) : plus
     haute au centre, brins tournés vers le dehors. Les niveaux lointains gardent une partie des mêmes brins, élargis."""
     rs = random.Random(seed)
     L = g.level
@@ -1607,7 +1607,7 @@ def toon_nodes(nt, albedo, vol=None):
 
 def material():
     """Matériau d'aperçu (EEVEE), proche du rendu en jeu : aplats cartoon, parties « sol » (UV2.x) aux couleurs du
-    champ d'herbe (pied sombre, couleur du sol, pointe claire). En jeu, c'est le shader NoHesi/Foliage qui fait foi."""
+    champ d'herbe (pied sombre, couleur du sol, pointe claire). En jeu, c'est le shader ChillRoad/Foliage qui fait foi."""
     m = bpy.data.materials.get(MATERIAL)
     if m is None:
         m = bpy.data.materials.new(MATERIAL)

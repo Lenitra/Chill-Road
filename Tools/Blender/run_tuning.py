@@ -7,7 +7,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import alp_all
 A = alp_all.load()
-PACK = os.path.normpath(os.path.join(HERE, "..", "..", "Assets", "NoHesi", "Models", "AlpPack"))
+PACK = os.path.normpath(os.path.join(HERE, "..", "..", "Assets", "ChillRoad", "Models", "AlpPack"))
 dry = "dry" in sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else False
 ids = ["tuning_garage", "tuning_sign"]
 print("TRIS", A.build_all(ids))

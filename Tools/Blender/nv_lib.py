@@ -896,7 +896,7 @@ def export_for_unity(path):
 
     Blender +X (car front) is turned to -Y, which the FBX axis conversion maps to Unity +Z.
     Body parts are merged into one mesh; the 4 wheels stay separate with their pivot at the hub and
-    Kenney-style names so the NoHesi VehicleController finds them. An inward-facing dark lining is added
+    Kenney-style names so the ChillRoad VehicleController finds them. An inward-facing dark lining is added
     around the cabin because Unity culls the back faces the Blender material used as cabin trim.
     """
     import os

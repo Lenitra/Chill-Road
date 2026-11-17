@@ -3,7 +3,7 @@ using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
-namespace NoHesi.EditorTools
+namespace ChillRoad.EditorTools
 {
     // Build de capture (copie du projet uniquement) : Capture/Capture.exe
     public static class CaptureBuild
@@ -14,7 +14,7 @@ namespace NoHesi.EditorTools
             Directory.CreateDirectory("Capture");
             var options = new BuildPlayerOptions
             {
-                scenes = new[] { "Assets/NoHesi/NoHesi.unity" },
+                scenes = new[] { "Assets/ChillRoad/ChillRoad.unity" },
                 locationPathName = "Capture/Capture.exe",
                 target = BuildTarget.StandaloneWindows64,
                 targetGroup = BuildTargetGroup.Standalone,

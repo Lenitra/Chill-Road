@@ -1,5 +1,5 @@
 """Carte des motifs de détail du pack alpin (style cartoon, 2026-11-16) : une image 128 x 1 dont chaque pixel donne
-le motif dessiné par le shader NoHesi/Toon sur la colonne de palette correspondante (traits sombres fins, sans
+le motif dessiné par le shader ChillRoad/Toon sur la colonne de palette correspondante (traits sombres fins, sans
 texture) : 1 = planches horizontales (bois), 2 = appareil de pierre (moellons), 3 = rangs de tuiles / lauzes,
 4 = écorce (stries verticales), 0 = rien.
 
@@ -11,7 +11,7 @@ import re
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "..", "..", "Assets", "NoHesi", "Models", "AlpPack", "AlpPack_Detail.png")
+OUT = os.path.join(HERE, "..", "..", "Assets", "ChillRoad", "Models", "AlpPack", "AlpPack_Detail.png")
 NCOL = 128
 
 PATTERNS = {

@@ -7,7 +7,7 @@ dit l'importance d'une route, tunnels en pointillés). « gris » est la version
 peut laisser le sol transparent (ground_alpha < 255) : le jeu se voit alors sous les routes.
 
 Écrite à côté de map_overview.png à chaque bake (map_overview.render l'appelle). Sans bake :
-`python map_minimap.py` la refait à partir des données déjà exportées dans Assets/NoHesi/Resources/Map
+`python map_minimap.py` la refait à partir des données déjà exportées dans Assets/ChillRoad/Resources/Map
 (`--out chemin.png` pour l'écrire ailleurs, `--style nom` pour un autre style).
 """
 import os
@@ -154,7 +154,7 @@ def render(g, H, rgba, snow, water, edges, rivers, out_path, style=None):
 
 if __name__ == "__main__":
     import map_overview as OV
-    res = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Assets", "NoHesi", "Resources", "Map"))
+    res = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Assets", "ChillRoad", "Resources", "Map"))
     out = sys.argv[sys.argv.index("--out") + 1] if "--out" in sys.argv else os.path.join(res, "map_minimap.png")
     style = sys.argv[sys.argv.index("--style") + 1] if "--style" in sys.argv else None
     g, H, rgba, paved, snow, water, edges, rivers, buildings = OV.from_export(res)

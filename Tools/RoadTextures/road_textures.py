@@ -1,7 +1,7 @@
-"""Texture de bruit de la route de NoHesi, générée par programme (aucun asset externe).
+"""Texture de bruit de la route de ChillRoad, générée par programme (aucun asset externe).
 
 La route suit la direction artistique des voitures : aplats de couleur et formes nettes, sans grain
-photographique. Le shader NoHesi/Road ne lit donc qu'une texture de bruits doux et périodiques, qu'il
+photographique. Le shader ChillRoad/Road ne lit donc qu'une texture de bruits doux et périodiques, qu'il
 seuille pour découper ses formes (bords de gravier, herbe, ornières, écaillage de la peinture).
 
     python road_textures.py [dossier_de_sortie]

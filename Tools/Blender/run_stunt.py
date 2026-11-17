@@ -1,14 +1,14 @@
 """Tremplins de cascade : construit, contrôle (z-fighting), exporte. Sans interface :
 blender -b Tools/Blender/AlpPack.blend --python Tools/Blender/run_stunt.py [-- dry]
 « dry » : construit et contrôle seulement (ni export, ni manifeste, ni sauvegarde).
-Ensuite : python Tools/Map/map_manifest.py, puis dans Unity « NoHesi > Importer le pack alpin »."""
+Ensuite : python Tools/Map/map_manifest.py, puis dans Unity « ChillRoad > Importer le pack alpin »."""
 import json, os, sys
 import bpy
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import alp_all
 A = alp_all.load()
-PACK = os.path.normpath(os.path.join(HERE, "..", "..", "Assets", "NoHesi", "Models", "AlpPack"))
+PACK = os.path.normpath(os.path.join(HERE, "..", "..", "Assets", "ChillRoad", "Models", "AlpPack"))
 dry = "dry" in sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else False
 ids = ["stunt_ramp_stone", "stunt_ramp_road"]
 RETIRED = {"stunt_ramp": "Stunt_Ramp"}     # tremplin « chantier » d'avant le 2026-11-17

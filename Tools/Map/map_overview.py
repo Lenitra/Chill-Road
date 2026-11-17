@@ -7,7 +7,7 @@ Aucun texte dans l'image : les noms de lieux sont posés par le jeu (deux langue
 sont reprises dans la légende de UI/WorldMap.cs : changer les deux ensemble.
 
 La minicarte du HUD (map_minimap.png, niveaux de gris) est dessinée par map_minimap.py, appelé ici à chaque bake.
-`from_export()` relit les données exportées dans Assets/NoHesi/Resources/Map (utile sans bake).
+`from_export()` relit les données exportées dans Assets/ChillRoad/Resources/Map (utile sans bake).
 """
 import json
 import math
@@ -317,7 +317,7 @@ def from_export(res_dir):
 
 
 if __name__ == "__main__":
-    res = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Assets", "NoHesi", "Resources", "Map")
+    res = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Assets", "ChillRoad", "Resources", "Map")
     res = os.path.normpath(res)
     if "--minimap" in sys.argv:
         import map_minimap

@@ -1,4 +1,4 @@
-"""Pack de voitures réelles low poly pour le trafic NoHesi (moteur commun).
+"""Pack de voitures réelles low poly pour le trafic ChillRoad (moteur commun).
 
 Chaque voiture est une fiche (pack_cars.py) : courbes de profil vue de côté / de dessus -> sections de
 carrosserie à 10 points (miroir), passages de roue par booléen, décors projetés sur les facettes, roues.

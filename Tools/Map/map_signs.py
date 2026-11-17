@@ -12,7 +12,7 @@ import map_lib as L
 import map_roads as R
 
 INSTANCED, DETAIL = 1, 2
-MANIFEST = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Assets", "NoHesi",
+MANIFEST = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Assets", "ChillRoad",
                                          "Models", "AlpPack", "AlpPack_manifest.json"))
 
 

@@ -12,7 +12,7 @@ Every line of code, every 3D model, shader, sound and texture was made with AI (
 
 ## The game
 
-<img src="Assets/NoHesi/Resources/Map/map_overview.png" alt="Map of the valley" width="360" align="right">
+<img src="Assets/ChillRoad/Resources/Map/map_overview.png" alt="Map of the valley" width="360" align="right">
 
 - **"Tour du massif"**: a ring valley around a central massif, with about 55 km of roads:
   - a 14.7 km 2×3-lane motorway loop, with four interchanges, a viaduct over the lake and two tunnels;
@@ -61,9 +61,9 @@ QWERTY and AZERTY layouts both work. A gamepad is recommended.
 
 1. Install **Unity 6000.3.11f1** (see [ProjectVersion.txt](ProjectSettings/ProjectVersion.txt)).
 2. Clone the repository and open the folder from Unity Hub. The first import rebuilds the `Library` folder and takes a while.
-3. Open the scene [Assets/NoHesi/NoHesi.unity](Assets/NoHesi/NoHesi.unity) and press Play. Loading the map takes about a minute in the editor.
+3. Open the scene [Assets/ChillRoad/ChillRoad.unity](Assets/ChillRoad/ChillRoad.unity) and press Play. Loading the map takes about a minute in the editor.
 
-Everything else lives under the **NoHesi** editor menu:
+Everything else lives under the **Chill Road** editor menu:
 
 | Menu | What it does |
 |---|---|
@@ -105,7 +105,7 @@ Adding `-nettest [seconds]` turns that copy into an unattended test player: ever
 ## Repository layout
 
 ```
-Assets/NoHesi/
+Assets/ChillRoad/
   Scripts/      C# game code: Core, Vehicle, Traffic, World, Net, UI, Gameplay, Editor, DebugTools
   Shaders/      flat-style road, terrain, sky, water and foliage shaders
   Models/       FBX exported from Blender: CarPack (traffic), PlayerCars, Vision74, EnvPack, AlpPack
@@ -121,8 +121,8 @@ Marketing/itch/ itch.io page text (EN/FR), covers and screenshots
 
 ### Content pipelines
 
-- **3D models**: run the scripts in `Tools/Blender` in Blender 5.x to build models from code (for example `pack_lib.py` + `pack_cars.py` for traffic, `play_cars.py` for playable cars, `alp_*.py` for the alpine pack). They export FBX into `Assets/NoHesi/Models`, and the import menus above set up the materials and prefabs.
-- **Map**: `python Tools/Map/map_bake.py` (Python 3 with `numpy` and `Pillow`) generates the relief, roads, earthworks, masks and previews, then exports to `Assets/NoHesi/Resources/Map`. `--roads` does the layout and previews only. The map itself is defined in `map_def.py`.
+- **3D models**: run the scripts in `Tools/Blender` in Blender 5.x to build models from code (for example `pack_lib.py` + `pack_cars.py` for traffic, `play_cars.py` for playable cars, `alp_*.py` for the alpine pack). They export FBX into `Assets/ChillRoad/Models`, and the import menus above set up the materials and prefabs.
+- **Map**: `python Tools/Map/map_bake.py` (Python 3 with `numpy` and `Pillow`) generates the relief, roads, earthworks, masks and previews, then exports to `Assets/ChillRoad/Resources/Map`. `--roads` does the layout and previews only. The map itself is defined in `map_def.py`.
 
 ## En français
 
@@ -132,4 +132,4 @@ On peut y rouler à plusieurs en réseau (expérimental). Un joueur héberge la 
 
 Tout le projet a été réalisé avec l'IA (Claude via Claude Code), sur les directions d'un humain : le code, les modèles 3D construits par scripts Blender, les shaders, et les sons et la musique synthétisés en direct. Le projet n'utilise aucun asset tiers.
 
-Pour l'ouvrir, installe Unity **6000.3.11f1**, ouvre le dossier depuis Unity Hub, puis lance la scène `Assets/NoHesi/NoHesi.unity`. Les outils se trouvent dans le menu **NoHesi** de l'éditeur.
+Pour l'ouvrir, installe Unity **6000.3.11f1**, ouvre le dossier depuis Unity Hub, puis lance la scène `Assets/ChillRoad/ChillRoad.unity`. Les outils se trouvent dans le menu **Chill Road** de l'éditeur.

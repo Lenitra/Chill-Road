@@ -1,4 +1,4 @@
-"""Low-poly Vision 74 for NoHesi: Polytope-style facets + vertical gradient palette (one texture, flat shading)."""
+"""Low-poly Vision 74 for ChillRoad: Polytope-style facets + vertical gradient palette (one texture, flat shading)."""
 import bpy, bmesh, math, os
 from mathutils import Vector, Matrix
 import hc_lib as H
