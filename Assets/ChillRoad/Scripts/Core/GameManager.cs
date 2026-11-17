@@ -126,6 +126,7 @@ namespace ChillRoad
             ShownCar = local.CarIndex;
             Player.Setup(CarTuning.Apply(assets.playerCars[local.CarIndex]));
             CarPaint.Apply(Player.Model, CarPaint.Selected(assets.playerCars[local.CarIndex]));
+            CarCosmetics.Apply(Player.Model, CarCosmetics.Fitted(assets.playerCars[local.CarIndex]), assets);
             Player.assist = 0.6f; // assistance fixe (non réglable)
             // Immobile tant que le monde n'est pas chargé
             Player.Body.isKinematic = true;
@@ -693,6 +694,8 @@ namespace ChillRoad
             var car = Player;
             if (car.Spec != spec) Swap(car, spec);
             CarPaint.Apply(car.Model, CarPaint.Selected(basic));
+            // Néons et vitres teintées du garage de tuning (pop and bang et flammes : VehicleEffects)
+            CarCosmetics.Apply(car.Model, CarCosmetics.Fitted(basic), assets);
         }
 
         /// <summary>Change le modèle et la fiche de la voiture sans l'arrêter (même position, même vitesse).</summary>

@@ -73,7 +73,13 @@ namespace ChillRoad
                 rpm = Mathf.Lerp(car.Rpm, car.Spec.redline * (0.5f + 0.4f * revPeak), k);
                 r = Mathf.InverseLerp(900f, car.Spec.redline, rpm);
                 load = Mathf.Max(load, k);
-                if (revPop && revT < 0.12f) { revPop = false; if (car.Exhausts.Count > 0) PlayBackfire(); }
+                if (revPop && revT < 0.12f)
+                {
+                    revPop = false;
+                    int popMode = CarCosmetics.Fitted(car.Spec).pop;
+                    if (car.Exhausts.Count > 0 && popMode != CarCosmetics.PopOff)
+                        PlayBackfire(popMode == CarCosmetics.PopDiesel ? 1.6f : popMode == CarCosmetics.PopBig ? 1.35f : 1f);
+                }
             }
             bool limiter = car.Spec != null && car.Rpm >= car.Spec.redline * 0.985f && car.Throttle > 0.5f;
             engine.SetState(rpm, load, r, limiter, paused ? 0f : masterVolume * 0.3f, Time.unscaledDeltaTime);
@@ -101,11 +107,18 @@ namespace ChillRoad
         }
 
         /// <summary>Détonation d'un retour de flamme à l'échappement : grave pour le V8, sèche pour le 4 cylindres.</summary>
-        public void PlayBackfire()
+        public void PlayBackfire() => PlayBackfire(1f);
+
+        /// <summary>
+        /// Détonation d'un retour de flamme ; loud : volume relatif du pop and bang (1 petit, plus fort et plus grave
+        /// pour le conséquent et le gazole).
+        /// </summary>
+        public void PlayBackfire(float loud)
         {
             float pitch = engine.Voice == EngineVoice.V8 ? 0.72f : engine.Voice == EngineVoice.V6 ? 0.85f : engine.Voice == EngineVoice.FlatPlaneV8Turbo ? 1.05f : engine.Voice == EngineVoice.V12 ? 1.3f : engine.Voice == EngineVoice.TwoStroke ? 1.7f
                 : engine.Voice == EngineVoice.Inline4 ? 1.25f : 0.95f;
-            float volume = engine.Voice == EngineVoice.V8 ? 0.7f : 0.55f;
+            float volume = (engine.Voice == EngineVoice.V8 ? 0.7f : 0.55f) * loud;
+            pitch /= Mathf.Lerp(1f, 1.25f, Mathf.Clamp01(loud - 1f));
             Play(pop, volume, pitch * Random.Range(0.9f, 1.1f));
         }
 

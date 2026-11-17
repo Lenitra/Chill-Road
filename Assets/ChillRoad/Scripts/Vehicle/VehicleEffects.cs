@@ -4,22 +4,31 @@ namespace ChillRoad
 {
     /// <summary>
     /// Effets de la voiture du joueur : fumée et traces de pneus en glisse, étincelles contre les obstacles,
-    /// débris aux chocs, retours de flamme à l'échappement (passage de rapport, lever de pied à haut régime).
+    /// débris aux chocs, retours de flamme à l'échappement (passage de rapport, lever de pied à haut régime ;
+    /// <see cref="ExhaustFlames"/>, selon le pop and bang choisi au garage).
     /// </summary>
     public class VehicleEffects : MonoBehaviour
     {
         VehicleController car;
         GameAssets assets;
-        ParticleSystem smoke, sparks, flames, debris;
+        ParticleSystem smoke, sparks, debris;
         SkidMarks skids;
-        Light flash;
-        float flashTimer, lastThrottle, backfireCooldown;
+        ExhaustFlames exhaust;
+        float lastThrottle, backfireCooldown;
         readonly float[] smokeAccumulator = new float[4];
         float scrapeAccumulator;
         Transform fxRoot;
 
-        /// <summary>Retour de flamme (pour le son).</summary>
-        public event System.Action Backfire;
+        /// <summary>Retour de flamme (pour le son) : volume relatif (1 = petit pop and bang d'origine).</summary>
+        public event System.Action<float> Backfire;
+
+        /// <summary>
+        /// Accessoires imposés (voiture d'un autre joueur, d'après son état réseau) ; nul : ceux montés au garage sur
+        /// la voiture conduite (<see cref="CarCosmetics.Fitted(VehicleSpec)"/>).
+        /// </summary>
+        public CarCosmetics.Look? Override;
+
+        CarCosmetics.Look Look => Override ?? CarCosmetics.Fitted(car.Spec);
 
         public void Init(VehicleController c, GameAssets a)
         {
@@ -46,10 +55,8 @@ namespace ChillRoad
             sparkFade.enabled = true;
             sparkFade.color = Fade(1f, 0f);
 
-            flames = MakeSystem(root, "Backfire", a.spark, 200, 0f, ParticleSystemRenderMode.Billboard);
-            var flameSize = flames.sizeOverLifetime;
-            flameSize.enabled = true;
-            flameSize.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0.2f));
+            exhaust = new ExhaustFlames(root, a, 0);
+            exhaust.Popped += loud => Backfire?.Invoke(loud);
 
             debris = MakeSystem(root, "Debris", a.metal, 150, 1f, ParticleSystemRenderMode.Mesh);
             var debrisRenderer = debris.GetComponent<ParticleSystemRenderer>();
@@ -71,15 +78,6 @@ namespace ChillRoad
             spin.x = new ParticleSystem.MinMaxCurve(-6f, 6f);
             spin.y = new ParticleSystem.MinMaxCurve(-6f, 6f);
             spin.z = new ParticleSystem.MinMaxCurve(-6f, 6f);
-
-            var flashGo = new GameObject("BackfireLight");
-            flashGo.transform.SetParent(root, false);
-            flash = flashGo.AddComponent<Light>();
-            flash.type = LightType.Point;
-            flash.color = new Color(1f, 0.55f, 0.2f);
-            flash.range = 6f;
-            flash.shadows = LightShadows.None;
-            flash.enabled = false;
 
             if (a.skidMark) skids = new SkidMarks(a.skidMark);
             car.Impacted += OnImpact;
@@ -164,16 +162,15 @@ namespace ChillRoad
             }
             skids?.Flush();
 
-            // Retour de flamme au lever de pied à haut régime
+            // Retour de flamme au lever de pied à haut régime (plus tôt avec un pop and bang conséquent ou au gazole)
+            exhaust.Look = Look;
+            exhaust.Velocity = v;
+            exhaust.Bind(car.Exhausts, car.transform);
             backfireCooldown -= dt;
-            if (lastThrottle > 0.8f && car.Throttle < 0.3f && car.Rpm01 > 0.65f) TriggerBackfire(0.8f);
+            float rpm = exhaust.Look.pop >= CarCosmetics.PopBig ? 0.55f : 0.65f;
+            if (lastThrottle > 0.8f && car.Throttle < 0.3f && car.Rpm01 > rpm) TriggerBackfire(0.8f);
             lastThrottle = car.Throttle;
-            if (flashTimer > 0f)
-            {
-                flashTimer -= dt;
-                flash.enabled = flashTimer > 0f;
-                flash.intensity = Mathf.Max(0f, flashTimer / 0.09f) * 6f;
-            }
+            exhaust.Tick(dt);
         }
 
         void OnGear(int gear)
@@ -182,40 +179,16 @@ namespace ChillRoad
         }
 
         /// <summary>
-        /// Retour de flamme à chaque sortie d'échappement du modèle (repères « exhaust-* »).
+        /// Retour de flamme à chaque sortie d'échappement du modèle (repères « exhaust-* »), selon le pop and bang monté.
         /// Une voiture sans pot (Vision 74 à hydrogène) ne pétarade pas.
         /// </summary>
         void TriggerBackfire(float strength)
         {
-            var pipes = car.Exhausts;
-            if (backfireCooldown > 0f || pipes.Count == 0) return;
-            backfireCooldown = 0.25f;
-            var t = car.transform;
-            Vector3 center = Vector3.zero;
-            foreach (var pipe in pipes)
-            {
-                if (!pipe) continue;
-                // Sens du flux : +Z du repère, sinon droit vers l'arrière s'il est mal orienté
-                Vector3 dir = pipe.forward;
-                if (Vector3.Dot(dir, -t.forward) < 0.3f) dir = -t.forward;
-                Vector3 mouth = pipe.position;
-                for (int k = 0; k < 8; k++)
-                {
-                    flames.Emit(new ParticleSystem.EmitParams
-                    {
-                        position = mouth + dir * Random.Range(0f, 0.12f),
-                        velocity = car.Velocity + dir * Random.Range(3f, 8f) + Random.insideUnitSphere * 1.1f,
-                        startSize = Random.Range(0.14f, 0.32f) * strength,
-                        startLifetime = Random.Range(0.06f, 0.14f),
-                        startColor = Color.Lerp(new Color(1f, 0.5f, 0.1f), new Color(0.4f, 0.6f, 1f), Random.value * 0.25f),
-                    }, 1);
-                }
-                center += mouth + dir * 0.4f;
-            }
-            flash.transform.position = center / pipes.Count;
-            flash.enabled = true;
-            flashTimer = 0.09f;
-            Backfire?.Invoke();
+            if (backfireCooldown > 0f) return;
+            exhaust.Look = Look;
+            exhaust.Velocity = car.Velocity;
+            exhaust.Bind(car.Exhausts, car.transform);
+            if (exhaust.Fire(strength)) backfireCooldown = 0.25f;
         }
 
         void OnImpact(Collision c, float impact)

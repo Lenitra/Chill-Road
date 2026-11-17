@@ -35,6 +35,10 @@ Shader "ChillRoad/Toon"
         [Toggle] _SnowCap ("Neige sur les faces tournées vers le ciel (zones enneigées de la carte)", Float) = 0
         _TreeWind ("Vent dans les arbres : amplitude", Range(0, 3)) = 1
         _TreeFlutter ("Vent : frémissement des feuilles", Range(0, 3)) = 1
+        // Vitres teintées des voitures (garage de tuning, CarCosmetics) : colonne de palette x ∈ [_GlassBand.x, _GlassBand.y]
+        // recolorée en _GlassTint (a = 0 : désactivé), réglées par bloc de propriétés
+        [HideInInspector] _GlassTint ("Teinte des vitres", Vector) = (1, 1, 1, 0)
+        [HideInInspector] _GlassBand ("Colonne du verre (u min, u max)", Vector) = (0, 0, 0, 0)
     }
 
     SubShader
@@ -55,6 +59,8 @@ Shader "ChillRoad/Toon"
             half _RampMid, _RampSoft, _ShadeLevel, _AmbientFlat, _AmbientStrength, _SpecStrength, _RimStrength, _RimWidth;
             half _DetailLines, _DetailStrength, _SnowCap;
             float _TreeWind, _TreeFlutter;
+            half4 _GlassTint;
+            float4 _GlassBand;
         CBUFFER_END
 
         // Neige (carte de la station de ski) : enneigement du sol lu dans la carte (MapTerrain), 0-1
@@ -247,6 +253,13 @@ Shader "ChillRoad/Toon"
             {
                 UNITY_SETUP_INSTANCE_ID(input);
                 half3 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv).rgb * _BaseColor.rgb;
+                // Vitres teintées : la teinte garde le dégradé du verre (plus clair en haut)
+                UNITY_BRANCH
+                if (_GlassTint.a > 0.0 && input.uv.x > _GlassBand.x && input.uv.x < _GlassBand.y)
+                {
+                    half lum = dot(albedo, half3(0.2126, 0.7152, 0.0722));
+                    albedo = lerp(albedo, _GlassTint.rgb * (0.35 + 2.0 * lum), _GlassTint.a);
+                }
                 #if defined(_DETAIL_LINES)
                     half id = SAMPLE_TEXTURE2D(_DetailMap, sampler_PointClamp, float2(input.uv.x, 0.5)).r * 255.0;
                     albedo *= 1.0 - DetailLines(id, input.positionOS, normalize(input.normalOS)) * _DetailStrength;
