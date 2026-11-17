@@ -57,6 +57,7 @@ namespace ChillRoad
                 go.transform.localScale = Vector3.one * scale;
                 TuneLods(go);
                 AddCollider(go, item);
+                if (BreakableProp.Fits(item)) go.AddComponent<BreakableProp>().Init(go.GetComponent<Collider>(), item.size * scale);
                 if (item.lights != null && item.lights.Length > 0) road.RegisterLamp(go.transform, item.lights);
                 if (Time.realtimeSinceStartup - last > 0.03f)
                 {

@@ -376,6 +376,8 @@ namespace ChillRoad
         void OnImpact(Collision c, float impact)
         {
             if (!Recording || player.InputEnabled == false) return;
+            // Petit panneau fauché : la voiture garde son élan, pas un accident
+            if (c.collider.GetComponentInParent<BreakableProp>()) return;
             var car = traffic ? traffic.Find(c.collider.gameObject) : null;
             if (car != null) foreach (var p in passes) if (p.car == car) p.hit = true;
             // Décor (glissière, mur, rocher) : seul le choc de face compte, pas la glissière frôlée à pleine vitesse

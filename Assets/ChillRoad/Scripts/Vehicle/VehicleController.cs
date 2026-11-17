@@ -600,6 +600,8 @@ namespace ChillRoad
 
             Vector3 up = transform.up, fwd = transform.forward, right = transform.right;
             Vector3 v = rb.linearVelocity;
+            preStepVelocity = v;
+            preStepAngular = rb.angularVelocity;
             float vz = Vector3.Dot(v, fwd), vx = Vector3.Dot(v, right);
             Speed = v.magnitude;
             ForwardSpeed = vz;
@@ -909,8 +911,28 @@ namespace ChillRoad
         /// <summary>Frottement contre un obstacle (glissière, mur, voiture) : point de contact et vitesse de glissement.</summary>
         public event Action<Vector3, Vector3, float> Scraped;
 
+        /// <summary>Vitesses avant le pas de physique en cours : celles d'avant un choc, lues dans OnCollisionEnter.</summary>
+        Vector3 preStepVelocity, preStepAngular;
+
         void OnCollisionEnter(Collision c)
         {
+            var prop = c.collider.GetComponentInParent<BreakableProp>();
+            if (prop)
+            {
+                // Débris d'un panneau déjà cassé : roulé dessus ou poussé, pas un choc
+                if (prop.Broken) return;
+                // Petit panneau percuté à 30 km/h ou plus : il casse et la voiture garde son élan (le solveur l'a
+                // arrêtée net contre le poteau pendant ce pas : on rend la vitesse d'avant, un peu réduite)
+                if (!Remote && preStepVelocity.magnitude >= BreakableProp.BreakSpeed)
+                {
+                    prop.Break(preStepVelocity, GetComponentsInChildren<Collider>());
+                    rb.linearVelocity = preStepVelocity * BreakableProp.SpeedKept;
+                    rb.angularVelocity = preStepAngular;
+                    // Bruit, étincelles et petite secousse, sans l'intensité d'un vrai accident
+                    Impacted?.Invoke(c, Mathf.Clamp(preStepVelocity.magnitude * 0.2f, 3.5f, 5.5f));
+                    return;
+                }
+            }
             float impact = c.relativeVelocity.magnitude;
             if (impact > 1.5f) Impacted?.Invoke(c, impact);
         }
@@ -922,7 +944,7 @@ namespace ChillRoad
             // Ignore le sol : seulement les contacts latéraux de la caisse
             if (Vector3.Dot(contact.normal, transform.up) > 0.6f) return;
             float slide = Vector3.ProjectOnPlane(c.relativeVelocity, contact.normal).magnitude;
-            if (slide > 4f) Scraped(contact.point, contact.normal, slide);
+            if (slide > 4f && !c.collider.GetComponentInParent<BreakableProp>()) Scraped(contact.point, contact.normal, slide);
         }
     }
 }
