@@ -1240,18 +1240,14 @@ def gryaris_details(c):
     c.decal([(0.68, 0.44), (0.815, 0.45), (0.815, 0.474), (0.68, 0.464)], 'front', 'paint', offset=0.010,
             name="VentBlade", min_facing=0.12)
     c.decal(ellipse(0.755, 0.34, 0.04, 0.04, n=12), 'front', 'lens', offset=0.010, name="FogLight", min_facing=0.12)
-    # phares effilés (boîtier noir, lame de feux de jour, deux projecteurs) : pointe intérieure contre le bandeau,
-    # ils s'élargissent vers le coin puis filent sur l'aile
+    # phares effilés, en deux aplats comme le reste du pack (boîtier noir, optique claire) : pointe intérieure contre
+    # le bandeau, ils s'élargissent vers le coin et tournent un peu sur l'aile
     c.decal([(0.42, 0.724), (0.56, 0.712), (0.72, 0.722), (0.86, 0.75), (0.875, 0.80), (0.82, 0.83), (0.64, 0.80),
              (0.50, 0.76)], 'front', 'black', name="Headlight", min_facing=0.12)
-    c.decal([(0.45, 0.722), (0.56, 0.716), (0.72, 0.727), (0.855, 0.755), (0.855, 0.768), (0.72, 0.741),
-             (0.56, 0.730), (0.45, 0.733)], 'front', 'led', offset=0.009, name="DRL", min_facing=0.12)
-    for yc, zc in ((0.61, 0.764), (0.735, 0.785)):
-        c.decal(ellipse(yc, zc, 0.036, 0.024, n=10), 'front', 'led', offset=0.009, name="Projector", min_facing=0.12)
-    c.decal([(2.04, 0.735), (2.02, 0.82), (1.90, 0.855), (1.72, 0.885), (1.62, 0.89), (1.74, 0.845), (1.90, 0.79)],
+    c.decal([(0.52, 0.738), (0.72, 0.742), (0.84, 0.766), (0.845, 0.795), (0.81, 0.808), (0.65, 0.782)], 'front',
+            'led', offset=0.009, name="HeadlightLens", min_facing=0.12)
+    c.decal([(2.04, 0.735), (2.02, 0.82), (1.90, 0.855), (1.78, 0.872), (1.84, 0.82), (1.92, 0.785)],
             'side', 'black', name="HeadlightTail", min_facing=0.2)
-    c.decal([(2.03, 0.745), (1.90, 0.80), (1.74, 0.855), (1.64, 0.885), (1.74, 0.868), (1.90, 0.815), (2.025, 0.76)],
-            'side', 'led', offset=0.009, name="DRLTail", min_facing=0.2)
     # capot : joints le long des ailes, de la baie de pare-brise à la pointe des phares
     seam = [(0.99, 0.745), (1.45, 0.73), (1.80, 0.69), (1.98, 0.60), (2.06, 0.47)]
     c.decal(band(seam, -0.004, 0.004), 'top', 'trim', offset=0.004, name="HoodSeam", min_facing=0.3)
