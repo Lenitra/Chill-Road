@@ -5,12 +5,12 @@ namespace NoHesi
 {
     /// <summary>
     /// Codes de triche tapés au clavier pendant la partie (les lettres saisies, selon la disposition du clavier).
-    /// « qzdsqzdsq » : +2 500 $ dans le portefeuille.
+    /// « qzdsqzdsq » : +10 000 $ dans le portefeuille.
     /// </summary>
     public class CheatCodes : MonoBehaviour
     {
         const string MoneyCode = "qzdsqzdsq";
-        const int MoneyAmount = 2500;
+        const int MoneyAmount = 10000;
 
         GameManager game;
         Keyboard keyboard;
