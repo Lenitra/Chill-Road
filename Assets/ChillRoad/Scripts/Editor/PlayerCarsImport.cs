@@ -10,7 +10,7 @@ namespace ChillRoad.EditorTools
     /// 1989), Ford Mustang fastback 1969 (celle de John Wick), Peel P50 (tricycle, roue « wheel-back-center »),
     /// Toyota AE86 Trueno (Initial D, phares escamotables), DeLorean DMC-12, Koenigsegg Jesko Attack, Aston Martin
     /// Valkyrie AMR-LMH, Renault Twingo (1re génération, 1993, traction), Citroën Ami (2020, quadricycle électrique
-    /// bridé à 45 km/h, un seul rapport) et Toyota GR Yaris (2020, intégrale, étriers « caliper-* »).
+    /// bridé à 45 km/h, un seul rapport) et Toyota GR Yaris (2020, intégrale).
     /// Un modèle absent est simplement ignoré.
     /// Les phares escamotables de la MX-5 sont des enfants « popup-left/right » dont le pivot est la charnière :
     /// CarLights les fait basculer. Palette et optiques partagées avec le pack de voitures, peinture propre à chaque
@@ -58,7 +58,7 @@ namespace ChillRoad.EditorTools
                 ("Valkyrie", new Color(0.05f, 0.56f, 0.53f), Valkyrie), // teal de l'AMR-LMH, accents vert citron
                 ("Twingo", new Color(0.97f, 0.77f, 0.10f), Twingo),   // « Jaune Indien » du lancement, boucliers gris
                 ("Ami", new Color(0.60f, 0.80f, 0.87f), Ami),         // « Bleu Ciel », boucliers et bas de caisse gris foncé
-                ("GRYaris", new Color(0.94f, 0.94f, 0.93f), GRYaris), // blanc nacré, toit carbone noir, étriers rouges
+                ("GRYaris", new Color(0.94f, 0.94f, 0.93f), GRYaris), // blanc nacré, toit carbone noir
             };
             // Accents hors palette (matériau « PK_Accent » du modèle) : couleur unie par voiture
             var accents = new Dictionary<string, Color>
@@ -270,9 +270,7 @@ namespace ChillRoad.EditorTools
 
         /// <summary>Toyota GR Yaris (2020) : 1 280 kg + le conducteur, 3 cylindres 1.6 turbo G16E-GTS (261 ch, 360 N·m),
         /// transmission intégrale GR-Four, boîte 6 rapports (les deux ponts d'origine, 3,941 et 3,350, ramenés à un seul :
-        /// 5e et 6e raccourcies d'autant), pneus 225/40 R18. Pas de voix 3 cylindres : celle du 4 cylindres.
-        /// Les étriers rouges sont des enfants « caliper-* » du modèle : ils suivent leur roue sans tourner
-        /// (<see cref="VehicleController"/>).</summary>
+        /// 5e et 6e raccourcies d'autant), pneus 225/40 R18. Pas de voix 3 cylindres : celle du 4 cylindres.</summary>
         static VehicleSpec GRYaris(GameObject model)
         {
             const float mass = 1340f;
