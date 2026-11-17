@@ -13,8 +13,11 @@ namespace ChillRoad
     /// vient cadrer la pièce ; la fiche montre ce que l'option regardée change (performances, adhérence par surface
     /// pour les pneus, réglages pour les suspensions).
     /// Chaque option s'achète seule (le niveau 3 ne donne pas les niveaux 1 et 2) ; une option achetée, comme la pièce
-    /// de série, se remonte ensuite gratuitement, autant de fois que l'on veut. Dernière entrée, la peinture : le nuancier de
-    /// <see cref="CarPaint"/>, essayé en direct sur la voiture de l'atelier ; une couleur achetée se remet gratuitement.
+    /// de série, se remonte ensuite gratuitement, autant de fois que l'on veut.
+    /// Deux onglets (LB / RB, Tab, ou clic) : PERFORMANCES (les pièces ci-dessus) et COSMÉTIQUE, sans effet sur la
+    /// conduite : la peinture (nuancier de <see cref="CarPaint"/>), puis les accessoires de <see cref="CarCosmetics"/>
+    /// (néons, vitres teintées, pop and bang, couleur des flammes), essayés en direct sur la voiture de l'atelier — le pop
+    /// and bang et les flammes y pétaradent en démonstration. Même règle d'achat : payé une fois, remonté gratuitement.
     /// En réseau, le monde continue pendant ce temps.
     /// </summary>
     public class TuningGarage : MonoBehaviour
@@ -38,8 +41,12 @@ namespace ChillRoad
         /// <summary>Vitesse au-dessous de laquelle on peut entrer (m/s).</summary>
         const float EnterSpeed = 5.5f;
         const int Stats = 6;
-        /// <summary>Entrée « Peinture » de la liste des pièces (après les pièces).</summary>
-        const int PaintRow = CarTuning.PartCount;
+        /// <summary>Onglets : performances (pièces), cosmétique (peinture et accessoires).</summary>
+        const int TabParts = 0, TabLooks = 1;
+        /// <summary>Lignes de l'onglet cosmétique : la peinture, puis un accessoire par ligne.</summary>
+        const int LookRows = 1 + CarCosmetics.ItemCount;
+        /// <summary>Onglet ouvert la dernière fois (gardé pour la session).</summary>
+        static int lastTab;
 
         public static bool IsOpen { get; private set; }
         /// <summary>Image où l'écran s'est ouvert ou fermé (la touche de fermeture ne doit pas ouvrir la pause).</summary>
@@ -66,16 +73,23 @@ namespace ChillRoad
         GameObject root;
         WorkshopStage stage;
         RectTransform screenRt, menuRt, cardRt;
-        Text carText, cashText, crumbText, countText, nameText, subText, levelText, actionText, hintText, leaveText;
+        Text carText, cashText, crumbText, countText, nameText, subText, levelText, actionText, hintText, leaveText, tabPrevText, tabNextText;
         readonly List<Row> rows = new List<Row>();
-        readonly List<(RectTransform fill, RectTransform gain, Text label, Text value)> bars = new List<(RectTransform, RectTransform, Text, Text)>();
+        readonly List<(RectTransform fill, RectTransform gain, Text label, Text value, RectTransform bg)> bars = new List<(RectTransform, RectTransform, Text, Text, RectTransform)>();
+        /// <summary>Boutons des onglets : plaque, libellé, trait de l'onglet ouvert.</summary>
+        readonly List<(HudShape plate, Text label, Image mark)> tabs = new List<(HudShape, Text, Image)>();
         /// <summary>Échelle des barres, par fiche (<see cref="CardMode"/>).</summary>
         readonly float[,] scale = new float[3, Stats];
-        /// <summary>Pièce ouverte (ses niveaux sont listés) ; -1 : liste des pièces.</summary>
+        /// <summary>Onglet ouvert (<see cref="TabParts"/>, <see cref="TabLooks"/>).</summary>
+        int tab;
+        /// <summary>Ligne ouverte de l'onglet (pièce, peinture ou accessoire, ses options sont listées) ; -1 : la liste.</summary>
         int part = -1;
         int openedFrame, shown = -1;
         /// <summary>Couleur montrée sur la voiture de l'atelier (-1 : à repeindre).</summary>
         int painted = -1;
+        /// <summary>Démonstration du pop and bang : option montrée, temps avant la prochaine pétarade.</summary>
+        int demoShown = -1;
+        float demoTimer;
         float messageTimer;
         string message;
         Color messageColor;
@@ -94,10 +108,24 @@ namespace ChillRoad
         }
 
         /// <summary>Le nuancier est ouvert.</summary>
-        bool InPaint => part == PaintRow;
+        bool InPaint => tab == TabLooks && part == 0;
+        /// <summary>Les options d'un accessoire cosmétique sont listées (<see cref="LookItem"/>).</summary>
+        bool InLook => tab == TabLooks && part > 0;
+        CarCosmetics.Item LookItem => (CarCosmetics.Item)(part - 1);
 
-        /// <summary>Lignes de la liste affichée : pièces et peinture, options de la pièce ouverte (série comprise), ou nuancier.</summary>
-        int RowCount => part < 0 ? CarTuning.PartCount + 1 : InPaint ? CarPaint.Count : CarTuning.Options((CarTuning.Part)part);
+        /// <summary>
+        /// Lignes de la liste affichée : pièces, ou peinture et accessoires ; options de la pièce ouverte (série comprise),
+        /// nuancier, ou options de l'accessoire.
+        /// </summary>
+        int RowCount
+        {
+            get
+            {
+                if (tab == TabParts) return part < 0 ? CarTuning.PartCount : CarTuning.Options((CarTuning.Part)part);
+                if (part < 0) return LookRows;
+                return InPaint ? CarPaint.Count : CarCosmetics.Options(LookItem);
+            }
+        }
 
         void Update()
         {
@@ -111,6 +139,7 @@ namespace ChillRoad
             CanEnter = false;
             float dt = Time.unscaledDeltaTime;
             if (Time.frameCount != openedFrame && (GameInput.CancelPressed || GameInput.PausePressed)) { Back(); return; }
+            if (Time.frameCount != openedFrame && (GameInput.TabPrevPressed || GameInput.TabNextPressed)) SwitchTab(1 - tab);
 
             // Toujours une ligne choisie (manette, clavier)
             var es = EventSystem.current;
@@ -129,7 +158,33 @@ namespace ChillRoad
             stage.Orbit(orbit);
 
             if (messageTimer > 0f) { messageTimer -= dt; if (messageTimer <= 0f) message = null; }
+            PreviewLook(dt);
             Refresh();
+        }
+
+        /// <summary>
+        /// Accessoires essayés sur la voiture de l'atelier : ceux montés, avec l'option regardée à la place de celle de
+        /// l'accessoire ouvert. Pop and bang et couleur des flammes : une pétarade de démonstration à intervalles.
+        /// </summary>
+        void PreviewLook(float dt)
+        {
+            var look = ShownLook();
+            stage.Dress(look);
+            bool exhaust = InLook && (LookItem == CarCosmetics.Item.Pop || LookItem == CarCosmetics.Item.Flame);
+            if (!exhaust) { demoShown = -1; return; }
+            if (shown != demoShown) { demoShown = shown; demoTimer = 0.3f; }
+            demoTimer -= dt;
+            if (demoTimer > 0f) return;
+            stage.Pop(look);
+            demoTimer = look.pop == CarCosmetics.PopDiesel ? 2.4f : 1.7f;
+        }
+
+        /// <summary>Accessoires montés, et l'option regardée de l'accessoire ouvert.</summary>
+        CarCosmetics.Look ShownLook()
+        {
+            var look = CarCosmetics.Fitted(BaseSpec);
+            if (InLook && shown >= 0) look[LookItem] = shown;
+            return look;
         }
 
         MapData.PoiJson Poi
@@ -174,19 +229,40 @@ namespace ChillRoad
             game.SetInputEnabled(false);
             if (game.Hud) game.Hud.SetVisible(false);
             message = null;
+            tab = lastTab;
             part = -1;
             Arrange();
             stage.SetCar(BaseSpec);
             painted = -1;
+            demoShown = -1;
+            stage.Dress(CarCosmetics.Fitted(BaseSpec));
             stage.Focus(-1, true);
             stage.Show();
             ShopFade.Cut(0.5f);
-            // Première pièce à niveaux que l'on peut encore améliorer
-            int first = 0;
-            for (int i = 0; i < CarTuning.PartCount; i++)
-                if (!CarTuning.IsTyped((CarTuning.Part)i) && CarTuning.Level(BaseSpec, (CarTuning.Part)i) < CarTuning.MaxLevel) { first = i; break; }
-            Select(first);
+            Select(FirstRow());
             Refresh();
+        }
+
+        /// <summary>Ligne choisie en arrivant sur un onglet : la première pièce à niveaux encore améliorable, ou la peinture.</summary>
+        int FirstRow()
+        {
+            if (tab == TabLooks) return 0;
+            for (int i = 0; i < CarTuning.PartCount; i++)
+                if (!CarTuning.IsTyped((CarTuning.Part)i) && CarTuning.Level(BaseSpec, (CarTuning.Part)i) < CarTuning.MaxLevel) return i;
+            return 0;
+        }
+
+        /// <summary>Passe à l'autre onglet, sur sa liste.</summary>
+        void SwitchTab(int t)
+        {
+            t = Mathf.Clamp(t, TabParts, TabLooks);
+            if (t == tab) return;
+            tab = lastTab = t;
+            part = -1;
+            message = null;
+            Arrange();
+            stage.Focus(-1);
+            Select(FirstRow());
         }
 
         public void Close()
@@ -208,10 +284,13 @@ namespace ChillRoad
             EventSystem.current?.SetSelectedGameObject(rows[shown].button.gameObject);
         }
 
-        /// <summary>Ouvre une pièce : ses niveaux remplacent la liste, la caméra vient la cadrer. Peinture : le nuancier, vue d'ensemble.</summary>
+        /// <summary>
+        /// Ouvre une pièce : ses niveaux remplacent la liste, la caméra vient la cadrer. Peinture : le nuancier, vue
+        /// d'ensemble. Accessoire : ses options, la caméra cadre le dessous de caisse, les vitres ou l'échappement.
+        /// </summary>
         void EnterPart(int p)
         {
-            if (p == PaintRow)
+            if (tab == TabLooks && p == 0)
             {
                 if (!CarPaint.Paintable(BaseSpec)) { Say(Loc.T("Cette voiture garde sa livrée d'origine", "This car keeps its factory livery"), Dim); return; }
                 part = p;
@@ -219,6 +298,18 @@ namespace ChillRoad
                 Arrange();
                 stage.Focus(-1);
                 Select(CarPaint.Selected(BaseSpec));
+                return;
+            }
+            if (tab == TabLooks)
+            {
+                var item = (CarCosmetics.Item)(p - 1);
+                if (!CarCosmetics.Available(BaseSpec, item)) { Say(CarCosmetics.Unavailable(item), Dim); return; }
+                part = p;
+                message = null;
+                Arrange();
+                stage.Focus(item == CarCosmetics.Item.Neon ? WorkshopStage.FocusUnder
+                          : item == CarCosmetics.Item.Tint ? WorkshopStage.FocusGlass : WorkshopStage.FocusExhaust);
+                Select(CarCosmetics.Fitted(BaseSpec, item));
                 return;
             }
             part = p;
@@ -250,8 +341,9 @@ namespace ChillRoad
             for (int i = 0; i < rows.Count; i++)
             {
                 rows[i].button.gameObject.SetActive(i < count);
-                foreach (var pip in rows[i].pips) pip.gameObject.SetActive(part < 0 && i < CarTuning.PartCount && !CarTuning.IsTyped((CarTuning.Part)i));
-                if (rows[i].swatch) rows[i].swatch.gameObject.SetActive((part < 0 && i == PaintRow) || InPaint);
+                foreach (var pip in rows[i].pips) pip.gameObject.SetActive(tab == TabParts && part < 0 && i < CarTuning.PartCount && !CarTuning.IsTyped((CarTuning.Part)i));
+                // Pastilles : peinture et accessoires de couleur (néons, vitres, flammes ; transparente si sans objet)
+                if (rows[i].swatch) rows[i].swatch.gameObject.SetActive(tab == TabLooks && (part < 0 || InPaint || LookItem != CarCosmetics.Item.Pop));
                 if (i >= count) continue;
                 rows[i].button.navigation = new Navigation
                 {
@@ -270,6 +362,7 @@ namespace ChillRoad
             if (i != shown) { Select(i); return; }
             if (part < 0) { EnterPart(i); return; }
             if (InPaint) { Paint(i); return; }
+            if (InLook) { FitLook(i); return; }
             var spec = BaseSpec;
             var p = (CarTuning.Part)part;
             int level = CarTuning.Level(spec, p);
@@ -311,6 +404,28 @@ namespace ChillRoad
                       : Loc.T($"{CarPaint.Name(i)} achetée !", $"{CarPaint.Name(i)} bought!"), Money);
         }
 
+        /// <summary>Validation d'une option d'accessoire : la remonter si elle est à disposition, sinon l'acheter si l'argent suffit.</summary>
+        void FitLook(int i)
+        {
+            var spec = BaseSpec;
+            var item = LookItem;
+            if (i == CarCosmetics.Fitted(spec, item)) { Say(Loc.T("Déjà installé", "Already fitted"), Dim); return; }
+            bool owned = CarCosmetics.Owns(spec, item, i);
+            int price = CarCosmetics.Price(spec, item, i);
+            if (!owned && Wallet.Cash < price)
+            {
+                Say(Loc.T($"Il te manque {Wallet.Format(price - Wallet.Cash)}", $"You need {Wallet.Format(price - Wallet.Cash)} more"), Danger);
+                return;
+            }
+            if (!CarCosmetics.Fit(spec, item, i)) return;
+            // La voiture garée dehors prend aussitôt ses néons et ses vitres (pop and bang : ses effets les lisent)
+            game.ShowCar(game.Local.CarIndex);
+            if (game.Local.Audio) game.Local.Audio.Chime();
+            stage.Punch();
+            string what = $"{CarCosmetics.Name(item)} : {CarCosmetics.OptionName(item, i)}";
+            Say(owned ? Loc.T($"{what}, monté", $"{what}, fitted") : Loc.T($"{what}, installé !", $"{what}, fitted!"), Money);
+        }
+
         void Say(string text, Color color)
         {
             message = text;
@@ -331,12 +446,25 @@ namespace ChillRoad
             cardRt.localScale = Vector3.one * Mathf.Min(1f, Mathf.Min(screenRt.rect.width / 1500f, screenRt.rect.height / 900f));
             carText.text = spec.displayName;
             cashText.text = Loc.T("Portefeuille : ", "Wallet: ") + Wallet.Format(cash);
-            crumbText.text = part < 0 ? Loc.T("PIÈCES", "PARTS") : InPaint ? Loc.T("PEINTURE", "PAINT") : CarTuning.Name((CarTuning.Part)part).ToUpperInvariant();
+            crumbText.text = tab == TabParts
+                ? (part < 0 ? Loc.T("PIÈCES", "PARTS") : CarTuning.Name((CarTuning.Part)part).ToUpperInvariant())
+                : part < 0 ? Loc.T("PEINTURE ET ACCESSOIRES", "PAINT AND ACCESSORIES") : InPaint ? Loc.T("PEINTURE", "PAINT") : CarCosmetics.Name(LookItem).ToUpperInvariant();
             countText.text = shown >= 0 ? $"{shown + 1} / {count}" : "";
             leaveText.text = part < 0 ? Loc.T("Sortir", "Leave") : Loc.T("Retour", "Back");
+            bool pad = GameInput.UsingGamepad;
+            for (int k = 0; k < tabs.Count; k++)
+            {
+                bool open = k == tab;
+                tabs[k].plate.color = open ? new Color(0.12f, 0.13f, 0.17f, 0.96f) : new Color(0.02f, 0.025f, 0.04f, 0.85f);
+                tabs[k].label.color = open ? White : Dim;
+                tabs[k].mark.enabled = open;
+            }
+            tabPrevText.text = pad ? "LB" : "";
+            tabNextText.text = pad ? "RB" : "Tab";
 
-            int current = part >= 0 && !InPaint ? CarTuning.Level(spec, (CarTuning.Part)part) : 0;
+            int current = tab == TabParts && part >= 0 ? CarTuning.Level(spec, (CarTuning.Part)part) : 0;
             int colour = CarPaint.Selected(spec);
+            var fitted = CarCosmetics.Fitted(spec);
             // Voiture de l'atelier : la couleur regardée dans le nuancier, sinon la sienne
             int look = InPaint && shown >= 0 ? shown : colour;
             if (look != painted) { stage.Paint(look); painted = look; }
@@ -345,7 +473,36 @@ namespace ChillRoad
                 var row = rows[i];
                 bool on = i == shown;
                 row.name.color = on ? Ink : White;
-                if (part < 0 && i == PaintRow)
+                if (tab == TabLooks && part < 0 && i > 0)
+                {
+                    // Accessoire : l'option montée, sa couleur dans la pastille
+                    var item = (CarCosmetics.Item)(i - 1);
+                    row.name.text = CarCosmetics.Name(item);
+                    bool can = CarCosmetics.Available(spec, item);
+                    row.swatch.color = can ? CarCosmetics.Swatch(item, fitted[item]) : Color.clear;
+                    row.status.text = can ? CarCosmetics.OptionName(item, fitted[item]).ToUpperInvariant() : Loc.T("INDISPONIBLE", "N/A");
+                    row.status.color = on ? InkDim : Dim;
+                }
+                else if (InLook)
+                {
+                    var item = LookItem;
+                    row.name.text = CarCosmetics.OptionName(item, i);
+                    row.swatch.color = CarCosmetics.Swatch(item, i);
+                    if (i == fitted[item]) { row.status.text = Loc.T("INSTALLÉ", "FITTED"); row.status.color = on ? InkMoney : Money; }
+                    else if (CarCosmetics.Owns(spec, item, i))
+                    {
+                        row.status.text = i == CarCosmetics.Stock(item) ? Loc.T("D'ORIGINE", "STOCK")
+                                        : CarCosmetics.OptionPrice(spec, item, i) == 0 ? Loc.T("GRATUIT", "FREE") : Loc.T("ACHETÉ", "OWNED");
+                        row.status.color = on ? InkDim : Dim;
+                    }
+                    else
+                    {
+                        int price = CarCosmetics.Price(spec, item, i);
+                        row.status.text = PriceText(price);
+                        row.status.color = cash >= price ? (on ? InkAccent : Accent) : on ? InkDanger : new Color(1f, 0.45f, 0.4f, 0.85f);
+                    }
+                }
+                else if (tab == TabLooks && part < 0)
                 {
                     row.name.text = Loc.T("Peinture", "Paint");
                     row.swatch.color = CarPaint.Shade(spec, colour);
@@ -401,11 +558,11 @@ namespace ChillRoad
             }
 
             if (shown < 0) return;
-            bool pad = GameInput.UsingGamepad;
             string ok = pad ? "A" : Loc.T("Entrée", "Enter");
             string turn = pad ? Loc.T("joystick droit : tourner", "right stick: rotate") : Loc.T("clic droit : tourner", "right click: rotate");
             string back = pad ? "B" : Loc.T("Échap", "Esc");
-            if (InPaint || (part < 0 && shown == PaintRow)) { RefreshPaint(spec, cash, ok, back, turn); return; }
+            if (InPaint || (tab == TabLooks && part < 0 && shown == 0)) { RefreshPaint(spec, cash, ok, back, turn); return; }
+            if (tab == TabLooks) { RefreshLook(spec, cash, ok, back, turn); return; }
 
             // Fiche : la pièce regardée (ou ouverte), et ce qu'apporte l'option visée
             var sel = (CarTuning.Part)(part < 0 ? shown : part);
@@ -445,8 +602,7 @@ namespace ChillRoad
             nameText.text = InPaint ? CarPaint.Name(shown) : Loc.T("Peinture", "Paint");
             subText.text = Loc.T("Couleur de carrosserie : sans effet sur la conduite", "Body colour: no effect on handling");
             levelText.text = can ? Loc.F($"{CarPaint.OwnedCount(spec)} / {CarPaint.Count} couleurs", $"{CarPaint.OwnedCount(spec)} / {CarPaint.Count} colours") : "";
-            var now = CarTuning.Apply(spec);
-            ShowBars(0, now, now);
+            ShowLook(spec, InPaint ? shown : colour, CarCosmetics.Fitted(spec));
 
             int price = InPaint ? CarPaint.Price(spec, shown) : 0;
             if (message != null) { actionText.text = message; actionText.color = messageColor; }
@@ -460,6 +616,75 @@ namespace ChillRoad
             hintText.text = InPaint
                 ? Loc.T($"↑ ↓ essayer  ·  {ok} peindre  ·  {back} retour  ·  {turn}", $"↑ ↓ try on  ·  {ok} paint  ·  {back} back  ·  {turn}")
                 : Loc.T($"↑ ↓ choisir  ·  {ok} ouvrir  ·  {back} sortir  ·  {turn}", $"↑ ↓ browse  ·  {ok} open  ·  {back} leave  ·  {turn}");
+        }
+
+        /// <summary>Fiche d'un accessoire cosmétique : ce qu'il fait, l'option visée et son prix, l'habillage complet de la voiture.</summary>
+        void RefreshLook(VehicleSpec spec, int cash, string ok, string back, string turn)
+        {
+            var item = part < 0 ? (CarCosmetics.Item)(shown - 1) : LookItem;
+            bool can = CarCosmetics.Available(spec, item);
+            int fitted = CarCosmetics.Fitted(spec, item);
+            int target = part < 0 ? fitted : shown;
+            string option = CarCosmetics.OptionName(item, target);
+            nameText.text = CarCosmetics.Name(item);
+            subText.text = part < 0 ? CarCosmetics.Effect(item) : CarCosmetics.OptionEffect(item, target);
+            levelText.text = can ? Loc.F($"{CarCosmetics.OwnedCount(spec, item)} / {CarCosmetics.Options(item)}") : "";
+            ShowLook(spec, CarPaint.Selected(spec), ShownLook());
+
+            int cost = CarCosmetics.Price(spec, item, target);
+            if (message != null) { actionText.text = message; actionText.color = messageColor; }
+            else if (!can) { actionText.text = CarCosmetics.Unavailable(item); actionText.color = Dim; }
+            else if (part < 0) { actionText.text = Loc.T($"{ok} : voir les {CarCosmetics.Options(item)} options", $"{ok}: see the {CarCosmetics.Options(item)} options"); actionText.color = White; }
+            else if (target == fitted) { actionText.text = Loc.T("Monté sur la voiture", "On the car"); actionText.color = Money; }
+            else if (target == CarCosmetics.Stock(item)) { actionText.text = Loc.T($"{ok} : remettre d'origine  ·  gratuit", $"{ok}: back to stock  ·  free"); actionText.color = White; }
+            else if (CarCosmetics.Owns(spec, item, target))
+            {
+                bool free = CarCosmetics.OptionPrice(spec, item, target) == 0;
+                actionText.text = Loc.T($"{ok} : monter {option}  ·  {(free ? "gratuit" : "déjà acheté")}", $"{ok}: fit {option}  ·  {(free ? "free" : "already owned")}");
+                actionText.color = White;
+            }
+            else if (cash < cost) { actionText.text = Loc.T($"Il te manque {Wallet.Format(cost - cash)}", $"You need {Wallet.Format(cost - cash)} more"); actionText.color = Danger; }
+            else { actionText.text = Loc.T($"{ok} : installer {option}  ·  {PriceText(cost)}", $"{ok}: fit {option}  ·  {PriceText(cost)}"); actionText.color = White; }
+
+            hintText.text = part < 0
+                ? Loc.T($"↑ ↓ choisir  ·  {ok} ouvrir  ·  {back} sortir  ·  {turn}", $"↑ ↓ browse  ·  {ok} open  ·  {back} leave  ·  {turn}")
+                : Loc.T($"↑ ↓ essayer  ·  {ok} installer  ·  {back} retour  ·  {turn}", $"↑ ↓ try on  ·  {ok} fit  ·  {back} back  ·  {turn}");
+        }
+
+        /// <summary>
+        /// Fiche de l'onglet cosmétique : à la place des barres, l'habillage de la voiture ligne par ligne (peinture et
+        /// accessoires), le changement essayé en surbrillance (« actuel → essayé »).
+        /// </summary>
+        void ShowLook(VehicleSpec spec, int paint, CarCosmetics.Look look)
+        {
+            var fitted = CarCosmetics.Fitted(spec);
+            int colour = CarPaint.Selected(spec);
+            for (int i = 0; i < Stats; i++)
+            {
+                var bar = bars[i];
+                bar.bg.gameObject.SetActive(false);
+                string now, then;
+                if (i == 0)
+                {
+                    bar.label.text = Loc.T("Peinture", "Paint");
+                    bool can = CarPaint.Paintable(spec);
+                    now = can ? CarPaint.Name(colour) : Loc.T("D'origine", "Factory");
+                    then = can ? CarPaint.Name(paint) : now;
+                }
+                else if (i <= CarCosmetics.ItemCount)
+                {
+                    var item = (CarCosmetics.Item)(i - 1);
+                    bar.label.text = CarCosmetics.Name(item);
+                    bool can = CarCosmetics.Available(spec, item);
+                    now = can ? CarCosmetics.OptionName(item, fitted[item]) : "—";
+                    then = can ? CarCosmetics.OptionName(item, look[item]) : now;
+                }
+                else { bar.label.text = ""; bar.value.text = ""; continue; }
+                bool changed = now != then;
+                bar.label.color = changed ? Brand : White;
+                bar.value.text = changed ? now + "  →  " + then : now;
+                bar.value.color = changed ? Brand : Accent;
+            }
         }
 
         /// <summary>Fiche montrée : 0 performances, 1 adhérence par surface (pneus), 2 réglages (suspensions).</summary>
@@ -488,6 +713,7 @@ namespace ChillRoad
             {
                 float a = Stat(mode, now, i), b = Stat(mode, after, i);
                 bool changed = Mathf.Abs(b - a) > 1e-3f;
+                bars[i].bg.gameObject.SetActive(true);
                 bars[i].label.text = Loc.T(StatLabels[mode, i, 0], StatLabels[mode, i, 1]);
                 bars[i].fill.localScale = new Vector3(Mathf.Clamp01(Bar(mode, i, a) / scale[mode, i]), 1f, 1f);
                 bars[i].gain.localScale = new Vector3(Mathf.Clamp01(Bar(mode, i, b) / scale[mode, i]), 1f, 1f);
@@ -575,6 +801,8 @@ namespace ChillRoad
             }
             stage = gameObject.AddComponent<WorkshopStage>();
             stage.Build(game);
+            // Démonstration du pop and bang : la détonation, avec la voix du moteur de la voiture
+            stage.Popped += loud => { if (game.Local.Audio) game.Local.Audio.PlayBackfire(loud); };
 
             root = new GameObject("TuningGarage", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = root.GetComponent<Canvas>();
@@ -608,13 +836,26 @@ namespace ChillRoad
             Loc.Bind(title, "GARAGE DE TUNING", "TUNING GARAGE");
             carText = Place(Label(banner, "", 24, TextAnchor.MiddleLeft, Dim, FontStyle.BoldAndItalic), new Vector2(28f, -62f), new Vector2(530f, 30f));
 
+            // Onglets : performances, cosmétique (LB / RB, Tab, ou clic)
+            var tabBar = Bar(menu, 54f, new Color(0.01f, 0.012f, 0.02f, 0.94f), 0f);
+            tabBar.GetComponent<LayoutElement>().flexibleHeight = 0f;
+            var th = tabBar.gameObject.AddComponent<HorizontalLayoutGroup>();
+            th.padding = new RectOffset(6, 6, 6, 6);
+            th.spacing = 6;
+            th.childControlWidth = true; th.childControlHeight = true;
+            th.childForceExpandWidth = false; th.childForceExpandHeight = true;
+            tabPrevText = TabGlyph(tabBar);
+            var tabNames = new[] { ("PERFORMANCES", "PERFORMANCE"), ("COSMÉTIQUE", "COSMETICS") };
+            for (int i = 0; i < tabNames.Length; i++) tabs.Add(MakeTab(tabBar, tabNames[i].Item1, tabNames[i].Item2, i));
+            tabNextText = TabGlyph(tabBar);
+
             var crumb = Bar(menu, 44f, new Color(0.01f, 0.012f, 0.02f, 0.94f), 0f);
             crumbText = Label(crumb, "", 22, TextAnchor.MiddleLeft, White, FontStyle.Bold);
             Stretch(crumbText.rectTransform, 26f, 120f);
             countText = Label(crumb, "", 22, TextAnchor.MiddleRight, Dim, FontStyle.Bold);
             Stretch(countText.rectTransform, 300f, 24f);
 
-            int count = Mathf.Max(CarTuning.PartCount + 1, Mathf.Max(CarTuning.MaxOptions, CarPaint.Count));
+            int count = Mathf.Max(Mathf.Max(CarTuning.PartCount, CarTuning.MaxOptions), Mathf.Max(LookRows, Mathf.Max(CarPaint.Count, CarCosmetics.MaxOptions)));
             for (int i = 0; i < count; i++)
             {
                 int index = i;
@@ -663,7 +904,7 @@ namespace ChillRoad
                 fill.pivot = new Vector2(0f, 0.5f);
                 fill.gameObject.AddComponent<Image>().color = Info;
                 var value = Place(Label(card, "", 21, TextAnchor.MiddleRight, Accent, FontStyle.Bold), new Vector2(480f, y), new Vector2(200f, 30f));
-                bars.Add((fill, gain, label, value));
+                bars.Add((fill, gain, label, value, bg));
             }
             actionText = Place(Label(card, "", 27, TextAnchor.MiddleLeft, White, FontStyle.BoldAndItalic), new Vector2(34f, -440f), new Vector2(650f, 40f));
             // Textes et barres de la fiche : leur marge suit le bord penché de la plaque
@@ -742,6 +983,38 @@ namespace ChillRoad
                 sw.gameObject.SetActive(false);
             }
             return new Row { button = b, name = name, status = status, pips = pips, swatch = swatch };
+        }
+
+        /// <summary>Onglet : plaque cliquable hors de la navigation de la liste, trait rose sous l'onglet ouvert.</summary>
+        (HudShape plate, Text label, Image mark) MakeTab(Transform parent, string fr, string en, int index)
+        {
+            var go = new GameObject("Tab", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape), typeof(Button), typeof(LayoutElement));
+            go.transform.SetParent(parent, false);
+            go.GetComponent<LayoutElement>().flexibleWidth = 1f;
+            var shape = go.GetComponent<HudShape>();
+            shape.Set(10f, 0f, 0f);
+            shape.color = new Color(0.02f, 0.025f, 0.04f, 0.85f);
+            var b = go.GetComponent<Button>();
+            b.targetGraphic = shape;
+            b.transition = Selectable.Transition.None;
+            b.navigation = new Navigation { mode = Navigation.Mode.None };
+            b.onClick.AddListener(() => SwitchTab(index));
+            var label = Label(go.transform, "", 22, TextAnchor.MiddleCenter, White, FontStyle.BoldAndItalic);
+            Stretch(label.rectTransform, 8f, 8f);
+            Loc.Bind(label, fr, en);
+            var mark = Rect(go.transform, "Active", new Vector2(0.1f, 0f), new Vector2(0.9f, 0f), new Vector2(0f, 0f), new Vector2(0f, 4f));
+            var img = mark.gameObject.AddComponent<Image>();
+            img.color = Brand;
+            img.raycastTarget = false;
+            return (shape, label, img);
+        }
+
+        /// <summary>Repère de touche (LB / RB, Tab) au bord de la rangée d'onglets.</summary>
+        Text TabGlyph(Transform parent)
+        {
+            var t = Label(parent, "", 19, TextAnchor.MiddleCenter, Dim, FontStyle.Bold);
+            t.gameObject.AddComponent<LayoutElement>().preferredWidth = 46;
+            return t;
         }
 
         // ------------------------------------------------------------------ helpers

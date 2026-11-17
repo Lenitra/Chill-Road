@@ -46,7 +46,7 @@ namespace ChillRoad
             var rng = new System.Random(2024);
             BuildRoad(assets);
             BuildTerrain(assets);
-            PlaceCar(car);
+            PlaceCar(car, assets);
             Scatter(assets, rng);
             if (assets.trafficCars != null && assets.trafficCars.Length > 0)
             {
@@ -276,12 +276,13 @@ namespace ChillRoad
 
         // ------------------------------------------------------------------ voiture et nature
 
-        void PlaceCar(VehicleSpec spec)
+        void PlaceCar(VehicleSpec spec, GameAssets assets)
         {
             if (spec == null || !spec.prefab) return;
             var go = Place(spec.prefab, new Vector3(RoadNetwork.LaneWidth * 0.5f, 0f, 0f), 0f, spec.modelScale);
             if (!go) return;
             CarPaint.Apply(go.transform, CarPaint.Selected(spec));
+            CarCosmetics.Apply(go.transform, CarCosmetics.Fitted(spec), assets);
             var b = BoundsOf(go);
             carCenter = b.center;
             carRadius = Mathf.Max(b.extents.x, b.extents.z);

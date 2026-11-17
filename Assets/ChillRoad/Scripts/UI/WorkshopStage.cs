@@ -26,6 +26,16 @@ namespace ChillRoad
         Vector3 look, lookVel;
         Material floor, wallLow, wallHigh, ceiling, steel, dark, red, yellow, blue, wood, peg, rubber, stripe, tube, pink, cyan;
 
+        /// <summary>Cadrages des accessoires cosmétiques (en plus des pièces de <see cref="CarTuning.Part"/>).</summary>
+        public const int FocusUnder = 20, FocusGlass = 21, FocusExhaust = 22;
+        /// <summary>Accessoires cosmétiques montrés sur la voiture du pont.</summary>
+        CarCosmetics.Look dressed;
+        bool isDressed;
+        ExhaustFlames exhaust;
+        readonly System.Collections.Generic.List<Transform> pipes = new System.Collections.Generic.List<Transform>();
+        /// <summary>Détonation de la démonstration du pop and bang (volume relatif, pour le son).</summary>
+        public event System.Action<float> Popped;
+
         public void Build(GameManager g)
         {
             lighting = new StudioLighting
@@ -129,7 +139,36 @@ namespace ChillRoad
                 Vector3 p = carPivot.InverseTransformPoint(t.position);
                 if (p.x < -0.1f) wheelL = p; else if (p.x > 0.1f) wheelR = p;
             }
+            // Sorties d'échappement du modèle (démonstration du pop and bang) ; habillage à refaire
+            pipes.Clear();
+            foreach (var t in carPivot.GetComponentsInChildren<Transform>(true))
+                if (t.name.StartsWith("exhaust")) pipes.Add(t);
+            isDressed = false;
             root.gameObject.SetActive(active);
+        }
+
+        /// <summary>Néons et vitres teintées sur la voiture du pont (essai ou accessoires montés).</summary>
+        public void Dress(CarCosmetics.Look look)
+        {
+            if (!carPivot || (isDressed && look.Same(dressed))) return;
+            dressed = look;
+            isDressed = true;
+            CarCosmetics.Apply(carPivot, look, game.assets);
+        }
+
+        /// <summary>Démonstration du pop and bang (et de la couleur des flammes) ; faux si la voiture n'a pas de pot ou s'il est désactivé.</summary>
+        public bool Pop(CarCosmetics.Look look)
+        {
+            if (!carPivot || pipes.Count == 0 || !game.assets.spark || !game.assets.particle) return false;
+            if (exhaust == null)
+            {
+                exhaust = new ExhaustFlames(root, game.assets, carPivot.gameObject.layer);
+                exhaust.Popped += loud => Popped?.Invoke(loud);
+            }
+            exhaust.Look = look;
+            exhaust.Velocity = Vector3.zero;
+            exhaust.Bind(pipes, carPivot);
+            return exhaust.Fire(1f);
         }
 
         /// <summary>Peint la voiture sur le pont (couleur du nuancier de <see cref="CarPaint"/> : essai ou couleur achetée).</summary>
@@ -176,6 +215,15 @@ namespace ChillRoad
                     p = new Vector3(-(ex + 3.4f), 0.45f, -0.3f); l = new Vector3(0f, 0.4f, 0f); break;
                 case (int)CarTuning.Part.Aero:
                     p = new Vector3(1.3f, top + 0.55f, -(ez + 2.9f)); l = new Vector3(0f, top * 0.7f, -ez * 0.7f); break;
+                case FocusUnder:
+                    // Néons : trois quarts avant, au ras du sol, pour voir le halo sous la caisse
+                    p = new Vector3(ex + 2.6f, 0.55f, ez + 1.4f); l = new Vector3(0f, 0.15f, 0f); break;
+                case FocusGlass:
+                    // Vitres : de profil, à hauteur des vitres
+                    p = new Vector3(-(ex + 3f), top * 0.9f, 1.4f); l = new Vector3(0f, top * 0.75f, -0.1f); break;
+                case FocusExhaust:
+                    // Pop and bang : trois quarts arrière, bas, sorties d'échappement au premier plan
+                    p = new Vector3(1.6f, 0.75f, -(ez + 2.7f)); l = new Vector3(0f, 0.4f, -ez * 0.8f); break;
                 default:
                     float d = Mathf.Min(Mathf.Max(ex, ez) * 1.7f + 3f, 6.8f);
                     p = new Vector3(Mathf.Sin(35f * Mathf.Deg2Rad) * d, 1.7f, Mathf.Cos(35f * Mathf.Deg2Rad) * d);
@@ -190,6 +238,7 @@ namespace ChillRoad
         protected override void Tick(float dt)
         {
             time += dt;
+            exhaust?.Tick(dt);
             Target(focus, out float ta, out float tr, out float th, out Vector3 tl);
             // Vue d'ensemble : la caméra fait lentement le tour de la voiture (et de l'atelier)
             if (focus < 0) drift += dt * 5f;

@@ -378,8 +378,9 @@ namespace ChillRoad
                 bounds = new Bounds(new Vector3(0f, b.extents.y, 0f), b.size);
             }
             SetLayer(pivot);
-            // Couleur choisie au garage de tuning
+            // Couleur et accessoires choisis au garage de tuning
             CarPaint.Apply(pivot, CarPaint.Selected(spec));
+            CarCosmetics.Apply(pivot, CarCosmetics.Fitted(spec), game.assets);
             placed.Add((pivot, spec));
             return pivot;
         }
@@ -388,7 +389,11 @@ namespace ChillRoad
         public void Repaint()
         {
             placed.RemoveAll(p => !p.pivot);
-            foreach (var (pivot, spec) in placed) CarPaint.Apply(pivot, CarPaint.Selected(spec));
+            foreach (var (pivot, spec) in placed)
+            {
+                CarPaint.Apply(pivot, CarPaint.Selected(spec));
+                CarCosmetics.Apply(pivot, CarCosmetics.Fitted(spec), game.assets);
+            }
         }
 
         Material packMaterial;
