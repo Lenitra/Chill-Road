@@ -30,6 +30,48 @@ namespace ChillRoad.EditorTools
             if (zip != null) EditorUtility.RevealInFinder(zip);
         }
 
+        /// <summary>Nom fixe du zip publié : les boutons du site pointent vers releases/latest/download/ChillRoad-Windows.zip.</summary>
+        public const string ReleaseZip = "Builds/ChillRoad-Windows.zip";
+
+        /// <summary>
+        /// Entrée en ligne de commande pour Tools/Release/release.ps1 (Unity en -batchmode, dans le worktree de release) :
+        /// « -releaseVersion 0.2.0 » fixe la version affichée en jeu, compile, zippe vers <see cref="ReleaseZip"/>, puis
+        /// quitte Unity avec le code 0 (réussite) ou 1 (échec).
+        /// </summary>
+        public static void ReleaseBuild()
+        {
+            int code = 1;
+            try
+            {
+                string version = CommandLineValue("-releaseVersion");
+                if (!string.IsNullOrEmpty(version)) PlayerSettings.bundleVersion = version;
+                if (Build())
+                {
+                    string zip = ZipBuild();
+                    if (zip != null)
+                    {
+                        if (File.Exists(ReleaseZip)) File.Delete(ReleaseZip);
+                        File.Move(zip, ReleaseZip);
+                        Debug.Log("Chill Road release : " + Path.GetFullPath(ReleaseZip) + " (v" + PlayerSettings.bundleVersion + ")");
+                        code = 0;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+            EditorApplication.Exit(code);
+        }
+
+        static string CommandLineValue(string name)
+        {
+            string[] args = Environment.GetCommandLineArgs();
+            for (int i = 0; i < args.Length - 1; i++)
+                if (args[i] == name) return args[i + 1];
+            return null;
+        }
+
         /// <summary>Compile le jeu dans un dossier vidé au préalable (aucun fichier d'un ancien build ne traîne).</summary>
         static bool Build()
         {
