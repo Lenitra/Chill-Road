@@ -12,7 +12,7 @@ namespace ChillRoad
     /// </summary>
     public class HudIcon : MaskableGraphic
     {
-        public enum Kind { Play, Car, Clock, Gear, Home, Power, Invite, Back, Map }
+        public enum Kind { Play, Car, Clock, Gear, Home, Power, Invite, Back, Map, Trophy, Road, Gauge, Ramp, Flag, Coin, Lock }
 
         Kind kind;
         Color cut = Color.black;
@@ -118,7 +118,90 @@ namespace ChillRoad
                     Poly(fg, new Vector2(0.1f, 0.5f), new Vector2(0.46f, 0.84f), new Vector2(0.46f, 0.16f));
                     Line(fg, new Vector2(0.4f, 0.5f), new Vector2(0.9f, 0.5f), 0.14f);
                     break;
+
+                case Kind.Trophy:
+                    // Coupe à anses, pied et socle, étoile évidée
+                    Arc(fg, new Vector2(0.27f, 0.7f), 0.11f, 0.06f, 180f, 360f);
+                    Arc(fg, new Vector2(0.73f, 0.7f), 0.11f, 0.06f, 0f, 180f);
+                    Poly(fg, new Vector2(0.25f, 0.88f), new Vector2(0.75f, 0.88f), new Vector2(0.71f, 0.62f), new Vector2(0.6f, 0.47f), new Vector2(0.4f, 0.47f), new Vector2(0.29f, 0.62f));
+                    Poly(fg, new Vector2(0.45f, 0.48f), new Vector2(0.55f, 0.48f), new Vector2(0.55f, 0.27f), new Vector2(0.45f, 0.27f));
+                    Poly(fg, new Vector2(0.36f, 0.2f), new Vector2(0.64f, 0.2f), new Vector2(0.58f, 0.29f), new Vector2(0.42f, 0.29f));
+                    Poly(fg, new Vector2(0.27f, 0.08f), new Vector2(0.73f, 0.08f), new Vector2(0.73f, 0.19f), new Vector2(0.27f, 0.19f));
+                    Star(bg, new Vector2(0.5f, 0.69f), 0.12f);
+                    break;
+
+                case Kind.Road:
+                    // Route qui file vers l'horizon : deux bas-côtés et la ligne médiane en tirets
+                    Line(fg, new Vector2(0.06f, 0.08f), new Vector2(0.4f, 0.92f), 0.085f);
+                    Line(fg, new Vector2(0.94f, 0.08f), new Vector2(0.6f, 0.92f), 0.085f);
+                    Poly(fg, new Vector2(0.455f, 0.08f), new Vector2(0.545f, 0.08f), new Vector2(0.537f, 0.3f), new Vector2(0.463f, 0.3f));
+                    Poly(fg, new Vector2(0.47f, 0.42f), new Vector2(0.53f, 0.42f), new Vector2(0.525f, 0.58f), new Vector2(0.475f, 0.58f));
+                    Poly(fg, new Vector2(0.482f, 0.7f), new Vector2(0.518f, 0.7f), new Vector2(0.515f, 0.82f), new Vector2(0.485f, 0.82f));
+                    break;
+
+                case Kind.Gauge:
+                    // Compteur : arc, graduations, aiguille dans le rouge
+                    {
+                        var o = new Vector2(0.5f, 0.42f);
+                        Arc(fg, o, 0.38f, 0.085f, -125f, 125f);
+                        for (int k = 0; k < 5; k++) Disc(fg, o + Dir(-100f + k * 50f) * 0.24f, 0.03f);
+                        Line(fg, o, o + Dir(58f) * 0.3f, 0.075f);
+                        Disc(fg, o, 0.085f);
+                    }
+                    break;
+
+                case Kind.Ramp:
+                    // Tremplin et trajectoire du saut en pointillés
+                    Poly(fg, new Vector2(0.04f, 0.1f), new Vector2(0.46f, 0.1f), new Vector2(0.46f, 0.4f));
+                    for (int k = 0; k < 6; k++)
+                    {
+                        float t = (k + 1) / 7f, x = 0.5f + t * 0.42f, y = 0.44f + 4f * 0.36f * t * (1f - t) - t * 0.48f;
+                        Disc(fg, new Vector2(x, y), 0.058f - k * 0.004f);
+                    }
+                    Poly(fg, new Vector2(0.62f, 0.1f), new Vector2(0.96f, 0.1f), new Vector2(0.96f, 0.16f), new Vector2(0.62f, 0.16f));
+                    break;
+
+                case Kind.Flag:
+                    // Drapeau à damier sur sa hampe
+                    Line(fg, new Vector2(0.18f, 0.06f), new Vector2(0.18f, 0.94f), 0.075f);
+                    Poly(fg, new Vector2(0.22f, 0.9f), new Vector2(0.88f, 0.9f), new Vector2(0.88f, 0.46f), new Vector2(0.22f, 0.46f));
+                    for (int i = 0; i < 4; i++)
+                        for (int j = 0; j < 2; j++)
+                        {
+                            if ((i + j) % 2 == 0) continue;
+                            float x0 = 0.25f + i * 0.155f, y0 = 0.49f + j * 0.19f;
+                            Poly(bg, new Vector2(x0, y0), new Vector2(x0 + 0.135f, y0), new Vector2(x0 + 0.135f, y0 + 0.17f), new Vector2(x0, y0 + 0.17f));
+                        }
+                    break;
+
+                case Kind.Coin:
+                    // Médaille : disque, liseré et étoile évidés
+                    Disc(fg, c, 0.42f, 48);
+                    Arc(bg, c, 0.33f, 0.045f, 0f, 360f);
+                    Star(bg, c, 0.2f);
+                    break;
+
+                case Kind.Lock:
+                    // Cadenas : anse, corps, trou de serrure
+                    Arc(fg, new Vector2(0.5f, 0.52f), 0.19f, 0.085f, -90f, 90f);
+                    Line(fg, new Vector2(0.31f, 0.5f), new Vector2(0.31f, 0.53f), 0.085f);
+                    Line(fg, new Vector2(0.69f, 0.5f), new Vector2(0.69f, 0.53f), 0.085f);
+                    Poly(fg, new Vector2(0.2f, 0.08f), new Vector2(0.8f, 0.08f), new Vector2(0.8f, 0.52f), new Vector2(0.2f, 0.52f));
+                    Disc(bg, new Vector2(0.5f, 0.34f), 0.065f);
+                    Poly(bg, new Vector2(0.47f, 0.17f), new Vector2(0.53f, 0.17f), new Vector2(0.52f, 0.33f), new Vector2(0.48f, 0.33f));
+                    break;
             }
+        }
+
+        /// <summary>Étoile à cinq branches : pentagone central et cinq pointes (chaque morceau convexe).</summary>
+        void Star(Color c, Vector2 center, float radius)
+        {
+            float inner = radius * 0.42f;
+            var pent = new Vector2[5];
+            for (int k = 0; k < 5; k++) pent[k] = center + Dir(36f + k * 72f) * inner;
+            Poly(c, pent);
+            for (int k = 0; k < 5; k++)
+                Poly(c, center + Dir(k * 72f) * radius, center + Dir(k * 72f + 36f) * inner * 0.98f, center + Dir(k * 72f - 36f) * inner * 0.98f);
         }
 
         // ------------------------------------------------------------------ primitives (coordonnées du carré, 0..1)
