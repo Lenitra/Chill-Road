@@ -10,7 +10,8 @@ namespace ChillRoad
     /// fait entrer la voiture que l'on conduit dans l'atelier (<see cref="WorkshopStage"/>). Menu à deux étages, en
     /// haut à gauche : les six pièces (<see cref="CarTuning"/>), puis les niveaux de la pièce ouverte (série, 1, 2, 3)
     /// avec leur prix ; la caméra de l'atelier vient cadrer la pièce, la fiche montre ce que le niveau regardé apporte.
-    /// Acheter un niveau installe aussi ceux qui le précèdent. Dernière entrée, la peinture : le nuancier de
+    /// Chaque niveau s'achète seul (le niveau 3 ne donne pas les niveaux 1 et 2) ; un niveau acheté, comme la pièce de
+    /// série, se remonte ensuite gratuitement, autant de fois que l'on veut. Dernière entrée, la peinture : le nuancier de
     /// <see cref="CarPaint"/>, essayé en direct sur la voiture de l'atelier ; une couleur achetée se remet gratuitement.
     /// En réseau, le monde continue pendant ce temps.
     /// </summary>
@@ -256,7 +257,7 @@ namespace ChillRoad
             }
         }
 
-        /// <summary>Validation d'une ligne : ouvrir la pièce, ou installer le niveau (et ceux qui le précèdent) si l'argent suffit.</summary>
+        /// <summary>Validation d'une ligne : ouvrir la pièce, ou monter le niveau (gratuit s'il est acheté, sinon s'il y a l'argent).</summary>
         void Choose(int i)
         {
             // L'appui qui a ouvert l'écran ne doit pas valider une ligne
@@ -268,26 +269,21 @@ namespace ChillRoad
             var p = (CarTuning.Part)part;
             int level = CarTuning.Level(spec, p);
             if (i == level) { Say(Loc.T("Déjà installé", "Already fitted"), Dim); return; }
-            if (i < level) { Say(Loc.T("La voiture a déjà mieux", "The car already has better"), Dim); return; }
-            int price = CarTuning.PriceTo(spec, p, i);
-            if (Wallet.Cash < price)
+            bool owned = CarTuning.Owns(spec, p, i);
+            int price = CarTuning.Price(spec, p, i);
+            if (!owned && Wallet.Cash < price)
             {
                 Say(Loc.T($"Il te manque {Wallet.Format(price - Wallet.Cash)}", $"You need {Wallet.Format(price - Wallet.Cash)} more"), Danger);
                 return;
             }
-            bool fitted = false;
-            for (int l = level; l < i; l++)
-            {
-                if (!CarTuning.Upgrade(spec, p)) break;
-                fitted = true;
-            }
-            if (!fitted) return;
+            if (!CarTuning.Fit(spec, p, i)) return;
             // La voiture garée dehors prend aussitôt sa nouvelle fiche
             game.ShowCar(game.Local.CarIndex);
             if (game.Local.Audio) game.Local.Audio.Chime();
             stage.Punch();
-            level = CarTuning.Level(spec, p);
-            Say(Loc.T($"{CarTuning.Name(p)} niveau {level} installé !", $"{CarTuning.Name(p)} level {level} fitted!"), Money);
+            if (i == 0) Say(Loc.T($"{CarTuning.Name(p)} de série remis", $"Stock {CarTuning.Name(p).ToLowerInvariant()} refitted"), Money);
+            else Say(owned ? Loc.T($"{CarTuning.Name(p)} niveau {i} remonté", $"{CarTuning.Name(p)} level {i} refitted")
+                           : Loc.T($"{CarTuning.Name(p)} niveau {i} installé !", $"{CarTuning.Name(p)} level {i} fitted!"), Money);
         }
 
         /// <summary>Validation d'une couleur : la remettre si elle est achetée, sinon l'acheter si l'argent suffit.</summary>
@@ -373,17 +369,18 @@ namespace ChillRoad
                     int level = CarTuning.Level(spec, p), price = CarTuning.NextPrice(spec, p);
                     for (int k = 0; k < row.pips.Length; k++)
                         row.pips[k].color = k < level ? (on ? InkBrand : Brand) : on ? new Color(0f, 0f, 0f, 0.18f) : PipOff;
-                    row.status.text = PriceText(price);
-                    row.status.color = price < 0 ? (on ? InkMoney : Money) : cash >= price ? (on ? InkAccent : Accent) : on ? InkDanger : new Color(1f, 0.45f, 0.4f, 0.85f);
+                    bool bought = price >= 0 && CarTuning.Owns(spec, p, level + 1);
+                    row.status.text = bought ? Loc.T("ACHETÉ", "OWNED") : PriceText(price);
+                    row.status.color = price < 0 ? (on ? InkMoney : Money) : bought ?(on ? InkDim : Dim) : cash >= price ? (on ? InkAccent : Accent) : on ? InkDanger : new Color(1f, 0.45f, 0.4f, 0.85f);
                 }
                 else
                 {
                     row.name.text = i == 0 ? Loc.T("Série", "Stock") : Loc.T($"Niveau {i}", $"Level {i}");
-                    if (i < current) { row.status.text = Loc.T("INCLUS", "INCLUDED"); row.status.color = on ? InkDim : Dim; }
-                    else if (i == current) { row.status.text = Loc.T("INSTALLÉ", "FITTED"); row.status.color = on ? InkMoney : Money; }
+                    if (i == current) { row.status.text = Loc.T("INSTALLÉ", "FITTED"); row.status.color = on ? InkMoney : Money; }
+                    else if (CarTuning.Owns(spec, (CarTuning.Part)part, i)) { row.status.text = i == 0 ? Loc.T("D'ORIGINE", "STOCK") : Loc.T("ACHETÉ", "OWNED"); row.status.color = on ? InkDim : Dim; }
                     else
                     {
-                        int price = CarTuning.PriceTo(spec, (CarTuning.Part)part, i);
+                        int price = CarTuning.Price(spec, (CarTuning.Part)part, i);
                         row.status.text = PriceText(price);
                         row.status.color = cash >= price ? (on ? InkAccent : Accent) : on ? InkDanger : new Color(1f, 0.45f, 0.4f, 0.85f);
                     }
@@ -406,14 +403,16 @@ namespace ChillRoad
             levelText.text = Loc.F($"Niveau {lv} / {CarTuning.MaxLevel}", $"Level {lv} / {CarTuning.MaxLevel}");
 
             var now = CarTuning.Apply(spec);
-            ShowBars(now, target > lv ? CarTuning.Preview(spec, sel, target) : now);
+            ShowBars(now, target != lv ? CarTuning.Preview(spec, sel, target) : now);
 
-            int cost = CarTuning.PriceTo(spec, sel, target);
+            int cost = CarTuning.Price(spec, sel, target);
+            bool has = CarTuning.Owns(spec, sel, target);
             if (message != null) { actionText.text = message; actionText.color = messageColor; }
-            else if (lv >= CarTuning.MaxLevel) { actionText.text = Loc.T("Pièce au niveau maximum", "Part fully upgraded"); actionText.color = Money; }
-            else if (part < 0) { actionText.text = Loc.T($"{ok} : voir les niveaux  ·  suivant {PriceText(cost)}", $"{ok}: see the levels  ·  next {PriceText(cost)}"); actionText.color = White; }
+            else if (part < 0 && lv >= CarTuning.MaxLevel) { actionText.text = Loc.T($"{ok} : voir les niveaux  ·  pièce au maximum", $"{ok}: see the levels  ·  part fully upgraded"); actionText.color = Money; }
+            else if (part < 0) { actionText.text = Loc.T($"{ok} : voir les niveaux  ·  suivant {(has ? "acheté" : PriceText(cost))}", $"{ok}: see the levels  ·  next {(has ? "owned" : PriceText(cost))}"); actionText.color = White; }
             else if (target == lv) { actionText.text = Loc.T("Niveau installé", "Level fitted"); actionText.color = Money; }
-            else if (target < lv) { actionText.text = Loc.T("La voiture a déjà mieux", "The car already has better"); actionText.color = Dim; }
+            else if (target == 0) { actionText.text = Loc.T($"{ok} : remettre la pièce de série  ·  gratuit", $"{ok}: refit the stock part  ·  free"); actionText.color = White; }
+            else if (has) { actionText.text = Loc.T($"{ok} : remonter le niveau {target}  ·  déjà acheté", $"{ok}: refit level {target}  ·  already owned"); actionText.color = White; }
             else if (cash < cost) { actionText.text = Loc.T($"Il te manque {Wallet.Format(cost - cash)}", $"You need {Wallet.Format(cost - cash)} more"); actionText.color = Danger; }
             else { actionText.text = Loc.T($"{ok} : installer le niveau {target}  ·  {PriceText(cost)}", $"{ok}: fit level {target}  ·  {PriceText(cost)}"); actionText.color = White; }
 

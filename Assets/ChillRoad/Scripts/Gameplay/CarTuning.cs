@@ -5,7 +5,9 @@ namespace ChillRoad
 {
     /// <summary>
     /// Améliorations achetées au garage de tuning (<see cref="TuningGarage"/>), voiture par voiture : six pièces à
-    /// trois niveaux, sauvegardées sur la machine (PlayerPrefs). Chaque niveau corrige un peu la fiche de la voiture
+    /// trois niveaux, sauvegardées sur la machine (PlayerPrefs). Chaque niveau s'achète seul (acheter le niveau 3 ne
+    /// donne pas les niveaux 1 et 2) ; un niveau acheté, comme la pièce de série, se remonte ensuite à volonté et
+    /// gratuitement. Le niveau monté corrige un peu la fiche de la voiture
     /// (<see cref="VehicleSpec"/>) : une voiture améliorée reste elle-même, une Ami au maximum ne rattrape pas une Supra.
     /// Le prix d'un niveau est une part de la valeur de la voiture (<see cref="Wallet.Price"/>, avec un plancher) ;
     /// la voiture offerte au départ (Ami) s'améliore gratuitement.
@@ -16,7 +18,10 @@ namespace ChillRoad
 
         public const int PartCount = 6;
         public const int MaxLevel = 3;
+        /// <summary>Niveau monté de chaque pièce (un chiffre par pièce).</summary>
         const string Key = "chillroad_tune_";
+        /// <summary>Niveaux achetés de chaque pièce (un chiffre par pièce : bit 0 = niveau 1, bit 1 = niveau 2…).</summary>
+        const string OwnedKey = "chillroad_tuneown_";
 
         /// <summary>Prix de chaque niveau, en part de la valeur de la voiture.</summary>
         static readonly float[] CostShare = { 0.04f, 0.08f, 0.14f };
@@ -24,6 +29,7 @@ namespace ChillRoad
         const int MinValue = 4000;
 
         static readonly Dictionary<string, int[]> levels = new Dictionary<string, int[]>();
+        static readonly Dictionary<string, int[]> owned = new Dictionary<string, int[]>();
         static readonly Dictionary<VehicleSpec, (string key, VehicleSpec tuned)> cache = new Dictionary<VehicleSpec, (string, VehicleSpec)>();
 
         public static string Name(Part p)
@@ -64,9 +70,37 @@ namespace ChillRoad
             return l;
         }
 
+        /// <summary>Niveaux achetés, en masque par pièce. Sauvegarde d'avant : les niveaux jusqu'au niveau monté ont été payés.</summary>
+        static int[] Owned(VehicleSpec spec)
+        {
+            string id = spec != null ? spec.id ?? "" : "";
+            if (owned.TryGetValue(id, out var o)) return o;
+            var l = Levels(spec);
+            o = new int[PartCount];
+            string saved = PlayerPrefs.GetString(OwnedKey + id, "");
+            for (int i = 0; i < PartCount; i++)
+            {
+                if (saved.Length == 0) { o[i] = (1 << l[i]) - 1; continue; }
+                int bits = i < saved.Length ? Mathf.Clamp(saved[i] - '0', 0, (1 << MaxLevel) - 1) : 0;
+                // Le niveau monté est forcément acheté
+                o[i] = l[i] > 0 ? bits | 1 << (l[i] - 1) : bits;
+            }
+            owned[id] = o;
+            return o;
+        }
+
+        /// <summary>Niveau monté sur la voiture (0 : pièce de série).</summary>
         public static int Level(VehicleSpec spec, Part p) => Levels(spec)[(int)p];
 
-        /// <summary>Niveaux achetés, toutes pièces confondues (0 à 18).</summary>
+        /// <summary>Vrai si ce niveau est à disposition (série, ou déjà acheté) : le monter est gratuit.</summary>
+        public static bool Owns(VehicleSpec spec, Part p, int level)
+        {
+            if (level <= 0) return true;
+            if (level > MaxLevel) return false;
+            return (Owned(spec)[(int)p] & (1 << (level - 1))) != 0;
+        }
+
+        /// <summary>Niveaux montés, toutes pièces confondues (0 à 18).</summary>
         public static int TotalLevels(VehicleSpec spec)
         {
             int n = 0;
@@ -74,11 +108,11 @@ namespace ChillRoad
             return n;
         }
 
-        /// <summary>Prix du niveau suivant d'une pièce (0 : gratuit, -1 : pièce au maximum).</summary>
+        /// <summary>Prix pour monter le niveau suivant d'une pièce (0 : gratuit ou déjà acheté, -1 : pièce au maximum).</summary>
         public static int NextPrice(VehicleSpec spec, Part p)
         {
             int l = Level(spec, p);
-            return l >= MaxLevel ? -1 : LevelPrice(spec, l + 1);
+            return l >= MaxLevel ? -1 : Price(spec, p, l + 1);
         }
 
         /// <summary>Prix d'un niveau (1 à <see cref="MaxLevel"/>), le même pour toutes les pièces de la voiture.</summary>
@@ -93,27 +127,37 @@ namespace ChillRoad
             return Mathf.Max(10, Mathf.RoundToInt(raw / step) * (int)step);
         }
 
-        /// <summary>Prix pour amener une pièce à un niveau donné depuis son niveau actuel (0 : déjà atteint ou gratuit).</summary>
-        public static int PriceTo(VehicleSpec spec, Part p, int level)
+        /// <summary>Prix pour monter un niveau d'une pièce : 0 s'il est déjà acheté (ou de série), son seul prix sinon.</summary>
+        public static int Price(VehicleSpec spec, Part p, int level) => Owns(spec, p, level) ? 0 : LevelPrice(spec, level);
+
+        /// <summary>
+        /// Monte un niveau d'une pièce (0 : remettre la pièce de série). Gratuit s'il est déjà acheté, sinon payé
+        /// seul s'il y a l'argent (les niveaux inférieurs restent à acheter). Vrai si la pièce a changé.
+        /// </summary>
+        public static bool Fit(VehicleSpec spec, Part p, int level)
         {
-            int total = 0;
-            for (int l = Level(spec, p) + 1; l <= Mathf.Min(level, MaxLevel); l++) total += LevelPrice(spec, l);
-            return total;
+            if (spec == null || level < 0 || level > MaxLevel || Level(spec, p) == level) return false;
+            if (!Owns(spec, p, level))
+            {
+                if (!Wallet.Spend(LevelPrice(spec, level))) return false;
+                Owned(spec)[(int)p] |= 1 << (level - 1);
+            }
+            Levels(spec)[(int)p] = level;
+            Save(spec);
+            return true;
         }
 
-        /// <summary>Achète le niveau suivant d'une pièce si l'argent suffit (vrai si installée).</summary>
-        public static bool Upgrade(VehicleSpec spec, Part p)
+        static void Save(VehicleSpec spec)
         {
-            if (spec == null) return false;
-            int price = NextPrice(spec, p);
-            if (price < 0 || !Wallet.Spend(price)) return false;
+            string id = spec.id ?? "";
             var l = Levels(spec);
-            l[(int)p]++;
+            var o = Owned(spec);
             var chars = new char[PartCount];
             for (int i = 0; i < PartCount; i++) chars[i] = (char)('0' + l[i]);
-            PlayerPrefs.SetString(Key + (spec.id ?? ""), new string(chars));
+            PlayerPrefs.SetString(Key + id, new string(chars));
+            for (int i = 0; i < PartCount; i++) chars[i] = (char)('0' + o[i]);
+            PlayerPrefs.SetString(OwnedKey + id, new string(chars));
             PlayerPrefs.Save();
-            return true;
         }
 
         /// <summary>
