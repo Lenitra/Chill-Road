@@ -4,17 +4,24 @@ using UnityEngine;
 namespace ChillRoad
 {
     /// <summary>
-    /// Petit panneau de bord de route (un seul poteau) : arrête la voiture en dessous de <see cref="BreakSpeed"/>, se
-    /// casse au-dessus. Le poteau part alors en débris physique, projeté devant la voiture en basculant vers elle ; la
-    /// voiture garde presque toute sa vitesse (voir VehicleController.OnCollisionEnter). Le panneau revient à sa place
+    /// Petit panneau de bord de route (un seul poteau) : n'arrête jamais la voiture. Percuté (au-delà d'une simple
+    /// touchette, <see cref="MinSpeed"/>), il casse et part en débris physique ; la voiture est seulement ralentie
+    /// (<see cref="SpeedAfter"/>, appliqué par VehicleController.OnCollisionEnter). Le panneau revient à sa place
     /// quand le joueur est loin et l'a laissé un moment.
     /// </summary>
     public class BreakableProp : MonoBehaviour
     {
-        /// <summary>Vitesse de la voiture (m/s) à partir de laquelle le panneau casse : 30 km/h.</summary>
-        public const float BreakSpeed = 30f / 3.6f;
-        /// <summary>Part de la vitesse gardée par la voiture qui casse un panneau.</summary>
-        public const float SpeedKept = 0.94f;
+        /// <summary>Vitesse (m/s) sous laquelle la voiture ne fait que s'appuyer contre le poteau : 5 km/h.</summary>
+        public const float MinSpeed = 5f / 3.6f;
+        /// <summary>Ralentissement de la voiture qui fauche un panneau : 15 % de sa vitesse plus 1 m/s (3,6 km/h).</summary>
+        const float Kept = 0.85f, Loss = 1f;
+
+        /// <summary>Vitesse de la voiture juste après avoir fauché un panneau, lancée à <paramref name="v"/>.</summary>
+        public static Vector3 SpeedAfter(Vector3 v)
+        {
+            float s = v.magnitude;
+            return s > 0.01f ? v * (Mathf.Max(0f, s * Kept - Loss) / s) : v;
+        }
 
         const float Mass = 18f;
         const float RestoreDelay = 90f, RestoreDistance = 200f;
@@ -87,9 +94,9 @@ namespace ChillRoad
             // Fauché au pied : le pied part devant à peu près à la vitesse de la voiture, le haut (le panneau) bascule
             // en arrière vers le capot. Vitesse donnée au centre du panneau, rotation autour de l'axe
             // Cross(up, avant) : avec l'autre sens le pied restait cloué sur place
-            body.linearVelocity = carVelocity * Random.Range(0.6f, 0.8f) + Vector3.up * Mathf.Clamp(1.5f + speed * 0.08f, 1.5f, 5f)
+            body.linearVelocity = carVelocity * Random.Range(0.6f, 0.8f) + Vector3.up * Mathf.Clamp(0.3f + speed * 0.15f, 0.3f, 5f)
                                   + Random.insideUnitSphere * 1.2f;
-            body.angularVelocity = Vector3.Cross(Vector3.up, flat) * Mathf.Clamp(speed * 0.22f, 2.5f, 10f) + Random.insideUnitSphere * 2f;
+            body.angularVelocity = Vector3.Cross(Vector3.up, flat) * Mathf.Clamp(speed * 0.22f, 1f, 10f) + Random.insideUnitSphere * 2f;
 
             // Plus de collision avec la voiture le temps qu'il passe par-dessus (sinon second choc contre le pare-brise)
             yield return new WaitForSeconds(0.8f);

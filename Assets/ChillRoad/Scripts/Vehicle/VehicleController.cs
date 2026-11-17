@@ -921,15 +921,15 @@ namespace ChillRoad
             {
                 // Débris d'un panneau déjà cassé : roulé dessus ou poussé, pas un choc
                 if (prop.Broken) return;
-                // Petit panneau percuté à 30 km/h ou plus : il casse et la voiture garde son élan (le solveur l'a
-                // arrêtée net contre le poteau pendant ce pas : on rend la vitesse d'avant, un peu réduite)
-                if (!Remote && preStepVelocity.magnitude >= BreakableProp.BreakSpeed)
+                // Petit panneau percuté : il casse et la voiture est seulement ralentie (le solveur l'a arrêtée net
+                // contre le poteau pendant ce pas : on rend la vitesse d'avant, réduite)
+                if (!Remote && preStepVelocity.magnitude >= BreakableProp.MinSpeed)
                 {
                     prop.Break(preStepVelocity, GetComponentsInChildren<Collider>());
-                    rb.linearVelocity = preStepVelocity * BreakableProp.SpeedKept;
+                    rb.linearVelocity = BreakableProp.SpeedAfter(preStepVelocity);
                     rb.angularVelocity = preStepAngular;
                     // Bruit, étincelles et petite secousse, sans l'intensité d'un vrai accident
-                    Impacted?.Invoke(c, Mathf.Clamp(preStepVelocity.magnitude * 0.2f, 3.5f, 5.5f));
+                    Impacted?.Invoke(c, Mathf.Clamp(preStepVelocity.magnitude * 0.2f, 2f, 5.5f));
                     return;
                 }
             }
