@@ -11,10 +11,11 @@ namespace ChillRoad
     /// Menu Options (construit en code), ouvert depuis l'accueil ou la pause, dans le langage visuel du HUD et de la
     /// pause : voile sombre, plaque inclinée anthracite (<see cref="HudShape"/>), police du HUD, titre or, rubriques
     /// cyan, curseurs or.
-    /// Rangé par onglets : Audio, Jeu (trafic, pluie, commandes tactiles si l'écran est tactile), Graphismes (qualité, distance des détails,
-    /// flou de mouvement, secousses), Écran (mode d'affichage, résolution et VSync sur ordinateur, limite d'images),
-    /// Touches (deux touches et deux boutons de manette par commande, <see cref="GameInput.Bind"/>), Carte (retour au
-    /// départ). Tout s'applique tout de suite (mode d'affichage et résolution : une fois le curseur lâché).
+    /// Rangé par onglets : Jeu (langue, trafic, pluie, secousses, commandes tactiles si l'écran est tactile, retour au
+    /// départ), Graphismes (écran : mode d'affichage, résolution et VSync sur ordinateur, limite d'images ; rendu :
+    /// qualité, distance des détails, flou de mouvement), Audio (volume général puis une voie par famille de sons, titre
+    /// des morceaux, son en arrière-plan), Touches (deux touches et deux boutons de manette par commande,
+    /// <see cref="GameInput.Bind"/>). Tout s'applique tout de suite (mode d'affichage et résolution : une fois le curseur lâché).
     /// Manette : LB/RB (clavier : Tab, Maj+Tab) pour changer d'onglet, haut/bas pour choisir (la ligne choisie
     /// s'éclaire), gauche/droite pour régler.
     /// </summary>
@@ -56,7 +57,7 @@ namespace ChillRoad
         // emplacement attend la touche ou le bouton suivant (Échap / Start : annuler, Suppr / Retour arrière : vider).
         // Pendant l'attente, la navigation des menus est coupée ; elle revient deux images après, pour que la touche
         // choisie (A, Entrée, B…) n'agisse pas aussi sur le menu.
-        const int KeysTab = 4;
+        const int GameTab = 0, GraphicsTab = 1, AudioTab = 2, KeysTab = 3;
         static readonly (float min, float max)[] SlotColumns = { (0.37f, 0.515f), (0.525f, 0.67f), (0.705f, 0.85f), (0.86f, 1f) };
         Button[,] keyGrid;
         bool capturing, navBlocked;
@@ -91,7 +92,7 @@ namespace ChillRoad
             th.spacing = 14;
             th.childControlWidth = true; th.childControlHeight = true;
             th.childForceExpandWidth = false; th.childForceExpandHeight = true;
-            var tabNames = new[] { ("AUDIO", "AUDIO"), ("JEU", "GAMEPLAY"), ("GRAPHISMES", "GRAPHICS"), ("ÉCRAN", "DISPLAY"), ("TOUCHES", "CONTROLS"), ("CARTE", "MAP") };
+            var tabNames = new[] { ("JEU", "GAMEPLAY"), ("GRAPHISMES", "GRAPHICS"), ("AUDIO", "AUDIO"), ("TOUCHES", "CONTROLS") };
             TabGlyph(tabRow, "LB", TextAnchor.MiddleRight);
             tabs = new (Button, Text, Graphic)[tabNames.Length];
             pages = new RectTransform[tabNames.Length];
@@ -102,30 +103,65 @@ namespace ChillRoad
             }
             TabGlyph(tabRow, "RB", TextAnchor.MiddleLeft);
 
-            // Audio
-            var audio = pages[0];
-            Section(audio, "AUDIO", "AUDIO", "", "");
-            var music = AddSlider(audio, "Musique", "Music", 0f, 1f, 20, () => GameSettings.MusicVolume, v => GameSettings.MusicVolume = v, Percent);
-            var effects = AddSlider(audio, "Effets et moteur", "Effects and engine", 0f, 1f, 20, () => GameSettings.EffectsVolume, v => GameSettings.EffectsVolume = v, Percent);
-
-            // Jeu
-            var play = pages[1];
-            Section(play, "PARTIE", "GAMEPLAY", "appliqué tout de suite", "applied immediately");
+            // Jeu : langue, monde (trafic, pluie), caméra, commandes tactiles, puis le retour au départ
+            var play = pages[GameTab];
+            Section(play, "GÉNÉRAL", "GENERAL", "", "");
+            var language = AddSlider(play, "Langue", "Language", 0f, 1f, 1, () => Loc.French ? 1f : 0f,
+                v => Loc.Set(v > 0.5f ? Language.French : Language.English), v => v > 0.5f ? "Français" : "English");
             var traffic = AddSlider(play, "Densité du trafic", "Traffic density", 0.2f, 2f, 18, () => GameSettings.TrafficDensity, v => GameSettings.TrafficDensity = v, Percent);
             var rain = AddSlider(play, "Probabilité de pluie", "Rain probability", 0f, 1f, 20, () => GameSettings.RainChance, v => GameSettings.RainChance = v, v => v < 0.01f ? Loc.T("Jamais", "Never") : v > 0.99f ? Loc.T("Toujours", "Always") : Percent(v));
+            var shake = AddToggle(play, "Secousses de caméra", "Camera shake", () => GameSettings.CameraShake, v => GameSettings.CameraShake = v);
             // Commandes tactiles (téléphone, tablette) : façon de diriger, ou désactivées. Absentes sur un PC sans
             // écran tactile, où elles ne s'affichent jamais.
             Slider touch = null;
             if (TouchScreen)
             {
-                Section(play, "COMMANDES", "CONTROLS", "téléphone, tablette", "phone, tablet");
+                Section(play, "COMMANDES TACTILES", "TOUCH CONTROLS", "", "");
                 touch = AddSlider(play, "Commandes tactiles", "Touch controls", 0f, 3f, 3, () => GameSettings.TouchSteer, v => GameSettings.TouchSteer = Mathf.RoundToInt(v),
                     v => v < 0.5f ? Loc.T("Désactivées", "Off") : v < 1.5f ? Loc.T("Glisser", "Slide") : v < 2.5f ? Loc.T("Boutons ‹ ›", "‹ › buttons") : Loc.T("Inclinaison", "Tilt"));
             }
+            Section(play, "CARTE", "MAP", "", "");
+            var gap = Rect(play, "Gap", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Fixed(gap, 6);
+            var apply = AddButton(play, ApplyRoad);
+            apply.button.GetComponent<LayoutElement>().preferredHeight = 54;
+            applyText = apply.text;
+            Loc.Bind(applyText, "Revenir au départ (route de la vallée)", "Back to the start (valley road)");
 
-            // Graphismes : changer la qualité remet la distance des détails au niveau conseillé
-            var gfx = pages[2];
-            Section(gfx, "GRAPHISMES", "GRAPHICS", "basse = plus d'images/s", "low = more fps");
+            // Graphismes : l'écran (mode d'affichage, définition et synchro verticale sur ordinateur seulement ; mode et
+            // définition appliqués une fois le curseur lâché, voir Update), puis le rendu
+            var gfx = pages[GraphicsTab];
+            Section(gfx, "ÉCRAN", "DISPLAY", "", "");
+            Slider window = null, resolution = null, vsync = null;
+            if (GraphicsQuality.HasDisplayOptions)
+            {
+                window = AddSlider(gfx, "Mode d'affichage", "Display mode", 0f, GraphicsQuality.WindowModes.Length - 1, GraphicsQuality.WindowModes.Length - 1,
+                    () => GameSettings.WindowMode, v =>
+                    {
+                        int m = Mathf.RoundToInt(v);
+                        if (m == GameSettings.WindowMode) return;
+                        GameSettings.WindowMode = m;
+                        displayAt = Time.unscaledTime + DisplayDelay;
+                    },
+                    v => GraphicsQuality.WindowModeName(Mathf.RoundToInt(v)));
+                int resSteps = Mathf.Max(1, GraphicsQuality.Resolutions.Length - 1);
+                resolution = AddSlider(gfx, "Résolution", "Resolution", 0f, resSteps, resSteps,
+                    () => GraphicsQuality.ResolutionIndex, v =>
+                    {
+                        int i = Mathf.RoundToInt(v);
+                        if (i == GraphicsQuality.ResolutionIndex) return;
+                        GraphicsQuality.SetResolutionIndex(i);
+                        displayAt = Time.unscaledTime + DisplayDelay;
+                    },
+                    v => GraphicsQuality.ResolutionName(Mathf.RoundToInt(v)));
+                vsync = AddToggle(gfx, "Synchro verticale (VSync)", "Vertical sync (VSync)", () => GameSettings.VSync, v => GameSettings.VSync = v);
+            }
+            var fps = AddSlider(gfx, "Limite d'images", "Frame rate limit", 0f, GraphicsQuality.FpsCaps.Length - 1, GraphicsQuality.FpsCaps.Length - 1,
+                () => GameSettings.FpsCap, v => GameSettings.FpsCap = Mathf.RoundToInt(v),
+                v => GameSettings.VSync && GraphicsQuality.HasDisplayOptions ? Loc.T("Suit l'écran (VSync)", "Follows display (VSync)") : GraphicsQuality.FpsName(Mathf.RoundToInt(v)));
+
+            // Rendu : changer la qualité remet la distance des détails au niveau conseillé
+            Section(gfx, "RENDU", "RENDERING", "", "");
             var quality = AddSlider(gfx, "Qualité graphique", "Graphics quality", 0f, 3f, 3, () => GameSettings.Quality, v =>
                 {
                     // (l'éditeur rappelle les curseurs sans changement de valeur : ne pas écraser la distance choisie)
@@ -138,51 +174,26 @@ namespace ChillRoad
             var detail = AddSlider(gfx, "Distance des détails", "Detail distance", 0f, GraphicsQuality.DetailLevels - 1, GraphicsQuality.DetailLevels - 1,
                 () => GameSettings.DetailDistance, v => GameSettings.DetailDistance = Mathf.RoundToInt(v), v => GraphicsQuality.DetailName(Mathf.RoundToInt(v)));
             var blur = AddToggle(gfx, "Flou de mouvement", "Motion blur", () => GameSettings.MotionBlur, v => GameSettings.MotionBlur = v);
-            var shake = AddToggle(gfx, "Secousses de caméra", "Camera shake", () => GameSettings.CameraShake, v => GameSettings.CameraShake = v);
 
-            // Écran : mode d'affichage, définition et synchro verticale sur ordinateur seulement ; mode et définition
-            // appliqués une fois le curseur lâché (voir Update), pas à chaque cran
-            var screen = pages[3];
-            Section(screen, "ÉCRAN", "DISPLAY", "", "");
-            Slider window = null, resolution = null, vsync = null;
+            // Audio : volume général puis une voie par famille de sons ; la musique ; le son quand la fenêtre est
+            // en arrière-plan (ordinateur seulement)
+            var audio = pages[AudioTab];
+            Section(audio, "VOLUME", "VOLUME", "", "");
+            var master = AddSlider(audio, "Volume général", "Master volume", 0f, 1f, 20, () => GameSettings.MasterVolume, v => GameSettings.MasterVolume = v, Percent);
+            var music = AddSlider(audio, "Musique", "Music", 0f, 1f, 20, () => GameSettings.MusicVolume, v => GameSettings.MusicVolume = v, Percent);
+            var engine = AddSlider(audio, "Moteur", "Engine", 0f, 1f, 20, () => GameSettings.EngineVolume, v => GameSettings.EngineVolume = v, Percent);
+            var effects = AddSlider(audio, "Effets", "Effects", 0f, 1f, 20, () => GameSettings.EffectsVolume, v => GameSettings.EffectsVolume = v, Percent);
+            var ambience = AddSlider(audio, "Ambiance", "Ambience", 0f, 1f, 20, () => GameSettings.AmbienceVolume, v => GameSettings.AmbienceVolume = v, Percent);
+            var ui = AddSlider(audio, "Sons du score", "Score sounds", 0f, 1f, 20, () => GameSettings.UiVolume, v => GameSettings.UiVolume = v, Percent);
+            Section(audio, "LECTURE", "PLAYBACK", "", "");
+            var trackNames = AddSlider(audio, "Titre des morceaux", "Track titles", 0f, 1f, 1, () => GameSettings.TrackNames ? 1f : 0f, v => GameSettings.TrackNames = v > 0.5f,
+                v => v > 0.5f ? Loc.T("Affiché", "Shown") : Loc.T("Masqué", "Hidden"));
+            Slider background = null;
             if (GraphicsQuality.HasDisplayOptions)
-            {
-                window = AddSlider(screen, "Mode d'affichage", "Display mode", 0f, GraphicsQuality.WindowModes.Length - 1, GraphicsQuality.WindowModes.Length - 1,
-                    () => GameSettings.WindowMode, v =>
-                    {
-                        int m = Mathf.RoundToInt(v);
-                        if (m == GameSettings.WindowMode) return;
-                        GameSettings.WindowMode = m;
-                        displayAt = Time.unscaledTime + DisplayDelay;
-                    },
-                    v => GraphicsQuality.WindowModeName(Mathf.RoundToInt(v)));
-                int resSteps = Mathf.Max(1, GraphicsQuality.Resolutions.Length - 1);
-                resolution = AddSlider(screen, "Résolution", "Resolution", 0f, resSteps, resSteps,
-                    () => GraphicsQuality.ResolutionIndex, v =>
-                    {
-                        int i = Mathf.RoundToInt(v);
-                        if (i == GraphicsQuality.ResolutionIndex) return;
-                        GraphicsQuality.SetResolutionIndex(i);
-                        displayAt = Time.unscaledTime + DisplayDelay;
-                    },
-                    v => GraphicsQuality.ResolutionName(Mathf.RoundToInt(v)));
-                vsync = AddToggle(screen, "Synchro verticale (VSync)", "Vertical sync (VSync)", () => GameSettings.VSync, v => GameSettings.VSync = v);
-            }
-            var fps = AddSlider(screen, "Limite d'images", "Frame rate limit", 0f, GraphicsQuality.FpsCaps.Length - 1, GraphicsQuality.FpsCaps.Length - 1,
-                () => GameSettings.FpsCap, v => GameSettings.FpsCap = Mathf.RoundToInt(v),
-                v => GameSettings.VSync && GraphicsQuality.HasDisplayOptions ? Loc.T("Suit l'écran (VSync)", "Follows display (VSync)") : GraphicsQuality.FpsName(Mathf.RoundToInt(v)));
+                background = AddToggle(audio, "Son en arrière-plan", "Sound in background", () => GameSettings.BackgroundAudio, v => GameSettings.BackgroundAudio = v);
 
             // Touches
             BuildKeys(pages[KeysTab]);
-
-            // Carte
-            var mapPage = pages[5];
-            Section(mapPage, "LA CARTE", "THE MAP", "balade libre", "free roam");
-            var gap = Rect(mapPage, "Gap", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            Fixed(gap, 12);
-            var apply = AddButton(mapPage, ApplyRoad);
-            applyText = apply.text;
-            Loc.Bind(applyText, "Revenir au départ (route de la vallée)", "Back to the start (valley road)");
 
             var bottom = ButtonRow(panel, 62);
             var defaults = AddButton(bottom, () => { GameSettings.ResetAll(); GameInput.ResetBindings(); displayAt = Time.unscaledTime + 0.01f; Changed(); RefreshAll(); });
@@ -202,14 +213,17 @@ namespace ChillRoad
                            "LB RB / Tab  category   ·   ↑ ↓  select   ·   ← →  adjust   ·   B / Esc  back");
 
             // Navigation explicite par page (voir ShowTab) : gauche/droite restent aux curseurs (réglage)
+            var gameItems = new List<Selectable> { language, traffic, rain, shake };
+            if (touch) gameItems.Add(touch);
+            gameItems.Add(apply.button);
+            var audioItems = new List<Selectable> { master, music, engine, effects, ambience, ui, trackNames };
+            if (background) audioItems.Add(background);
             pageItems = new[]
             {
-                new Selectable[] { music, effects },
-                touch ? new Selectable[] { traffic, rain, touch } : new Selectable[] { traffic, rain },
-                new Selectable[] { quality, detail, blur, shake },
-                window ? new Selectable[] { window, resolution, vsync, fps } : new Selectable[] { fps },
+                gameItems.ToArray(),
+                window ? new Selectable[] { window, resolution, vsync, fps, quality, detail, blur } : new Selectable[] { fps, quality, detail, blur },
+                audioItems.ToArray(),
                 KeyColumn(),
-                new Selectable[] { apply.button },
             };
             ShowTab(lastTab);
 
@@ -512,7 +526,7 @@ namespace ChillRoad
             var page = Rect(parent, name, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             page.gameObject.AddComponent<LayoutElement>().flexibleHeight = 1f;
             var layout = page.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 8;
+            layout.spacing = 6;
             layout.childAlignment = TextAnchor.UpperLeft;
             layout.childControlHeight = true; layout.childControlWidth = true;
             layout.childForceExpandHeight = false; layout.childForceExpandWidth = true;
@@ -547,7 +561,7 @@ namespace ChillRoad
         void Section(RectTransform parent, string fr, string en, string noteFr, string noteEn)
         {
             var row = Rect(parent, "Section", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            Fixed(row, 46);
+            Fixed(row, 42);
             var h = row.gameObject.AddComponent<HorizontalLayoutGroup>();
             h.spacing = 14;
             h.childAlignment = TextAnchor.LowerLeft;
@@ -576,7 +590,7 @@ namespace ChillRoad
         Slider AddSlider(RectTransform parent, string fr, string en, float min, float max, int steps, Func<float> get, Action<float> set, Func<float, string> format)
         {
             var row = Rect(parent, en, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            row.gameObject.AddComponent<LayoutElement>().preferredHeight = 50;
+            row.gameObject.AddComponent<LayoutElement>().preferredHeight = 46;
             // Ligne choisie : plaque inclinée plus claire et trait or à gauche (allumés par HighlightRows)
             var plate = Shape(row, "Selected", RowOn).Set(18f, 0f, 0f);
             Fill(plate.rectTransform, new Vector2(-18, 1), new Vector2(14, -1));
