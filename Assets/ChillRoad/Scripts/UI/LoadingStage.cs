@@ -5,30 +5,39 @@ using UnityEngine.Rendering.Universal;
 namespace ChillRoad
 {
     /// <summary>
-    /// Décor 3D de l'écran de chargement, fait des assets du jeu : la voiture choisie garée sur une nationale (enrobé,
-    /// marquages et accotements du shader de route), prairie vallonnée à facettes (shader de terrain), pins, verger et
-    /// sa clôture, buissons, rochers et fleurs du pack d'environnement, une voiture du trafic qui passe, sous le ciel, la
-    /// lumière et la météo du jeu. Construit à l'écart du monde (qui se génère pendant ce temps) et filmé par sa propre
-    /// caméra, qui tourne lentement autour de la voiture, dans une texture affichée derrière l'interface.
+    /// Décor 3D de l'écran de chargement, fait des assets du jeu : une vallée alpine. La voiture choisie est garée sur
+    /// une nationale (enrobé, marquages et accotements du shader de route) qui file en lacets doux le long du fond de
+    /// vallée, entre prés vallonnés, verger clôturé, fermes, et deux versants de montagnes : forêt de conifères en bas,
+    /// roche puis neige sur les sommets (shader de terrain). Une voiture du trafic passe de temps en temps. Construit à
+    /// l'écart du monde (qui se génère pendant ce temps), sous le ciel, la lumière et la météo du jeu, et filmé par sa
+    /// propre caméra en plans enchaînés, dans une texture affichée derrière l'interface.
     /// </summary>
     public class LoadingStage : MonoBehaviour
     {
         static readonly Vector3 Origin = new Vector3(0f, 2500f, -6000f);
-        const float Half = 360f;                 // demi-longueur de la route et du terrain (m)
+        const float RoadHalf = 1100f;            // demi-longueur de la route (m)
+        const float GroundHalf = 1700f;          // demi-côté du terrain (m)
+        const float Straight = 110f;             // la route est droite autour de la voiture (verger, clôture)
         const float Embankment = 2.2f;           // la route est sur un remblai, comme en jeu
         const float TrafficSpeed = 21f;
 
         public RenderTexture Texture { get; private set; }
         /// <summary>Caméra du décor (la pluie de l'orage tombe aussi autour d'elle).</summary>
         public Camera Camera => cam;
+        /// <summary>
+        /// Fond du menu d'accueil : après le chargement, la réalisation passe (par un fondu au noir) à une seule orbite
+        /// lente, la voiture cadrée dans le tiers droit de l'image pour laisser la gauche aux boutons.
+        /// </summary>
+        public bool Menu { get; set; }
+        /// <summary>Part de la demi-largeur de l'image dont la voiture est décalée vers la droite en mode menu.</summary>
+        public float MenuShift { get; set; } = 0.4f;
 
         GameObject root;
         Camera cam;
         Vector3 carCenter;
-        float carRadius = 2.5f, angle = 232f, time;
+        float carRadius = 2.5f, angle = 232f, time, menuTime = -1f, toMenuFade;
         Transform traffic;
-        float trafficZ = 300f;
-        readonly List<Collider> colliders = new List<Collider>();
+        float trafficZ = 300f, trafficLift;
 
         public void Build(GameAssets assets, VehicleSpec car, Camera template)
         {
@@ -41,11 +50,15 @@ namespace ChillRoad
             Scatter(assets, rng);
             if (assets.trafficCars != null && assets.trafficCars.Length > 0)
             {
-                var t = Place(assets.trafficCars[rng.Next(assets.trafficCars.Length)], new Vector3(-RoadNetwork.LaneWidth * 0.5f, 0f, trafficZ), 180f, assets.trafficCarScale);
+                Vector3 at = Axis(trafficZ) - RightAt(trafficZ) * (RoadNetwork.LaneWidth * 0.5f);
+                var t = Place(assets.trafficCars[rng.Next(assets.trafficCars.Length)], at, 180f, assets.trafficCarScale);
                 traffic = t ? t.transform : null;
+                // Hauteur du pivot au-dessus de la chaussée (Place pose le bas du modèle sur la route)
+                if (traffic) trafficLift = traffic.localPosition.y - at.y;
             }
             // Décor inerte : aucun collider (le monde réel se construit à côté)
             foreach (var c in root.GetComponentsInChildren<Collider>(true)) Destroy(c);
+            NoMapSnow();
             BuildCamera(template);
         }
 
@@ -56,6 +69,45 @@ namespace ChillRoad
             if (cam) Destroy(cam.gameObject);
             if (Texture) { Texture.Release(); Destroy(Texture); Texture = null; }
             Destroy(this);
+        }
+
+        /// <summary>
+        /// La carte de neige du monde (routes enneigées, neige sur les toits et les sapins) est lue à la position : hors
+        /// de la carte, elle prendrait la valeur de son bord, et la vallée du décor se retrouvait sous la neige. Le décor
+        /// l'éteint pour ses propres objets (la neige des sommets vient du terrain lui-même).
+        /// </summary>
+        void NoMapSnow()
+        {
+            int snowOn = Shader.PropertyToID("_ChillRoadSnowOn"), trailOn = Shader.PropertyToID("_ChillRoadSnowTrailOn");
+            var block = new MaterialPropertyBlock();
+            foreach (var r in root.GetComponentsInChildren<Renderer>(true))
+            {
+                r.GetPropertyBlock(block);
+                block.SetFloat(snowOn, 0f);
+                block.SetFloat(trailOn, 0f);
+                r.SetPropertyBlock(block);
+            }
+        }
+
+        // ------------------------------------------------------------------ tracé
+
+        static float S(float a, float b, float v) => Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(a, b, v));
+
+        /// <summary>Axe de la route : droit autour de la voiture, puis grandes courbes en S le long de la vallée.</summary>
+        static float AxisX(float z) =>
+            70f * S(Straight, 650f, z) - 45f * S(650f, RoadHalf, z) - 50f * S(Straight, 650f, -z) + 40f * S(650f, RoadHalf, -z);
+
+        /// <summary>Profil de la route : elle monte doucement vers l'amont de la vallée et descend un peu vers l'aval.</summary>
+        static float AxisY(float z) =>
+            12f * S(Straight, 650f, z) + 16f * S(650f, RoadHalf, z) - 5f * S(Straight, 650f, -z) + 6f * S(650f, RoadHalf, -z);
+
+        static Vector3 Axis(float z) => new Vector3(AxisX(z), AxisY(z), z);
+
+        /// <summary>Droite de la route (horizontale) au point z de l'axe.</summary>
+        static Vector3 RightAt(float z)
+        {
+            Vector3 t = Axis(z + 0.5f) - Axis(z - 0.5f);
+            return new Vector3(t.z, 0f, -t.x).normalized;
         }
 
         // ------------------------------------------------------------------ route
@@ -71,21 +123,23 @@ namespace ChillRoad
             road.SetInfo(info, info);
             verge.SetInfo(info, info);
             marks.SetInfo(info, info);
-            const float step = 10f;
-            for (float z = -Half; z < Half; z += step)
+            const float step = 8f;
+            float along = 0f;
+            for (float z = -RoadHalf; z < RoadHalf; z += step)
             {
                 float z2 = z + step;
-                Vector3 a = new Vector3(0f, 0f, z), b = new Vector3(0f, 0f, z2);
-                road.Quad(a - Vector3.right * hw, a + Vector3.right * hw, b - Vector3.right * hw, b + Vector3.right * hw,
-                    new Vector2(-hw, z + Half), new Vector2(hw, z + Half), new Vector2(-hw, z2 + Half), new Vector2(hw, z2 + Half));
+                Vector3 a = Axis(z), b = Axis(z2);
+                Vector3 ra = RightAt(z), rb = RightAt(z2);
+                float ga = along, gb = along + Vector3.Distance(a, b);
+                along = gb;
+                road.Quad(a - ra * hw, a + ra * hw, b - rb * hw, b + rb * hw,
+                    new Vector2(-hw, ga), new Vector2(hw, ga), new Vector2(-hw, gb), new Vector2(hw, gb));
                 // Accotement en gravier puis talus enherbé qui descend vers la prairie
-                float ga = z + Half, gb = z2 + Half;
                 foreach (float side in new[] { -1f, 1f })
                 {
-                    Vector3 r = Vector3.right * side;
-                    Vector3 ea = a + r * hw, eb = b + r * hw;
-                    Vector3 sa = ea + r * 1.2f - Vector3.up * 0.06f, sb = eb + r * 1.2f - Vector3.up * 0.06f;
-                    Vector3 oa = sa + r * 5f - Vector3.up * Embankment, ob = sb + r * 5f - Vector3.up * Embankment;
+                    Vector3 ea = a + ra * (side * hw), eb = b + rb * (side * hw);
+                    Vector3 sa = ea + ra * (side * 1.2f) - Vector3.up * 0.06f, sb = eb + rb * (side * 1.2f) - Vector3.up * 0.06f;
+                    Vector3 oa = sa + ra * (side * 5f) - Vector3.up * Embankment, ob = sb + rb * (side * 5f) - Vector3.up * Embankment;
                     if (side > 0)
                     {
                         verge.Quad(ea, sa, eb, sb, new Vector2(0f, ga), new Vector2(1.2f, ga), new Vector2(0f, gb), new Vector2(1.2f, gb));
@@ -102,63 +156,119 @@ namespace ChillRoad
                     Mark(marks, side * RoadNetwork.CountryEdge, 0.2f, z, z2);
             }
             // Ligne centrale discontinue (4,5 m tous les 12 m, comme en jeu)
-            for (float z = -Half; z < Half; z += 12f) Mark(marks, 0f, 0.15f, z, z + 4.5f);
+            for (float z = -RoadHalf; z < RoadHalf; z += 12f) Mark(marks, 0f, 0.15f, z, z + 4.5f);
 
             AddMesh(root.transform, "Road", road.Build("LoadingRoad"), assets.asphalt, true);
             AddMesh(root.transform, "Verge", verge.Build("LoadingVerge"), assets.verge ? assets.verge : assets.dirt, true);
             AddMesh(root.transform, "Markings", marks.Build("LoadingMarks"), assets.roadMarking, false);
         }
 
+        /// <summary>Marquage le long de l'axe, à une distance latérale donnée.</summary>
         static void Mark(RoadNetwork.MeshBuilder mb, float x, float width, float z0, float z1)
         {
             Vector3 up = Vector3.up * 0.025f;
             float w = width * 0.5f;
-            mb.Quad(new Vector3(x - w, 0f, z0) + up, new Vector3(x + w, 0f, z0) + up, new Vector3(x - w, 0f, z1) + up, new Vector3(x + w, 0f, z1) + up);
+            Vector3 a = Axis(z0) + up, b = Axis(z1) + up, ra = RightAt(z0), rb = RightAt(z1);
+            mb.Quad(a + ra * (x - w), a + ra * (x + w), b + rb * (x - w), b + rb * (x + w));
         }
 
         // ------------------------------------------------------------------ terrain
 
-        /// <summary>Hauteur de la prairie : à plat au pied du remblai, collines à facettes au loin.</summary>
+        /// <summary>Distance horizontale (approchée) à l'axe de la route.</summary>
+        static float RoadDistance(float x, float z) => Mathf.Abs(x - AxisX(Mathf.Clamp(z, -RoadHalf, RoadHalf)));
+
+        /// <summary>Part « montagne » : nulle dans le fond de vallée, pleine sur les versants et au bout de la vallée.</summary>
+        static float Mountain(float x, float z)
+        {
+            float d = RoadDistance(x, z);
+            float walls = S(260f, 1350f, d);
+            float ends = S(RoadHalf - 60f, GroundHalf - 100f, Mathf.Abs(z));
+            return Mathf.Max(walls, ends);
+        }
+
+        /// <summary>Crêtes : bruit « en arêtes » (1 - |2n - 1|) à deux échelles, pour des sommets pointus.</summary>
+        static float Ridge(float x, float z)
+        {
+            float a = 1f - Mathf.Abs(Mathf.PerlinNoise(x * 0.0019f + 7.1f, z * 0.0019f + 2.3f) * 2f - 1f);
+            float b = 1f - Mathf.Abs(Mathf.PerlinNoise(x * 0.0061f + 1.9f, z * 0.0061f + 9.4f) * 2f - 1f);
+            return a * a * 0.85f + b * 0.15f;
+        }
+
+        /// <summary>Hauteur du sol : à plat au pied du remblai, prés vallonnés, puis les versants et leurs sommets.</summary>
         static float Ground(float x, float z)
         {
-            float away = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(14f, 140f, Mathf.Abs(x)));
+            float d = RoadDistance(x, z);
+            float floor = AxisY(Mathf.Clamp(z, -RoadHalf, RoadHalf)) - Embankment - 0.1f;
+            float away = S(14f, 140f, d);
+            float m = Mountain(x, z);
             float hills = Mathf.PerlinNoise(x * 0.0055f + 11.3f, z * 0.0055f + 4.1f) * 46f + Mathf.PerlinNoise(x * 0.021f + 3.7f, z * 0.021f) * 7f;
-            return -Embankment - 0.1f + away * hills;
+            return floor + away * hills + m * m * (150f + 400f * Ridge(x, z));
         }
+
+        /// <summary>Altitude au-dessus du fond de vallée (étages : prés, forêt, roche, neige).</summary>
+        static float Altitude(float x, float z) => Ground(x, z) - AxisY(Mathf.Clamp(z, -RoadHalf, RoadHalf));
 
         static float Forest(float x, float z) => Mathf.PerlinNoise(x * 0.012f + 40f, z * 0.012f + 17f);
 
+        /// <summary>Forêt de conifères sur les versants : dense en bas, clairsemée en montant, absente au-dessus de 230 m.</summary>
+        static float ConiferBelt(float x, float z)
+        {
+            float h = Altitude(x, z);
+            return Mountain(x, z) > 0.08f ? S(240f, 150f, h) * S(0.3f, 0.5f, Forest(x * 0.7f, z * 0.7f) + (1f - S(20f, 120f, h)) * 0.25f) : 0f;
+        }
+
+        /// <summary>Coordonnées d'un axe de la grille : mailles fines près de la route, larges sur les montagnes au loin.</summary>
+        static List<float> GridAxis()
+        {
+            var half = new List<float>();
+            for (float c = 0f; c < GroundHalf; c += Mathf.Clamp(9f + c * 0.04f, 9f, 60f)) half.Add(c);
+            half.Add(GroundHalf);
+            var axis = new List<float>();
+            for (int i = half.Count - 1; i > 0; i--) axis.Add(-half[i]);
+            axis.AddRange(half);
+            return axis;
+        }
+
         void BuildTerrain(GameAssets assets)
         {
-            const float step = 16f;
-            int n = Mathf.RoundToInt(Half * 2f / step);
-            var v = new Vector3[(n + 1) * (n + 1)];
+            var xs = GridAxis();
+            int n = xs.Count;
+            var v = new Vector3[n * n];
             var c = new Color[v.Length];
-            for (int iz = 0; iz <= n; iz++)
-            for (int ix = 0; ix <= n; ix++)
-            {
-                float x = -Half + ix * step, z = -Half + iz * step;
-                float h = Ground(x, z);
-                int i = iz * (n + 1) + ix;
-                v[i] = new Vector3(x, h, z);
-                // Masques du shader de terrain : r = sous-bois, g = herbe sèche, b = roche, a = terre battue
-                float forest = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.5f, 0.68f, Forest(x, z))) * Mathf.InverseLerp(20f, 40f, Mathf.Abs(x));
-                float dry = Mathf.Clamp01(Mathf.PerlinNoise(x * 0.03f + 5f, z * 0.03f) - 0.45f) * 1.6f;
-                float dirt = Mathf.Clamp01(1f - (Mathf.Abs(x) - RoadNetwork.CountryHalfWidth - 4f) / 5f);
-                c[i] = new Color(forest * (1f - dirt), dry, Mathf.InverseLerp(30f, 44f, h) * 0.6f, dirt);
-            }
-            var t = new List<int>();
+            var extra = new Vector2[v.Length];
             for (int iz = 0; iz < n; iz++)
             for (int ix = 0; ix < n; ix++)
             {
-                int i = iz * (n + 1) + ix;
-                t.Add(i); t.Add(i + n + 1); t.Add(i + 1);
-                t.Add(i + 1); t.Add(i + n + 1); t.Add(i + n + 2);
+                float x = xs[ix], z = xs[iz];
+                float h = Ground(x, z), alt = Altitude(x, z), d = RoadDistance(x, z);
+                int i = iz * n + ix;
+                v[i] = new Vector3(x, h, z);
+                // Masques du shader de terrain : r = sous-bois, g = herbe sèche, b = roche, a = terre battue
+                float meadowForest = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.5f, 0.68f, Forest(x, z))) * Mathf.InverseLerp(20f, 40f, d);
+                float forest = Mathf.Max(meadowForest, ConiferBelt(x, z));
+                float dry = Mathf.Clamp01(Mathf.PerlinNoise(x * 0.03f + 5f, z * 0.03f) - 0.45f) * 1.6f + S(150f, 260f, alt) * 0.5f;
+                float dirt = Mathf.Clamp01(1f - (d - RoadNetwork.CountryHalfWidth - 4f) / 5f);
+                float rock = S(230f, 330f, alt) * 0.7f;
+                c[i] = new Color(forest * (1f - dirt) * (1f - rock), Mathf.Clamp01(dry), rock, dirt);
+                // Neige des sommets (uv2.y), au-dessus de ~330 m, avec un liseré irrégulier
+                float snowLine = 300f + (Mathf.PerlinNoise(x * 0.004f + 3f, z * 0.004f) - 0.5f) * 90f;
+                extra[i] = new Vector2(0f, S(snowLine - 40f, snowLine + 50f, alt));
+            }
+            var t = new int[(n - 1) * (n - 1) * 6];
+            int k = 0;
+            for (int iz = 0; iz < n - 1; iz++)
+            for (int ix = 0; ix < n - 1; ix++)
+            {
+                int i = iz * n + ix;
+                t[k++] = i; t[k++] = i + n; t[k++] = i + 1;
+                t[k++] = i + 1; t[k++] = i + n; t[k++] = i + n + 1;
             }
             var m = new Mesh { name = "LoadingGround" };
+            if (v.Length > 65000) m.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
             m.vertices = v;
             m.colors = c;
-            m.SetTriangles(t, 0);
+            m.uv2 = extra;
+            m.triangles = t;
             m.RecalculateNormals();
             m.RecalculateBounds();
             AddMesh(root.transform, "Ground", m, assets.terrain, true);
@@ -181,34 +291,83 @@ namespace ChillRoad
         {
             float R() => (float)rng.NextDouble();
             float Rr(float lo, float hi) => Mathf.Lerp(lo, hi, R());
+            bool Has(GameObject[] list) => list != null && list.Length > 0;
+            GameObject Pick(GameObject[] list) => list[rng.Next(list.Length)];
 
             // Verger derrière une clôture en bois, côté gauche (comme le long des nationales du jeu)
-            if (a.fruitTrees != null && a.fruitTrees.Length > 0)
+            if (Has(a.fruitTrees))
                 for (float z = -70f; z <= 90f; z += 9f)
                 for (float x = -20f; x >= -52f; x -= 8f)
-                    Nature(a.fruitTrees[rng.Next(a.fruitTrees.Length)], x + Rr(-1f, 1f), z + Rr(-1f, 1f), R() * 360f, Rr(0.9f, 1.2f));
+                    Nature(Pick(a.fruitTrees), x + Rr(-1f, 1f), z + Rr(-1f, 1f), R() * 360f, Rr(0.9f, 1.2f));
             if (a.fence) Fence(a.fence, -14.5f, -80f, 100f);
 
-            // Forêts de pins sur les collines, buissons et herbes hautes au pied du remblai, rochers et fleurs
-            for (int i = 0; i < 700; i++)
+            // Fermes isolées dans le fond de vallée, tournées vers la route
+            if (Has(a.buildings))
             {
-                float x = Rr(-Half, Half), z = Rr(-Half, Half);
-                float ax = Mathf.Abs(x);
-                if (ax < 14f) continue;
+                Farm(a, rng, 150f, 34f);
+                Farm(a, rng, 230f, -40f);
+                Farm(a, rng, -190f, 38f);
+                Farm(a, rng, 420f, -46f);
+            }
+
+            // Prés : bosquets de pins, buissons et herbes hautes au pied du remblai, rochers et fleurs
+            for (int i = 0; i < 900; i++)
+            {
+                float x = Rr(-260f, 260f), z = Rr(-520f, 520f);
+                x += AxisX(z);
+                float d = RoadDistance(x, z);
+                if (d < 14f || Mountain(x, z) > 0.15f) continue;
                 bool orchard = x < -12f && x > -58f && z > -80f && z < 100f;
                 float roll = R();
-                if (!orchard && Forest(x, z) > 0.52f && ax > 22f && a.pines != null && a.pines.Length > 0)
-                    Nature(a.pines[rng.Next(a.pines.Length)], x, z, R() * 360f, Rr(0.9f, 1.6f));
-                else if (roll < 0.25f && ax < 60f && a.shrubs != null && a.shrubs.Length > 0)
-                    Nature(a.shrubs[rng.Next(a.shrubs.Length)], x, z, R() * 360f, Rr(0.9f, 1.4f));
-                else if (roll < 0.45f && ax < 45f && a.grass != null && a.grass.Length > 0)
-                    Nature(a.grass[rng.Next(a.grass.Length)], x, z, R() * 360f, Rr(0.9f, 1.3f));
-                else if (roll < 0.55f && ax < 45f && a.flowers != null && a.flowers.Length > 0)
-                    Nature(a.flowers[rng.Next(a.flowers.Length)], x, z, R() * 360f, Rr(0.9f, 1.2f));
-                else if (roll < 0.62f && a.bigRocks != null && a.bigRocks.Length > 0 && ax > 30f)
-                    Nature(a.bigRocks[rng.Next(a.bigRocks.Length)], x, z, R() * 360f, Rr(0.7f, 1.3f));
-                else if (roll < 0.72f && a.smallRocks != null && a.smallRocks.Length > 0)
-                    Nature(a.smallRocks[rng.Next(a.smallRocks.Length)], x, z, R() * 360f, Rr(0.8f, 1.4f));
+                if (!orchard && Forest(x, z) > 0.52f && d > 22f && Has(a.pines))
+                    Nature(Pick(a.pines), x, z, R() * 360f, Rr(0.9f, 1.6f));
+                else if (roll < 0.25f && d < 60f && Has(a.shrubs))
+                    Nature(Pick(a.shrubs), x, z, R() * 360f, Rr(0.9f, 1.4f));
+                else if (roll < 0.45f && d < 45f && Has(a.grass))
+                    Nature(Pick(a.grass), x, z, R() * 360f, Rr(0.9f, 1.3f));
+                else if (roll < 0.55f && d < 45f && Has(a.flowers))
+                    Nature(Pick(a.flowers), x, z, R() * 360f, Rr(0.9f, 1.2f));
+                else if (roll < 0.62f && d > 30f && Has(a.bigRocks))
+                    Nature(Pick(a.bigRocks), x, z, R() * 360f, Rr(0.7f, 1.3f));
+                else if (roll < 0.72f && Has(a.smallRocks))
+                    Nature(Pick(a.smallRocks), x, z, R() * 360f, Rr(0.8f, 1.4f));
+            }
+
+            // Versants : forêt de conifères (plus grands en bas), quelques gros blocs dans les éboulis au-dessus
+            if (Has(a.pines))
+            {
+                int placed = 0;
+                for (int i = 0; i < 6000 && placed < 900; i++)
+                {
+                    float z = Rr(-950f, 950f), side = R() < 0.5f ? -1f : 1f;
+                    float x = AxisX(z) + side * Rr(220f, 950f);
+                    float belt = ConiferBelt(x, z);
+                    if (belt < 0.5f || R() > belt) continue;
+                    float alt = Altitude(x, z);
+                    Nature(Pick(a.pines), x, z, R() * 360f, Mathf.Lerp(2.1f, 1.3f, Mathf.InverseLerp(30f, 230f, alt)) * Rr(0.85f, 1.15f));
+                    placed++;
+                }
+            }
+            if (Has(a.bigRocks))
+                for (int i = 0; i < 400; i++)
+                {
+                    float z = Rr(-900f, 900f), x = AxisX(z) + (R() < 0.5f ? -1f : 1f) * Rr(350f, 1000f);
+                    float alt = Altitude(x, z);
+                    if (alt > 220f && alt < 340f) Nature(Pick(a.bigRocks), x, z, R() * 360f, Rr(2.5f, 5f));
+                }
+        }
+
+        /// <summary>Ferme : un bâtiment du pack, posé en retrait de la route et tourné vers elle, avec quelques arbres.</summary>
+        void Farm(GameAssets a, System.Random rng, float z, float offset)
+        {
+            float x = AxisX(z) + offset;
+            float yaw = offset > 0f ? -90f : 90f;
+            var b = Place(a.buildings[rng.Next(a.buildings.Length)], new Vector3(x, Ground(x, z) - 0.2f, z), yaw + (float)(rng.NextDouble() * 16.0 - 8.0), 1f);
+            if (!b || a.fruitTrees == null || a.fruitTrees.Length == 0) return;
+            for (int i = 0; i < 4; i++)
+            {
+                float tx = x + Mathf.Sign(offset) * (12f + i * 3f), tz = z - 14f + i * 9f;
+                Nature(a.fruitTrees[rng.Next(a.fruitTrees.Length)], tx, tz, (float)rng.NextDouble() * 360f, 1.1f);
             }
         }
 
@@ -283,7 +442,7 @@ namespace ChillRoad
             cam.rect = new Rect(0f, 0f, 1f, 1f);
             cam.fieldOfView = 36f;
             cam.nearClipPlane = 0.2f;
-            cam.farClipPlane = 1500f;
+            cam.farClipPlane = 4000f;
             Resize();
             UpdateCamera(0f);
         }
@@ -298,33 +457,121 @@ namespace ChillRoad
             cam.targetTexture = Texture;
         }
 
-        /// <summary>Caméra qui tourne lentement autour de la voiture, à hauteur d'homme (comme la vue de l'accueil).</summary>
+        /// <summary>Durée d'un plan, et du fondu au noir qui sépare deux plans (s).</summary>
+        const float ShotLength = 5.5f, CutFade = 0.35f;
+
+        /// <summary>Part de noir sur l'image (0 = image pleine) : fondu entre deux plans, appliqué par l'écran de chargement.</summary>
+        public float Fade { get; private set; } = 1f;
+
+        /// <summary>
+        /// Réalisation façon bande-annonce : quatre plans qui s'enchaînent en fondu au noir, chacun en lent mouvement
+        /// (orbite à hauteur d'homme, travelling bas sur l'avant, grue qui s'élève sur la vallée, glissé sur l'arrière).
+        /// Positions dans le repère de la voiture, en multiples de son rayon.
+        /// </summary>
         void UpdateCamera(float dt)
         {
             // Pas de saut quand une image est lente (construction du monde en parallèle)
             angle += Mathf.Min(dt, 0.05f) * 5f;
-            float dist = carRadius * 3.3f + 1.5f;
-            Vector3 center = carCenter + Vector3.up * 0.1f;
-            Quaternion around = Quaternion.Euler(0f, angle, 0f);
-            Vector3 pos = center + around * new Vector3(0f, 0.9f, -dist);
-            cam.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(center + Vector3.up * 0.25f - pos, Vector3.up));
+            if (Menu && menuTime < 0f)
+            {
+                // Passage au menu : on finit le plan en cours par un fondu au noir, puis l'orbite du menu s'ouvre
+                toMenuFade = Mathf.Max(toMenuFade, Fade);
+                toMenuFade = Mathf.MoveTowards(toMenuFade, 1f, dt / CutFade);
+                if (toMenuFade >= 1f) menuTime = 0f;
+                else
+                {
+                    ShotCamera();
+                    Fade = toMenuFade;
+                    return;
+                }
+            }
+            if (menuTime >= 0f)
+            {
+                menuTime += dt;
+                Fade = 1f - Mathf.Clamp01(menuTime / 0.6f);
+                MenuCamera();
+                return;
+            }
+            ShotCamera();
+        }
+
+        /// <summary>Orbite du menu : lente, un peu plus haute et plus large, la voiture décalée vers la droite.</summary>
+        void MenuCamera()
+        {
+            float r = carRadius, fov = 38f;
+            float dist = r * 3.6f + 2f;
+            Vector3 c = carCenter;
+            Vector3 pos = c + Quaternion.Euler(0f, angle * 0.8f + 40f, 0f) * new Vector3(0f, 1.2f, -dist);
+            Vector3 aim = c + Vector3.up * 0.3f;
+            var look = Quaternion.LookRotation(aim - pos, Vector3.up);
+            float halfWidth = Vector3.Distance(pos, aim) * Mathf.Tan(fov * 0.5f * Mathf.Deg2Rad) * cam.aspect;
+            pos -= look * Vector3.right * (MenuShift * halfWidth);
+            cam.fieldOfView = fov;
+            cam.transform.SetPositionAndRotation(pos, look);
+        }
+
+        void ShotCamera()
+        {
+            int shot = Mathf.FloorToInt(time / ShotLength) % 4;
+            float local = Mathf.Repeat(time, ShotLength);
+            float e = Mathf.SmoothStep(0f, 1f, local / ShotLength);
+            Fade = 1f - Mathf.Clamp01(Mathf.Min(local / CutFade, (ShotLength - local) / CutFade));
+
+            float r = carRadius;
+            Vector3 c = carCenter;
+            Vector3 pos, aim;
+            float fov;
+            switch (shot)
+            {
+                case 1:   // travelling bas qui glisse devant le capot
+                    pos = c + Vector3.Lerp(new Vector3(-2.6f * r, -0.15f, 2.3f * r), new Vector3(-0.9f * r, -0.05f, 2.9f * r), e);
+                    aim = c + new Vector3(0f, -0.1f, 0.15f * r);
+                    fov = 30f;
+                    break;
+                case 2:   // grue : on s'élève au-dessus du bas-côté, la vallée et ses sommets apparaissent derrière la voiture
+                    pos = c + Vector3.Lerp(new Vector3(4.2f * r, 0.6f, -3.6f * r), new Vector3(5.2f * r, 4.6f, -5f * r), e);
+                    aim = c + Vector3.Lerp(new Vector3(0f, 0.3f, 0f), new Vector3(0f, 1.2f, 2f * r), e);
+                    fov = 42f;
+                    break;
+                case 3:   // glissé bas le long de l'arrière
+                    pos = c + Vector3.Lerp(new Vector3(2.4f * r, -0.1f, -3.4f * r), new Vector3(0.6f * r, 0f, -3.6f * r), e);
+                    aim = c + new Vector3(0f, 0f, -0.2f * r);
+                    fov = 32f;
+                    break;
+                default:  // orbite lente à hauteur d'homme (comme la vue de l'accueil)
+                {
+                    float dist = r * 3.3f + 1.5f;
+                    pos = c + Quaternion.Euler(0f, angle, 0f) * new Vector3(0f, 1f, -dist);
+                    aim = c + Vector3.up * 0.35f;
+                    fov = 36f;
+                    break;
+                }
+            }
+            // Jamais sous la prairie ni sous la route
+            Vector3 o = root.transform.position;
+            float ground = o.y + Mathf.Max(AxisY(pos.z - o.z), Ground(pos.x - o.x, pos.z - o.z)) + 0.35f;
+            if (pos.y < ground) pos.y = ground;
+            cam.fieldOfView = fov;
+            cam.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(aim - pos, Vector3.up));
         }
 
         void LateUpdate()
         {
             if (!cam) return;
             float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
-            time += dt;
+            // Les plans suivent le temps réel (le chargement fait des images lentes), les mouvements restent fluides
+            time += Mathf.Min(Time.unscaledDeltaTime, 0.25f);
             Resize();
             UpdateCamera(dt);
-            // Une voiture du trafic passe de temps en temps sur la voie d'en face
+            // Une voiture du trafic passe de temps en temps sur la voie d'en face, en suivant les courbes
             if (traffic)
             {
                 trafficZ -= TrafficSpeed * dt;
-                if (trafficZ < -Half + 20f) trafficZ = Half - 20f;
-                var p = traffic.localPosition;
-                p.z = trafficZ;
-                traffic.localPosition = p;
+                if (trafficZ < -RoadHalf + 20f) trafficZ = 420f;
+                Vector3 p = Axis(trafficZ) - RightAt(trafficZ) * (RoadNetwork.LaneWidth * 0.5f);
+                traffic.localPosition = p + Vector3.up * trafficLift;
+                Vector3 fwd = Axis(trafficZ - 1f) - Axis(trafficZ + 1f);
+                traffic.localRotation = Quaternion.LookRotation(fwd, Vector3.up);
             }
         }
     }
