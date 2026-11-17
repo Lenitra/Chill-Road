@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chill Road</title>
+<meta name="description" content="Chill Road : un jeu de conduite low-poly en monde ouvert dans une vallée alpine. Téléchargement gratuit pour Windows.">
+<meta property="og:title" content="Chill Road">
+<meta property="og:description" content="Une vallée alpine, un col, des lacets : roule à ton rythme. Jeu de conduite low-poly gratuit pour Windows.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M9 2h14l-6 28H3z' fill='%23ffc233'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:ital,wght@0,500;0,600;0,700;1,600;1,800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0d12;
+    --plate: #13161d;
+    --plate-2: #1b1f28;
+    --line: #262b36;
+    --text: #eef1f6;
+    --muted: #9aa3b2;
+    --gold: #ffc233;
+    --gold-deep: #f29e1f;
+    --ink: #14100a;
+    --cyan: #59d9ff;
+    --skew: -14deg;
+    --max: 1180px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 400 17px/1.6 "Barlow", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  img { display: block; max-width: 100%; }
+  a { color: inherit; }
+  .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+  .display { font-family: "Barlow Semi Condensed", "Bahnschrift", sans-serif; }
+  .kicker {
+    font: 700 13px/1 "Barlow Semi Condensed", "Bahnschrift", sans-serif;
+    letter-spacing: .32em; text-transform: uppercase; color: var(--cyan);
+  }
+
+  /* ---------- header ---------- */
+  header.top {
+    position: fixed; inset: 0 0 auto 0; z-index: 20;
+    background: linear-gradient(to bottom, rgba(11,13,18,.92), rgba(11,13,18,0));
+    transition: background .25s;
+  }
+  header.top.solid { background: rgba(11,13,18,.94); box-shadow: 0 1px 0 var(--line); }
+  header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 68px; }
+  .brand { text-decoration: none; font: italic 800 26px/1 "Barlow Semi Condensed", "Bahnschrift", sans-serif; letter-spacing: .01em; }
+  .brand b { color: var(--gold); font-weight: 800; }
+  nav.links { display: flex; gap: 6px; }
+  nav.links a {
+    text-decoration: none; font: 600 15px/1 "Barlow Semi Condensed", sans-serif; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted); padding: 10px 12px;
+  }
+  nav.links a:hover { color: var(--text); }
+  nav.links a.cta { color: var(--gold); }
+
+  /* ---------- plates & buttons ---------- */
+  .btn {
+    position: relative; display: inline-flex; align-items: center; gap: 14px;
+    padding: 16px 30px; text-decoration: none; isolation: isolate;
+    font: italic 800 21px/1 "Barlow Semi Condensed", "Bahnschrift", sans-serif; letter-spacing: .02em; text-transform: uppercase;
+    transition: transform .15s ease;
+  }
+  .btn::before {
+    content: ""; position: absolute; inset: 0; z-index: -1;
+    transform: skewX(var(--skew)); border-radius: 2px;
+    transition: background .15s ease, box-shadow .15s ease;
+  }
+  .btn:hover { transform: translateX(4px); }
+  .btn-gold { color: var(--ink); }
+  .btn-gold::before { background: linear-gradient(100deg, var(--gold), var(--gold-deep)); box-shadow: 0 10px 30px -10px rgba(255,170,40,.55); }
+  .btn-gold:hover::before { box-shadow: 0 14px 36px -10px rgba(255,170,40,.75); }
+  .btn-ghost { color: var(--text); }
+  .btn-ghost::before { background: rgba(27,31,40,.85); box-shadow: inset 4px 0 0 var(--gold); }
+  .btn-ghost:hover::before { background: rgba(40,45,56,.95); }
+  .btn svg { width: 22px; height: 22px; flex: none; }
+  .chev { font-style: normal; font-weight: 700; }
+
+  /* ---------- hero ---------- */
+  .hero { position: relative; min-height: 100vh; min-height: 100svh; display: flex; align-items: flex-end; overflow: hidden; }
+  .hero-bg { position: absolute; inset: 0; }
+  .hero-bg img { width: 100%; height: 100%; object-fit: cover; object-position: 62% 30%; }
+  .hero-bg::after {
+    content: ""; position: absolute; inset: 0;
+    background:
+      linear-gradient(90deg, rgba(11,13,18,.94) 0%, rgba(11,13,18,.78) 34%, rgba(11,13,18,.12) 68%, rgba(11,13,18,0) 100%),
+      linear-gradient(0deg, var(--bg) 0%, rgba(11,13,18,0) 32%);
+  }
+  .hero .wrap { position: relative; padding-top: 120px; padding-bottom: 12vh; width: 100%; }
+  .logo {
+    margin: 18px 0 0; font: italic 800 clamp(64px, 11vw, 150px)/.86 "Barlow Semi Condensed", "Bahnschrift", sans-serif;
+    letter-spacing: -.01em; text-shadow: 0 6px 30px rgba(0,0,0,.35);
+  }
+  .logo span { color: var(--gold); }
+  .bar { display: flex; gap: 10px; margin: 22px 0 22px; }
+  .bar i { display: block; height: 5px; transform: skewX(var(--skew)); }
+  .bar i:first-child { width: 230px; background: var(--gold); }
+  .bar i:last-child { width: 46px; background: var(--cyan); }
+  .tagline { font: italic 600 clamp(20px, 2.4vw, 26px)/1.3 "Barlow Semi Condensed", sans-serif; color: #dfe5ee; max-width: 560px; margin: 0 0 34px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 18px 22px; align-items: center; }
+  .meta { margin-top: 18px; color: var(--muted); font-size: 15px; }
+  .meta b { color: var(--text); font-weight: 500; }
+
+  /* ---------- sections ---------- */
+  section { padding: 110px 0 0; }
+  .head { margin-bottom: 40px; }
+  .head h2 {
+    margin: 12px 0 0; font: italic 800 clamp(38px, 5vw, 56px)/1 "Barlow Semi Condensed", "Bahnschrift", sans-serif; text-transform: uppercase;
+  }
+  .head h2 span { color: var(--gold); }
+
+  .intro { display: grid; grid-template-columns: 1.1fr .9fr; gap: 56px; align-items: start; }
+  .intro p { margin: 0 0 18px; color: #cfd5df; font-size: 19px; }
+  .intro p:first-child { color: var(--text); font-size: 21px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .stat { background: var(--plate); border-left: 4px solid var(--gold); padding: 18px 20px; clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 100%, 0 100%); }
+  .stat b { display: block; font: italic 800 38px/1 "Barlow Semi Condensed", sans-serif; color: var(--gold); }
+  .stat span { display: block; margin-top: 6px; color: var(--muted); font-size: 15px; line-height: 1.35; }
+
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 56px; }
+  .feature { background: var(--plate); padding: 26px 26px 24px; border-top: 3px solid var(--line); transition: border-color .2s; }
+  .feature:hover { border-top-color: var(--cyan); }
+  .feature h3 { margin: 0 0 8px; font: italic 700 23px/1.15 "Barlow Semi Condensed", sans-serif; }
+  .feature p { margin: 0; color: var(--muted); font-size: 16px; }
+
+  /* ---------- gallery ---------- */
+  .gallery { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+  .shot { position: relative; margin: 0; overflow: hidden; background: var(--plate); cursor: zoom-in; border: 0; padding: 0; text-align: left; color: inherit; font: inherit; }
+  .shot img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s ease; }
+  .shot:hover img { transform: scale(1.04); }
+  .shot figcaption {
+    position: absolute; left: 0; bottom: 0; right: 0; padding: 30px 18px 14px;
+    background: linear-gradient(0deg, rgba(8,10,14,.88), rgba(8,10,14,0));
+    font: italic 600 18px/1.2 "Barlow Semi Condensed", sans-serif;
+  }
+  .g-wide { grid-column: span 4; grid-row: span 2; aspect-ratio: auto; }
+  .g-side { grid-column: span 2; }
+  .g-third { grid-column: span 3; aspect-ratio: 16 / 9; }
+  .g-side { aspect-ratio: 16 / 9; }
+
+  /* ---------- download ---------- */
+  .dl {
+    position: relative; background: var(--plate); padding: 52px 56px; overflow: hidden;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center;
+  }
+  .dl::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--gold); }
+  .dl h2 { margin: 12px 0 14px; font: italic 800 clamp(34px, 4vw, 48px)/1 "Barlow Semi Condensed", sans-serif; text-transform: uppercase; }
+  .dl p { margin: 0 0 26px; color: #cfd5df; }
+  .steps { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+  .steps li { counter-increment: s; position: relative; padding: 0 0 18px 54px; color: #cfd5df; }
+  .steps li::before {
+    content: counter(s); position: absolute; left: 0; top: -2px; width: 36px; height: 32px;
+    display: grid; place-items: center; background: var(--plate-2); color: var(--gold);
+    font: italic 800 19px/1 "Barlow Semi Condensed", sans-serif;
+    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  }
+  .steps li:last-child { padding-bottom: 0; }
+  .steps b { color: var(--text); font-weight: 500; }
+  kbd { font: 600 14px/1 "Barlow Semi Condensed", sans-serif; background: var(--plate-2); border: 1px solid var(--line); border-radius: 4px; padding: 3px 7px; color: var(--text); }
+  .note { margin-top: 26px; font-size: 15px; color: var(--muted); }
+
+  /* ---------- footer ---------- */
+  footer { margin-top: 110px; border-top: 1px solid var(--line); padding: 34px 0 44px; color: var(--muted); font-size: 15px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 30px; justify-content: space-between; align-items: center; }
+  footer a { color: var(--text); text-decoration: none; border-bottom: 1px solid var(--line); }
+  footer a:hover { border-color: var(--gold); }
+
+  /* ---------- lightbox ---------- */
+  .lightbox { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; background: rgba(5,6,9,.94); padding: 24px; cursor: zoom-out; }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: min(1600px, 100%); max-height: 88vh; box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+  .lightbox p { position: absolute; bottom: 18px; left: 0; right: 0; text-align: center; margin: 0; font: italic 600 18px/1 "Barlow Semi Condensed", sans-serif; color: #dfe5ee; }
+
+  :focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+
+  @media (max-width: 900px) {
+    nav.links a:not(.cta) { display: none; }
+    .intro, .dl { grid-template-columns: 1fr; }
+    .dl { padding: 40px 28px; gap: 34px; }
+    .features { grid-template-columns: 1fr 1fr; }
+    .gallery { grid-template-columns: 1fr 1fr; }
+    .g-wide { grid-column: span 2; grid-row: auto; aspect-ratio: 16 / 9; }
+    .g-side { grid-column: span 2; aspect-ratio: 16 / 9; }
+    .g-third { grid-column: span 2; }
+    .hero-bg img { object-position: 64% 50%; }
+    .hero-bg::after {
+      background: linear-gradient(0deg, var(--bg) 6%, rgba(11,13,18,.8) 52%, rgba(11,13,18,.35) 100%);
+    }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding: 0 16px; }
+    .features, .stats { grid-template-columns: 1fr; }
+    section { padding-top: 80px; }
+    .btn { font-size: 19px; padding: 15px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top" id="top">
+  <div class="wrap">
+    <a class="brand" href="#">CHILL <b>ROAD</b></a>
+    <nav class="links">
+      <a href="#jeu">Le jeu</a>
+      <a href="#images">Images</a>
+      <a class="cta" href="#telecharger">Télécharger</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="hero-bg"><img src="img/hero.jpg" alt="Une Vision 74 blanche traverse un village de montagne aux chalets colorés, sommets enneigés au loin"></div>
+    <div class="wrap">
+      <div class="kicker">Balade alpine · Monde ouvert</div>
+      <h1 class="logo display">CHILL <span>ROAD</span></h1>
+      <div class="bar"><i></i><i></i></div>
+      <p class="tagline">Une vallée alpine, un col, des lacets&nbsp;: roule à ton rythme.</p>
+      <div class="actions">
+        <a class="btn btn-gold" href="https://github.com/Lenitra/Chill-Road/releases/latest/download/ChillRoad-Windows.zip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
+          Télécharger
+        </a>
+        <a class="btn btn-ghost" href="#jeu">Découvrir <i class="chev">›</i></a>
+      </div>
+      <div class="meta"><b>Gratuit</b> · Windows 10/11 64 bits · zip de 85 Mo · en développement</div>
+    </div>
+  </div>
+
+  <section id="jeu">
+    <div class="wrap">
+      <div class="head">
+        <div class="kicker">Le jeu</div>
+        <h2>Prends la <span>route</span></h2>
+      </div>
+      <div class="intro">
+        <div>
+          <p>Chill Road est un jeu de conduite low-poly en monde ouvert. Pas de chrono imposé ni de score à battre&nbsp;: tu choisis ta voiture et tu pars explorer une vallée alpine.</p>
+          <p>Autoroute en boucle avec viaduc et tunnels, route de campagne, cols en lacets, chemins de terre et station de ski. Le jour tombe, l’orage arrive, la route mouille. Et quand l’envie te prend, il y a des courses, des sauts et des amis à inviter.</p>
+        </div>
+        <div class="stats">
+          <div class="stat"><b>5 km</b><span>de vallée autour d’un massif central</span></div>
+          <div class="stat"><b>55 km</b><span>de routes, de l’autoroute à la piste</span></div>
+          <div class="stat"><b>441 m</b><span>d’altitude au sommet du col</span></div>
+          <div class="stat"><b>~25</b><span>types de véhicules dans le trafic</span></div>
+        </div>
+      </div>
+
+      <div class="features">
+        <div class="feature">
+          <h3>Un garage varié</h3>
+          <p>De la microcar à trois roues de 49&nbsp;cm³ à l’hypercar V12 du Mans, à acheter, peindre et régler.</p>
+        </div>
+        <div class="feature">
+          <h3>Une conduite qui a du poids</h3>
+          <p>Suspensions, modèle de pneus, boîtes de 3 à 9 rapports. Les dérives viennent d’une vraie glisse.</p>
+        </div>
+        <div class="feature">
+          <h3>Jour, nuit et orages</h3>
+          <p>Cycle complet, pluie et éclairs, route qui se mouille et perd du grip. Neige en altitude.</p>
+        </div>
+        <div class="feature">
+          <h3>À plusieurs</h3>
+          <p>Héberge une partie et donne ton code d’invitation&nbsp;: tes amis te rejoignent par Internet, sans rien régler.</p>
+        </div>
+        <div class="feature">
+          <h3>Courses et sauts</h3>
+          <p>Sprints et circuits dans la vallée, fantôme de ton meilleur temps, tremplins à trouver.</p>
+        </div>
+        <div class="feature">
+          <h3>Tout est synthétisé</h3>
+          <p>Moteurs et musique sont générés en direct. Le jeu ne contient aucun fichier audio.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="images">
+    <div class="wrap">
+      <div class="head">
+        <div class="kicker">Images</div>
+        <h2>En <span>jeu</span></h2>
+      </div>
+      <div class="gallery">
+        <button class="shot g-wide" data-full="img/village.jpg" data-cap="La traversée du village">
+          <img src="img/village_s.jpg" srcset="img/village_s.jpg 800w, img/village.jpg 1600w" sizes="(max-width: 900px) 100vw, 780px" alt="Voiture blanche dans la rue principale d'un village alpin" loading="lazy">
+          <figcaption>La traversée du village</figcaption>
+        </button>
+        <button class="shot g-side" data-full="img/carte.jpg" data-cap="Le Tour du massif : autoroute, vallée, cols et lac">
+          <img src="img/carte_s.jpg" alt="Carte de la vallée vue du dessus, avec l'autoroute en boucle, le lac et les routes de col" loading="lazy">
+          <figcaption>La carte du massif</figcaption>
+        </button>
+        <button class="shot g-side" data-full="img/station.jpg" data-cap="La station de ski des Combes">
+          <img src="img/station_s.jpg" alt="Route enneigée qui monte vers des chalets, sapins sur la pente" loading="lazy">
+          <figcaption>Station des Combes</figcaption>
+        </button>
+        <button class="shot g-third" data-full="img/titre.jpg" data-cap="L’écran titre">
+          <img src="img/titre_s.jpg" srcset="img/titre_s.jpg 800w, img/titre.jpg 1600w" sizes="(max-width: 900px) 100vw, 580px" alt="Menu principal du jeu devant une route de vallée et une voiture blanche" loading="lazy">
+          <figcaption>L’écran titre</figcaption>
+        </button>
+        <button class="shot g-third" data-full="img/chargement.jpg" data-cap="Le chargement, en route vers la vallée">
+          <img src="img/chargement_s.jpg" srcset="img/chargement_s.jpg 800w, img/chargement.jpg 1600w" sizes="(max-width: 900px) 100vw, 580px" alt="Écran de chargement avec la voiture sur une route de montagne" loading="lazy">
+          <figcaption>Le chargement</figcaption>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section id="telecharger">
+    <div class="wrap">
+      <div class="dl">
+        <div>
+          <div class="kicker">Télécharger</div>
+          <h2>Gratuit, pour Windows</h2>
+          <p>Le jeu est en cours de développement&nbsp;: attends-toi à quelques imperfections, et à des nouveautés régulières.</p>
+          <a class="btn btn-gold" href="https://github.com/Lenitra/Chill-Road/releases/latest/download/ChillRoad-Windows.zip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
+            Chill Road pour Windows
+          </a>
+        </div>
+        <ol class="steps">
+          <li><b>Décompresse</b> le zip où tu veux (clic droit → Extraire tout).</li>
+          <li><b>Lance</b> <kbd>Chill Road.exe</kbd> dans le dossier «&nbsp;Chill Road&nbsp;».</li>
+          <li>Si Windows affiche «&nbsp;Windows a protégé votre ordinateur&nbsp;», clique sur <b>Informations complémentaires</b> puis <b>Exécuter quand même</b>&nbsp;: le jeu n’est pas signé.</li>
+          <li>Une <b>manette</b> est conseillée. Le clavier marche aussi, en AZERTY comme en QWERTY.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Chill Road · un projet de TauMah, réalisé avec l’IA (Claude, via Claude Code).</span>
+    <span>v0.1.0 · 17 novembre 2026</span>
+  </div>
+</footer>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Image agrandie">
+  <img alt="">
+  <p></p>
+</div>
+
+<script>
+  const header = document.getElementById('top');
+  const onScroll = () => header.classList.toggle('solid', window.scrollY > 40);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  const box = document.getElementById('lightbox');
+  const boxImg = box.querySelector('img');
+  const boxCap = box.querySelector('p');
+  let opener = null;
+  document.querySelectorAll('.shot').forEach(b => b.addEventListener('click', () => {
+    opener = b;
+    boxImg.src = b.dataset.full;
+    boxImg.alt = b.querySelector('img').alt;
+    boxCap.textContent = b.dataset.cap;
+    box.classList.add('open');
+    box.tabIndex = -1; box.focus();
+  }));
+  const close = () => { box.classList.remove('open'); if (opener) opener.focus(); };
+  box.addEventListener('click', close);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && box.classList.contains('open')) close(); });
+</script>
+</body>
+</html>
