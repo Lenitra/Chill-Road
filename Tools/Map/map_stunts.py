@@ -1,4 +1,5 @@
-"""Cascades : tremplins posés au bord des routes (modèle « stunt_ramp » du pack alpin, Tools/Blender/alp_stunt.py).
+"""Cascades : tremplins posés au bord des routes (modèles « stunt_ramp_stone » et « stunt_ramp_road » du pack alpin,
+Tools/Blender/alp_stunt.py).
 
 Chaque tremplin est sur une bande de lancement goudronnée, à droite de la chaussée dans le sens de la marche : on quitte
 la route, on prend le tremplin et on retombe plus loin sur l'accotement aplani. Le jeu (StuntJumps.cs) valide la
@@ -6,11 +7,15 @@ cascade quand la distance parcourue en l'air atteint « target » ; la prime « 
 
 Un site est donné par un point proche de la route et un cap approximatif : l'arête, l'abscisse et le sens sont
 retrouvés sur le réseau (les identifiants d'arêtes peuvent changer, pas les lieux).
+
+Habillage selon l'environnement (style) : ouvrage routier en béton au bord de l'autoroute et près des villages, remblai
+de pierres sèches et de terre ailleurs (campagne, routes de col). Un site peut imposer le sien.
 """
 import math
 import numpy as np
 
-RAMP = "stunt_ramp"
+RAMPS = {"stone": "stunt_ramp_stone", "road": "stunt_ramp_road"}
+URBAN = 250.0            # en deçà de cette distance du bord d'un village : habillage routier
 RAMP_L = 17.0            # longueur du tablier (m) : entrée au sol → nez (comme alp_stunt.py)
 RAMP_W = 5.6             # largeur hors tout
 GAP = 1.4                # entre le bord de la chaussée et le flanc du tremplin
@@ -20,11 +25,17 @@ PAVED_AFTER = 14.0       # goudron après le nez (le reste de la réception est 
 UNDER = 0.3              # comme map_roads.UNDER : le sol passe 30 cm sous la chaussée
 
 # id, noms, point près de la route (x, z), cap approximatif (dx, dz), distance à franchir (m), prime ($)
+# (+ habillage imposé en option : "stone" ou "road" ; sinon choisi par style())
 SITES = [
     ("plan", "Saut du Plan", "Le Plan Jump", (689.0, -1757.9), (1.0, 0.1), 8.0, 500),
+    ("pres", "Saut des Prés", "Meadows Jump", (2067.0, 441.3), (0.0, 1.0), 15.0, 900),
+    ("chenal", "Saut de La Chenal", "La Chenal Jump", (-1810.8, 595.5), (0.0, 1.0), 20.0, 1200),
     ("granges", "Saut des Granges", "Les Granges Jump", (1696.9, -409.3), (0.2, 1.0), 25.0, 1500),
+    ("col", "Saut du Col", "Pass Jump", (440.8, 551.8), (-1.0, -0.1), 30.0, 2000),
     ("petit_pas", "Saut du Petit Pas", "Petit Pas Jump", (1460.9, 1749.6), (-1.0, 0.0), 40.0, 3000),
+    ("port", "Saut du Port", "Le Port Jump", (1564.0, -1926.2), (0.9, 0.4), 45.0, 3500),
     ("gorge", "Saut de la Gorge", "Gorge Jump", (-1893.6, -1019.0), (0.0, -1.0), 60.0, 6000),
+    ("plaine", "Saut de la Plaine", "Lowland Jump", (-619.9, -1751.3), (1.0, -0.1), 75.0, 9000),
     ("autoroute", "Saut de l'Autoroute", "Motorway Jump", (-497.4, 2130.9), (1.0, -0.1), 90.0, 12000),
 ]
 
@@ -119,10 +130,22 @@ def evaluate(g, H, edges, f, river=None, water=None):
     return dict(work=work, grade=grade, clear_max=float(clear.max()), drop=drop, s=float(s))
 
 
+def style(f):
+    """Habillage d'un site : « road » au bord de l'autoroute ou près d'un village, « stone » ailleurs (hameaux
+    compris : quelques fermes ne font pas un environnement bâti)."""
+    import map_def as D
+    if f["edge"]["kind"] == "highway":
+        return "road"
+    for v in D.VILLAGES:
+        if math.hypot(f["ox"] - v[2], f["oz"] - v[3]) < v[4] + URBAN:
+            return "road"
+    return "stone"
+
+
 def resolve(edges):
-    """Sites de SITES retrouvés sur le réseau : liste de cadres (frame) avec id, noms, target, reward."""
+    """Sites de SITES retrouvés sur le réseau : liste de cadres (frame) avec id, noms, target, reward, item."""
     out = []
-    for (sid, fr, en, (x, z), (hx, hz), target, reward) in SITES:
+    for (sid, fr, en, (x, z), (hx, hz), target, reward, *forced) in SITES:
         best = None
         for e in edges:
             if e["kind"] in ("ramp", "track"):
@@ -136,6 +159,8 @@ def resolve(edges):
         tx, tz = _tangent(e["pts"], i)
         f = frame(e, i, 1 if tx * hx + tz * hz >= 0 else -1, target)
         f.update(id=sid, fr=fr, en=en, reward=reward)
+        f["style"] = forced[0] if forced else style(f)
+        f["item"] = RAMPS[f["style"]]
         out.append(f)
     return out
 
@@ -186,13 +211,14 @@ def populate(P, sites):
         ys = [P.h(f["ox"] + f["rx"] * k, f["oz"] + f["rz"] * k) for k in (-RAMP_W / 2, 0.0, RAMP_W / 2)]
         f["y"] = min(ys) - 0.03
         f["yaw"] = yaw_of(f["tx"], f["tz"]) % 360.0
-        P.add(RAMP, mx, mz, f["yaw"], y=f["y"])
+        P.add(f["item"], mx, mz, f["yaw"], y=f["y"])
     return sites
 
 
 def clear(places, sites):
     """Retire de la liste les objets (panneaux, balises, bornes) posés dans une bande."""
-    keep = [p for p in places if p["item"] == RAMP or not any(inside(f, p["x"], p["z"]) for f in sites)]
+    ramps = set(RAMPS.values())
+    keep = [p for p in places if p["item"] in ramps or not any(inside(f, p["x"], p["z"]) for f in sites)]
     return keep, len(places) - len(keep)
 
 

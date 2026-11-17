@@ -5,8 +5,9 @@ using UnityEngine;
 namespace NoHesi
 {
     /// <summary>
-    /// Cascades uniques : des tremplins sont posés au bord des routes (carte générée, Tools/Map/map_stunts.py ; modèle
-    /// « stunt_ramp » du pack alpin). Chacun demande une distance à parcourir en l'air : la voiture décolle du
+    /// Cascades uniques : des tremplins sont posés au bord des routes (carte générée, Tools/Map/map_stunts.py ; modèles
+    /// « stunt_ramp_stone » en campagne et « stunt_ramp_road » près des villages et de l'autoroute, pack alpin).
+    /// Chacun demande une distance à parcourir en l'air : la voiture décolle du
     /// tremplin, et si elle retombe sur ses roues au moins <c>target</c> mètres plus loin, la cascade est réussie.
     /// Une cascade ne rapporte sa prime qu'une fois (versée directement au portefeuille, hors combo) ; ensuite le
     /// tremplin reste un saut comme un autre, et le jeu retient la meilleure distance.
