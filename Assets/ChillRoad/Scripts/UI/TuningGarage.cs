@@ -11,7 +11,7 @@ namespace ChillRoad
     /// haut à gauche : les pièces (<see cref="CarTuning"/>), puis les options de la pièce ouverte avec leur prix : niveaux
     /// (série, 1, 2, 3) ou types pour les pneus et les suspensions (origine, rallye, slick…). La caméra de l'atelier
     /// vient cadrer la pièce ; la fiche montre ce que l'option regardée change (performances, adhérence par surface
-    /// pour les pneus, réglages pour les suspensions, dont la hauteur de caisse essayée en direct sur la voiture).
+    /// pour les pneus, réglages pour les suspensions).
     /// Chaque option s'achète seule (le niveau 3 ne donne pas les niveaux 1 et 2) ; une option achetée, comme la pièce
     /// de série, se remonte ensuite gratuitement, autant de fois que l'on veut. Dernière entrée, la peinture : le nuancier de
     /// <see cref="CarPaint"/>, essayé en direct sur la voiture de l'atelier ; une couleur achetée se remet gratuitement.
@@ -400,10 +400,6 @@ namespace ChillRoad
                 }
             }
 
-            // Hauteur de caisse de la voiture de l'atelier : la suspension regardée, sinon celle montée
-            int suspLook = part == (int)CarTuning.Part.Suspension && shown >= 0 ? shown : CarTuning.Level(spec, CarTuning.Part.Suspension);
-            stage.RideHeight(CarTuning.SuspensionOf(new VehicleSpec { suspension = suspLook }).drop);
-
             if (shown < 0) return;
             bool pad = GameInput.UsingGamepad;
             string ok = pad ? "A" : Loc.T("Entrée", "Enter");
@@ -480,8 +476,8 @@ namespace ChillRoad
                 { "Neige", "Snow" }, { "Hors route", "Off-road" }, { "Tenue en glisse", "Grip while sliding" },
             },
             {
-                { "Raideur des ressorts", "Spring rate" }, { "Amortissement", "Damping" }, { "Antiroulis", "Anti-roll" },
-                { "Débattement", "Travel" }, { "Hauteur de caisse", "Ride height" }, { "Braquage", "Steering lock" },
+                { "Raideur des ressorts", "Spring rate" }, { "Antiroulis", "Anti-roll" }, { "Débattement", "Travel" },
+                { "Tenue sur goudron", "Grip on tarmac" }, { "Tenue sur terre", "Grip on dirt" }, { "Braquage", "Steering lock" },
             },
         };
 
@@ -511,10 +507,10 @@ namespace ChillRoad
                 switch (i)
                 {
                     case 0: return 100f / u.sag;
-                    case 1: return 100f * u.damp;
-                    case 2: return 100f * u.arb;
-                    case 3: return 30f * u.travel;                 // débattement de base : 30 cm
-                    case 4: return -u.drop * 100f;                 // cm, par rapport à l'origine
+                    case 1: return 100f * u.arb;
+                    case 2: return 30f * u.travel;                 // débattement de base : 30 cm
+                    case 3: return 100f * u.smooth;                // adhérence relative, goudron
+                    case 4: return 100f * u.rough;                 // terre, neige, hors route
                     default: return s.steerLock;
                 }
             }
@@ -529,8 +525,11 @@ namespace ChillRoad
             }
         }
 
-        /// <summary>Longueur de barre d'une valeur : la hauteur de caisse (écart, négatif possible) part de 6 cm.</summary>
-        static float Bar(int mode, int i, float v) => mode == 2 && i == 4 ? 6f + v : v;
+        /// <summary>
+        /// Longueur de barre d'une valeur. Tenue sur goudron / terre (85 à 110 %) : la barre part de 80 % pour que
+        /// l'écart entre les réglages se voie.
+        /// </summary>
+        static float Bar(int mode, int i, float v) => mode == 2 && (i == 3 || i == 4) ? v - 80f : v;
 
         static string Format(int mode, int i, float v)
         {
@@ -538,8 +537,7 @@ namespace ChillRoad
             if (mode == 2)
                 switch (i)
                 {
-                    case 3: return Loc.F($"{v:0} cm");
-                    case 4: return Mathf.Abs(v) < 0.05f ? Loc.T("d'origine", "stock") : Loc.F($"{v:+0.0;-0.0} cm");
+                    case 2: return Loc.F($"{v:0} cm");
                     case 5: return Loc.F($"{v:0}°");
                     default: return Loc.F($"{v:0} %");
                 }

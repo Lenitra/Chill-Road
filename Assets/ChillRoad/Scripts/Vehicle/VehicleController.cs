@@ -190,7 +190,7 @@ namespace ChillRoad
         // Pneus : glissement au pic et adhérence en glisse de la surface courante
         float sPeak = 0.13f, slideMu = 0.8f;
         // Réglages de la voiture montée : suspension et pneus choisis au garage (CarTuning) appliqués aux réglages de base
-        float travel = 0.3f, sag = 0.055f, arb = 1.6f, drop;
+        float travel = 0.3f, sag = 0.055f, arb = 1.6f;
         CarTuning.TireProfile tire;
         CarTuning.SuspensionProfile susp;
         float lastSlipAngle, slipRate;
@@ -218,7 +218,6 @@ namespace ChillRoad
             travel = suspensionTravel * susp.travel;
             sag = staticSag * susp.sag;
             arb = antiRoll * susp.arb;
-            drop = susp.drop;
             if (model) { model.gameObject.SetActive(false); Destroy(model.gameObject); }
             var pivot = new GameObject("Model").transform;
             pivot.SetParent(transform, false);
@@ -337,9 +336,9 @@ namespace ChillRoad
                 var mf = visual.GetComponentInChildren<MeshFilter>();
                 if (mf && mf.sharedMesh) w.radius = Mathf.Max(0.1f, mf.sharedMesh.bounds.extents.y * mf.transform.lossyScale.y);
             }
-            // L'ancrage est au-dessus du centre de roue : à l'enfoncement statique la roue retombe à sa place (plus haut
-            // dans la caisse si la suspension l'abaisse : la caisse descend d'autant)
-            w.mount = center + Vector3.up * (travel - sag + drop);
+            // L'ancrage est au-dessus du centre de roue : à l'enfoncement statique la roue retombe à sa place (la caisse
+            // garde sa hauteur quelle que soit la suspension)
+            w.mount = center + Vector3.up * (travel - sag);
             w.compression = w.prevCompression = sag;
             wheels.Add(w);
         }
@@ -894,7 +893,7 @@ namespace ChillRoad
             if (Remote)
             {
                 // Voiture d'un autre joueur : roue à sa place de repos, glisse de son essieu reçue du réseau
-                point = transform.TransformPoint(w.mount) - transform.up * (travel - sag + drop + w.radius);
+                point = transform.TransformPoint(w.mount) - transform.up * (travel - sag + w.radius);
                 normal = transform.up;
                 skid = remoteGrounded ? (w.front ? SkidFront : SkidRear) : 0f;
                 return remoteGrounded;

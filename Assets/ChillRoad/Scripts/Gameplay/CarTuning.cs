@@ -73,18 +73,17 @@ namespace ChillRoad
         /// <summary>
         /// Suspension : multiplicateurs des réglages de la conduite (<see cref="VehicleController"/>).
         /// sag : enfoncement statique (moins = ressorts plus raides) ; damp : amortissement ; arb : barres antiroulis ;
-        /// travel : débattement ; drop : caisse abaissée (m, négatif = relevée) ; steer : braquage en plus (degrés) ;
-        /// smooth / rough : adhérence sur chaussée lisse / sur terre, neige et hors route (roues qui suivent le sol).
+        /// travel : débattement ; steer : braquage en plus (degrés) ; smooth / rough : adhérence sur chaussée lisse / sur terre, neige et hors route (roues qui suivent le sol).
         /// </summary>
-        public struct SuspensionProfile { public float sag, damp, arb, travel, drop, steer, smooth, rough; }
+        public struct SuspensionProfile { public float sag, damp, arb, travel, steer, smooth, rough; }
 
         static readonly SuspensionProfile[] Suspensions =
         {
-            new SuspensionProfile { sag = 1f,    damp = 1f,    arb = 1f,    travel = 1f,    drop = 0f,     steer = 0f,  smooth = 1f,    rough = 1f },    // origine
-            new SuspensionProfile { sag = 0.8f,  damp = 1.12f, arb = 1.3f,  travel = 0.9f,  drop = 0.025f, steer = 0f,  smooth = 1.02f, rough = 0.97f }, // sport
-            new SuspensionProfile { sag = 0.6f,  damp = 1.3f,  arb = 1.7f,  travel = 0.72f, drop = 0.05f,  steer = 0f,  smooth = 1.04f, rough = 0.88f }, // piste
-            new SuspensionProfile { sag = 1.3f,  damp = 0.95f, arb = 0.75f, travel = 1.4f,  drop = -0.045f, steer = 0f, smooth = 0.98f, rough = 1.1f },  // rallye
-            new SuspensionProfile { sag = 0.75f, damp = 1.2f,  arb = 1.5f,  travel = 0.85f, drop = 0.035f, steer = 14f, smooth = 1f,    rough = 0.95f }, // drift
+            new SuspensionProfile { sag = 1f,    damp = 1f,    arb = 1f,    travel = 1f,    steer = 0f,  smooth = 1f,    rough = 1f },    // origine
+            new SuspensionProfile { sag = 0.8f,  damp = 1.12f, arb = 1.3f,  travel = 0.9f,  steer = 0f,  smooth = 1.02f, rough = 0.97f }, // sport
+            new SuspensionProfile { sag = 0.6f,  damp = 1.3f,  arb = 1.7f,  travel = 0.72f, steer = 0f,  smooth = 1.04f, rough = 0.88f }, // piste
+            new SuspensionProfile { sag = 1.3f,  damp = 0.95f, arb = 0.75f, travel = 1.4f,  steer = 0f,  smooth = 0.98f, rough = 1.1f },  // rallye
+            new SuspensionProfile { sag = 0.75f, damp = 1.2f,  arb = 1.5f,  travel = 0.85f, steer = 14f, smooth = 1f,    rough = 0.95f }, // drift
         };
 
         public static TireProfile TireOf(VehicleSpec s) => Tires[Mathf.Clamp(s != null ? s.tires : 0, 0, TypeCount - 1)];
@@ -116,7 +115,7 @@ namespace ChillRoad
                 case Part.Brakes: return Loc.T("+12 % de freinage par niveau", "+12% braking per level");
                 case Part.Weight: return Loc.T("-4 % de poids par niveau", "-4% weight per level");
                 case Part.Aero: return Loc.T("Plus d'appui, moins de traînée", "More downforce, less drag");
-                default: return Loc.T("Cinq réglages : fermeté, hauteur, braquage", "Five setups: stiffness, ride height, lock");
+                default: return Loc.T("Cinq réglages : fermeté, débattement, braquage", "Five setups: stiffness, travel, lock");
             }
         }
 
@@ -165,9 +164,9 @@ namespace ChillRoad
             if (p == Part.Suspension)
                 switch (i)
                 {
-                    case SuspSport: return Loc.T("Plus ferme et plus basse : moins de roulis", "Firmer and lower: less body roll");
-                    case SuspTrack: return Loc.T("Très ferme, au ras du sol : faite pour le goudron", "Very stiff and slammed: made for tarmac");
-                    case SuspRally: return Loc.T("Souple et relevée : avale les bosses et la terre", "Soft and raised: soaks up bumps and dirt");
+                    case SuspSport: return Loc.T("Plus ferme : moins de roulis, plus vive", "Firmer: less body roll, sharper");
+                    case SuspTrack: return Loc.T("Très ferme : faite pour le goudron, sèche sur la terre", "Very stiff: made for tarmac, harsh on dirt");
+                    case SuspRally: return Loc.T("Souple, grand débattement : avale bosses et terre", "Soft, long travel: soaks up bumps and dirt");
                     case SuspDrift: return Loc.T("Ferme, avec un grand angle de braquage", "Stiff, with extra steering lock");
                     default: return Loc.T("Réglage d'usine, confortable", "Factory setup, comfortable");
                 }
