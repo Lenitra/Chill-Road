@@ -78,13 +78,14 @@ namespace ChillRoad
             float dirt = car.OnRoad ? car.SurfaceDirt : 0.35f;
             float grounded = car.GroundedWheels > 0 ? 1f : 0f;
             float dust = grounded * dirt * (1f - car.Wetness * 0.8f) * (speed01 * 70f + car.SkidAmount * 50f);
-            float spray = grounded * car.Wetness * (car.OnRoad ? 1f - car.SurfaceDirt * 0.6f : 0.3f) * (Mathf.Clamp01((car.Speed - 8f) / 30f) * 80f + car.SkidAmount * 40f);
+            // Gerbe d'eau discrète : un voile léger derrière la voiture, sans masquer la route
+            float spray = grounded * car.Wetness * (car.OnRoad ? 1f - car.SurfaceDirt * 0.6f : 0.3f) * (Mathf.Clamp01((car.Speed - 8f) / 30f) * 30f + car.SkidAmount * 16f);
             // Neige : gerbe blanche soulevée par les roues, plus fournie en glisse et hors de la chaussée
             float powder = grounded * car.SurfaceSnow * (car.OnRoad ? 0.7f : 1.3f) * (speed01 * 80f + car.SkidAmount * 90f);
             dust *= 1f - car.SurfaceSnow;
             emission.rateOverTime = dust + spray + powder;
             Color dustColor = car.OnRoad ? new Color(0.62f, 0.54f, 0.42f) : new Color(0.5f, 0.47f, 0.36f);
-            Color c = Color.Lerp(dustColor, new Color(0.8f, 0.83f, 0.87f, 0.5f), spray / Mathf.Max(1f, dust + spray));
+            Color c = Color.Lerp(dustColor, new Color(0.8f, 0.83f, 0.87f, 0.3f), spray / Mathf.Max(1f, dust + spray));
             main.startColor = Color.Lerp(c, new Color(0.96f, 0.97f, 1f, 0.8f), powder / Mathf.Max(1f, dust + spray + powder));
         }
     }
