@@ -189,8 +189,6 @@ namespace ChillRoad
             veil.raycastTarget = false;
 
             loadingLogo = Logo(panel, new Vector2(0.5f, 0.8f), 128, true, out loadingLogoGroup);
-            var tagline = Label(loadingLogo, 26, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.8f), FontStyle.Italic, new Vector2(0.5f, 0f), new Vector2(0f, -26f), new Vector2(1200, 40));
-            Loc.Bind(tagline, "Une vallée alpine, un col, des lacets : roule à ton rythme.", "An alpine valley, a mountain pass, hairpins: drive at your own pace.");
 
             // Bas de l'écran : astuce sur sa plaque, puis étape, pourcentage et barre
             var box = Rect(panel, "Progress", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(-660f, 56f), new Vector2(660f, 236f));
