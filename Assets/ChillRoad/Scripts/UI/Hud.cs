@@ -147,15 +147,16 @@ namespace ChillRoad
         // Tuiles du menu (pictogramme, nom, détail) ; la voiture ouvre le garage (CarPicker)
         class PauseTile { public Button button; public HudShape plate; public HudIcon icon; public Text label, sub; public float on; }
         readonly List<PauseTile> pauseTiles = new List<PauseTile>();
-        PauseTile carTile, timeTile, inviteTile;
+        PauseTile carTile, timeTile, inviteTile, trophyTile;
         CarPicker picker;
+        AchievementsMenu achievementsMenu;
         static readonly Color TileNormal = new Color(0.13f, 0.15f, 0.19f, 0.96f);
         static readonly Color TileOff = new Color(0.09f, 0.1f, 0.12f, 0.9f);
         static readonly Color TileGold = new Color(0.95f, 0.62f, 0.12f, 1f);
         static readonly Color Ink = new Color(0.06f, 0.07f, 0.09f);
         static readonly Color InkDim = new Color(0.06f, 0.07f, 0.09f, 0.72f);
         static readonly Color Muted = new Color(0.46f, 0.48f, 0.52f);
-        const float HeroH = 124f, MidH = 236f, ExitH = 100f, RowGap = 14f;
+        const float HeroH = 124f, MidH = 196f, SetH = 96f, ExitH = 84f, RowGap = 14f;
         float netRefresh, inviteCopied = -10f, inviteClock;
         string inviteAnnounced;
         /// <summary>
@@ -215,6 +216,9 @@ namespace ChillRoad
             BuildBottomLeft();
             BuildPause();
             gameObject.AddComponent<CheatCodes>().Init(gm);
+            // Succès : suivi en jeu, notification en bas à droite (et son carillon)
+            gameObject.AddComponent<Achievements>().Init(gm);
+            gameObject.AddComponent<AchievementToast>().Init();
 
             // Gains : la cagnotte en jeu réagit, une ligne discrète nomme le gain ; accident : flash rouge
             slot.Score.NearMiss += (pts, gap) =>
@@ -760,8 +764,8 @@ namespace ChillRoad
         // ------------------------------------------------------------------ pause
 
         /// <summary>
-        /// Menu pause en tuiles (pictogramme + nom + détail) : Reprendre (et Inviter, hôte d'une partie en réseau) ;
-        /// Voiture (ouvre le garage), Heure, Options ; Menu principal, Quitter. Contrôles à droite.
+        /// Menu pause en tuiles (pictogramme + nom + détail), par groupes : Reprendre (et Inviter, hôte d'une partie en
+        /// réseau) ; Voiture (ouvre le garage), Carte, Succès ; Options, Heure ; Menu principal, Quitter. Contrôles à droite.
         /// </summary>
         void BuildPause()
         {
@@ -793,15 +797,19 @@ namespace ChillRoad
             // Hôte : copie le code d'invitation dans le presse-papiers (ou en demande un s'il n'y en a pas)
             inviteTile = Tile(hero, HeroH, HudIcon.Kind.Invite, "Inviter", "Invite", true, 1f, InviteAction);
 
+            // Garage, monde et progression
             var mid = TileRow(box, MidH);
             carTile = Tile(mid, MidH, HudIcon.Kind.Car, "Voiture", "Car", false, 1f, OpenPicker);
-            // L'heure d'une partie rejointe est celle du serveur
-            timeTile = Tile(mid, MidH, HudIcon.Kind.Clock, "Heure", "Time", false, 1f,
-                () => { if (!(game.Net && game.Net.IsClient)) game.DayNight.Advance(3f); RefreshPause(); });
             var map = Tile(mid, MidH, HudIcon.Kind.Map, "Carte", "Map", false, 1f, OpenMap);
             Loc.Bind(map.sub, "Lieux, courses, GPS", "Places, races, GPS");
-            var options = Tile(mid, MidH, HudIcon.Kind.Gear, "Options", "Options", false, 1f, OpenOptions);
+            trophyTile = Tile(mid, MidH, HudIcon.Kind.Trophy, "Succès", "Achievements", false, 1f, OpenAchievements);
+
+            // Réglages : options, heure (celle d'une partie rejointe est celle du serveur)
+            var settings = TileRow(box, SetH);
+            var options = Tile(settings, SetH, HudIcon.Kind.Gear, "Options", "Options", true, 1f, OpenOptions);
             Loc.Bind(options.sub, "Son, jeu, graphismes", "Sound, game, graphics");
+            timeTile = Tile(settings, SetH, HudIcon.Kind.Clock, "Heure", "Time", true, 1f,
+                () => { if (!(game.Net && game.Net.IsClient)) game.DayNight.Advance(3f); RefreshPause(); });
 
             var exits = TileRow(box, ExitH);
             var home = Tile(exits, ExitH, HudIcon.Kind.Home, "Menu principal", "Main menu", true, 1f, game.ReturnToTitle);
@@ -1022,6 +1030,8 @@ namespace ChillRoad
             timeTile.sub.text = client
                 ? Loc.T($"{game.DayNight.Clock}  ·  réglée par l'hôte", $"{game.DayNight.Clock}  ·  set by the host")
                 : Loc.F($"{game.DayNight.Clock}  ·  +3 h");
+            int got = Achievements.UnlockedCount, total = Achievements.All.Length;
+            trophyTile.sub.text = Loc.F($"{got} / {total} obtenus", $"{got} / {total} unlocked");
             // En réseau, rien ne s'arrête : c'est un menu, pas une pause
             pauseTitle.text = online ? "MENU" : "PAUSE";
             RefreshNet();
@@ -1070,8 +1080,8 @@ namespace ChillRoad
                 netLabel.text = first + "\n" + (invite.Length > 0 ? invite + "\n" : "") + collisions;
                 netLayout.preferredHeight = lines * 28f;
             }
-            // Hauteur de la plaque : marges, titre, ligne d'état (en réseau), trois rangées de tuiles et leurs espaces
-            float height = 60f + 90f + HeroH + MidH + ExitH + RowGap * 3f + (online ? lines * 28f + RowGap : 0f);
+            // Hauteur de la plaque : marges, titre, ligne d'état (en réseau), quatre rangées de tuiles et leurs espaces
+            float height = 60f + 90f + HeroH + MidH + SetH + ExitH + RowGap * 4f + (online ? lines * 28f + RowGap : 0f);
             pauseBox.offsetMin = new Vector2(pauseBox.offsetMin.x, -height * 0.5f);
             pauseBox.offsetMax = new Vector2(pauseBox.offsetMax.x, height * 0.5f);
         }
@@ -1114,6 +1124,24 @@ namespace ChillRoad
             WorldMap.Toggle();
         }
 
+        /// <summary>Écran des succès depuis la pause : le panneau de pause revient à la fermeture, sur la tuile Succès.</summary>
+        void OpenAchievements()
+        {
+            if (!achievementsMenu)
+            {
+                achievementsMenu = gameObject.AddComponent<AchievementsMenu>();
+                achievementsMenu.Init();
+            }
+            pausePanel.SetActive(false);
+            achievementsMenu.Open(() =>
+            {
+                pausePanel.SetActive(true);
+                openedFrame = Time.frameCount;
+                RefreshPause();
+                EventSystem.current?.SetSelectedGameObject(trophyTile.button.gameObject);
+            });
+        }
+
         /// <summary>Options depuis la pause : le panneau de pause revient à la fermeture.</summary>
         void OpenOptions()
         {
@@ -1129,11 +1157,12 @@ namespace ChillRoad
 
         void UpdatePause()
         {
-            if (OptionsMenu.IsOpen || Dealership.IsOpen || TuningGarage.IsOpen || RaceSetup.IsOpen || CarPicker.IsOpen || game.Demo || GameManager.DedicatedServer) return;
+            if (OptionsMenu.IsOpen || Dealership.IsOpen || TuningGarage.IsOpen || RaceSetup.IsOpen || CarPicker.IsOpen || AchievementsMenu.IsOpen
+                || game.Demo || GameManager.DedicatedServer) return;
             // Carte globale ouverte (ou tout juste fermée par Échap) : la pause attend
             if (WorldMap.IsOpen || Time.frameCount == WorldMap.ChangedFrame || Time.frameCount == Dealership.ChangedFrame
                 || Time.frameCount == TuningGarage.ChangedFrame || Time.frameCount == RaceSetup.ChangedFrame
-                || Time.frameCount == CarPicker.ChangedFrame) return;
+                || Time.frameCount == CarPicker.ChangedFrame || Time.frameCount == AchievementsMenu.ChangedFrame) return;
             if (Time.frameCount == openedFrame || game.State != GameManager.Phase.Playing) return;
             if (!Paused && GameInput.PausePressed) SetPaused(true);
             else if (Paused && (GameInput.PausePressed || GameInput.CancelPressed)) SetPaused(false);
