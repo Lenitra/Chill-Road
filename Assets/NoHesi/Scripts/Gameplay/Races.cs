@@ -143,7 +143,7 @@ namespace NoHesi
                 id = "rives", fr = "Boucle des Rives", en = "Lakeshore Loop", laps = 2, spacing = 600f, heading = new Vector2(0.99f, 0.12f), side = 0,
                 points = new[] { new Vector2(542.7f, -1776.2f), new Vector2(1430.4f, -1939.0f), new Vector2(1116.1f, -2176.9f), new Vector2(349.9f, -1927.7f) },
             },
-            // Tours : route de la vallée vers le Villard, chemin de la Gorge sous le viaduc, retour par l'échangeur ouest (≈ 2,7 km)
+            // Tours : route de la vallée vers le Villard, chemin de la Gorge sous l'autoroute (passage inférieur), retour par l'échangeur ouest (≈ 2,7 km)
             new Def
             {
                 id = "gorge", fr = "Boucle de la Gorge", en = "Gorge Loop", laps = 3, spacing = 450f, heading = new Vector2(-0.17f, -0.99f), side = -1,

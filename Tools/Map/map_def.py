@@ -488,10 +488,30 @@ def roads(net):
     # aux Rives, le chemin arrive d'équerre, par le sud (côté montagne) : la route du lac y fait un coude
     land(k_, "h_rives", (ez_, -ex_) if ex_ > 0 else (-ez_, ex_), **TR)
 
-    # Chemin de la Gorge : de la route du Villard, sous le viaduc de l'autoroute, puis au pied du versant extérieur
-    # jusqu'à l'échangeur ouest
-    q_ = net.road("chemin_gorge", "track", "r_villard", smooth=12.0)
+    # Chemin de la Gorge : de la route du Villard, sous l'autoroute par un passage inférieur, puis au pied du versant
+    # extérieur jusqu'à l'échangeur ouest. Le passage croise l'autoroute d'équerre, au pied du versant : l'autoroute y
+    # monte de 3 m en remblai (pas plus : à 3 m au-dessus du sol, elle commencerait là le viaduc de la gorge) et le
+    # chemin descend en tranchée, plus bas côté versant où le sol remonte vite, dans un tube de 40 m : gabarit de 5 m,
+    # dalle, puis la chaussée de l'autoroute.
+    AP = au.spline()
+    AT = L.tangents(AP)
+    i = int(np.argmin(np.hypot(AP[:, 0] + 2058.0, AP[:, 1] + 381.0)))
+    cx, cz = float(AP[i, 0]), float(AP[i, 1])
+    wx, wz = float(AT[i, 1]), float(-AT[i, 0])            # d'équerre, vers l'ouest (le versant)
+    if wx > 0:
+        wx, wz = -wx, -wz
+
+    def across(u):
+        """Point à u mètres de l'axe de l'autoroute, d'équerre (u > 0 : côté versant)."""
+        return (cx + wx * u, cz + wz * u)
+    # remblai centré un peu au nord (en amont) du passage : au sud, l'autoroute retrouve le sol avant le viaduc
+    lifts.append((cx - float(AT[i, 0]) * 15.0, cz - float(AT[i, 1]) * 15.0, 3.0, 40.0, 140.0))
+    q_ = net.road("chemin_gorge", "track", "r_villard", smooth=12.0,
+                  lift=[across(0.0) + (-4.5, 24.0, 60.0), across(22.0) + (-4.0, 8.0, 40.0)])
     q_.to(*stub("r_villard", -1.0))
+    q_.route(across(-48.0), goal_heading=(wx, wz), label="chemin_gorge>passage", **TR)
+    q_.to(across(-20.0), across(20.0)).bridge(1, "underpass")
+    q_.to(across(34.0))
     # par le haut du versant (sinon le chemin longe l'autoroute), arrivée en biais par le sud-ouest
     q_.route((-2330, -120), label="chemin_gorge>versant", **TR)
     ux, uz = overpass_out("ech_o")

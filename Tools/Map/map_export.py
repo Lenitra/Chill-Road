@@ -196,12 +196,18 @@ def export(g, H, info, nodes, edges, water, edge, rgba, paved, snow, places=(), 
 
         def st(v):
             return r2(np.interp(v, e["s"], s3))
+
+        def span(a, b, k):
+            d = dict(s0=st(a), s1=st(b), kind=k)
+            if k == "tunnel" and R.underpass(e, a, b):
+                d["roof"] = R.UNDERPASS_ROOF       # coque mince (RoadNetwork : dalle au-dessus du gabarit)
+            return d
         return dict(id=e["id"], kind=e["kind"], a=e["a"], b=e["b"], hw=e["hw"], lane=e["lane"], sidewalk=e["sidewalk"],
                     dirt=e["dirt"], speed=e["speed"], lanes=e.get("lanes", 1), median=e.get("median", 0.0),
                     oneway=e.get("oneway", 0),
                     pts=[r2(v) for q in P for v in (q[0], q[2], q[1])],
                     rail=[int(v) for v in e["rail"]],
-                    spans=[dict(s0=st(a), s1=st(b), kind=k) for (a, b, k) in e["spans"]],
+                    spans=[span(a, b, k) for (a, b, k) in e["spans"]],
                     aux=[dict(sa=st(sa), sb=st(sb), side=int(side), width=r2(w)) for (sa, sb, side, w) in e.get("aux", ())])
     data = dict(
         n=g.n, step=g.step, half=g.half, hmin=hmin, hmax=hmax,

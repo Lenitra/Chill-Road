@@ -33,6 +33,17 @@ def tunnel_height(kind):
     return TUNNEL_H.get(kind, TUNNEL_H_DEFAULT)
 
 
+# Passage inférieur (Path.bridge(..., "underpass")) : tunnel court sous le remblai d'une autre route, gardé tel que
+# tracé (pas de couverture minimale de relief). Sa coque n'a qu'une dalle de cette épaisseur au-dessus du gabarit
+# (RoadNetwork.TunnelRoof pour un tunnel sous la montagne) : la route du dessus passe à gabarit + dalle + 0,3 m.
+UNDERPASS_ROOF = 1.0
+
+
+def underpass(e, s0, s1):
+    """La travée [s0, s1] de l'arête est-elle un passage inférieur ?"""
+    return any(abs(s0 - a) < 0.5 and abs(s1 - b) < 0.5 for (a, b) in e.get("underpass", ()))
+
+
 DS = 2.5                      # pas des profils (m)
 UNDER = 0.3                   # le relief passe sous la chaussée
 CUT_FLAT, CUT_SLOPE = 4.6, 1.05      # plat > accotement + pas de grille : le sol ne remonte pas dessus
@@ -354,7 +365,9 @@ class Path:
         return self
 
     def bridge(self, back=1, kind="bridge"):
-        """Marque le tronçon entre les « back » derniers points de contrôle comme pont (pas de terrassement)."""
+        """Marque le tronçon entre les « back » derniers points de contrôle comme pont (pas de terrassement), tunnel
+        (kind = "tunnel" : calé ensuite là où le relief couvre le tube) ou passage inférieur (kind = "underpass" :
+        tunnel gardé tel quel, sous le remblai d'une autre route ; voir UNDERPASS_ROOF)."""
         self.bridges.append((len(self.ctrl) - 1 - back, len(self.ctrl) - 1, kind))
         return self
 
@@ -417,7 +430,7 @@ def _refine_spans(g, H, e, ha, hb):
         prof = solve_profile(e, ha, hb, pin=False)
         spans = []
         for (s0, s1, kind) in e["spans"]:
-            if kind not in ("tunnel", "viaduct"):
+            if kind not in ("tunnel", "viaduct") or underpass(e, s0, s1):
                 spans.append([s0, s1, kind])
                 continue
             # ce qui manque encore pour être un tunnel (couverture) ou un viaduc (hauteur libre)
@@ -541,15 +554,20 @@ def build_edges(net, rivers, lakes_level, verbose=True):
                 continue
             pts = P[a:b + 1].copy()
             spans = []
+            under = []
             for (p0, p1, kind) in spans_p:
                 q0, q1 = max(p0, a), min(p1, b)
                 if q1 > q0:
-                    spans.append([float(s[q0] - s[a]), float(s[q1] - s[a]), kind])
+                    span = [float(s[q0] - s[a]), float(s[q1] - s[a]), kind]
+                    if kind == "underpass":            # un tunnel pour tout le reste (tube, terrassement, trous)
+                        span[2] = "tunnel"
+                        under.append((span[0], span[1]))
+                    spans.append(span)
             aux = [[float(s[ia] - s[a]), float(s[ib] - s[a]), side, width] for (ia, ib, side, width) in aux_p
                    if a <= min(ia, ib) and max(ia, ib) <= b]
             eid = ch.id if len(cuts) == 2 else "%s_%d" % (ch.id, k + 1)
             edges.append(dict(id=eid, chain=ch.id, kind=ch.kind, a=na, b=nb, pts=pts, s=L.arclen(pts), spans=spans,
-                              aux=aux, opts=ch.opts, **{k2: v for k2, v in KINDS[ch.kind].items()}))
+                              underpass=under, aux=aux, opts=ch.opts, **{k2: v for k2, v in KINDS[ch.kind].items()}))
 
     # Ponts automatiques : franchissement des rivières
     for e in edges:

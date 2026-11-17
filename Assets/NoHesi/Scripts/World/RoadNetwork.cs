@@ -129,6 +129,16 @@ namespace NoHesi
                 return null;
             }
 
+            /// <summary>Épaisseur de la coque au-dessus du gabarit, dans le tunnel en s : la dalle d'un passage inférieur
+            /// (sous le remblai d'une autre route), sinon <see cref="TunnelRoof"/>.</summary>
+            public float RoofAt(float s)
+            {
+                if (spans != null)
+                    foreach (var sp in spans)
+                        if (s >= sp.s0 && s <= sp.s1 && sp.kind == "tunnel" && sp.roof > 0f) return sp.roof;
+                return TunnelRoof;
+            }
+
             public float LimitAt(float s) => limit[IndexAt(s)];
         }
 
@@ -580,6 +590,8 @@ namespace NoHesi
             public float s, curve;
             public int rail;
             public string span;
+            /// <summary>Épaisseur de la coque du tunnel au-dessus du gabarit (Edge.RoofAt).</summary>
+            public float roof;
             /// <summary>Largeur de la voie d'insertion à gauche et à droite de l'axe.</summary>
             public float auxL, auxR;
             public float Aux(float side) => side < 0f ? auxL : auxR;
@@ -616,7 +628,7 @@ namespace NoHesi
             void Add(float s)
             {
                 int i = e.IndexAt(s);
-                var sec = new Section { s = s, p = e.Evaluate(s, out var tangent, out var right), right = right, rail = e.rail[i], span = e.SpanAt(s) };
+                var sec = new Section { s = s, p = e.Evaluate(s, out var tangent, out var right), right = right, rail = e.rail[i], span = e.SpanAt(s), roof = e.RoofAt(s) };
                 if (e.aux != null) { sec.auxL = e.AuxWidth(s, -1); sec.auxR = e.AuxWidth(s, 1); }
                 // Courbure (1/m) : pour tracer la ligne d'axe continue dans les virages serrés
                 int a = Mathf.Max(i - 3, 0), b = Mathf.Min(i + 3, e.pts.Length - 1);
@@ -791,7 +803,9 @@ namespace NoHesi
 
                 if (tunnel)
                 {
-                    // Tube : parois et voûte vues de l'intérieur, trottoirs de service, coque vue de l'extérieur
+                    // Tube : parois et voûte vues de l'intérieur, trottoirs de service, coque vue de l'extérieur (dalle
+                    // mince sous une route en remblai : passage inférieur)
+                    tubeOutside[1].y = tubeOutside[2].y = hin + A.roof;
                     Extrude(tube, a, ra, b, rb, 0f, tubeInside);
                     Extrude(tube, a, ra, b, rb, 0f, tubeOutside);
                     Extrude(tube, a, ra, b, rb, 0f, curbRight);

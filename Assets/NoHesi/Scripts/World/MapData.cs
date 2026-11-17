@@ -24,7 +24,9 @@ namespace NoHesi
         /// (au nœud de la bretelle), biseau jusqu'à sb. side : +1 = à droite de l'axe (sens a → b), -1 = à gauche.
         /// </summary>
         [Serializable] public class AuxJson { public float sa, sb; public int side; public float width; }
-        [Serializable] public class SpanJson { public float s0, s1; public string kind; }
+        /// <summary>Ouvrage entre les abscisses s0 et s1 (pont, tunnel, barrage). roof : épaisseur de la coque d'un
+        /// tunnel au-dessus du gabarit, donnée pour un passage inférieur (dalle mince) ; 0 = RoadNetwork.TunnelRoof.</summary>
+        [Serializable] public class SpanJson { public float s0, s1; public string kind; public float roof; }
         [Serializable]
         public class EdgeJson
         {
