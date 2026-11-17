@@ -12,6 +12,8 @@ namespace ChillRoad
     /// Un succès obtenu déclenche <see cref="Unlocked"/> : la notification en bas à droite (<see cref="AchievementToast"/>)
     /// et son carillon. L'écran des succès s'ouvre depuis le menu pause (<see cref="AchievementsMenu"/>).
     /// Au premier lancement, ce que la sauvegarde prouve déjà (voitures, records, tremplins) est accordé sans notification.
+    /// Chaque succès rapporte une récompense en argent (<see cref="Def.Reward"/>), versée à l'obtention ; celles des succès
+    /// accordés en silence sont versées ensemble en jeu, avec une notification récapitulative.
     /// </summary>
     public class Achievements : MonoBehaviour
     {
@@ -42,7 +44,19 @@ namespace ChillRoad
             public string Description => Loc.T(descFr, descEn);
             /// <summary>Objectif à franchir en une fois (oui / non) : pas de barre de progression.</summary>
             public bool Single => goal <= 1f && scale == 1f && string.IsNullOrEmpty(unitFr);
+            /// <summary>Récompense versée au portefeuille à l'obtention ($).</summary>
+            public int Reward => Rewards.TryGetValue(id, out int r) ? r : 0;
         }
+
+        /// <summary>Récompense de chaque succès, selon sa difficulté (de 500 $ à 150 000 $).</summary>
+        static readonly Dictionary<string, int> Rewards = new Dictionary<string, int>
+        {
+            { "road_1km", 500 }, { "road_100km", 5000 }, { "road_1000km", 50000 }, { "road_night", 5000 }, { "road_rain", 5000 }, { "road_snow", 5000 },
+            { "speed_200", 2000 }, { "speed_300", 15000 }, { "speed_nm1", 500 }, { "speed_nm250", 10000 }, { "speed_extreme", 10000 }, { "speed_combo", 15000 },
+            { "style_drift", 500 }, { "style_drift500", 5000 }, { "style_jump", 500 }, { "style_air", 5000 }, { "style_stunt", 2500 }, { "style_stunts", 50000 },
+            { "race_1", 1000 }, { "race_10", 10000 }, { "race_pb", 2500 }, { "race_clean", 5000 }, { "race_5", 10000 }, { "race_all", 75000 },
+            { "career_10k", 2500 }, { "career_1m", 100000 }, { "career_car", 2500 }, { "career_cars", 150000 }, { "career_tune", 2500 }, { "career_online", 5000 },
+        };
 
         static Def D(string id, Category c, string fr, string en, string dfr, string den, Stat s, float goal,
             string ufr = null, string uen = null, float scale = 1f)
@@ -116,14 +130,17 @@ namespace ChillRoad
         const string UnlockKey = "chillroad_ach";          // « id:date unix, id:date… »
         const string StatsKey = "chillroad_ach_stats";     // compteurs séparés par « ; »
         const string RacesKey = "chillroad_ach_races";     // identifiants des courses terminées
+        const string PaidKey = "chillroad_ach_paid";       // succès dont la récompense a été versée
 
         static Dictionary<string, long> unlocked;
         static float[] stats;
-        static HashSet<string> racesDone;
+        static HashSet<string> racesDone, paid;
         static bool dirty;
 
-        /// <summary>Succès obtenu (définition) : notification et carillon.</summary>
+        /// <summary>Succès obtenu (définition) : notification et carillon. Sa récompense est déjà versée.</summary>
         public static event Action<Def> Unlocked;
+        /// <summary>Récompenses de succès obtenus auparavant (sauvegarde existante), versées d'un coup : nombre, montant.</summary>
+        public static event Action<int, int> BackPaid;
 
         static void Load()
         {
@@ -143,6 +160,9 @@ namespace ChillRoad
             racesDone = new HashSet<string>(StringComparer.Ordinal);
             foreach (var id in PlayerPrefs.GetString(RacesKey, "").Split(','))
                 if (!string.IsNullOrEmpty(id)) racesDone.Add(id);
+            paid = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var id in PlayerPrefs.GetString(PaidKey, "").Split(','))
+                if (!string.IsNullOrEmpty(id)) paid.Add(id);
         }
 
         static void Save()
@@ -156,6 +176,7 @@ namespace ChillRoad
             for (int i = 0; i < StatCount; i++) values[i] = stats[i].ToString("0.###", CultureInfo.InvariantCulture);
             PlayerPrefs.SetString(StatsKey, string.Join(";", values));
             PlayerPrefs.SetString(RacesKey, string.Join(",", racesDone));
+            PlayerPrefs.SetString(PaidKey, string.Join(",", paid));
             PlayerPrefs.Save();
         }
 
@@ -220,8 +241,40 @@ namespace ChillRoad
         {
             unlocked[d.id] = notify ? DateTimeOffset.UtcNow.ToUnixTimeSeconds() : 0L;
             dirty = true;
+            // Accordé en silence (déjà mérité dans la sauvegarde) : payé plus tard, en un récapitulatif (PayPending)
+            if (notify) Pay(d);
             Save();
             if (notify) Unlocked?.Invoke(d);
+        }
+
+        /// <summary>Verse la récompense d'un succès obtenu, une seule fois.</summary>
+        static bool Pay(Def d)
+        {
+            if (!paid.Add(d.id)) return false;
+            dirty = true;
+            if (d.Reward > 0) Wallet.Add(d.Reward);
+            return true;
+        }
+
+        /// <summary>Récompense versée pour ce succès.</summary>
+        public static bool IsPaid(Def d) { Load(); return paid.Contains(d.id); }
+
+        /// <summary>Total des récompenses déjà versées.</summary>
+        public static int RewardsEarned
+        {
+            get { Load(); int n = 0; foreach (var d in All) if (paid.Contains(d.id)) n += d.Reward; return n; }
+        }
+
+        /// <summary>Succès obtenus mais pas encore payés (sauvegarde d'avant les récompenses, accordés en silence) : tout est versé d'un coup.</summary>
+        static void PayPending()
+        {
+            Load();
+            int count = 0, cash = 0;
+            foreach (var d in All)
+                if (unlocked.ContainsKey(d.id) && Pay(d)) { count++; cash += d.Reward; }
+            if (count == 0) return;
+            Save();
+            BackPaid?.Invoke(count, cash);
         }
 
         /// <summary>Remet tous les succès et compteurs à zéro (outil de test).</summary>
@@ -230,6 +283,7 @@ namespace ChillRoad
             PlayerPrefs.DeleteKey(UnlockKey);
             PlayerPrefs.DeleteKey(StatsKey);
             PlayerPrefs.DeleteKey(RacesKey);
+            PlayerPrefs.DeleteKey(PaidKey);
             PlayerPrefs.Save();
             unlocked = null;
             Load();
@@ -346,6 +400,8 @@ namespace ChillRoad
                 CheckState(!catchUp);
                 // Premier passage : ce que la sauvegarde prouve déjà est accordé en silence
                 if (catchUp && game.Races && game.Races.All.Count > 0) catchUp = false;
+                // Récompenses en attente : versées en jeu, une fois le rattrapage fait (la notification se voit)
+                if (!catchUp && Counting) PayPending();
             }
             saveTimer -= Time.unscaledDeltaTime;
             if (saveTimer <= 0f) { saveTimer = 10f; Save(); }

@@ -27,6 +27,7 @@ namespace ChillRoad
         static readonly Color CardLocked = new Color(0.075f, 0.085f, 0.11f, 0.95f);
         static readonly Color CardDone = new Color(0.14f, 0.12f, 0.08f, 0.96f);
         static readonly Color MedalLocked = new Color(0.16f, 0.18f, 0.22f);
+        static readonly Color Money = new Color(0.5f, 1f, 0.6f);
 
         const float Slope = 0.14f;
         const float AreaW = 1760f, AreaH = 860f;
@@ -45,7 +46,7 @@ namespace ChillRoad
             public HudShape plate, edge, barBack, barFill;
             public Image medal;
             public HudIcon icon;
-            public Text title, desc, state, value;
+            public Text title, desc, state, value, reward;
         }
 
         Font font;
@@ -155,6 +156,9 @@ namespace ChillRoad
             c.title.text = d.Name;
             c.title.color = done ? White : new Color(0.85f, 0.87f, 0.9f);
             c.desc.text = d.Description;
+            // Récompense : verte une fois versée, dorée et discrète à obtenir
+            c.reward.text = d.Reward > 0 ? "+" + Wallet.Format(d.Reward) : "";
+            c.reward.color = done ? Money : new Color(Accent.r, Accent.g, Accent.b, 0.75f);
             if (done)
             {
                 var when = Achievements.UnlockDate(d);
@@ -187,8 +191,9 @@ namespace ChillRoad
             area.localScale = Vector3.one * fit;
 
             int got = Achievements.UnlockedCount, total = Achievements.All.Length;
-            countText.text = Loc.F($"{got} / {total} succès obtenus  ·  {Mathf.RoundToInt(100f * got / total)} %",
-                $"{got} / {total} achievements unlocked  ·  {Mathf.RoundToInt(100f * got / total)}%");
+            string earned = Wallet.Format(Achievements.RewardsEarned);
+            countText.text = Loc.F($"{got} / {total} succès obtenus  ·  {Mathf.RoundToInt(100f * got / total)} %  ·  {earned} gagnés",
+                $"{got} / {total} achievements unlocked  ·  {Mathf.RoundToInt(100f * got / total)}%  ·  {earned} earned");
             totalFill.localScale = new Vector3(Mathf.Max(0.004f, got / (float)total), 1f, 1f);
 
             // Onglets : le choisi passe à l'or (textes à l'encre)
@@ -353,6 +358,17 @@ namespace ChillRoad
             c.medal.sprite = HudArt.Disc;
             c.medal.raycastTarget = false;
             c.icon = Icon(mr, HudIcon.Kind.Lock, new Vector2(0.5f, 0.5f), Vector2.zero, 56f);
+            // Récompense sous la médaille
+            c.reward = Label(c.rt, 19, TextAnchor.MiddleCenter, Money, FontStyle.BoldAndItalic);
+            var rr = c.reward.rectTransform;
+            rr.anchorMin = rr.anchorMax = new Vector2(0f, 1f);
+            rr.pivot = new Vector2(0.5f, 0.5f);
+            rr.sizeDelta = new Vector2(130f, 26f);
+            rr.anchoredPosition = new Vector2(mx - 3f, my - 68f);
+            c.reward.horizontalOverflow = HorizontalWrapMode.Wrap;
+            c.reward.resizeTextForBestFit = true;
+            c.reward.resizeTextMinSize = 13;
+            c.reward.resizeTextMaxSize = 19;
 
             c.title = Place(Label(c.rt, 29, TextAnchor.MiddleLeft, White, FontStyle.BoldAndItalic), new Vector2(166f, -34f), new Vector2(CardW - 204f, 44f), CardH);
             c.title.horizontalOverflow = HorizontalWrapMode.Wrap;

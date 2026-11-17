@@ -7,7 +7,7 @@ namespace ChillRoad
     /// <summary>
     /// Notification d'un succès obtenu, en bas à droite (à gauche du compte-tours) : plaque inclinée qui glisse depuis le
     /// bord, médaille dorée au trophée qui claque, « SUCCÈS DÉBLOQUÉ », nom et description, liseré doré qui se vide
-    /// pendant l'affichage. Un carillon (arpège de cloches, synthétisé ici) l'accompagne. Les succès obtenus coup sur coup
+    /// pendant l'affichage, et la récompense versée en vert (« +5 000 $ »). Un carillon (arpège de cloches, synthétisé ici) l'accompagne. Les succès obtenus coup sur coup
     /// passent l'un après l'autre. Son propre canevas, au-dessus des menus (achat à la concession, garage…).
     /// </summary>
     public class AchievementToast : MonoBehaviour
@@ -17,6 +17,7 @@ namespace ChillRoad
         static readonly Color Gold = new Color(0.95f, 0.62f, 0.12f);
         static readonly Color Dim = new Color(1f, 1f, 1f, 0.62f);
         static readonly Color Plate = new Color(0.03f, 0.04f, 0.06f, 0.94f);
+        static readonly Color Money = new Color(0.5f, 1f, 0.6f);
 
         const float W = 500f, H = 116f, Slope = 0.14f;
         const float ShowTime = 5f, InTime = 0.45f, OutTime = 0.35f;
@@ -29,10 +30,12 @@ namespace ChillRoad
         HudShape stripe;
         Image glow;
         RectTransform medal;
-        Text kicker, title, detail;
+        Text kicker, title, detail, reward;
         AudioSource source;
         AudioClip chime;
-        readonly Queue<Achievements.Def> queue = new Queue<Achievements.Def>();
+        /// <summary>Notification en attente : textes déjà dans la langue en cours, récompense ($).</summary>
+        struct Entry { public string kicker, title, detail; public int reward; }
+        readonly Queue<Entry> queue = new Queue<Entry>();
         float t = -1f;
 
         public void Init()
@@ -46,16 +49,34 @@ namespace ChillRoad
             source.priority = 16;
             chime = MakeChime();
             Achievements.Unlocked += Enqueue;
+            Achievements.BackPaid += OnBackPaid;
         }
 
         void OnDestroy()
         {
             Achievements.Unlocked -= Enqueue;
+            Achievements.BackPaid -= OnBackPaid;
             if (panel) Destroy(panel.root.gameObject);
             if (chime) Destroy(chime);
         }
 
-        void Enqueue(Achievements.Def d) => queue.Enqueue(d);
+        void Enqueue(Achievements.Def d) => queue.Enqueue(new Entry
+        {
+            kicker = Loc.T("SUCCÈS DÉBLOQUÉ", "ACHIEVEMENT UNLOCKED"),
+            title = d.Name,
+            detail = d.Description,
+            reward = d.Reward,
+        });
+
+        /// <summary>Récompenses des succès obtenus avant leur création : un récapitulatif.</summary>
+        void OnBackPaid(int count, int cash) => queue.Enqueue(new Entry
+        {
+            kicker = Loc.T("RÉCOMPENSES DES SUCCÈS", "ACHIEVEMENT REWARDS"),
+            title = count > 1 ? Loc.F($"{count} succès déjà obtenus", $"{count} achievements already unlocked")
+                : Loc.T("Un succès déjà obtenu", "One achievement already unlocked"),
+            detail = Loc.T("Récompenses versées au portefeuille.", "Rewards paid into your wallet."),
+            reward = cash,
+        });
 
         /// <summary>Montre une notification (essai, capture) sans débloquer de succès.</summary>
         public void Preview(Achievements.Def d) => Enqueue(d);
@@ -100,12 +121,13 @@ namespace ChillRoad
             if (t >= total) { t = -1f; group.alpha = 0f; }
         }
 
-        void Show(Achievements.Def d)
+        void Show(Entry e)
         {
             t = 0f;
-            kicker.text = Loc.T("SUCCÈS DÉBLOQUÉ", "ACHIEVEMENT UNLOCKED");
-            title.text = d.Name;
-            detail.text = d.Description;
+            kicker.text = e.kicker;
+            title.text = e.title;
+            detail.text = e.detail;
+            reward.text = e.reward > 0 ? "+" + Wallet.Format(e.reward) : "";
             if (chime && source) source.PlayOneShot(chime, Mathf.Clamp01(GameSettings.UiVolume) * 0.75f);
         }
 
@@ -176,6 +198,9 @@ namespace ChillRoad
             kicker = Label(panel, 16, Accent, FontStyle.BoldAndItalic, new Vector2(124f, -14f), new Vector2(W - 150f, 22f));
             title = Label(panel, 28, White, FontStyle.BoldAndItalic, new Vector2(122f, -38f), new Vector2(W - 146f, 36f));
             detail = Label(panel, 17, Dim, FontStyle.Bold, new Vector2(124f, -76f), new Vector2(W - 150f, 32f));
+            // Récompense : en vert, à droite de la ligne « succès débloqué »
+            reward = Label(panel, 20, Money, FontStyle.BoldAndItalic, new Vector2(W - 196f, -12f), new Vector2(170f, 26f));
+            reward.alignment = TextAnchor.MiddleRight;
             detail.horizontalOverflow = HorizontalWrapMode.Wrap;
             detail.resizeTextForBestFit = true;
             detail.resizeTextMinSize = 12;
