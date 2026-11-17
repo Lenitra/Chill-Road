@@ -26,6 +26,8 @@ namespace ChillRoad
         /// fondu avant la limite.
         /// </summary>
         const float HornRange = 400f, HornHalf = 30f, HornFadeOut = 100f;
+        /// <summary>Luminosité de ses feux par rapport à ceux de la voiture du joueur (<see cref="CarLights.Brightness"/>).</summary>
+        const float LightBrightness = 0.4f;
 
         public byte Id { get; private set; }
         public string Name = "";
@@ -79,6 +81,7 @@ namespace ChillRoad
             if (!lights)
             {
                 lights = gameObject.AddComponent<CarLights>();
+                lights.Brightness = LightBrightness;
                 lights.Init(Car, game.assets);
                 if (game.assets.particle) gameObject.AddComponent<VehicleDust>().Init(Car, game.assets.particle);
                 if (game.assets.particle && game.assets.spark) gameObject.AddComponent<VehicleEffects>().Init(Car, game.assets);

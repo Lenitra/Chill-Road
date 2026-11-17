@@ -49,6 +49,12 @@ namespace ChillRoad
         /// <summary>Appel de phares en cours (demandé, ou encore dans sa durée minimale) : c'est lui qui part sur le réseau.</summary>
         public bool Flashing => Flash || flashHold > 0f;
 
+        /// <summary>
+        /// Luminosité de tous les feux (faisceaux, optiques, lumière des feux arrière, halo d'appel de phares) :
+        /// 1 pour la voiture du joueur, moins pour celles des autres joueurs (<see cref="RemoteCar"/>), qui éblouissaient.
+        /// </summary>
+        public float Brightness = 1f;
+
         /// <summary>Phares allumés (choix du joueur, gardé aux changements de voiture).</summary>
         public bool On { get; private set; }
         public event System.Action<bool> Toggled;
@@ -213,7 +219,7 @@ namespace ChillRoad
             flashWas = Flash;
             flashHold = Mathf.Max(0f, flashHold - Time.deltaTime);
             flash = Mathf.MoveTowards(flash, Flashing ? 1f : 0f, Time.deltaTime * (Flashing ? 20f : 9f));
-            float beam = level * 450f + flash * FlashBeam;
+            float beam = (level * 450f + flash * FlashBeam) * Brightness;
             foreach (var l in beams)
             {
                 if (!l) continue;
@@ -224,13 +230,13 @@ namespace ChillRoad
             // Feux stop : optiques et lumière projetée bien plus fortes au freinage
             bool braking = car.BrakeInput > 0.1f && car.ForwardSpeed > 0.5f;
             // Phares éteints : seuls les feux stop s'allument, plus discrètement
-            float target = TailLights.RearFactor(level, braking);
+            float target = TailLights.RearFactor(level, braking) * Brightness;
             if (Mathf.Abs(target - glow) > 0.01f)
             {
                 glow = target;
                 TailLights.Apply(tails, glow, mpb);
             }
-            float head = level + flash * FlashGlow;
+            float head = (level + flash * FlashGlow) * Brightness;
             if (Mathf.Abs(head - headGlow) > 0.01f)
             {
                 headGlow = head;
@@ -242,7 +248,7 @@ namespace ChillRoad
                 popupOpen = Mathf.MoveTowards(popupOpen, popupTarget, Time.deltaTime / PopupTime);
                 PosePopups();
             }
-            float rearIntensity = braking ? Mathf.Lerp(1.2f, 8f, level) : level * 3.5f;
+            float rearIntensity = (braking ? Mathf.Lerp(1.2f, 8f, level) : level * 3.5f) * Brightness;
             foreach (var l in rear)
             {
                 if (!l) continue;
@@ -271,7 +277,7 @@ namespace ChillRoad
                     if (d > 0.5f && d < FlareRange)
                     {
                         float facing = Mathf.Clamp01(Vector3.Dot(lamp.forward, to / d) * 3f);
-                        size = (FlareSize + d * FlareGrowth) * beamScale * flash * facing;
+                        size = (FlareSize + d * FlareGrowth) * beamScale * flash * facing * Mathf.Sqrt(Brightness);
                         flare.transform.SetPositionAndRotation(lamp.position + to / d * 0.35f, cam.transform.rotation);
                         flare.transform.localScale = Vector3.one * size;
                     }
