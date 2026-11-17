@@ -48,7 +48,8 @@ namespace ChillRoad
         NetCarState state;
         bool hasState;
         uint lastMs;
-        int carIndex = -1, paint = -1;
+        int carIndex = -1, paint = -1, cosm = -1;
+        VehicleEffects effects;
         // Chevauchement avec la voiture locale : collisions coupées jusqu'à ce qu'elles soient séparées
         bool ghost = true;
         int localTeleports = -1;
@@ -84,10 +85,17 @@ namespace ChillRoad
                 lights.Brightness = LightBrightness;
                 lights.Init(Car, game.assets);
                 if (game.assets.particle) gameObject.AddComponent<VehicleDust>().Init(Car, game.assets.particle);
-                if (game.assets.particle && game.assets.spark) gameObject.AddComponent<VehicleEffects>().Init(Car, game.assets);
+                if (game.assets.particle && game.assets.spark)
+                {
+                    effects = gameObject.AddComponent<VehicleEffects>();
+                    // Ses accessoires arrivent avec son état ; d'ici là, ceux d'origine (pas ceux du joueur local)
+                    effects.Override = CarCosmetics.Look.Stock;
+                    effects.Init(Car, game.assets);
+                }
             }
             else lights.Rebuild();
             paint = -1;
+            cosm = -1;
             box = null;
             ghost = true;
         }
@@ -109,6 +117,14 @@ namespace ChillRoad
             }
             if (s.carIndex != carIndex) SetCar(s.carIndex);
             if (s.paint != paint) { paint = s.paint; CarPaint.Apply(Car.Model, paint); }
+            if (s.cosm != cosm)
+            {
+                // Néons, vitres, pop and bang et flammes choisis par ce joueur
+                cosm = s.cosm;
+                var look = CarCosmetics.Look.Unpack(s.cosm);
+                CarCosmetics.Apply(Car.Model, look, game.assets);
+                if (effects) effects.Override = look;
+            }
             buffer.Push(t, s.pos, s.rot, s.vel);
             state = s;
             hasState = true;

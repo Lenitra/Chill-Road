@@ -17,7 +17,7 @@ namespace ChillRoad
     /// </summary>
     public static class NetProtocol
     {
-        public const byte Version = 5;
+        public const byte Version = 6;
         /// <summary>Port du serveur ; s'il est pris, les suivants sont essayés (et interrogés par la recherche locale).</summary>
         public const int DefaultPort = 47777;
         public const int PortTries = 4;
@@ -113,7 +113,7 @@ namespace ChillRoad
         public const byte Full = 1, Version = 2;
     }
 
-    /// <summary>État d'une voiture de joueur, tel qu'il voyage sur le réseau (37 octets).</summary>
+    /// <summary>État d'une voiture de joueur, tel qu'il voyage sur le réseau (39 octets).</summary>
     public struct NetCarState
     {
         public Vector3 pos, vel;
@@ -122,6 +122,8 @@ namespace ChillRoad
         public int gear, carIndex;
         /// <summary>Couleur choisie au garage de tuning (indice du nuancier de <see cref="CarPaint"/>).</summary>
         public byte paint;
+        /// <summary>Accessoires du garage de tuning : néons, vitres, pop and bang, flammes (<see cref="CarCosmetics.Look.Pack"/>).</summary>
+        public ushort cosm;
         /// <summary>Compteur de téléportations (replacement, départ) : quand il change, la voiture saute sans glisser.</summary>
         public byte teleport;
         public bool lights, braking, handbrake, onRoad, grounded;
@@ -146,6 +148,8 @@ namespace ChillRoad
             w.Byte((byte)Mathf.Clamp(carIndex, 0, 255));
             w.Byte(teleport);
             w.Byte(paint);
+            w.Byte((byte)(cosm & 255));
+            w.Byte((byte)(cosm >> 8));
         }
 
         public static NetCarState Read(NetReader r)
@@ -173,6 +177,8 @@ namespace ChillRoad
             s.carIndex = r.Byte();
             s.teleport = r.Byte();
             s.paint = r.Byte();
+            int low = r.Byte();
+            s.cosm = (ushort)(low | r.Byte() << 8);
             return s;
         }
     }

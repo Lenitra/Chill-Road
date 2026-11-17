@@ -1024,6 +1024,7 @@ namespace ChillRoad
                 steer = car.SteerAngle, rpm01 = car.Rpm01, throttle = car.Throttle, gear = car.Gear,
                 carIndex = game.ShownCar, teleport = (byte)car.TeleportCount,
                 paint = (byte)CarPaint.Selected(game.assets.playerCars[Mathf.Clamp(game.ShownCar, 0, game.assets.playerCars.Length - 1)]),
+                cosm = CarCosmetics.Fitted(game.assets.playerCars[Mathf.Clamp(game.ShownCar, 0, game.assets.playerCars.Length - 1)]).Pack(),
                 lights = game.Lights && game.Lights.On, braking = car.BrakeInput > 0.1f, handbrake = car.HandbrakeOn,
                 horn = game.Horn, flash = game.Lights && game.Lights.Flashing,
                 onRoad = car.OnRoad, grounded = car.GroundedWheels > 0, dirt = car.SurfaceDirt,
