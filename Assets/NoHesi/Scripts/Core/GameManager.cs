@@ -191,6 +191,7 @@ namespace NoHesi
 
             Net = gameObject.AddComponent<NetGame>();
             Net.Init(this);
+            gameObject.AddComponent<PlayerList>().Init(this);
             ApplyLiveSettings();
         }
 

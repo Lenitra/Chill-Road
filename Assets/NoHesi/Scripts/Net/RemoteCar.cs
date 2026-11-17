@@ -31,6 +31,9 @@ namespace NoHesi
         public string Name = "";
         public VehicleController Car { get; private set; }
         public Color Color => Colors[Id % Colors.Length];
+        /// <summary>Voiture conduite (indice du garage) et sa peinture (nuancier de <see cref="CarPaint"/>), d'après son dernier état.</summary>
+        public int CarIndex => carIndex;
+        public int Paint => Mathf.Max(0, paint);
         /// <summary>Un premier état est arrivé : la voiture est en place.</summary>
         public bool Ready => hasState;
         /// <summary>Repère de mise à jour (liste des joueurs encore présents).</summary>

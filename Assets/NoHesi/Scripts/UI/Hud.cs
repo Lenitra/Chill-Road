@@ -144,6 +144,14 @@ namespace NoHesi
         /// </summary>
         public bool Paused => WorldMap.IsOpen || inPause || Dealership.IsOpen || TuningGarage.IsOpen || RaceSetup.IsOpen;
 
+        // Partie en réseau : à droite du menu, le tableau des joueurs (PlayerList) prend la place des contrôles
+        GameObject controlsPanel;
+        bool playersPage = true;
+        /// <summary>Menu d'une partie en réseau ouvert sur le tableau des joueurs (à la place des contrôles).</summary>
+        public bool PlayersInMenu => inPause && pausePanel && pausePanel.activeSelf && game.Online && playersPage;
+        /// <summary>Menu d'une partie en réseau : montre à droite le tableau des joueurs, ou les contrôles.</summary>
+        public void ShowPlayersInMenu(bool players) => playersPage = players;
+
         /// <summary>Masque le HUD (chargement, écran d'accueil).</summary>
         public void SetVisible(bool visible)
         {
@@ -758,6 +766,13 @@ namespace NoHesi
         {
             var panel = Rect(parent, "Controls", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(40, -370), new Vector2(780, 370));
             Backdrop(panel);
+            controlsPanel = panel.gameObject;
+            // En réseau, un clic sur le panneau montre le tableau des joueurs à sa place
+            panel.gameObject.AddComponent<Image>().color = Color.clear;
+            var toPlayers = panel.gameObject.AddComponent<Button>();
+            toPlayers.transition = Selectable.Transition.None;
+            toPlayers.navigation = new Navigation { mode = Navigation.Mode.None };
+            toPlayers.onClick.AddListener(() => { if (game.Online) playersPage = true; });
             var layout = panel.gameObject.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(50, 50, 30, 30);
             layout.spacing = 3;
@@ -784,11 +799,16 @@ namespace NoHesi
         {
             bool touch = TouchInput.InUse && GameSettings.TouchSteer != 0;
             bool pad = !touch && GameInput.UsingGamepad;
-            int shown = (touch ? 2 : pad ? 1 : 0) + (Loc.French ? 3 : 0) + GameSettings.TouchSteer * 6;
+            bool online = game.Online;
+            int shown = (touch ? 2 : pad ? 1 : 0) + (Loc.French ? 3 : 0) + GameSettings.TouchSteer * 6 + (online ? 100 : 0);
             if (shown == controlsShown) return;
             controlsShown = shown;
             controlsTitle.text = touch ? Loc.T("CONTRÔLES  ·  TACTILE", "CONTROLS  ·  TOUCH")
                 : pad ? Loc.T("CONTRÔLES  ·  MANETTE", "CONTROLS  ·  GAMEPAD") : Loc.T("CONTRÔLES  ·  CLAVIER", "CONTROLS  ·  KEYBOARD");
+            // En réseau : comment revenir au tableau des joueurs
+            if (online)
+                controlsTitle.text += "<size=19>      " + (touch ? Loc.T("touche : joueurs", "tap: players") : pad ? Loc.T("RB : joueurs", "RB: players")
+                    : Loc.T("Tab : joueurs", "Tab: players")) + "</size>";
             for (int i = 0; i < Controls.Length; i++)
             {
                 var c = Controls[i];
@@ -894,6 +914,7 @@ namespace NoHesi
             openedFrame = Time.frameCount;
             if (paused)
             {
+                controlsPanel.SetActive(!PlayersInMenu);
                 RefreshPause();
                 EventSystem.current?.SetSelectedGameObject(firstButton.gameObject);
             }
@@ -925,6 +946,13 @@ namespace NoHesi
                 EventSystem.current.SetSelectedGameObject(firstButton.gameObject);
             // Les contrôles suivent l'appareil touché en dernier, même menu ouvert
             if (Paused) RefreshControls();
+            // En réseau : Tab ou RB (LB) passe des contrôles au tableau des joueurs, qui prend leur place
+            if (inPause && pausePanel.activeSelf)
+            {
+                if (game.Online && (GameInput.TabNextPressed || GameInput.TabPrevPressed)) playersPage = !playersPage;
+                bool controls = !PlayersInMenu;
+                if (controlsPanel.activeSelf != controls) controlsPanel.SetActive(controls);
+            }
             // En réseau, l'état de la partie change menu ouvert (joueurs, code d'invitation obtenu, latence)
             if (inPause && pausePanel.activeSelf && game.Online)
             {

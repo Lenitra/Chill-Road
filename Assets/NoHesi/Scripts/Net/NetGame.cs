@@ -120,6 +120,53 @@ namespace NoHesi
         /// <summary>Joueurs présents, soi compris.</summary>
         public int PlayerCount => State == Mode.Host ? peerList.Count + (Dedicated ? 0 : 1) : IsClient ? Mathf.Max(names.Count, remotes.Count + 1) : 1;
 
+        /// <summary>Un joueur de la partie, pour le tableau des joueurs (<see cref="PlayerList"/>).</summary>
+        public struct PlayerInfo
+        {
+            public byte id;
+            public string name;
+            /// <summary>Voiture conduite (indice du garage), -1 tant que son premier état n'est pas arrivé ; sa peinture.</summary>
+            public int car, paint;
+            /// <summary>Le joueur qui héberge la partie (numéro 0) ; un serveur dédié n'en a pas.</summary>
+            public bool host;
+            public bool local;
+            /// <summary>Sa voiture (nulle pour le joueur local).</summary>
+            public RemoteCar remote;
+        }
+
+        /// <summary>Joueurs présents, soi compris : l'hôte d'abord, puis par ordre d'arrivée (numéro de joueur).</summary>
+        public void ListPlayers(List<PlayerInfo> into)
+        {
+            into.Clear();
+            if (!Active) return;
+            if (!Dedicated)
+            {
+                int shown = Mathf.Clamp(game.ShownCar, 0, game.assets.playerCars.Length - 1);
+                into.Add(new PlayerInfo
+                {
+                    id = LocalId, name = PlayerName, car = shown, paint = CarPaint.Selected(game.assets.playerCars[shown]),
+                    host = State == Mode.Host, local = true,
+                });
+            }
+            if (State == Mode.Host)
+                foreach (var p in peerList) into.Add(Describe(p.id, p.name, p.car));
+            else
+            {
+                // La liste des noms arrive une fois par seconde ; une voiture déjà là sans nom connu compte aussi
+                foreach (var kv in names)
+                    if (kv.Key != LocalId) into.Add(Describe(kv.Key, kv.Value, byId.TryGetValue(kv.Key, out var car) ? car : null));
+                foreach (var r in remotes)
+                    if (r && !names.ContainsKey(r.Id)) into.Add(Describe(r.Id, r.Name, r));
+            }
+            into.Sort((a, b) => a.id.CompareTo(b.id));
+        }
+
+        static PlayerInfo Describe(byte id, string name, RemoteCar car) => new PlayerInfo
+        {
+            id = id, name = string.IsNullOrEmpty(name) ? "…" : name, host = id == 0, remote = car,
+            car = car && car.Ready ? car.CarIndex : -1, paint = car && car.Ready ? car.Paint : 0,
+        };
+
         /// <summary>Adresse à donner aux joueurs qui veulent rejoindre (hôte).</summary>
         public string LocalAddress
         {

@@ -179,6 +179,12 @@ namespace NoHesi
         /// </summary>
         public static bool FlashPadHeld => Pad != null && Pad.dpad.down.isPressed;
 
+        /// <summary>
+        /// Tableau des joueurs d'une partie en réseau, en conduisant : Tab maintenu. À la manette et au doigt, il est dans
+        /// le menu (voir <see cref="PlayerList"/>).
+        /// </summary>
+        public static bool PlayersHeld => Kb != null && Kb.tabKey.isPressed;
+
         public static bool LookBack
         {
             get
