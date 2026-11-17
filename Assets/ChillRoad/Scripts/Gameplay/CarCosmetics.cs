@@ -53,8 +53,8 @@ namespace ChillRoad
             new Option("Légères", "Light", new Color(0.42f, 0.46f, 0.5f), 0.015f),
             new Option("Foncées", "Dark", new Color(0.2f, 0.21f, 0.24f), 0.02f),
             new Option("Limousine", "Limo", new Color(0.06f, 0.06f, 0.075f), 0.025f),
-            new Option("Bleutées", "Blue", new Color(0.18f, 0.34f, 0.78f), 0.025f),
-            new Option("Ambrées", "Amber", new Color(0.72f, 0.44f, 0.12f), 0.025f),
+            new Option("Bleutées", "Blue", new Color(0.13f, 0.21f, 0.42f), 0.025f),
+            new Option("Ambrées", "Amber", new Color(0.44f, 0.29f, 0.11f), 0.025f),
         };
 
         static readonly Option[] Pops =
