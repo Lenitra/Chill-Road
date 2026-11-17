@@ -307,8 +307,8 @@ namespace ChillRoad
 
         static readonly List<Renderer> renderers = new List<Renderer>();
         static MaterialPropertyBlock mpb;
-        static readonly Dictionary<int, (Material pool, Material halo, Material tube)> neonMaterials = new Dictionary<int, (Material, Material, Material)>();
-        static Texture2D softTexture, haloTexture;
+        static readonly Dictionary<int, (Material pool, Material tube)> neonMaterials = new Dictionary<int, (Material, Material)>();
+        static Texture2D softTexture;
         static Mesh quad;
 
         /// <summary>
@@ -391,38 +391,97 @@ namespace ChillRoad
             var root = new GameObject(GlowName) { layer = layer }.transform;
             root.SetParent(model, false);
 
-            // Halo au sol en deux couches : un cœur sous la caisse, et une large auréole au dégradé long qui déborde
-            // tout autour (la lumière se diffuse sur la route au lieu de s'arrêter net au bord d'une tache)
-            var center = new Vector3(b.center.x, ground + 0.03f, b.center.z);
-            Piece(root, "Pool", center, Quaternion.Euler(90f, 0f, 0f), new Vector3(halfW * 2.3f, len * 0.98f, 1f), mats.pool, layer);
-            Piece(root, "Halo", center + Vector3.up * 0.005f, Quaternion.Euler(90f, 0f, 0f), new Vector3(halfW * 4.2f, len * 1.55f, 1f), mats.halo, layer);
+            // Flaque de lumière au sol, façon GTA : elle épouse le contour de la caisse (rectangle arrondi), pleine
+            // dessous, et déborde d'environ un mètre tout autour en s'éteignant doucement
+            var pool = Piece(root, "Pool", new Vector3(b.center.x, ground + 0.035f, b.center.z), Quaternion.identity, Vector3.one, mats.pool, layer);
+            pool.GetComponent<MeshFilter>().sharedMesh = PoolMesh(halfW * 0.94f, len * 0.47f, Mathf.Clamp(halfW * 0.6f + 0.55f, 0.9f, 1.3f));
             // Tubes sous les bas de caisse, entre les roues (croix de deux plans : visibles de côté comme d'en haut)
             float zMid = (front + rear) * 0.5f, tubeLen = Mathf.Max(0.4f, front - rear - wheelR * 2.2f);
             float x = Mathf.Max(0.2f, track - 0.22f), y = ground + Mathf.Clamp(wheelR * 0.45f, 0.08f, 0.16f);
             foreach (float s in new[] { -1f, 1f })
             {
                 var pos = new Vector3(s * x, y, zMid);
-                Piece(root, "Tube", pos, Quaternion.Euler(90f, 0f, 0f), new Vector3(0.09f, tubeLen, 1f), mats.tube, layer);
-                Piece(root, "Tube", pos, Quaternion.Euler(0f, 90f, 0f), new Vector3(tubeLen, 0.09f, 1f), mats.tube, layer);
+                Piece(root, "Tube", pos, Quaternion.Euler(90f, 0f, 0f), new Vector3(0.11f, tubeLen, 1f), mats.tube, layer);
+                Piece(root, "Tube", pos, Quaternion.Euler(0f, 90f, 0f), new Vector3(tubeLen, 0.11f, 1f), mats.tube, layer);
             }
 
-            // Deux lumières basses le long de la caisse (avant et arrière) : un éclairage régulier du sol, des bas de
-            // caisse et des jantes, au lieu d'un point chaud au milieu
-            foreach (float s in new[] { -1f, 1f })
+            // Trois lumières dans le volume de la caisse, le long de l'axe : assez hautes pour éclairer la route loin
+            // autour (pas seulement à la verticale), et les bas de caisse, jantes et pneus par en dessous
+            foreach (float s in new[] { -1f, 0f, 1f })
             {
                 var lightGo = new GameObject("NeonLight") { layer = layer };
                 lightGo.transform.SetParent(root, false);
-                lightGo.transform.localPosition = new Vector3(b.center.x, ground + 0.16f, zMid + s * len * 0.24f);
+                lightGo.transform.localPosition = new Vector3(b.center.x, ground + 0.42f, zMid + s * len * 0.3f);
                 var light = lightGo.AddComponent<Light>();
                 light.type = LightType.Point;
                 light.color = color;
-                light.range = Mathf.Max(2.6f, halfW * 2.2f + len * 0.25f);
-                light.intensity = 4f;
+                light.range = halfW * 2f + 1.8f;
+                light.intensity = 3.2f;
                 light.shadows = LightShadows.None;
             }
         }
 
-        static void Piece(Transform parent, string name, Vector3 pos, Quaternion rot, Vector3 scale, Material mat, int layer)
+        static readonly Dictionary<int, Mesh> poolMeshes = new Dictionary<int, Mesh>();
+
+        /// <summary>
+        /// Flaque des néons (plan du sol, repère du modèle) : rectangle arrondi de demi-côtés hw × hl, plein, entouré
+        /// d'anneaux qui s'en écartent jusqu'à <paramref name="spread"/> m. L'intensité (alpha des sommets, le shader
+        /// additif la multiplie) décroît en cloche : vive au ras de la caisse, nulle au bord, sans arête.
+        /// </summary>
+        static Mesh PoolMesh(float hw, float hl, float spread)
+        {
+            int key = Mathf.RoundToInt(hw * 50f) * 1000000 + Mathf.RoundToInt(hl * 50f) * 1000 + Mathf.RoundToInt(spread * 50f);
+            if (poolMeshes.TryGetValue(key, out var cached) && cached) return cached;
+            const int perCorner = 8, rings = 7;
+            float r0 = Mathf.Min(hw, hl) * 0.45f;
+            int ringVerts = perCorner * 4;
+            var verts = new List<Vector3> { Vector3.zero };
+            var cols = new List<Color32> { new Color32(255, 255, 255, 255) };
+            var tris = new List<int>();
+            for (int ring = 0; ring <= rings; ring++)
+            {
+                float k = ring / (float)rings, d = spread * k;
+                // Cloche : forte près de la caisse, longue traîne, zéro au bord
+                float a = Mathf.Pow(1f - k, 2.2f);
+                for (int c = 0; c < 4; c++)
+                {
+                    float cx = (c == 0 || c == 3 ? 1f : -1f) * (hw - r0), cz = (c < 2 ? 1f : -1f) * (hl - r0);
+                    for (int j = 0; j < perCorner; j++)
+                    {
+                        float ang = (c * 90f + 90f * j / (perCorner - 1)) * Mathf.Deg2Rad;
+                        verts.Add(new Vector3(cx + Mathf.Cos(ang) * (r0 + d), 0f, cz + Mathf.Sin(ang) * (r0 + d)));
+                        cols.Add(new Color32(255, 255, 255, (byte)Mathf.RoundToInt(a * 255f)));
+                    }
+                }
+            }
+            // Éventail plein sous la caisse, puis bandes entre anneaux (faces vers le haut)
+            for (int i = 0; i < ringVerts; i++)
+                tris.AddRange(new[] { 0, 1 + (i + 1) % ringVerts, 1 + i });
+            for (int ring = 0; ring < rings; ring++)
+            {
+                int a0 = 1 + ring * ringVerts, b0 = a0 + ringVerts;
+                for (int i = 0; i < ringVerts; i++)
+                {
+                    int i1 = (i + 1) % ringVerts;
+                    tris.AddRange(new[] { a0 + i, a0 + i1, b0 + i1, a0 + i, b0 + i1, b0 + i });
+                }
+            }
+            var mesh = new Mesh { name = "NeonPool" };
+            mesh.SetVertices(verts);
+            mesh.SetColors(cols);
+            var uv = new Vector2[verts.Count];
+            for (int i = 0; i < uv.Length; i++) uv[i] = new Vector2(0.5f, 0.5f);
+            mesh.uv = uv;
+            var normals = new Vector3[verts.Count];
+            for (int i = 0; i < normals.Length; i++) normals[i] = Vector3.up;
+            mesh.normals = normals;
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateBounds();
+            poolMeshes[key] = mesh;
+            return mesh;
+        }
+
+        static GameObject Piece(Transform parent, string name, Vector3 pos, Quaternion rot, Vector3 scale, Material mat, int layer)
         {
             var go = new GameObject(name, typeof(MeshFilter), typeof(MeshRenderer)) { layer = layer };
             go.transform.SetParent(parent, false);
@@ -436,16 +495,17 @@ namespace ChillRoad
             r.receiveShadows = false;
             r.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
             r.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+            return go;
         }
 
         /// <summary>Matériaux des néons d'une couleur (copies du matériau additif des étincelles), partagés.</summary>
-        static (Material pool, Material halo, Material tube) NeonMaterials(int neon, Material spark)
+        static (Material pool, Material tube) NeonMaterials(int neon, Material spark)
         {
-            if (neonMaterials.TryGetValue(neon, out var m) && m.pool && m.halo && m.tube) return m;
+            if (neonMaterials.TryGetValue(neon, out var m) && m.pool && m.tube) return m;
             var c = NeonColor(neon);
-            m.pool = Glow(spark, "NeonPool", c * 1.5f, HaloTexture);
-            m.halo = Glow(spark, "NeonHalo", c * 0.9f, HaloTexture);
-            m.tube = Glow(spark, "NeonTube", c * 7f, SoftTexture);
+            // Flaque : couleur saturée (les sommets portent la forme) ; tubes : très lumineux, le bloom les fait briller
+            m.pool = Glow(spark, "NeonPool", c * 1.7f, Texture2D.whiteTexture);
+            m.tube = Glow(spark, "NeonTube", c * 8f, SoftTexture);
             neonMaterials[neon] = m;
             return m;
         }
@@ -481,34 +541,6 @@ namespace ChillRoad
                 softTexture.SetPixels32(px);
                 softTexture.Apply(false, true);
                 return softTexture;
-            }
-        }
-
-        /// <summary>
-        /// Halo des néons au sol : rectangle très arrondi, intensité qui décroît en douceur du centre jusqu'au bord
-        /// (courbe en cloche, nulle au bord du carré : aucune arête visible), avec mipmaps pour rester lisse de loin.
-        /// </summary>
-        static Texture2D HaloTexture
-        {
-            get
-            {
-                if (haloTexture) return haloTexture;
-                const int n = 128;
-                haloTexture = new Texture2D(n, n, TextureFormat.RGBA32, true) { name = "NeonHalo", wrapMode = TextureWrapMode.Clamp };
-                var px = new Color32[n * n];
-                for (int y = 0; y < n; y++)
-                    for (int x = 0; x < n; x++)
-                    {
-                        float u = Mathf.Abs((x + 0.5f) / n * 2f - 1f), v = Mathf.Abs((y + 0.5f) / n * 2f - 1f);
-                        float d = Mathf.Pow(Mathf.Pow(u, 3f) + Mathf.Pow(v, 3f), 1f / 3f);
-                        float t = Mathf.Clamp01(d), fall = 1f - t * t * (3f - 2f * t);
-                        float a = fall * fall;
-                        byte k = (byte)Mathf.RoundToInt(a * 255f);
-                        px[y * n + x] = new Color32(255, 255, 255, k);
-                    }
-                haloTexture.SetPixels32(px);
-                haloTexture.Apply(true, true);
-                return haloTexture;
             }
         }
 
