@@ -7,7 +7,8 @@ namespace NoHesi
     /// Neige déformable : les roues tassent la neige et y laissent des sillons. Une texture de tassement de 80 m de
     /// côté suit le joueur (recopiée décalée quand il avance, comblée lentement par la neige qui tombe) ; chaque roue
     /// au sol y imprime son passage. Les shaders du sol et de la route la lisent (Shaders/SnowTrail.hlsl) : fond du
-    /// sillon tassé, bords éclairés, bourrelet. Le trafic proche laisse aussi ses traces.
+    /// sillon tassé, bords éclairés, bourrelet. Le trafic proche et les autres joueurs laissent aussi leurs traces,
+    /// calculées sur cette machine.
     /// </summary>
     public class SnowTrails : MonoBehaviour
     {
@@ -109,7 +110,8 @@ namespace NoHesi
             Shader.SetGlobalFloat(OnId, 1f);
         }
 
-        /// <summary>Passages de roues depuis l'image précédente : le joueur (contacts réels) et le trafic proche.</summary>
+        /// <summary>Passages de roues depuis l'image précédente : le joueur (contacts réels), le trafic proche et les
+        /// autres joueurs proches.</summary>
         void Collect(Vector3 center)
         {
             segments.Clear();
@@ -131,6 +133,23 @@ namespace NoHesi
                     float w = c.halfWidth * 0.8f, l = c.length * 0.3f;
                     for (int k = 0; k < 4; k++)
                         Add(id + 8 + k, q + r * (k % 2 == 0 ? -w : w) + f * (k < 2 ? -l : l), c.truck ? 0.22f : 0.17f, 0.9f, frame);
+                }
+            }
+            // Autres joueurs : rien ne passe par le réseau, leurs sillons sont calculés ici à partir de la voiture
+            // montrée (roues à leur place de repos, au sol selon l'état reçu : la trace s'interrompt pendant un saut)
+            if (gm.Online)
+            {
+                foreach (var remote in gm.Net.Remotes)
+                {
+                    if (!remote || !remote.Ready || !remote.Car || !remote.gameObject.activeInHierarchy) continue;
+                    Vector3 q = remote.transform.position;
+                    float dx = q.x - center.x, dz = q.z - center.z;
+                    if (dx * dx + dz * dz > 42f * 42f) continue;
+                    var rc = remote.Car;
+                    // Clés à part du joueur (0-7) et du trafic : bit 40 + identifiant de l'objet
+                    long id = (1L << 40) | ((long)(uint)remote.GetInstanceID() << 3);
+                    for (int i = 0; i < rc.WheelCount && i < 8; i++)
+                        if (rc.WheelContact(i, out var point, out _, out _)) Add(id + i, point, 0.17f, 1f, frame);
                 }
             }
             // Roues qui ne touchent plus le sol (saut, voiture sortie de la zone) : la trace s'interrompt
