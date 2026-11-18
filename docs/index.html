@@ -9,7 +9,9 @@
 <meta property="og:description" content="Une vallée alpine, un col, des lacets : roule à ton rythme. Jeu de conduite low-poly gratuit pour Windows.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M9 2h14l-6 28H3z' fill='%23ffc233'/%3E%3C/svg%3E">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="img/logo-192.png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:ital,wght@0,500;0,600;0,700;1,600;1,800&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
@@ -54,7 +56,8 @@
   }
   header.top.solid { background: rgba(11,13,18,.94); box-shadow: 0 1px 0 var(--line); }
   header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 68px; }
-  .brand { text-decoration: none; font: italic 800 26px/1 "Barlow Semi Condensed", "Bahnschrift", sans-serif; letter-spacing: .01em; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font: italic 800 26px/1 "Barlow Semi Condensed", "Bahnschrift", sans-serif; letter-spacing: .01em; }
+  .brand img { display: block; width: 52px; height: 52px; flex: none; }
   .brand b { color: var(--gold); font-weight: 800; }
   nav.links { display: flex; gap: 6px; }
   nav.links a {
@@ -186,7 +189,7 @@
 
 <header class="top" id="top">
   <div class="wrap">
-    <a class="brand" href="#">CHILL <b>ROAD</b></a>
+    <a class="brand" href="#"><img src="img/logo-96.png" srcset="img/logo-96.png 1x, img/logo-192.png 2x" width="52" height="52" alt=""><span>CHILL <b>ROAD</b></span></a>
     <nav class="links">
       <a href="#images">Images</a>
       <a class="cta" href="#telecharger">Télécharger</a>

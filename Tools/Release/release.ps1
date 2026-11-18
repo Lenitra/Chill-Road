@@ -136,11 +136,13 @@ try {
 Step "Site docs/index.html"
 $utf8 = New-Object Text.UTF8Encoding($false)
 $html = [IO.File]::ReadAllText($siteFile, $utf8)
-$date = (Get-Date).ToString('d MMMM yyyy', [Globalization.CultureInfo]::GetCultureInfo('fr-FR'))
+$published = [TimeZoneInfo]::ConvertTimeBySystemTimeZoneId((Get-Date), 'Romance Standard Time')   # heure de Paris
+$date = $published.ToString('d MMMM yyyy', [Globalization.CultureInfo]::GetCultureInfo('fr-FR'))
+$time = $published.ToString("H' h 'mm")
 $replacements = @(
     @{ Pattern = 'zip de \d+ Mo';                       Value = "zip de $sizeMo Mo" },                 # en-tête
     @{ Pattern = 'Version \d+\.\d+\.\d+ · \d+ Mo';      Value = "Version $Version · $sizeMo Mo" },     # bloc téléchargement
-    @{ Pattern = 'v\d+\.\d+\.\d+ · \d{1,2} [^\s<]+ \d{4}'; Value = "v$Version · $date" }               # pied de page
+    @{ Pattern = 'v\d+\.\d+\.\d+ · \d{1,2} [^\s<]+ \d{4}(?: à \d{1,2} h \d{2})?'; Value = "v$Version · $date à $time" }   # pied de page
 )
 foreach ($r in $replacements) {
     if ($html -match $r.Pattern) { $html = [regex]::Replace($html, $r.Pattern, $r.Value) }
