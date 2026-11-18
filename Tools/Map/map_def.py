@@ -542,6 +542,10 @@ def roads(net):
     d_._heading = (vx_, vz_)
     d_.route("alp_villard", label="chemin_villard", **TR).node("alp_villard")
 
+    # Auto-école : circuit relié à la route de la vallée (en dernier : les tracés précédents restent en cache)
+    import map_school
+    map_school.roads(net, v, VP, VT)
+
 
 def pois(nodes, edges):
     """Lieux-dits affichés par le jeu (id, noms, position, rayon) ; « depart » : point de départ, r = cap (degrés,

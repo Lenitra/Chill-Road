@@ -219,6 +219,7 @@ namespace ChillRoad
             BuildPause();
             Polaroid = gameObject.AddComponent<RadarPolaroid>();
             Polaroid.Init(gm, canvas);
+            gameObject.AddComponent<DrivingSchool>().Init(gm, canvas);
             gameObject.AddComponent<CheatCodes>().Init(gm);
             // Succès : suivi en jeu, notification en bas à droite (et son carillon)
             gameObject.AddComponent<Achievements>().Init(gm);

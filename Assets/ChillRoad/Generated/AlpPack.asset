@@ -2213,6 +2213,119 @@ MonoBehaviour:
     module: 0
     ymin: -1
     lights: []
+  - id: showroom_bay_a
+    category: interior
+    tags:
+    - shop
+    - interior
+    prefab: {fileID: 919132149155446097, guid: f92afda097e679946b845a5dfa18d11e, type: 3}
+    size: {x: 7.04, y: 6.9, z: 23.3}
+    footprint: {x: 7, y: 23}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: -0.3
+    lights: []
+  - id: showroom_bay_b
+    category: interior
+    tags:
+    - shop
+    - interior
+    prefab: {fileID: 919132149155446097, guid: 316e323bffad98340aee7c81ada5cabb, type: 3}
+    size: {x: 7.04, y: 6.9, z: 23.3}
+    footprint: {x: 7, y: 23}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: -0.3
+    lights: []
+  - id: showroom_bay_c
+    category: interior
+    tags:
+    - shop
+    - interior
+    prefab: {fileID: 919132149155446097, guid: eb4208e0373b4144ebc7172449337d21, type: 3}
+    size: {x: 7.04, y: 6.9, z: 23.3}
+    footprint: {x: 7, y: 23}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: -0.3
+    lights: []
+  - id: tuning_workshop
+    category: interior
+    tags:
+    - shop
+    - interior
+    prefab: {fileID: 919132149155446097, guid: dc337e45d9caa2044a7ddefd250f0852, type: 3}
+    size: {x: 13.6, y: 5.9, z: 16.6}
+    footprint: {x: 13, y: 16}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: -0.3
+    lights: []
+  - id: school_board
+    category: street
+    tags:
+    - school
+    - sign
+    prefab: {fileID: 919132149155446097, guid: 0bde4ad9355afbb41ab133e6ffd87ce8, type: 3}
+    size: {x: 3.44, y: 3.32, z: 0.16}
+    footprint: {x: 3.4, y: 0.3}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: 0.02
+    lights: []
+  - id: school_cone
+    category: sign
+    tags:
+    - school
+    prefab: {fileID: 919132149155446097, guid: e1b05d99619e47a488c496d900c7d546, type: 3}
+    size: {x: 0.42, y: 0.65, z: 0.42}
+    footprint: {x: 0.42, y: 0.42}
+    collider: capsule
+    radius: 0.16
+    module: 0
+    ymin: 0
+    lights: []
+  - id: school_tires
+    category: street
+    tags:
+    - school
+    prefab: {fileID: 919132149155446097, guid: bf606a9b157391e42a6e0442e7bf42bf, type: 3}
+    size: {x: 0.76, y: 0.79, z: 0.75}
+    footprint: {x: 0.8, y: 0.8}
+    collider: capsule
+    radius: 0.38
+    module: 0
+    ymin: 0
+    lights: []
+  - id: school_arch
+    category: street
+    tags:
+    - school
+    prefab: {fileID: 919132149155446097, guid: 531debf3e8327b2418c3a67dc0813d5c, type: 3}
+    size: {x: 15.9, y: 5.89, z: 0.9}
+    footprint: {x: 15.8, y: 0.9}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
+  - id: school_kiosk
+    category: street
+    tags:
+    - school
+    prefab: {fileID: 919132149155446097, guid: 09bae78775ef1ed4e832af04d3ed0250, type: 3}
+    size: {x: 7.5, y: 3.12, z: 5.75}
+    footprint: {x: 7.5, y: 5.8}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
   - id: snow_groomer
     category: ski
     tags:
@@ -2704,45 +2817,6 @@ MonoBehaviour:
     module: 0
     ymin: -0.01
     lights: []
-  - id: showroom_bay_a
-    category: interior
-    tags:
-    - shop
-    - interior
-    prefab: {fileID: 919132149155446097, guid: f92afda097e679946b845a5dfa18d11e, type: 3}
-    size: {x: 7.04, y: 6.9, z: 23.3}
-    footprint: {x: 7, y: 23}
-    collider: none
-    radius: 0
-    module: 0
-    ymin: -0.3
-    lights: []
-  - id: showroom_bay_b
-    category: interior
-    tags:
-    - shop
-    - interior
-    prefab: {fileID: 919132149155446097, guid: 316e323bffad98340aee7c81ada5cabb, type: 3}
-    size: {x: 7.04, y: 6.9, z: 23.3}
-    footprint: {x: 7, y: 23}
-    collider: none
-    radius: 0
-    module: 0
-    ymin: -0.3
-    lights: []
-  - id: showroom_bay_c
-    category: interior
-    tags:
-    - shop
-    - interior
-    prefab: {fileID: 919132149155446097, guid: eb4208e0373b4144ebc7172449337d21, type: 3}
-    size: {x: 7.04, y: 6.9, z: 23.3}
-    footprint: {x: 7, y: 23}
-    collider: none
-    radius: 0
-    module: 0
-    ymin: -0.3
-    lights: []
   - id: showroom_end
     category: interior
     tags:
@@ -2751,19 +2825,6 @@ MonoBehaviour:
     prefab: {fileID: 919132149155446097, guid: 937e4615c50be504aa1a649f9dc96843, type: 3}
     size: {x: 2.56, y: 6.9, z: 23.56}
     footprint: {x: 1.2, y: 23}
-    collider: none
-    radius: 0
-    module: 0
-    ymin: -0.3
-    lights: []
-  - id: tuning_workshop
-    category: interior
-    tags:
-    - shop
-    - interior
-    prefab: {fileID: 919132149155446097, guid: dc337e45d9caa2044a7ddefd250f0852, type: 3}
-    size: {x: 13.6, y: 5.9, z: 16.6}
-    footprint: {x: 13, y: 16}
     collider: none
     radius: 0
     module: 0

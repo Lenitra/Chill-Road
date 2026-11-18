@@ -3444,6 +3444,182 @@
    "material": ""
   },
   {
+   "id": "showroom_bay_a",
+   "file": "Showroom_Bay_A",
+   "category": "interior",
+   "tags": [
+    "shop",
+    "interior"
+   ],
+   "sx": 7.04,
+   "sy": 6.9,
+   "sz": 23.3,
+   "fw": 7.0,
+   "fd": 23.0,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.3,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "showroom_bay_b",
+   "file": "Showroom_Bay_B",
+   "category": "interior",
+   "tags": [
+    "shop",
+    "interior"
+   ],
+   "sx": 7.04,
+   "sy": 6.9,
+   "sz": 23.3,
+   "fw": 7.0,
+   "fd": 23.0,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.3,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "showroom_bay_c",
+   "file": "Showroom_Bay_C",
+   "category": "interior",
+   "tags": [
+    "shop",
+    "interior"
+   ],
+   "sx": 7.04,
+   "sy": 6.9,
+   "sz": 23.3,
+   "fw": 7.0,
+   "fd": 23.0,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.3,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "tuning_workshop",
+   "file": "Tuning_Workshop",
+   "category": "interior",
+   "tags": [
+    "shop",
+    "interior"
+   ],
+   "sx": 13.6,
+   "sy": 5.9,
+   "sz": 16.6,
+   "fw": 13.0,
+   "fd": 16.0,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.3,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "school_board",
+   "file": "School_Board",
+   "category": "street",
+   "tags": [
+    "school",
+    "sign"
+   ],
+   "sx": 3.44,
+   "sy": 3.32,
+   "sz": 0.16,
+   "fw": 3.4,
+   "fd": 0.3,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.02,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "school_cone",
+   "file": "School_Cone",
+   "category": "sign",
+   "tags": [
+    "school"
+   ],
+   "sx": 0.42,
+   "sy": 0.65,
+   "sz": 0.42,
+   "fw": 0.42,
+   "fd": 0.42,
+   "collider": "capsule",
+   "radius": 0.16,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "school_tires",
+   "file": "School_Tires",
+   "category": "street",
+   "tags": [
+    "school"
+   ],
+   "sx": 0.76,
+   "sy": 0.79,
+   "sz": 0.75,
+   "fw": 0.8,
+   "fd": 0.8,
+   "collider": "capsule",
+   "radius": 0.38,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "school_arch",
+   "file": "School_Arch",
+   "category": "street",
+   "tags": [
+    "school"
+   ],
+   "sx": 15.9,
+   "sy": 5.89,
+   "sz": 0.9,
+   "fw": 15.8,
+   "fd": 0.9,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "school_kiosk",
+   "file": "School_Kiosk",
+   "category": "street",
+   "tags": [
+    "school"
+   ],
+   "sx": 7.5,
+   "sy": 3.12,
+   "sz": 5.75,
+   "fw": 7.5,
+   "fd": 5.8,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
    "id": "snow_groomer",
    "file": "Snow_Groomer",
    "category": "ski",
@@ -4201,66 +4377,6 @@
    "material": "AP_Flora"
   },
   {
-   "id": "showroom_bay_a",
-   "file": "Showroom_Bay_A",
-   "category": "interior",
-   "tags": [
-    "shop",
-    "interior"
-   ],
-   "sx": 7.04,
-   "sy": 6.9,
-   "sz": 23.3,
-   "fw": 7.0,
-   "fd": 23.0,
-   "collider": "none",
-   "radius": 0.0,
-   "module": 0.0,
-   "ymin": -0.3,
-   "lights": [],
-   "material": ""
-  },
-  {
-   "id": "showroom_bay_b",
-   "file": "Showroom_Bay_B",
-   "category": "interior",
-   "tags": [
-    "shop",
-    "interior"
-   ],
-   "sx": 7.04,
-   "sy": 6.9,
-   "sz": 23.3,
-   "fw": 7.0,
-   "fd": 23.0,
-   "collider": "none",
-   "radius": 0.0,
-   "module": 0.0,
-   "ymin": -0.3,
-   "lights": [],
-   "material": ""
-  },
-  {
-   "id": "showroom_bay_c",
-   "file": "Showroom_Bay_C",
-   "category": "interior",
-   "tags": [
-    "shop",
-    "interior"
-   ],
-   "sx": 7.04,
-   "sy": 6.9,
-   "sz": 23.3,
-   "fw": 7.0,
-   "fd": 23.0,
-   "collider": "none",
-   "radius": 0.0,
-   "module": 0.0,
-   "ymin": -0.3,
-   "lights": [],
-   "material": ""
-  },
-  {
    "id": "showroom_end",
    "file": "Showroom_End",
    "category": "interior",
@@ -4273,26 +4389,6 @@
    "sz": 23.56,
    "fw": 1.2,
    "fd": 23.0,
-   "collider": "none",
-   "radius": 0.0,
-   "module": 0.0,
-   "ymin": -0.3,
-   "lights": [],
-   "material": ""
-  },
-  {
-   "id": "tuning_workshop",
-   "file": "Tuning_Workshop",
-   "category": "interior",
-   "tags": [
-    "shop",
-    "interior"
-   ],
-   "sx": 13.6,
-   "sy": 5.9,
-   "sz": 16.6,
-   "fw": 13.0,
-   "fd": 16.0,
    "collider": "none",
    "radius": 0.0,
    "module": 0.0,

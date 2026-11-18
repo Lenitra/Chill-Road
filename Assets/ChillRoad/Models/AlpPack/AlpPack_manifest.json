@@ -4714,6 +4714,134 @@
    "note": "atelier (menu du garage de tuning) : x -6,5..6,5, y -8..8 (porte en y = 8), plafond 5,6 m ; plateaux du pont à 0,2 m"
   },
   {
+   "id": "school_board",
+   "file": "School_Board",
+   "category": "street",
+   "tags": [
+    "school",
+    "sign"
+   ],
+   "size": [
+    3.44,
+    3.32,
+    0.16
+   ],
+   "ymin": 0.02,
+   "footprint": [
+    3.4,
+    0.3
+   ],
+   "lods": 3,
+   "tris": [
+    60,
+    60,
+    60
+   ],
+   "collider": "box"
+  },
+  {
+   "id": "school_cone",
+   "file": "School_Cone",
+   "category": "sign",
+   "tags": [
+    "school"
+   ],
+   "size": [
+    0.42,
+    0.65,
+    0.42
+   ],
+   "ymin": 0.0,
+   "footprint": [
+    0.42,
+    0.42
+   ],
+   "lods": 3,
+   "tris": [
+    92,
+    68,
+    44
+   ],
+   "collider": "capsule",
+   "radius": 0.16
+  },
+  {
+   "id": "school_tires",
+   "file": "School_Tires",
+   "category": "street",
+   "tags": [
+    "school"
+   ],
+   "size": [
+    0.76,
+    0.79,
+    0.75
+   ],
+   "ymin": 0.0,
+   "footprint": [
+    0.8,
+    0.8
+   ],
+   "lods": 3,
+   "tris": [
+    272,
+    176,
+    112
+   ],
+   "collider": "capsule",
+   "radius": 0.38
+  },
+  {
+   "id": "school_arch",
+   "file": "School_Arch",
+   "category": "street",
+   "tags": [
+    "school"
+   ],
+   "size": [
+    15.9,
+    5.89,
+    0.9
+   ],
+   "ymin": 0.0,
+   "footprint": [
+    15.8,
+    0.9
+   ],
+   "lods": 3,
+   "tris": [
+    780,
+    780,
+    780
+   ],
+   "collider": "none"
+  },
+  {
+   "id": "school_kiosk",
+   "file": "School_Kiosk",
+   "category": "street",
+   "tags": [
+    "school"
+   ],
+   "size": [
+    7.5,
+    3.12,
+    5.75
+   ],
+   "ymin": 0.0,
+   "footprint": [
+    7.5,
+    5.8
+   ],
+   "lods": 3,
+   "tris": [
+    84,
+    84,
+    84
+   ],
+   "collider": "box"
+  },
+  {
    "id": "snow_groomer",
    "file": "Snow_Groomer",
    "category": "ski",

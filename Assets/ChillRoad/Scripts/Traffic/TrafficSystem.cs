@@ -133,7 +133,7 @@ namespace ChillRoad
             spawnPoints.Clear();
             foreach (var e in road.Edges)
             {
-                if (e.kind == RoadKind.Track) continue;
+                if (e.kind == RoadKind.Track || e.id.StartsWith("ecole_")) continue;   // ni chemins ni circuit de l'auto-école
                 // l'autoroute attire plus de trafic que les autres routes
                 int weight = e.kind == RoadKind.Highway ? 3 : e.kind == RoadKind.Ramp ? 2 : 1;
                 for (float s = e.trimA + 25f; s < e.Length - e.trimB - 25f; s += 30f)
@@ -845,7 +845,7 @@ namespace ChillRoad
             var options = new List<(RoadNetwork.Edge e, float w)>();
             foreach (var e in n.edges)
             {
-                if (e == c.edge) continue;
+                if (e == c.edge || e.id.StartsWith("ecole_")) continue;   // le circuit de l'auto-école reste libre
                 if (e.oneway && e.a != n) continue;     // sens interdit : une bretelle ne se prend que de a vers b
                 int dir = e.a == n ? 1 : -1;
                 e.LanePosition(dir > 0 ? e.trimA : e.Length - e.trimB, dir, out var f);

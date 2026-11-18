@@ -691,13 +691,13 @@ namespace ChillRoad
                 var mark = Box(content, "Poi_" + poi.id, new Vector2(0.5f, 0.5f), Local(poi.x, poi.z), new Vector2(10f, 10f));
                 bool left = poi.side < 0;
                 fixedSize.Add(mark);
-                bool dealer = poi.id == "dealer", tuning = poi.id == "tuning";
-                if (dealer || tuning)
+                bool dealer = poi.id == "dealer", tuning = poi.id == "tuning", school = poi.id == "school";
+                if (dealer || tuning || school)
                 {
-                    Color tint = dealer ? Info : Tuning;
+                    Color tint = school ? new Color(1f, 0.76f, 0.2f) : dealer ? Info : Tuning;
                     Disc(mark, 32f, Ink);
                     Disc(mark, 26f, tint);
-                    var glyph = Label(mark, dealer ? "€" : "⚙", dealer ? 19 : 21, TextAnchor.MiddleCenter, Ink, new Vector2(0f, 0.5f), new Vector2(30f, 30f), FontStyle.Bold);
+                    var glyph = Label(mark, school ? "A" : dealer ? "€" : "⚙", dealer || school ? 19 : 21, TextAnchor.MiddleCenter, Ink, new Vector2(0f, 0.5f), new Vector2(30f, 30f), FontStyle.Bold);
                     glyph.raycastTarget = false;
                     var tag = MapLabel(mark, 21, left ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, tint, new Vector2(left ? -24f : 24f, 0f), FontStyle.BoldAndItalic);
                     tag.rectTransform.pivot = new Vector2(left ? 1f : 0f, 0.5f);

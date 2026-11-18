@@ -62,6 +62,7 @@ class Net:
         self.lines = {}
         self.fixed = {}              # nœuds à hauteur imposée
         self.merges = set()          # nœuds posés sur l'axe de l'autoroute, où s'attache une bretelle
+        self.crossings = set()       # coupes de chaîne (Path.split) qui sont de vrais carrefours
 
     def node(self, name, x, z):
         self.nodes[name] = (float(x), float(z))
@@ -539,7 +540,8 @@ def build_edges(net, rivers, lakes_level, verbose=True):
         for (name, x, z) in ch.splits:
             i = int(np.argmin(np.hypot(P[:, 0] - x, P[:, 1] - z)))
             net.nodes[name] = (float(P[i, 0]), float(P[i, 1]))
-            net.merges.add(name)
+            if name not in net.crossings:          # carrefour ordinaire, pas une bretelle collée à l'autoroute
+                net.merges.add(name)
             cuts.append((i, name))
         cuts.sort()
         # un pont tracé à la main est un « viaduc » jusqu'à son ajustement au relief (_refine_spans)
