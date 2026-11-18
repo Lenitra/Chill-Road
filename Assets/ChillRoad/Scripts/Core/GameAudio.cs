@@ -19,6 +19,8 @@ namespace ChillRoad
         AudioSource windBody, windAir, skid, siren, horn;
         /// <summary>Klaxon tenu (R3 / H) : réglé par <see cref="GameManager"/> chaque image de conduite.</summary>
         public bool Horn;
+        /// <summary>Part d'écho du moteur (0 dehors, 1 au fond d'un tunnel) : réglée par <see cref="GameManager"/>.</summary>
+        public float TunnelEcho;
         EngineSynth engine;
         float lastThrottle, revT, revPeak;
         bool revPop;
@@ -116,6 +118,7 @@ namespace ChillRoad
             }
             bool limiter = car.Spec != null && car.Rpm >= car.Spec.redline * 0.985f && car.Throttle > 0.5f;
             engine.SetState(rpm, load, r, limiter, paused ? 0f : EngineVol * 0.3f, Time.unscaledDeltaTime);
+            engine.SetEcho(TunnelEcho);
             // Soupape de décharge du turbo au lever de pied sous pression
             if ((engine.Voice == EngineVoice.Inline6Turbo || engine.Voice == EngineVoice.FlatPlaneV8Turbo) && lastThrottle > 0.6f && car.Throttle < 0.2f && engine.Boost > 0.35f) engine.BlowOff();
             lastThrottle = car.Throttle;

@@ -51,6 +51,8 @@ namespace ChillRoad
 
         int sampleRate, bovSeen;
         EngineVoice current = EngineVoice.Auto;
+        volatile float echoTarget;
+        TunnelEcho echo;
 
         public EngineVoice Voice => current;
         public float Boost => boost;
@@ -58,6 +60,7 @@ namespace ChillRoad
         void Awake()
         {
             sampleRate = AudioSettings.outputSampleRate;
+            echo = new TunnelEcho(sampleRate);
             var src = GetComponent<AudioSource>();
             // Boucle muette : la source doit jouer pour que OnAudioFilterRead soit appelé
             src.clip = AudioClip.Create("EngineCarrier", sampleRate, 1, sampleRate, false);
@@ -88,6 +91,9 @@ namespace ChillRoad
             float target = loadValue * Mathf.InverseLerp(0.3f, 0.75f, rpmRelative);
             boost = Mathf.MoveTowards(boost, target, dt * (target > boost ? 1.1f : 3f));
         }
+
+        /// <summary>Part d'écho (0 à l'air libre, 1 au fond d'un tunnel) : appelé à chaque image.</summary>
+        public void SetEcho(float amount) => echoTarget = Mathf.Clamp01(amount);
 
         /// <summary>Soupape de décharge (« pschitt ») au lever de pied sous pression.</summary>
         public void BlowOff() => bovTrigger++;
@@ -263,6 +269,7 @@ namespace ChillRoad
                 float y = Mathf.Clamp(Tanh(p.drive * Raw(s, r, l, rel, lim, b) * p.gain) / n, -1f, 1f) * vol;
                 for (int c = 0; c < channels; c++) data[i + c] = y;
             }
+            echo?.Process(data, channels, echoTarget);
         }
 
         static float Tanh(float x) => (float)System.Math.Tanh(x);
@@ -333,6 +340,54 @@ namespace ChillRoad
             s.dcX = sum;
             s.dcY = o;
             return o;
+        }
+
+        /// <summary>
+        /// Écho d'un tube de tunnel : six lignes à retard rebouclées (trois par oreille, durées premières entre elles pour
+        /// ne pas sonner métallique), étouffées dans les aigus à chaque retour comme sur du béton. Le son qui entre suit
+        /// <c>amount</c> ; les lignes continuent de s'éteindre seules à la sortie du tunnel.
+        /// </summary>
+        public sealed class TunnelEcho
+        {
+            static readonly float[] DelaysMs = { 67f, 113f, 191f, 73f, 127f, 211f };
+            static readonly float[] Feedback = { 0.46f, 0.40f, 0.34f, 0.44f, 0.39f, 0.33f };
+            const float Wet = 0.62f;
+            readonly float[][] lines = new float[6][];
+            readonly int[] pos = new int[6];
+            readonly float[] damp = new float[6];
+            readonly float dampK, inputK, smooth;
+            float input, send;
+
+            public TunnelEcho(int rate)
+            {
+                for (int i = 0; i < 6; i++) lines[i] = new float[Mathf.Max(1, Mathf.RoundToInt(DelaysMs[i] * 0.001f * rate))];
+                dampK = 1f - Mathf.Exp(-2f * Mathf.PI * 2600f / rate);
+                inputK = 1f - Mathf.Exp(-2f * Mathf.PI * 3800f / rate);
+                smooth = 1f - Mathf.Exp(-1f / (0.08f * rate));
+            }
+
+            public void Process(float[] data, int channels, float amount)
+            {
+                for (int i = 0; i < data.Length; i += channels)
+                {
+                    send += (amount - send) * smooth;
+                    float dryL = data[i], dryR = channels > 1 ? data[i + 1] : dryL;
+                    input += ((dryL + dryR) * 0.5f - input) * inputK;
+                    float l = 0f, r = 0f;
+                    for (int k = 0; k < 6; k++)
+                    {
+                        var line = lines[k];
+                        float o = line[pos[k]];
+                        damp[k] += (o - damp[k]) * dampK;
+                        line[pos[k]] = input * send + damp[k] * Feedback[k];
+                        if (++pos[k] >= line.Length) pos[k] = 0;
+                        if (k < 3) l += o; else r += o;
+                    }
+                    data[i] = Mathf.Clamp(dryL + l * Wet / 1.6f, -1f, 1f);
+                    if (channels > 1) data[i + 1] = Mathf.Clamp(dryR + r * Wet / 1.6f, -1f, 1f);
+                    for (int c = 2; c < channels; c++) data[i + c] = data[i];
+                }
+            }
         }
 
         static void Fire(State s, int cyl, float l, float rel, bool lim)
