@@ -5,6 +5,7 @@ import bpy
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import alp_all
+import alp_manifest_keep as K
 A = alp_all.load()
 PACK = os.path.normpath(os.path.join(HERE, "..", "..", "Assets", "ChillRoad", "Models", "AlpPack"))
 dry = "dry" in sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else False
@@ -13,5 +14,5 @@ print("TRIS", A.build_all(ids))
 print("CHECK", A.check(ids, lods=(0,)))
 if not dry:
     print("EXPORT", A.export_all(ids, folder=PACK))
-    print("MANIFEST", A.write_manifest(folder=PACK))
+    print("MANIFEST", K.write(A, PACK))
     bpy.ops.wm.save_mainfile()

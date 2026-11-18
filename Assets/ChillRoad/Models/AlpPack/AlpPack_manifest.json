@@ -5738,6 +5738,60 @@
    ],
    "collider": "none",
    "material": "AP_Flora"
+  },
+  {
+   "id": "showroom_end",
+   "file": "Showroom_End",
+   "category": "interior",
+   "tags": [
+    "shop",
+    "interior"
+   ],
+   "size": [
+    2.56,
+    6.9,
+    23.56
+   ],
+   "ymin": -0.3,
+   "footprint": [
+    1.2,
+    23.0
+   ],
+   "lods": 2,
+   "tris": [
+    1704,
+    1404
+   ],
+   "collider": "none",
+   "note": "mur de bout du hall (pièce côté +x), y -14..9 ; Unity : à gauche tel quel, à droite en miroir"
+  },
+  {
+   "id": "speed_camera",
+   "file": "Speed_Camera",
+   "category": "radar",
+   "tags": [
+    "radar",
+    "road"
+   ],
+   "size": [
+    0.86,
+    4.42,
+    1.17
+   ],
+   "ymin": -0.5,
+   "footprint": [
+    0.86,
+    0.86
+   ],
+   "lods": 3,
+   "tris": [
+    844,
+    348,
+    48
+   ],
+   "collider": "capsule",
+   "radius": 0.32,
+   "note": "radar de vitesse à deux faces (±Z Unity : le long de la route), lampes de flash à 4,06 m"
   }
  ]
 }
