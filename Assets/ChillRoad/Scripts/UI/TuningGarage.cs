@@ -75,7 +75,7 @@ namespace ChillRoad
         RectTransform screenRt, menuRt, cardRt;
         Text carText, cashText, crumbText, countText, nameText, subText, levelText, actionText, hintText, leaveText, tabPrevText, tabNextText;
         readonly List<Row> rows = new List<Row>();
-        readonly List<(RectTransform fill, RectTransform gain, Text label, Text value, RectTransform bg)> bars = new List<(RectTransform, RectTransform, Text, Text, RectTransform)>();
+        readonly List<(RectTransform fill, RectTransform gain, RectTransform loss, Text label, Text value, RectTransform bg)> bars = new List<(RectTransform, RectTransform, RectTransform, Text, Text, RectTransform)>();
         /// <summary>Boutons des onglets : plaque, libellé, trait de l'onglet ouvert.</summary>
         readonly List<(HudShape plate, Text label, Image mark)> tabs = new List<(HudShape, Text, Image)>();
         /// <summary>Échelle des barres, par fiche (<see cref="CardMode"/>).</summary>
@@ -712,14 +712,18 @@ namespace ChillRoad
             for (int i = 0; i < Stats; i++)
             {
                 float a = Stat(mode, now, i), b = Stat(mode, after, i);
-                bool changed = Mathf.Abs(b - a) > 1e-3f;
+                bool changed = Mathf.Abs(b - a) > 1e-3f, lost = changed && b < a;
+                float barA = Mathf.Clamp01(Bar(mode, i, a) / scale[mode, i]), barB = Mathf.Clamp01(Bar(mode, i, b) / scale[mode, i]);
                 bars[i].bg.gameObject.SetActive(true);
                 bars[i].label.text = Loc.T(StatLabels[mode, i, 0], StatLabels[mode, i, 1]);
-                bars[i].fill.localScale = new Vector3(Mathf.Clamp01(Bar(mode, i, a) / scale[mode, i]), 1f, 1f);
-                bars[i].gain.localScale = new Vector3(Mathf.Clamp01(Bar(mode, i, b) / scale[mode, i]), 1f, 1f);
-                bars[i].label.color = changed ? Brand : White;
+                // Le plein s'arrête à la valeur qui reste ; au-delà, le gain (rose) ou ce qui serait perdu (rouge)
+                bars[i].fill.localScale = new Vector3(Mathf.Min(barA, barB), 1f, 1f);
+                bars[i].gain.localScale = new Vector3(lost ? 0f : barB, 1f, 1f);
+                bars[i].loss.localScale = new Vector3(lost ? barA : 0f, 1f, 1f);
+                Color tint = lost ? Danger : Brand;
+                bars[i].label.color = changed ? tint : White;
                 bars[i].value.text = changed ? Format(mode, i, a) + "  →  " + Format(mode, i, b) : Format(mode, i, a);
-                bars[i].value.color = changed ? Brand : Accent;
+                bars[i].value.color = changed ? tint : Accent;
             }
         }
 
@@ -900,11 +904,14 @@ namespace ChillRoad
                 var gain = Rect(bg, "Gain", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
                 gain.pivot = new Vector2(0f, 0.5f);
                 gain.gameObject.AddComponent<Image>().color = Brand;
+                var loss = Rect(bg, "Loss", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+                loss.pivot = new Vector2(0f, 0.5f);
+                loss.gameObject.AddComponent<Image>().color = Danger;
                 var fill = Rect(bg, "Fill", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
                 fill.pivot = new Vector2(0f, 0.5f);
                 fill.gameObject.AddComponent<Image>().color = Info;
                 var value = Place(Label(card, "", 21, TextAnchor.MiddleRight, Accent, FontStyle.Bold), new Vector2(480f, y), new Vector2(200f, 30f));
-                bars.Add((fill, gain, label, value, bg));
+                bars.Add((fill, gain, loss, label, value, bg));
             }
             actionText = Place(Label(card, "", 27, TextAnchor.MiddleLeft, White, FontStyle.BoldAndItalic), new Vector2(34f, -440f), new Vector2(650f, 40f));
             // Textes et barres de la fiche : leur marge suit le bord penché de la plaque
