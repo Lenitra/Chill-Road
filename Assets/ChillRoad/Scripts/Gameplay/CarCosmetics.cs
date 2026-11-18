@@ -305,11 +305,11 @@ namespace ChillRoad
         static readonly int GlassTintId = Shader.PropertyToID("_GlassTint"), GlassBandId = Shader.PropertyToID("_GlassBand");
         const string GlowName = "Underglow";
 
+        /// <summary>Hauteur des lumières des néons au-dessus du sol (m) et leur intensité.</summary>
+        const float NeonHeight = 0.45f, NeonIntensity = 6f;
+
         static readonly List<Renderer> renderers = new List<Renderer>();
         static MaterialPropertyBlock mpb;
-        static readonly Dictionary<int, (Material pool, Material tube)> neonMaterials = new Dictionary<int, (Material, Material)>();
-        static Texture2D softTexture;
-        static Mesh quad;
 
         /// <summary>
         /// Habille un modèle posé (voiture du joueur, voiture d'un autre joueur, atelier, vitrine) : teinte des vitres et
@@ -347,12 +347,16 @@ namespace ChillRoad
                 }
             }
 
-            if (look.neon > 0 && assets && assets.spark) BuildNeons(model, look.neon, assets.spark);
+            if (look.neon > 0) BuildNeons(model, look.neon);
             renderers.Clear();
         }
 
-        /// <summary>Néons : halo additif au sol, deux tubes sous les bas de caisse, lumière ponctuelle colorée.</summary>
-        static void BuildNeons(Transform model, int neon, Material spark)
+        /// <summary>
+        /// Néons : de vraies lumières colorées sous la caisse, rien d'autre (ni halo dessiné ni tube, qui traversaient le
+        /// sol). Elles sont placées dans le volume de la voiture, le long de l'axe : sans ombre, elles passent sous la caisse
+        /// et éclairent la route tout autour, ainsi que les jantes et les bas de caisse par en dessous.
+        /// </summary>
+        static void BuildNeons(Transform model, int neon)
         {
             // Encombrement du modèle dans son propre repère (les renderers sont déjà dans « renderers »)
             bool any = false;
@@ -371,193 +375,21 @@ namespace ChillRoad
             }
             if (!any) return;
             float ground = b.min.y, halfW = b.extents.x, len = b.size.z;
-            // Empattement d'après les roues du modèle (wheel-*), sinon d'après la longueur
-            float front = b.center.z + len * 0.3f, rear = b.center.z - len * 0.3f, wheelR = 0.3f, track = halfW * 0.85f;
-            bool wheels = false;
-            foreach (var t in model.GetComponentsInChildren<Transform>(true))
-            {
-                if (!t.name.StartsWith("wheel")) continue;
-                var p = model.InverseTransformPoint(t.position);
-                if (!wheels) { front = rear = p.z; wheels = true; }
-                front = Mathf.Max(front, p.z);
-                rear = Mathf.Min(rear, p.z);
-                wheelR = Mathf.Max(0.15f, p.y - ground);
-                if (Mathf.Abs(p.x) > 0.1f) track = Mathf.Min(track, Mathf.Abs(p.x));
-            }
-
             var color = NeonColor(neon);
-            var mats = NeonMaterials(neon, spark);
             int layer = model.gameObject.layer;
             var root = new GameObject(GlowName) { layer = layer }.transform;
             root.SetParent(model, false);
-
-            // Flaque de lumière au sol, façon GTA : elle épouse le contour de la caisse (rectangle arrondi), pleine
-            // dessous, et déborde d'un mètre et demi environ tout autour en s'éteignant très progressivement (diffuse)
-            var pool = Piece(root, "Pool", new Vector3(b.center.x, ground + 0.035f, b.center.z), Quaternion.identity, Vector3.one, mats.pool, layer);
-            pool.GetComponent<MeshFilter>().sharedMesh = PoolMesh(halfW * 0.9f, len * 0.45f, Mathf.Clamp(halfW * 0.8f + 0.75f, 1.2f, 1.7f));
-            // Tubes sous les bas de caisse, entre les roues (croix de deux plans : visibles de côté comme d'en haut)
-            float zMid = (front + rear) * 0.5f, tubeLen = Mathf.Max(0.4f, front - rear - wheelR * 2.2f);
-            float x = Mathf.Max(0.2f, track - 0.22f), y = ground + Mathf.Clamp(wheelR * 0.45f, 0.08f, 0.16f);
-            foreach (float s in new[] { -1f, 1f })
-            {
-                var pos = new Vector3(s * x, y, zMid);
-                Piece(root, "Tube", pos, Quaternion.Euler(90f, 0f, 0f), new Vector3(0.15f, tubeLen, 1f), mats.tube, layer);
-                Piece(root, "Tube", pos, Quaternion.Euler(0f, 90f, 0f), new Vector3(tubeLen, 0.15f, 1f), mats.tube, layer);
-            }
-
-            // Trois lumières dans le volume de la caisse, le long de l'axe : assez hautes pour éclairer la route loin
-            // autour (pas seulement à la verticale), et les bas de caisse, jantes et pneus par en dessous
             foreach (float s in new[] { -1f, 0f, 1f })
             {
                 var lightGo = new GameObject("NeonLight") { layer = layer };
                 lightGo.transform.SetParent(root, false);
-                lightGo.transform.localPosition = new Vector3(b.center.x, ground + 0.42f, zMid + s * len * 0.3f);
+                lightGo.transform.localPosition = new Vector3(b.center.x, ground + NeonHeight, b.center.z + s * len * 0.32f);
                 var light = lightGo.AddComponent<Light>();
                 light.type = LightType.Point;
                 light.color = color;
-                light.range = halfW * 2f + 2.8f;
-                light.intensity = 3.2f;
+                light.range = halfW * 2f + 3.2f;
+                light.intensity = NeonIntensity;
                 light.shadows = LightShadows.None;
-            }
-        }
-
-        static readonly Dictionary<int, Mesh> poolMeshes = new Dictionary<int, Mesh>();
-
-        /// <summary>
-        /// Flaque des néons (plan du sol, repère du modèle) : rectangle arrondi de demi-côtés hw × hl, plein, entouré
-        /// d'anneaux qui s'en écartent jusqu'à <paramref name="spread"/> m. L'intensité (alpha des sommets, le shader
-        /// additif la multiplie) décroît en cloche : vive au ras de la caisse, nulle au bord, sans arête.
-        /// </summary>
-        static Mesh PoolMesh(float hw, float hl, float spread)
-        {
-            int key = Mathf.RoundToInt(hw * 50f) * 1000000 + Mathf.RoundToInt(hl * 50f) * 1000 + Mathf.RoundToInt(spread * 50f);
-            if (poolMeshes.TryGetValue(key, out var cached) && cached) return cached;
-            const int perCorner = 8, rings = 10;
-            float r0 = Mathf.Min(hw, hl) * 0.6f;
-            int ringVerts = perCorner * 4;
-            var verts = new List<Vector3> { Vector3.zero };
-            var cols = new List<Color32> { new Color32(255, 255, 255, 255) };
-            var tris = new List<int>();
-            for (int ring = 0; ring <= rings; ring++)
-            {
-                float k = ring / (float)rings, d = spread * k;
-                // Dégradé doux (inverse d'un smoothstep) : pas de plateau saturé ni de bord net, s'éteint en douceur
-                float a = 1f - k * k * (3f - 2f * k);
-                for (int c = 0; c < 4; c++)
-                {
-                    float cx = (c == 0 || c == 3 ? 1f : -1f) * (hw - r0), cz = (c < 2 ? 1f : -1f) * (hl - r0);
-                    for (int j = 0; j < perCorner; j++)
-                    {
-                        float ang = (c * 90f + 90f * j / (perCorner - 1)) * Mathf.Deg2Rad;
-                        verts.Add(new Vector3(cx + Mathf.Cos(ang) * (r0 + d), 0f, cz + Mathf.Sin(ang) * (r0 + d)));
-                        cols.Add(new Color32(255, 255, 255, (byte)Mathf.RoundToInt(a * 255f)));
-                    }
-                }
-            }
-            // Éventail plein sous la caisse, puis bandes entre anneaux (faces vers le haut)
-            for (int i = 0; i < ringVerts; i++)
-                tris.AddRange(new[] { 0, 1 + (i + 1) % ringVerts, 1 + i });
-            for (int ring = 0; ring < rings; ring++)
-            {
-                int a0 = 1 + ring * ringVerts, b0 = a0 + ringVerts;
-                for (int i = 0; i < ringVerts; i++)
-                {
-                    int i1 = (i + 1) % ringVerts;
-                    tris.AddRange(new[] { a0 + i, a0 + i1, b0 + i1, a0 + i, b0 + i1, b0 + i });
-                }
-            }
-            var mesh = new Mesh { name = "NeonPool" };
-            mesh.SetVertices(verts);
-            mesh.SetColors(cols);
-            var uv = new Vector2[verts.Count];
-            for (int i = 0; i < uv.Length; i++) uv[i] = new Vector2(0.5f, 0.5f);
-            mesh.uv = uv;
-            var normals = new Vector3[verts.Count];
-            for (int i = 0; i < normals.Length; i++) normals[i] = Vector3.up;
-            mesh.normals = normals;
-            mesh.SetTriangles(tris, 0);
-            mesh.RecalculateBounds();
-            poolMeshes[key] = mesh;
-            return mesh;
-        }
-
-        static GameObject Piece(Transform parent, string name, Vector3 pos, Quaternion rot, Vector3 scale, Material mat, int layer)
-        {
-            var go = new GameObject(name, typeof(MeshFilter), typeof(MeshRenderer)) { layer = layer };
-            go.transform.SetParent(parent, false);
-            go.transform.localPosition = pos;
-            go.transform.localRotation = rot;
-            go.transform.localScale = scale;
-            go.GetComponent<MeshFilter>().sharedMesh = Quad;
-            var r = go.GetComponent<MeshRenderer>();
-            r.sharedMaterial = mat;
-            r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            r.receiveShadows = false;
-            r.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
-            r.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
-            return go;
-        }
-
-        /// <summary>Matériaux des néons d'une couleur (copies du matériau additif des étincelles), partagés.</summary>
-        static (Material pool, Material tube) NeonMaterials(int neon, Material spark)
-        {
-            if (neonMaterials.TryGetValue(neon, out var m) && m.pool && m.tube) return m;
-            var c = NeonColor(neon);
-            // Flaque : couleur saturée (les sommets portent la forme) ; tubes : très lumineux, le bloom les fait briller
-            m.pool = Glow(spark, "NeonPool", c * 1.05f, Texture2D.whiteTexture);
-            m.tube = Glow(spark, "NeonTube", c * 6.5f, SoftTexture);
-            neonMaterials[neon] = m;
-            return m;
-        }
-
-        static Material Glow(Material spark, string name, Color c, Texture2D tex)
-        {
-            var mat = new Material(spark) { name = name + " (runtime)" };
-            if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", tex);
-            c.a = 1f;
-            mat.SetColor("_BaseColor", c);
-            if (mat.HasProperty("_Cull")) mat.SetFloat("_Cull", 0f);
-            return mat;
-        }
-
-        /// <summary>Tache douce à bords de rectangle arrondi (halo des néons).</summary>
-        static Texture2D SoftTexture
-        {
-            get
-            {
-                if (softTexture) return softTexture;
-                const int n = 64;
-                softTexture = new Texture2D(n, n, TextureFormat.RGBA32, false) { name = "NeonSoft", wrapMode = TextureWrapMode.Clamp };
-                var px = new Color32[n * n];
-                for (int y = 0; y < n; y++)
-                    for (int x = 0; x < n; x++)
-                    {
-                        float u = Mathf.Abs((x + 0.5f) / n * 2f - 1f), v = Mathf.Abs((y + 0.5f) / n * 2f - 1f);
-                        float d = Mathf.Pow(Mathf.Pow(u, 4f) + Mathf.Pow(v, 4f), 0.25f);
-                        float t = Mathf.Clamp01((d - 0.2f) / 0.8f), a = 1f - t * t * (3f - 2f * t);
-                        byte k = (byte)Mathf.RoundToInt(a * 255f);
-                        px[y * n + x] = new Color32(255, 255, 255, k);
-                    }
-                softTexture.SetPixels32(px);
-                softTexture.Apply(false, true);
-                return softTexture;
-            }
-        }
-
-        /// <summary>Carré unité centré (couleurs de sommet blanches : le shader des particules les multiplie).</summary>
-        static Mesh Quad
-        {
-            get
-            {
-                if (quad) return quad;
-                quad = new Mesh { name = "NeonQuad" };
-                quad.vertices = new[] { new Vector3(-0.5f, -0.5f, 0f), new Vector3(0.5f, -0.5f, 0f), new Vector3(0.5f, 0.5f, 0f), new Vector3(-0.5f, 0.5f, 0f) };
-                quad.uv = new[] { new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(0f, 1f) };
-                quad.colors32 = new[] { new Color32(255, 255, 255, 255), new Color32(255, 255, 255, 255), new Color32(255, 255, 255, 255), new Color32(255, 255, 255, 255) };
-                quad.normals = new[] { Vector3.back, Vector3.back, Vector3.back, Vector3.back };
-                quad.triangles = new[] { 0, 2, 1, 0, 3, 2 };
-                quad.RecalculateBounds();
-                return quad;
             }
         }
     }
