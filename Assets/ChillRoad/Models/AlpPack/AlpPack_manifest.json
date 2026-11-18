@@ -5764,6 +5764,34 @@
    ],
    "collider": "none",
    "note": "atelier (menu du garage de tuning) : x -6,5..6,5, y -8..8 (porte en y = 8), plafond 5,6 m ; plateaux du pont à 0,2 m"
+  },
+  {
+   "id": "speed_camera",
+   "file": "Speed_Camera",
+   "category": "radar",
+   "tags": [
+    "radar",
+    "road"
+   ],
+   "size": [
+    0.86,
+    4.42,
+    1.17
+   ],
+   "ymin": -0.5,
+   "footprint": [
+    0.86,
+    0.86
+   ],
+   "lods": 3,
+   "tris": [
+    844,
+    348,
+    48
+   ],
+   "collider": "capsule",
+   "radius": 0.32,
+   "note": "radar de vitesse à deux faces (±Z Unity : le long de la route), lampes de flash à 4,06 m"
   }
  ]
 }

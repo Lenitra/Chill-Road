@@ -2769,4 +2769,17 @@ MonoBehaviour:
     module: 0
     ymin: -0.3
     lights: []
+  - id: speed_camera
+    category: radar
+    tags:
+    - radar
+    - road
+    prefab: {fileID: 919132149155446097, guid: 0261ee8500693024cb11e980196f89e6, type: 3}
+    size: {x: 0.86, y: 4.42, z: 1.17}
+    footprint: {x: 0.86, y: 0.86}
+    collider: capsule
+    radius: 0.32
+    module: 0
+    ymin: -0.5
+    lights: []
   material: {fileID: 2100000, guid: 3eed8be611f581147be1494ad190aaba, type: 2}

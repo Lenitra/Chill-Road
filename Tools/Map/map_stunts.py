@@ -18,16 +18,20 @@ RAMPS = {"stone": "stunt_ramp_stone", "road": "stunt_ramp_road"}
 URBAN = 250.0            # en deçà de cette distance du bord d'un village : habillage routier
 RAMP_L = 17.0            # longueur du tablier (m) : entrée au sol → nez (comme alp_stunt.py)
 RAMP_W = 5.6             # largeur hors tout
-GAP = 1.4                # entre le bord de la chaussée et le flanc du tremplin
+GAP = 2.2                # entre le bord de la chaussée et le flanc du tremplin (le décor du modèle, rochers et blocs
+                         # sans collision, va jusqu'à 4,7 m de l'axe : il reste hors de la chaussée)
 RUNIN = 70.0             # bande d'élan goudronnée avant le tremplin
 HALF = 4.8               # demi-largeur de la bande aplanie
 PAVED_AFTER = 14.0       # goudron après le nez (le reste de la réception est en herbe, aplanie)
+PAVED_EDGE = 0.8         # le goudron de la bande s'arrête à cette distance du bord de la chaussée
 UNDER = 0.3              # comme map_roads.UNDER : le sol passe 30 cm sous la chaussée
+OPEN_BEFORE = 30.0       # glissière ouverte avant la bande d'élan (de quoi quitter la route en biais)
+OPEN_AFTER = 20.0        # et après la réception (de quoi revenir sur la route)
 
 # id, noms, point près de la route (x, z), cap approximatif (dx, dz), distance à franchir (m), prime ($)
 # (+ habillage imposé en option : "stone" ou "road" ; sinon choisi par style())
 SITES = [
-    ("plan", "Saut du Plan", "Le Plan Jump", (689.0, -1757.9), (1.0, 0.1), 8.0, 500),
+    ("plan", "Saut du Plan", "Le Plan Jump", (716.8, -1754.4), (1.0, 0.1), 8.0, 500),
     ("pres", "Saut des Prés", "Meadows Jump", (2067.0, 441.3), (0.0, 1.0), 15.0, 900),
     ("chenal", "Saut de La Chenal", "La Chenal Jump", (-1810.8, 595.5), (0.0, 1.0), 20.0, 1200),
     ("granges", "Saut des Granges", "Les Granges Jump", (1696.9, -409.3), (0.2, 1.0), 25.0, 1500),
@@ -68,7 +72,7 @@ def frame(e, i, direction, target):
     j = d.argmin(axis=1)
     road_y, road_d = P[j, 2], d[np.arange(len(u)), j]
     return dict(edge=e, i=i, direction=direction, ox=float(ox), oz=float(oz), tx=tx, tz=tz, rx=rx, rz=rz, u=u, cx=cx,
-                cz=cz, road_y=road_y, road_d=road_d, off=off, target=target)
+                cz=cz, road_i=j, road_y=road_y, road_d=road_d, off=off, target=target)
 
 
 def profile(f):
@@ -175,14 +179,34 @@ def strips(sites):
 
 
 def paved(sites):
-    """Aires goudronnées (map_export.masks) : rectangles (x, z, (demi-longueur, demi-largeur, rotation), altitude)."""
+    """Aires goudronnées (map_export.masks) : rectangles (x, z, (demi-longueur, demi-largeur, rotation), altitude).
+    Côté route, le goudron va presque jusqu'à la chaussée : la bande se lit comme un accès depuis la route."""
     out = []
+    b0, b1 = PAVED_EDGE - GAP - RAMP_W / 2, RAMP_W / 2 + 0.6
+    b = (b0 + b1) / 2
     for f in sites:
         u0, u1 = -RUNIN, RAMP_L + PAVED_AFTER
         m = (u0 + u1) / 2
         rot = math.degrees(math.atan2(f["tz"], f["tx"]))
-        out.append((f["ox"] + f["tx"] * m, f["oz"] + f["tz"] * m, ((u1 - u0) / 2, RAMP_W / 2 + 0.6, rot), 0.0))
+        out.append((f["ox"] + f["tx"] * m + f["rx"] * b, f["oz"] + f["tz"] * m + f["rz"] * b,
+                    ((u1 - u0) / 2, (b1 - b0) / 2, rot), 0.0))
     return out
+
+
+def open_rails(sites):
+    """Retire les glissières du côté du tremplin (e["rail"], bits 0-1), de l'avant de l'élan à la fin de la réception :
+    rien ne sépare la route de la bande, à l'aller comme au retour."""
+    for f in sites:
+        e = f["edge"]
+        S = e["s"]
+        s = S[f["road_i"]]
+        a, b = float(s.min()), float(s.max())
+        if f["direction"] > 0:
+            a, b = a - OPEN_BEFORE, b + OPEN_AFTER
+        else:
+            a, b = a - OPEN_AFTER, b + OPEN_BEFORE
+        bit = 2 if f["direction"] > 0 else 1           # droite du sens de marche : bit 1 de a vers b, sinon bit 0
+        e["rail"][(S >= a) & (S <= b)] &= ~np.uint8(bit)
 
 
 def corridor(f, margin=1.5):

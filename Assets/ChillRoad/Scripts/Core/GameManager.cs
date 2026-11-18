@@ -81,6 +81,8 @@ namespace ChillRoad
         public Dealership Dealer { get; private set; }
         /// <summary>Cascades uniques : tremplins de la carte, distance à parcourir en l'air.</summary>
         public StuntJumps Stunts { get; private set; }
+        /// <summary>Radars de vitesse de la carte : passer assez vite déclenche le flash.</summary>
+        public SpeedCameras Radars { get; private set; }
         /// <summary>Courses chronométrées sur la carte (sprints, tours) et records personnels.</summary>
         public Races Races { get; private set; }
 
@@ -247,6 +249,8 @@ namespace ChillRoad
             gameObject.AddComponent<TuningGarage>().Init(this);
             Stunts = gameObject.AddComponent<StuntJumps>();
             Stunts.Init(this);
+            Radars = gameObject.AddComponent<SpeedCameras>();
+            Radars.Init(this);
             Races = gameObject.AddComponent<Races>();
             Races.Init(this);
             menus = gameObject.AddComponent<MenuScreens>();
@@ -568,6 +572,7 @@ namespace ChillRoad
             {
                 Score.Tick(dt);
                 Stunts.Tick(dt);
+                Radars.Tick(dt);
                 UpdateResetButton();
                 if (GameInput.CameraPressed) cameraRig.NextView();
                 if (local.Audio) local.Audio.Horn = GameInput.HornHeld;

@@ -4299,6 +4299,26 @@
    "ymin": -0.3,
    "lights": [],
    "material": ""
+  },
+  {
+   "id": "speed_camera",
+   "file": "Speed_Camera",
+   "category": "radar",
+   "tags": [
+    "radar",
+    "road"
+   ],
+   "sx": 0.86,
+   "sy": 4.42,
+   "sz": 1.17,
+   "fw": 0.86,
+   "fd": 0.86,
+   "collider": "capsule",
+   "radius": 0.32,
+   "module": 0.0,
+   "ymin": -0.5,
+   "lights": [],
+   "material": ""
   }
  ]
 }

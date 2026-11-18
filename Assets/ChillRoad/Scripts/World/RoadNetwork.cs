@@ -957,10 +957,11 @@ namespace ChillRoad
                         GroundQuad(shoulder, ga, oa, gb, ob);
                         GroundQuad(shoulder, ka, ga, kb, gb);
                     }
-                    // Glissière : partout sur l'autoroute, ailleurs là où le terrain plonge (bit 0 : gauche, bit 1 : droite)
+                    // Glissière là où la carte en demande (bit 0 : gauche, bit 1 : droite) : toute l'autoroute sauf le
+                    // long des tremplins, ailleurs là où le terrain plonge
                     int bit = side < 0 ? 1 : 2;
                     bool nearJunction = !highway && (mid < railFrom || mid > railTo);
-                    if (sw <= 0f && !nearJunction && (A.rail & bareBit) == 0 && (B.rail & bareBit) == 0 && (highway || (A.rail & bit) != 0 && (B.rail & bit) != 0))
+                    if (sw <= 0f && !nearJunction && (A.rail & bareBit) == 0 && (B.rail & bareBit) == 0 && (A.rail & bit) != 0 && (B.rail & bit) != 0)
                     {
                         Extrude(rails, a, ra * side, b, rb * side, hw + wa + 0.45f, hw + wb + 0.45f, side > 0 ? RailProfile : Mirror(RailProfile));
                         if (i % 2 == 0)

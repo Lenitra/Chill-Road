@@ -52,6 +52,11 @@ namespace ChillRoad
         /// course (degrés), length / width = tablier ; target = distance à parcourir en l'air (m), reward = prime.
         /// </summary>
         [Serializable] public class StuntJson { public string id, fr, en; public float x, y, z, yaw, length, width, target; public int reward; }
+        /// <summary>
+        /// Radar de vitesse : (x, y, z) = point de l'axe de la route, yaw = sens de la route (degrés), halfWidth = demi-largeur
+        /// contrôlée, flash* = position des lampes ; target = vitesse à atteindre (km/h), reward = prime.
+        /// </summary>
+        [Serializable] public class RadarJson { public string id, fr, en; public float x, y, z, yaw, halfWidth, flashX, flashY, flashZ, target; public int reward; }
         [Serializable]
         public class MapJson
         {
@@ -65,6 +70,7 @@ namespace ChillRoad
             public PlaceJson[] places;
             public PoiJson[] pois;
             public StuntJson[] stunts;
+            public RadarJson[] radars;
         }
 
         public MapJson Json { get; private set; }

@@ -10,7 +10,7 @@ namespace ChillRoad
     {
         public static FxBursts Instance { get; private set; }
 
-        ParticleSystem confetti, streaks;
+        ParticleSystem confetti, streaks, glare;
         readonly Light[] flashes = new Light[4];
         readonly float[] flashTime = new float[4];
         readonly float[] flashDuration = new float[4];
@@ -39,6 +39,9 @@ namespace ChillRoad
             sr.velocityScale = 0.06f;
             sr.lengthScale = 1f;
             Fade(streaks, 0.6f);
+
+            glare = System("RadarGlare", white, 16, 0f, ParticleSystemRenderMode.Billboard);
+            Fade(glare, 1f);
 
             for (int i = 0; i < flashes.Length; i++)
             {
@@ -114,6 +117,24 @@ namespace ChillRoad
                     startSize = Random.Range(0.03f, 0.06f),
                     startLifetime = Random.Range(0.25f, 0.45f),
                     startColor = new Color(0.75f, 0.9f, 1f),
+                }, 1);
+        }
+
+        /// <summary>Éclair d'un radar : halo blanc visible en plein jour, et lumière sur la route et les voitures.</summary>
+        public void RadarFlash(Vector3 pos, float strength = 1f)
+        {
+            var color = new Color(0.86f, 0.93f, 1f);
+            Flash(pos, color, 45f * strength, 55f, 0.2f);
+            if (!glare) return;
+            foreach (var (size, life) in new[] { (7f, 0.12f), (2.4f, 0.2f) })
+                glare.Emit(new ParticleSystem.EmitParams
+                {
+                    position = pos,
+                    velocity = Vector3.zero,
+                    startSize = size * strength,
+                    startLifetime = life,
+                    startColor = color,
+                    rotation = 0f,
                 }, 1);
         }
 

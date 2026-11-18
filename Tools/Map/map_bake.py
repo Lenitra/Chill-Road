@@ -61,6 +61,7 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
     import map_village as VL
     import map_stunts as ST
     import map_station as SK
+    import map_radars as RD
     pads = VL.pads(g, H, edges) + SK.pads(g, H, edges)
     stunts = ST.resolve(edges)
     Hc, edge = R.carve(g, H, nodes, edges, pads, ST.strips(stunts))
@@ -84,9 +85,11 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
             for (s0, s1, kind) in e["spans"]:
                 span |= (e["s"] >= s0 - 4.0) & (e["s"] <= s1 + 4.0)
             e["rail"][inside & ~span] &= ~np.uint8(3)
+    ST.open_rails(stunts)                      # aucune glissière entre la route et les bandes des tremplins
     placer = VL.populate(g, Hc, edge, water, nodes, edges, info["rivers"])
     ST.populate(placer, stunts)
     SK.populate(placer, g, Hc, nodes, edges)
+    radars = RD.populate(placer, RD.resolve(edges))
     pads = pads + ST.paved(stunts)             # bandes d'élan goudronnées (le relief, lui, est déjà terrassé)
     urban = [(v[2], v[3], v[4]) for v in D.VILLAGES + D.HAMLETS]
     rgba, paved, snow, forest, urban_m, slope = E.masks(g, Hc, info, edge, water, edges, urban_pts=urban,
@@ -96,10 +99,12 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
     print("signalisation : %d objets" % len(signs))
     places, removed = ST.clear(placer.places + signs, stunts)
     print("cascades : %d tremplins, %d objets retires des bandes" % (len(stunts), removed))
+    places, removed = RD.clear(places, radars)
+    print("radars : %d poses, %d objets retires autour des mats" % (len(radars), removed))
     if export:
         E.export(g, Hc, info, nodes, edges, water, edge, rgba, paved, snow, places=places,
                  pois=D.pois(nodes, edges) + VL.pois() + SK.pois(), blocked=placer.blocked, holes=hole, tunnels=R.tunnel_zone(g, edges),
-                 stunts=ST.export(stunts))
+                 stunts=ST.export(stunts), radars=RD.export(radars))
         import map_overview as OV
         for e in edges:
             tun = np.where(R.tunnel_mask(e))[0]
