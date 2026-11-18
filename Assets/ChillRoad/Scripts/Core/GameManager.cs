@@ -59,6 +59,7 @@ namespace ChillRoad
         public bool Demo => false;
         /// <summary>Météo : temps clair ou orage (route mouillée).</summary>
         public WeatherSystem Weather { get; private set; }
+        VehicleGrime grime;
         /// <summary>Le joueur de cette machine : sa voiture, sa caméra, son HUD, son son.</summary>
         public PlayerSlot Local => local;
         /// <summary>
@@ -144,7 +145,8 @@ namespace ChillRoad
                 // Eau sous les roues (gerbes, sillage, gouttes) et salissure de la caisse (boue, neige, lavée dans l'eau)
                 var splash = playerGo.AddComponent<VehicleSplash>();
                 splash.Init(Player, assets.particle, WaterLevelAt);
-                playerGo.AddComponent<VehicleGrime>().Init(Player, splash);
+                grime = playerGo.AddComponent<VehicleGrime>();
+                grime.Init(Player, splash);
             }
             VehicleEffects effects = null;
             if (assets.particle && assets.spark)
@@ -541,6 +543,7 @@ namespace ChillRoad
             Player.SurfaceDirt = surface.onRoad ? surface.dirt : 0f;
             Player.Wetness = Weather.WetnessAt(pos);       // sèche dans les tunnels
             if (local.Audio) local.Audio.TunnelEcho = Weather.Shelter;
+            if (grime) grime.Rain = Player.Wetness > 0f ? Weather.Rain : 0f;   // à l'abri dans un tunnel
             // Neige : la voiture s'y enfonce (quelques centimètres sur la chaussée tassée, davantage en neige fraîche)
             Player.SurfaceSnow = surface.snow;
             Player.SnowSink = Mathf.MoveTowards(Player.SnowSink, surface.snow * (surface.onRoad ? 0.035f : 0.09f), dt * 0.25f);

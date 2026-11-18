@@ -35,10 +35,15 @@ namespace ChillRoad
         // Couleurs déposées (sRGB) : chemin de terre / herbe, par temps sec / mouillé
         static readonly Color DirtDry = new Color(0.60f, 0.51f, 0.38f), DirtWet = new Color(0.34f, 0.25f, 0.16f);
         static readonly Color GrassDry = new Color(0.45f, 0.39f, 0.25f), GrassWet = new Color(0.29f, 0.23f, 0.13f);
+        /// <summary>Temps (s) pour que la pluie franche lave une voiture couverte de boue, de neige, à l'arrêt.</summary>
+        const float RainMudTime = 70f, RainSnowTime = 45f;
 
         /// <summary>Boue et neige sur la voiture (0-1).</summary>
         public float Mud => mud;
         public float Snow => snow;
+
+        /// <summary>Pluie qui tombe réellement sur la voiture (0-1 ; 0 dans un tunnel) : réglée par le jeu.</summary>
+        public float Rain;
 
         public void Init(VehicleController c, VehicleSplash s)
         {
@@ -139,8 +144,14 @@ namespace ChillRoad
                 snowWash = Redirty(snowWash, snowAdd);
             }
 
-            // La pluie rince doucement sur le goudron ; la neige fond hors de la neige
-            if (car.OnRoad && wet > 0f) mud = Mathf.Max(0f, mud - dt * wet * (1f - dirtShare) * 0.004f);
+            // La pluie lave la boue et la neige (d'autant plus vite qu'on roule), bien moins sur un chemin qui resalit ;
+            // la neige fond aussi d'elle-même hors de la neige
+            if (Rain > 0.01f)
+            {
+                float rinse = dt * Rain * (1f + s01 * 0.8f);
+                mud = Mathf.Max(0f, mud - rinse * Mathf.Lerp(1f, 0.3f, dirtShare) / RainMudTime);
+                snow = Mathf.Max(0f, snow - rinse * (1f - snowShare) / RainSnowTime);
+            }
             if (snowShare < 0.05f) snow = Mathf.Max(0f, snow - dt * (1f + s01) / 240f);
 
             // Dans l'eau : rinçage jusqu'à la ligne d'eau (un peu au-dessus à vive allure, la gerbe arrose)
