@@ -14,6 +14,8 @@ namespace ChillRoad
         const string CashKey = "chillroad_cash";
         const string OwnedKey = "chillroad_owned";
         public const string StarterCar = "ami";
+        /// <summary>Argent d'un joueur qui débute (aucune sauvegarde d'argent).</summary>
+        public const int StarterCash = 10000;
 
         /// <summary>Prix des voitures par identifiant (les voitures absentes de la table coûtent <see cref="DefaultPrice"/>).</summary>
         static readonly Dictionary<string, int> Prices = new Dictionary<string, int>
@@ -39,7 +41,7 @@ namespace ChillRoad
         /// <summary>Argent disponible.</summary>
         public static int Cash
         {
-            get { if (cash < 0) cash = Mathf.Max(0, PlayerPrefs.GetInt(CashKey, 0)); return cash; }
+            get { if (cash < 0) cash = Mathf.Max(0, PlayerPrefs.GetInt(CashKey, StarterCash)); return cash; }
         }
 
         /// <summary>Montant formaté selon la langue : « 12 345 $ » ou « $12,345 ».</summary>
