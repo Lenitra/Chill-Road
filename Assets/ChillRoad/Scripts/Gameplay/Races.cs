@@ -261,8 +261,8 @@ namespace ChillRoad
         /// <summary>Course que l'on vient de proposer au serveur, tant qu'il ne l'a pas reprise.</summary>
         Track proposed;
 
-        /// <summary>Voiture imposée par la course à plusieurs en cours : on ne change pas de voiture avant la fin.</summary>
-        public bool CarLocked => borrowed;
+        /// <summary>Course en cours (décompte compris), seul ou à plusieurs : on ne change pas de voiture avant la fin.</summary>
+        public bool CarLocked => borrowed || Active != null;
         /// <summary>Invitation à une course à plusieurs affichée, en attente de réponse (la touche d'entrée y répond).</summary>
         public bool InvitePending => inviteOpen;
 

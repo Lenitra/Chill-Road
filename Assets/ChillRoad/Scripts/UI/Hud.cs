@@ -1023,10 +1023,10 @@ namespace ChillRoad
         void RefreshPause()
         {
             RefreshControls();
-            // Une seule voiture achetée, ou voiture imposée par une course à plusieurs : tuile grisée
+            // Une seule voiture achetée, ou course en cours : tuile grisée
             bool locked = game.Races && game.Races.CarLocked;
             carTile.button.interactable = game.OwnedCars > 1 && !locked;
-            carTile.sub.text = locked ? Loc.T("Imposée par la course", "Set by the race") : game.Player.Spec.displayName;
+            carTile.sub.text = locked ? Loc.T("Verrouillée pendant la course", "Locked during the race") : game.Player.Spec.displayName;
             var net = game.Net;
             bool online = game.Online;
             bool client = online && net.IsClient;

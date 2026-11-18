@@ -693,7 +693,7 @@ namespace ChillRoad
         /// </summary>
         public bool CycleCar(int delta, bool remember = true)
         {
-            // Voiture imposée par une course à plusieurs : on la garde jusqu'à la fin
+            // Course en cours : on garde sa voiture jusqu'à la fin
             if (Races && Races.CarLocked) return false;
             var cars = assets.playerCars;
             int step = delta >= 0 ? 1 : -1;
