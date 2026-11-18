@@ -57,7 +57,8 @@ namespace ChillRoad
         /// <summary>Caméra à l'abri d'un tunnel (0 = à l'air libre, 1 = loin des têtes) : pas d'éclair qui illumine
         /// l'intérieur, averse étouffée.</summary>
         public float Shelter { get; private set; }
-        AudioSource rainSource;
+        AudioSource rainWash, rainPatter, rainDrops;
+        readonly List<AudioLowPassFilter> rainFilters = new List<AudioLowPassFilter>();
         AudioSource[] thunderSources;
         AudioClip[] thunderFar, thunderClose;
         LineRenderer bolt;
@@ -289,12 +290,26 @@ namespace ChillRoad
 
             bool paused = Time.timeScale < 0.01f;
             float master = GameSettings.AmbienceVolume;
-            if (rainSource) rainSource.volume = paused ? 0f : master * Rain * 0.42f * (1f - 0.75f * Shelter);
+            UpdateRainAudio(paused ? 0f : master);
             if (bolt)
             {
                 boltT += Time.deltaTime;
                 bolt.enabled = boltT < 0.28f && (boltT < 0.07f || boltT > 0.12f);
             }
+        }
+
+        /// <summary>Dosage des couches de pluie. En zone de neige, l'averse tombe en flocons, sans bruit ; sous un
+        /// tunnel, elle s'étouffe : moins forte et privée de ses aigus.</summary>
+        void UpdateRainAudio(float volume)
+        {
+            if (!rainWash) return;
+            RainSynth.Mix(Rain * (1f - SnowZone), out float wash, out float patter, out float drops);
+            volume *= 1f - 0.5f * Shelter;
+            rainWash.volume = wash * volume;
+            rainPatter.volume = patter * volume;
+            rainDrops.volume = drops * volume;
+            float cutoff = Mathf.Lerp(22000f, 700f, Mathf.Sqrt(Shelter));
+            foreach (var filter in rainFilters) filter.cutoffFrequency = cutoff;
         }
 
         // ------------------------------------------------------------------ éclairs et tonnerre
@@ -615,18 +630,15 @@ namespace ChillRoad
         void BuildAudio()
         {
             const int rate = 44100;
-            var rainGo = new GameObject("RainAudio");
-            rainGo.transform.SetParent(transform, false);
-            rainSource = rainGo.AddComponent<AudioSource>();
-            rainSource.clip = RainClip(rate);
-            rainSource.loop = true;
-            rainSource.volume = 0f;
-            rainSource.spatialBlend = 0f;
-            rainSource.Play();
+            rainWash = RainLayer("RainWash", RainSynth.Wash());
+            rainPatter = RainLayer("RainPatter", RainSynth.Patter());
+            rainDrops = RainLayer("RainDrops", RainSynth.Drops());
+            var thunderGo = new GameObject("ThunderAudio");
+            thunderGo.transform.SetParent(transform, false);
             thunderSources = new AudioSource[3];
             for (int i = 0; i < thunderSources.Length; i++)
             {
-                thunderSources[i] = rainGo.AddComponent<AudioSource>();
+                thunderSources[i] = thunderGo.AddComponent<AudioSource>();
                 thunderSources[i].playOnAwake = false;
                 thunderSources[i].spatialBlend = 0f;
             }
@@ -634,36 +646,21 @@ namespace ChillRoad
             thunderClose = new[] { ThunderClip(rate, 71, true), ThunderClip(rate, 83, true) };
         }
 
-        /// <summary>Pluie : souffle clair (bruit passe-haut adouci) et impacts de gouttes épars.</summary>
-        static AudioClip RainClip(int rate)
+        /// <summary>Couche de pluie en boucle (échantillons stéréo entrelacés), avec son filtre d'étouffement.</summary>
+        AudioSource RainLayer(string layerName, float[] samples)
         {
-            int n = rate * 3;
-            var d = new float[n];
-            var rng = new System.Random(17);
-            float lp = 0f, hp = 0f, drop = 0f, dropPhase = 0f, dropF = 3000f;
-            for (int i = 0; i < n; i++)
-            {
-                float w = (float)rng.NextDouble() * 2f - 1f;
-                hp += (w - hp) * 0.06f;             // passe-bas lent → w - hp = passe-haut
-                lp += ((w - hp) - lp) * 0.45f;      // adoucit l'aigu
-                if (rng.NextDouble() < 0.0022) { drop = 0.25f + (float)rng.NextDouble() * 0.35f; dropF = 1800f + (float)rng.NextDouble() * 3500f; }
-                dropPhase += 2f * Mathf.PI * dropF / rate;
-                float x = lp * 0.55f + Mathf.Sin(dropPhase) * drop;
-                drop *= 0.9975f;
-                d[i] = x;
-            }
-            // Fondu enchaîné de la boucle
-            int fade = rate / 10;
-            for (int i = 0; i < fade; i++)
-            {
-                float t = i / (float)fade;
-                d[i] = d[i] * t + d[n - fade + i] * (1f - t);
-            }
-            var c = AudioClip.Create("Rain", n - fade, 1, rate, false);
-            var trimmed = new float[n - fade];
-            Array.Copy(d, trimmed, n - fade);
-            c.SetData(trimmed, 0);
-            return c;
+            var go = new GameObject(layerName);
+            go.transform.SetParent(transform, false);
+            var clip = AudioClip.Create(layerName, samples.Length / 2, 2, RainSynth.Rate, false);
+            clip.SetData(samples, 0);
+            var source = go.AddComponent<AudioSource>();
+            source.clip = clip;
+            source.loop = true;
+            source.volume = 0f;
+            source.spatialBlend = 0f;
+            rainFilters.Add(go.AddComponent<AudioLowPassFilter>());
+            source.Play();
+            return source;
         }
 
         /// <summary>
