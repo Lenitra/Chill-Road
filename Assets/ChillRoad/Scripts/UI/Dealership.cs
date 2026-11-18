@@ -6,8 +6,8 @@ using UnityEngine.UI;
 namespace ChillRoad
 {
     /// <summary>
-    /// Concession (lieu « dealer » de la carte) : à l'arrêt dans la zone, A / E / Entrée (ou l'invite du HUD) fait
-    /// entrer dans le hall d'exposition (<see cref="ShowroomStage"/>) : toute la gamme alignée sur ses podiums, de la
+    /// Concession (lieu « dealer » de la carte) : on entre en voiture par la porte du hall (<see cref="GarageDoorway"/>),
+    /// et on se retrouve dans le hall d'exposition (<see cref="ShowroomStage"/>) : toute la gamme alignée sur ses podiums, de la
     /// moins chère à la plus chère. ← → passe d'une voiture à l'autre (la caméra glisse le long de la rangée), le
     /// podium de la voiture regardée tourne (joystick droit ou clic droit pour le tourner à la main). Une voiture
     /// achetée (<see cref="Wallet"/>) rejoint le garage et on prend son volant ; une voiture déjà possédée se choisit
@@ -23,8 +23,8 @@ namespace ChillRoad
         static readonly Color Money = new Color(0.5f, 1f, 0.6f);
         static readonly Color TooDear = new Color(1f, 0.45f, 0.4f);
 
-        /// <summary>Vitesse au-dessous de laquelle on peut entrer (m/s).</summary>
-        const float EnterSpeed = 5.5f;
+        /// <summary>Porte du hall dans le repère du bâtiment (axe de l'entrée, sur la façade).</summary>
+        static readonly Vector3 DoorLocal = new Vector3(6f, 0f, 9f);
         /// <summary>
         /// Pente commune de toutes les plaques (décalage horizontal par pixel de hauteur, environ 8°) : grandes et
         /// petites plaques ont le même angle, et les textes suivent le bord penché de leur panneau.
@@ -36,12 +36,13 @@ namespace ChillRoad
         /// <summary>Image où l'écran s'est ouvert ou fermé (la touche de fermeture ne doit pas ouvrir la pause).</summary>
         public static int ChangedFrame { get; private set; } = -1;
 
-        /// <summary>Le joueur est arrêté dans la zone de la concession : l'invite s'affiche.</summary>
-        public bool CanEnter { get; private set; }
+        /// <summary>Le joueur est aux abords de la concession : le HUD indique d'entrer par la porte.</summary>
+        public bool Near => door != null && door.Near;
 
         GameManager game;
         Font font;
         GameObject root;
+        GarageDoorway door;
         ShowroomStage stage;
         RectTransform screenRt, infoRt, cardRt;
         Text cashText, countText, nameText, subText, priceText, actionText, hintText;
@@ -60,6 +61,7 @@ namespace ChillRoad
         {
             game = g;
             font = HudArt.Font;
+            door = new GarageDoorway(g, "car_showroom", DoorLocal, Info);
         }
 
         void OnDestroy()
@@ -72,11 +74,9 @@ namespace ChillRoad
             if (!game || game.Map == null) return;
             if (!IsOpen)
             {
-                CanEnter = InZone();
-                if (CanEnter && GameInput.InteractPressed) Open();
+                door.Tick(CanDriveIn(), Open);
                 return;
             }
-            CanEnter = false;
             float dt = Time.unscaledDeltaTime;
             if (Time.frameCount != openedFrame && (GameInput.CancelPressed || GameInput.PausePressed)) { Close(); return; }
 
@@ -113,23 +113,17 @@ namespace ChillRoad
             Refresh();
         }
 
-        bool InZone()
+        /// <summary>Le joueur peut entrer en voiture : en jeu, sans menu ouvert ni course en cours.</summary>
+        bool CanDriveIn()
         {
-            var poi = game.DealerPoi;
-            if (poi == null || GameManager.DedicatedServer || game.State != GameManager.Phase.Playing) return false;
+            if (GameManager.DedicatedServer || game.State != GameManager.Phase.Playing) return false;
             if ((game.Hud && game.Hud.Paused) || OptionsMenu.IsOpen || WorldMap.IsOpen) return false;
-            // Invitation à une course affichée : la touche d'entrée y répond
-            if (game.Races && game.Races.InvitePending) return false;
-            var car = game.Player;
-            if (!car || car.Speed > EnterSpeed) return false;
-            Vector3 p = car.transform.position;
-            float dx = p.x - poi.x, dz = p.z - poi.z, r = Mathf.Max(poi.r, 30f);
-            return dx * dx + dz * dz < r * r;
+            return !game.Races || (!game.Races.InvitePending && game.Races.Active == null);
         }
 
         public void Open()
         {
-            if (IsOpen || !InZone()) return;
+            if (IsOpen) return;
             if (!root) Build();
             IsOpen = true;
             root.SetActive(true);
@@ -158,7 +152,7 @@ namespace ChillRoad
             stage.Hide();
             ShopFade.Cut(0.4f);
             if (game.Hud) game.Hud.SetVisible(true);
-            game.SetInputEnabled(true);
+            door.Leave();                          // la voiture ressort toute seule par la porte
             EventSystem.current?.SetSelectedGameObject(null);
         }
 

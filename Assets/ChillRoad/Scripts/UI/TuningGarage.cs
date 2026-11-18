@@ -38,8 +38,8 @@ namespace ChillRoad
         static readonly Color InkDanger = new Color(0.74f, 0.13f, 0.09f);
         static readonly Color InkBrand = new Color(0.8f, 0.16f, 0.58f);
 
-        /// <summary>Vitesse au-dessous de laquelle on peut entrer (m/s).</summary>
-        const float EnterSpeed = 5.5f;
+        /// <summary>Baie ouverte de l'atelier dans le repère du bâtiment (sur la façade).</summary>
+        static readonly Vector3 DoorLocal = new Vector3(-3.6f, 0f, 8f);
         const int Stats = 6;
         /// <summary>Onglets : performances (pièces), cosmétique (peinture et accessoires).</summary>
         const int TabParts = 0, TabLooks = 1;
@@ -54,8 +54,8 @@ namespace ChillRoad
         /// <summary>Atelier de la partie en cours (invite du HUD).</summary>
         public static TuningGarage Current { get; private set; }
 
-        /// <summary>Le joueur est arrêté dans la zone du garage : l'invite s'affiche.</summary>
-        public bool CanEnter { get; private set; }
+        /// <summary>Le joueur est aux abords du garage : le HUD indique d'entrer par la baie ouverte.</summary>
+        public bool Near => door != null && door.Near;
 
         class Row
         {
@@ -68,8 +68,7 @@ namespace ChillRoad
 
         GameManager game;
         Font font;
-        MapData.PoiJson poi;
-        bool poiSearched;
+        GarageDoorway door;
         GameObject root;
         WorkshopStage stage;
         RectTransform screenRt, menuRt, cardRt;
@@ -99,6 +98,7 @@ namespace ChillRoad
             game = g;
             font = HudArt.Font;
             Current = this;
+            door = new GarageDoorway(g, "tuning_garage", DoorLocal, Brand);
         }
 
         void OnDestroy()
@@ -132,11 +132,9 @@ namespace ChillRoad
             if (!game || game.Map == null) return;
             if (!IsOpen)
             {
-                CanEnter = InZone();
-                if (CanEnter && GameInput.InteractPressed) Open();
+                door.Tick(CanDriveIn(), Open);
                 return;
             }
-            CanEnter = false;
             float dt = Time.unscaledDeltaTime;
             if (Time.frameCount != openedFrame && (GameInput.CancelPressed || GameInput.PausePressed)) { Back(); return; }
             if (Time.frameCount != openedFrame && (GameInput.TabPrevPressed || GameInput.TabNextPressed)) SwitchTab(1 - tab);
@@ -187,33 +185,12 @@ namespace ChillRoad
             return look;
         }
 
-        MapData.PoiJson Poi
+        /// <summary>Le joueur peut entrer en voiture : en jeu, sans menu ouvert ni course en cours.</summary>
+        bool CanDriveIn()
         {
-            get
-            {
-                if (!poiSearched && game.Map != null && game.Map.Json != null)
-                {
-                    poiSearched = true;
-                    if (game.Map.Json.pois != null)
-                        foreach (var p in game.Map.Json.pois)
-                            if (p.id == "tuning") poi = p;
-                }
-                return poi;
-            }
-        }
-
-        bool InZone()
-        {
-            var p = Poi;
-            if (p == null || GameManager.DedicatedServer || game.State != GameManager.Phase.Playing) return false;
+            if (GameManager.DedicatedServer || game.State != GameManager.Phase.Playing) return false;
             if ((game.Hud && game.Hud.Paused) || OptionsMenu.IsOpen || WorldMap.IsOpen || Dealership.IsOpen) return false;
-            // Invitation à une course affichée : la touche d'entrée y répond
-            if (game.Races && game.Races.InvitePending) return false;
-            var car = game.Player;
-            if (!car || car.Speed > EnterSpeed) return false;
-            Vector3 pos = car.transform.position;
-            float dx = pos.x - p.x, dz = pos.z - p.z, r = Mathf.Max(p.r, 30f);
-            return dx * dx + dz * dz < r * r;
+            return !game.Races || (!game.Races.InvitePending && game.Races.Active == null);
         }
 
         /// <summary>Voiture que l'on conduit (fiche d'origine, sans améliorations).</summary>
@@ -221,7 +198,7 @@ namespace ChillRoad
 
         public void Open()
         {
-            if (IsOpen || !InZone()) return;
+            if (IsOpen) return;
             if (!root) Build();
             IsOpen = true;
             root.SetActive(true);
@@ -274,7 +251,7 @@ namespace ChillRoad
             stage.Hide();
             ShopFade.Cut(0.4f);
             if (game.Hud) game.Hud.SetVisible(true);
-            game.SetInputEnabled(true);
+            door.Leave();                          // la voiture ressort toute seule par la baie
             EventSystem.current?.SetSelectedGameObject(null);
         }
 

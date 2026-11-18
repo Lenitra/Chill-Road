@@ -389,26 +389,15 @@ namespace ChillRoad
             driftBarImage = driftBar.gameObject.AddComponent<Image>();
             driftBarImage.color = DriftColor;
 
-            // Concession : invite à entrer, à l'arrêt dans la zone (bouton : clic ou doigt)
+            // Concession et garage de tuning : aux abords, rappel d'entrer en voiture par la porte
             var dealer = Rect(canvas, "DealerPrompt", new Vector2(0.5f, 0.24f), new Vector2(0.5f, 0.24f), new Vector2(-330f, -32f), new Vector2(330f, 32f));
             dealerGroup = dealer.gameObject.AddComponent<CanvasGroup>();
             dealerGroup.alpha = 0f;
             dealerGroup.blocksRaycasts = dealerGroup.interactable = false;
             var plate = Shape(dealer, "Plate", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(660f, 64f), new Color(0.02f, 0.03f, 0.05f, 0.75f));
             plate.Set(18f, 0f, 0f);
-            plate.raycastTarget = true;
             dealerStripe = Shape(dealer, "Stripe", new Vector2(0.5f, 1f), Vector2.zero, new Vector2(420f, 3f), Info);
             dealerStripe.Set(0f, 120f, 120f);
-            var enter = dealer.gameObject.AddComponent<Button>();
-            enter.targetGraphic = plate;
-            enter.transition = Selectable.Transition.None;
-            enter.navigation = new Navigation { mode = Navigation.Mode.None };
-            enter.onClick.AddListener(() =>
-            {
-                // Même invite pour le garage de tuning
-                if (TuningGarage.Current && TuningGarage.Current.CanEnter) TuningGarage.Current.Open();
-                else if (game.Dealer) game.Dealer.Open();
-            });
             dealerText = Label(dealer, "", 28, TextAnchor.MiddleCenter, White, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(640f, 56f), FontStyle.BoldAndItalic);
             dealerText.supportRichText = true;
         }
@@ -557,21 +546,19 @@ namespace ChillRoad
             driftAlpha = Mathf.MoveTowards(driftAlpha, showPanel ? 1f : 0f, dt * (showPanel ? 8f : 3f));
             driftGroup.alpha = driftAlpha;
 
-            // Concession ou garage de tuning : invite à entrer
-            bool tuning = TuningGarage.Current && TuningGarage.Current.CanEnter && !Paused;
-            bool dealer = tuning || (game.Dealer && game.Dealer.CanEnter && !Paused);
+            // Concession ou garage de tuning : on y entre en voiture
+            bool tuning = TuningGarage.Current && TuningGarage.Current.Near && !Paused;
+            bool dealer = tuning || (game.Dealer && game.Dealer.Near && !Paused);
             if (dealer)
             {
                 Color tint = tuning ? new Color(1f, 0.42f, 0.82f) : Info;
                 dealerStripe.color = tint;
                 string hex = ColorUtility.ToHtmlStringRGB(tint);
-                string key = TouchInput.Showing ? Loc.T("touche ici", "tap here") : GameInput.UsingGamepad ? "A" : Loc.T("E ou Entrée", "E or Enter");
                 dealerText.text = tuning
-                    ? Loc.T($"<color=#{hex}>GARAGE DE TUNING</color>   ·   {key} : entrer", $"<color=#{hex}>TUNING GARAGE</color>   ·   {key}: enter")
-                    : Loc.T($"<color=#{hex}>CONCESSION</color>   ·   {key} : entrer", $"<color=#{hex}>CAR DEALER</color>   ·   {key}: enter");
+                    ? Loc.T($"<color=#{hex}>GARAGE DE TUNING</color>   ·   roulez jusqu'à la porte", $"<color=#{hex}>TUNING GARAGE</color>   ·   drive up to the door")
+                    : Loc.T($"<color=#{hex}>CONCESSION</color>   ·   roulez jusqu'à la porte", $"<color=#{hex}>CAR DEALER</color>   ·   drive up to the door");
             }
             dealerGroup.alpha = Mathf.MoveTowards(dealerGroup.alpha, dealer ? 1f : 0f, dt * 5f);
-            dealerGroup.blocksRaycasts = dealerGroup.interactable = dealer;
 
             if (flashAlpha > 0f)
             {
