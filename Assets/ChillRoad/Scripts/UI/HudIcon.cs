@@ -12,7 +12,7 @@ namespace ChillRoad
     /// </summary>
     public class HudIcon : MaskableGraphic
     {
-        public enum Kind { Play, Car, Clock, Gear, Home, Power, Invite, Back, Map, Trophy, Road, Gauge, Ramp, Flag, Coin, Lock }
+        public enum Kind { Play, Car, Clock, Gear, Home, Power, Invite, Back, Map, Trophy, Road, Gauge, Ramp, Flag, Coin, Lock, Radar }
 
         Kind kind;
         Color cut = Color.black;
@@ -189,6 +189,17 @@ namespace ChillRoad
                     Poly(fg, new Vector2(0.2f, 0.08f), new Vector2(0.8f, 0.08f), new Vector2(0.8f, 0.52f), new Vector2(0.2f, 0.52f));
                     Disc(bg, new Vector2(0.5f, 0.34f), 0.065f);
                     Poly(bg, new Vector2(0.47f, 0.17f), new Vector2(0.53f, 0.17f), new Vector2(0.52f, 0.33f), new Vector2(0.48f, 0.33f));
+                    break;
+
+                case Kind.Radar:
+                    // Tête de radar sur son mât, objectif évidé, éclairs du flash
+                    Line(fg, new Vector2(0.34f, 0.06f), new Vector2(0.34f, 0.5f), 0.09f);
+                    Poly(fg, new Vector2(0.1f, 0.46f), new Vector2(0.58f, 0.46f), new Vector2(0.58f, 0.82f), new Vector2(0.1f, 0.82f));
+                    Disc(bg, new Vector2(0.34f, 0.64f), 0.115f);
+                    Disc(fg, new Vector2(0.34f, 0.64f), 0.05f);
+                    Line(fg, new Vector2(0.68f, 0.64f), new Vector2(0.95f, 0.64f), 0.065f);
+                    Line(fg, new Vector2(0.66f, 0.78f), new Vector2(0.88f, 0.92f), 0.065f);
+                    Line(fg, new Vector2(0.66f, 0.5f), new Vector2(0.88f, 0.36f), 0.065f);
                     break;
             }
         }

@@ -7,8 +7,8 @@ namespace ChillRoad
 {
     /// <summary>
     /// Écran des succès, ouvert depuis le menu pause (tuile « Succès ») : en tête, le trophée, le nombre de succès
-    /// obtenus et une jauge ; dessous, un onglet par catégorie (pictogramme, nom, obtenus / total) et la grille de ses six
-    /// succès. Chaque carte montre une médaille (dorée si obtenu, sombre sinon), le nom, l'objectif, puis la date
+    /// obtenus et une jauge ; dessous, un onglet par catégorie (pictogramme, nom, obtenus / total) et la grille de ses
+    /// succès (six au plus). Chaque carte montre une médaille (dorée si obtenu, sombre sinon), le nom, l'objectif, puis la date
     /// d'obtention ou la progression (jauge et valeur).
     /// ← → (croix, joystick), LB / RB, Tab ou clic pour changer d'onglet ; Échap / B pour revenir au menu pause.
     /// </summary>
@@ -31,7 +31,7 @@ namespace ChillRoad
 
         const float Slope = 0.14f;
         const float AreaW = 1760f, AreaH = 860f;
-        const float TabW = 316f, TabH = 66f, TabGap = 14f;
+        const float TabW = 280f, TabH = 66f, TabGap = 14f;
         const float CardW = 560f, CardH = 250f, CardGap = 24f;
 
         public static bool IsOpen { get; private set; }
@@ -322,7 +322,11 @@ namespace ChillRoad
             t.button.onClick.AddListener(() => Select(index));
             t.icon = Icon(go.transform, Achievements.CategoryIcon((Achievements.Category)i), new Vector2(0f, 0.5f), new Vector2(42f, 0f), 38f);
             t.name = Label(go.transform, 24, TextAnchor.MiddleLeft, White, FontStyle.BoldAndItalic);
-            Fit(t.name.rectTransform, Vector2.zero, Vector2.one, new Vector2(76f, 0f), new Vector2(-80f, 0f));
+            Fit(t.name.rectTransform, Vector2.zero, Vector2.one, new Vector2(76f, 0f), new Vector2(-74f, 0f));
+            t.name.horizontalOverflow = HorizontalWrapMode.Wrap;
+            t.name.resizeTextForBestFit = true;
+            t.name.resizeTextMinSize = 16;
+            t.name.resizeTextMaxSize = 24;
             t.count = Label(go.transform, 20, TextAnchor.MiddleRight, Dim, FontStyle.Bold);
             Fit(t.count.rectTransform, Vector2.zero, Vector2.one, new Vector2(0f, 0f), new Vector2(-24f, 0f));
             t.name.GetComponent<Shadow>().enabled = t.count.GetComponent<Shadow>().enabled = false;

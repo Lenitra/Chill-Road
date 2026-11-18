@@ -89,6 +89,9 @@ namespace ChillRoad
         float raceZoom = -1f;
         /// <summary>Distance au départ (unités d'écran) sous laquelle le curseur ou le viseur le survole.</summary>
         const float RaceHoverRadius = 18f;
+        // Radars et tremplins : repère et étiquette de chacun (couleur et texte selon qu'il est déjà réussi)
+        readonly List<Image> radarDots = new List<Image>(), stuntDots = new List<Image>();
+        readonly List<Text> radarLabels = new List<Text>(), stuntLabels = new List<Text>();
         bool pressed;
         float pressMoved;
         float zoom = 1.12f;
@@ -151,6 +154,10 @@ namespace ChillRoad
                 raceLabels.Clear();
                 raceStarts.Clear();
                 raceFinishes.Clear();
+                radarDots.Clear();
+                radarLabels.Clear();
+                stuntDots.Clear();
+                stuntLabels.Clear();
                 raceHover = -1;
                 raceZoom = -1f;
             }
@@ -169,6 +176,7 @@ namespace ChillRoad
                 center = aim = new Vector2(0f, 60f);
                 BuildHints(GameInput.UsingGamepad);
                 RefreshRaceLabels();
+                RefreshGoals();
                 Refresh();
             }
         }
@@ -337,6 +345,22 @@ namespace ChillRoad
                         nav.SetDestination(t.start.pos, t.fr, t.en);
                         return;
                     }
+            // Clic sur un radar : le GPS y mène
+            if (game.Radars)
+                foreach (var r in game.Radars.All)
+                    if ((Local(r.center.x, r.center.z) - Local(xz.x, xz.y)).magnitude * zoom < 18f)
+                    {
+                        nav.SetDestination(r.center, r.data.fr, r.data.en);
+                        return;
+                    }
+            // Clic sur un tremplin : le GPS mène au début de sa bande d'élan
+            if (game.Stunts)
+                foreach (var s in game.Stunts.All)
+                    if ((Local(s.lip.x, s.lip.z) - Local(xz.x, xz.y)).magnitude * zoom < 18f)
+                    {
+                        nav.SetDestination(s.lip - s.forward * (s.data.length + 40f), s.data.fr, s.data.en);
+                        return;
+                    }
             string fr = null, en = null;
             float best = float.MaxValue;
             if (game.Map.Json.pois != null)
@@ -362,6 +386,12 @@ namespace ChillRoad
             if (game.Races)
                 foreach (var t in game.Races.All)
                     if (t.Name == name) return true;
+            if (game.Radars)
+                foreach (var r in game.Radars.All)
+                    if (r.Name == name) return true;
+            if (game.Stunts)
+                foreach (var s in game.Stunts.All)
+                    if (s.Name == name) return true;
             if (game.Map.Json.pois != null)
                 foreach (var poi in game.Map.Json.pois)
                     if (!string.IsNullOrEmpty(poi.fr) && Loc.T(poi.fr, poi.en) == name) return true;
@@ -592,6 +622,8 @@ namespace ChillRoad
                     }
                     raceFinishes.Add(finish);
                 }
+            BuildGoals();
+
             // Ordre : image, itinéraire du GPS, tracés des courses, puis les repères
             mapRoute.transform.SetSiblingIndex(1);
 
@@ -730,7 +762,7 @@ namespace ChillRoad
                 (new Color32(238, 234, 224, 255), new Color32(92, 92, 98, 255), 4.5f, "Chemin", "Lane"),
                 (new Color32(212, 176, 128, 255), new Color32(104, 76, 48, 255), 3.5f, "Chemin de terre", "Dirt track"),
             };
-            int rows = roads.Length + 1;
+            int rows = roads.Length + 2;
             float legendHeight = 62f + rows * rowStep + 14f;
             float legendTop = -Margin - headHeight - 14f;
             var legend = Panel(shade, "Legend", new Vector2(0f, 1f), new Vector2(x, legendTop - legendHeight * 0.5f), new Vector2(width, legendHeight));
@@ -771,8 +803,10 @@ namespace ChillRoad
             // Courses : une ligne par genre (le nom est écrit au départ en zoomant, le détail et le record au survol)
             RaceSwatch(LegendRow(legend, col1, top - 3f * rowStep, colW, "Course : sprint", "Race: sprint"), Races.SprintTint);
             RaceSwatch(LegendRow(legend, col1, top - 4f * rowStep, colW, "Course : tours", "Race: laps"), Races.LapsTint);
+            RadarSwatch(LegendRow(legend, col1, top - 5f * rowStep, colW, "Radar", "Speed camera"));
+            StuntSwatch(LegendRow(legend, col1, top - 6f * rowStep, colW, "Tremplin", "Stunt jump"));
             {
-                var row = LegendRow(legend, col1, top - 5f * rowStep, colW, "Votre voiture", "Your car");
+                var row = LegendRow(legend, col0, top - (roads.Length + 1) * rowStep, colW, "Votre voiture", "Your car");
                 var arrow = Box(row, "Arrow", new Vector2(0f, 0.5f), new Vector2(17f, 0f), new Vector2(17f, 19f)).gameObject.AddComponent<HudArrow>();
                 arrow.color = Accent;
                 arrow.raycastTarget = false;
@@ -1069,6 +1103,73 @@ namespace ChillRoad
             }
         }
 
+        /// <summary>
+        /// Repères des objectifs : radars (pastille à centre sombre) et tremplins (losange), avec leur nom et leur objectif
+        /// écrits en zoomant.
+        /// </summary>
+        void BuildGoals()
+        {
+            if (game.Radars)
+                foreach (var r in game.Radars.All)
+                {
+                    var mark = Box(content, "Radar_" + r.data.id, new Vector2(0.5f, 0.5f), Local(r.center.x, r.center.z), new Vector2(10f, 10f));
+                    Disc(mark, 18f, Ink);
+                    radarDots.Add(Disc(mark, 13f, SpeedCameras.Tint));
+                    Disc(mark, 5f, Ink);
+                    radarLabels.Add(GoalLabel(mark));
+                }
+            if (game.Stunts)
+                foreach (var s in game.Stunts.All)
+                {
+                    var mark = Box(content, "Stunt_" + s.data.id, new Vector2(0.5f, 0.5f), Local(s.lip.x, s.lip.z), new Vector2(10f, 10f));
+                    Diamond(mark, 14f, Ink);
+                    stuntDots.Add(Diamond(mark, 9.5f, StuntJumps.Tint));
+                    stuntLabels.Add(GoalLabel(mark));
+                }
+        }
+
+        Text GoalLabel(RectTransform mark)
+        {
+            var label = MapLabel(mark, 17, TextAnchor.MiddleLeft, Color.white, new Vector2(14f, 0f), FontStyle.BoldAndItalic);
+            label.rectTransform.pivot = new Vector2(0f, 0.5f);
+            fixedSize.Add(mark);
+            AddName(label, mark, 5, RaceNameZoom, 18f, true);
+            return label;
+        }
+
+        /// <summary>État des objectifs : leur couleur avec ce qu'il faut atteindre, vert avec le record une fois réussis.</summary>
+        void RefreshGoals()
+        {
+            if (game.Radars)
+            {
+                var all = game.Radars.All;
+                for (int i = 0; i < radarDots.Count && i < all.Count; i++)
+                {
+                    var r = all[i];
+                    Color tint = r.done ? SpeedCameras.DoneTint : SpeedCameras.Tint;
+                    radarDots[i].color = tint;
+                    radarLabels[i].color = tint;
+                    radarLabels[i].text = r.done
+                        ? Loc.F($"{r.Name}  ·  record {r.best:0} km/h", $"{r.Name}  ·  best {r.best:0} km/h")
+                        : Loc.F($"{r.Name}  ·  {r.Target:0} km/h");
+                }
+            }
+            if (game.Stunts)
+            {
+                var all = game.Stunts.All;
+                for (int i = 0; i < stuntDots.Count && i < all.Count; i++)
+                {
+                    var s = all[i];
+                    Color tint = s.done ? StuntJumps.DoneTint : StuntJumps.Tint;
+                    stuntDots[i].color = tint;
+                    stuntLabels[i].color = tint;
+                    stuntLabels[i].text = !s.done ? Loc.F($"{s.Name}  ·  {s.Target:0} m")
+                        : s.best > 0f ? Loc.F($"{s.Name}  ·  record {s.best:0} m", $"{s.Name}  ·  best {s.best:0} m")
+                        : s.Name;
+                }
+            }
+        }
+
         /// <summary>Repère d'un joueur : flèche orientée cerclée de blanc sur un disque d'encre (or : soi ; couleur et pseudo : les autres).</summary>
         RectTransform PlayerMark(int index)
         {
@@ -1143,6 +1244,30 @@ namespace ChillRoad
             Disc(row, 19f, Ink, at);
             Disc(row, 14f, tint, at);
             Disc(row, 5f, Color.white, at);
+        }
+
+        static void RadarSwatch(RectTransform row)
+        {
+            var at = new Vector2(17f - row.sizeDelta.x * 0.5f, 0f);
+            Disc(row, 18f, Ink, at);
+            Disc(row, 13f, SpeedCameras.Tint, at);
+            Disc(row, 5f, Ink, at);
+        }
+
+        static void StuntSwatch(RectTransform row)
+        {
+            var at = new Vector2(17f - row.sizeDelta.x * 0.5f, 0f);
+            Diamond(row, 14f, Ink, at);
+            Diamond(row, 9.5f, StuntJumps.Tint, at);
+        }
+
+        static Image Diamond(RectTransform parent, float size, Color color, Vector2? pos = null)
+        {
+            var img = Box(parent, "Diamond", new Vector2(0.5f, 0.5f), pos ?? Vector2.zero, new Vector2(size, size)).gameObject.AddComponent<Image>();
+            img.color = color;
+            img.raycastTarget = false;
+            img.rectTransform.localEulerAngles = new Vector3(0f, 0f, 45f);
+            return img;
         }
 
         static Image Disc(RectTransform parent, float size, Color color, Vector2? pos = null)

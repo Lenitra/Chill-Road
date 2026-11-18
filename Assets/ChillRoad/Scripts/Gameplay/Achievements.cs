@@ -6,9 +6,9 @@ using UnityEngine;
 namespace ChillRoad
 {
     /// <summary>
-    /// Succès du joueur : 30 objectifs en 5 catégories (route, vitesse, style, courses, carrière), suivis en jouant et
+    /// Succès du joueur : 34 objectifs en 6 catégories (route, vitesse, radars, style, courses, carrière), suivis en jouant et
     /// sauvegardés sur la machine (PlayerPrefs). Les compteurs cumulés (distance, frôlements, argent gagné…) vivent ici ;
-    /// les objectifs d'état (voitures achetées, courses terminées, tremplins) sont relus régulièrement dans le jeu.
+    /// les objectifs d'état (voitures achetées, courses terminées, tremplins, radars) sont relus régulièrement dans le jeu.
     /// Un succès obtenu déclenche <see cref="Unlocked"/> : la notification en bas à droite (<see cref="AchievementToast"/>)
     /// et son carillon. L'écran des succès s'ouvre depuis le menu pause (<see cref="AchievementsMenu"/>).
     /// Au premier lancement, ce que la sauvegarde prouve déjà (voitures, records, tremplins) est accordé sans notification.
@@ -17,8 +17,8 @@ namespace ChillRoad
     /// </summary>
     public class Achievements : MonoBehaviour
     {
-        public enum Category { Road, Speed, Style, Races, Career }
-        public const int CategoryCount = 5;
+        public enum Category { Road, Speed, Radars, Style, Races, Career }
+        public const int CategoryCount = 6;
 
         /// <summary>Compteurs suivis (index dans la sauvegarde des statistiques).</summary>
         public enum Stat
@@ -26,8 +26,9 @@ namespace ChillRoad
             Distance, NightDistance, RainDistance, SnowDistance, TopSpeed, NearMisses, ExtremeNearMisses, BestCombo,
             Drifts, BestDrift, Jumps, BestAir, Stunts, StuntsAll, RacesFinished, DistinctRaces, AllRaces, Earned,
             CarsOwned, CarsAll, Tuned, Online, BestBeaten, CleanRace,
+            Radars, RadarsAll, RadarBest,
         }
-        const int StatCount = 24;
+        const int StatCount = 27;
 
         public class Def
         {
@@ -53,6 +54,7 @@ namespace ChillRoad
         {
             { "road_1km", 500 }, { "road_100km", 5000 }, { "road_1000km", 50000 }, { "road_night", 5000 }, { "road_rain", 5000 }, { "road_snow", 5000 },
             { "speed_200", 2000 }, { "speed_300", 15000 }, { "speed_nm1", 500 }, { "speed_nm250", 10000 }, { "speed_extreme", 10000 }, { "speed_combo", 15000 },
+            { "radar_1", 2500 }, { "radar_6", 10000 }, { "radar_300", 15000 }, { "radar_all", 50000 },
             { "style_drift", 500 }, { "style_drift500", 5000 }, { "style_jump", 500 }, { "style_air", 5000 }, { "style_stunt", 2500 }, { "style_stunts", 50000 },
             { "race_1", 1000 }, { "race_10", 10000 }, { "race_pb", 2500 }, { "race_clean", 5000 }, { "race_5", 10000 }, { "race_all", 75000 },
             { "career_10k", 2500 }, { "career_1m", 100000 }, { "career_car", 2500 }, { "career_cars", 150000 }, { "career_tune", 2500 }, { "career_online", 5000 },
@@ -62,7 +64,7 @@ namespace ChillRoad
             string ufr = null, string uen = null, float scale = 1f)
             => new Def { id = id, category = c, fr = fr, en = en, descFr = dfr, descEn = den, stat = s, goal = goal, unitFr = ufr, unitEn = uen ?? ufr, scale = scale };
 
-        /// <summary>Tous les succès, dans l'ordre de l'écran (six par catégorie).</summary>
+        /// <summary>Tous les succès, dans l'ordre de l'écran (six au plus par catégorie : la grille de l'écran).</summary>
         public static readonly Def[] All =
         {
             D("road_1km", Category.Road, "Premiers tours de roue", "First miles", "Parcourir 1 km.", "Drive 1 km.", Stat.Distance, 1000f, "km", "km", 1000f),
@@ -78,6 +80,11 @@ namespace ChillRoad
             D("speed_nm250", Category.Speed, "Slalom", "Slalom", "Réussir 250 frôlements.", "Pull off 250 near misses.", Stat.NearMisses, 250f, "", ""),
             D("speed_extreme", Category.Speed, "Au millimètre", "Paper-thin", "Réussir 50 frôlements extrêmes.", "Pull off 50 extreme near misses.", Stat.ExtremeNearMisses, 50f, "", ""),
             D("speed_combo", Category.Speed, "Tout ou rien", "All in", "Encaisser un combo de 10 000 $.", "Bank a $10,000 combo.", Stat.BestCombo, 10000f, "$"),
+
+            D("radar_1", Category.Radars, "Souriez !", "Say cheese", "Se faire flasher par un radar.", "Get flashed by a speed camera.", Stat.Radars, 1f),
+            D("radar_6", Category.Radars, "Abonné au flash", "Frequent flasher", "Se faire flasher par 6 radars différents.", "Get flashed by 6 different speed cameras.", Stat.Radars, 6f, "", ""),
+            D("radar_300", Category.Radars, "Retrait de permis", "License revoked", "Se faire flasher à 300 km/h.", "Get flashed at 300 km/h.", Stat.RadarBest, 300f, "km/h"),
+            D("radar_all", Category.Radars, "Ennemi public", "Public enemy", "Se faire flasher par tous les radars de la carte.", "Get flashed by every speed camera on the map.", Stat.RadarsAll, 1f),
 
             D("style_drift", Category.Style, "Ça glisse", "Sideways", "Encaisser un premier drift.", "Bank your first drift.", Stat.Drifts, 1f),
             D("style_drift500", Category.Style, "Roi du drift", "Drift king", "Encaisser un drift de 500 $ d'un seul tenant.", "Bank a single $500 drift.", Stat.BestDrift, 500f, "$"),
@@ -107,6 +114,7 @@ namespace ChillRoad
             {
                 case Category.Road: return Loc.T("ROUTE", "ROAD");
                 case Category.Speed: return Loc.T("VITESSE", "SPEED");
+                case Category.Radars: return Loc.T("RADARS", "CAMERAS");
                 case Category.Style: return Loc.T("STYLE", "STYLE");
                 case Category.Races: return Loc.T("COURSES", "RACES");
                 default: return Loc.T("CARRIÈRE", "CAREER");
@@ -119,6 +127,7 @@ namespace ChillRoad
             {
                 case Category.Road: return HudIcon.Kind.Road;
                 case Category.Speed: return HudIcon.Kind.Gauge;
+                case Category.Radars: return HudIcon.Kind.Radar;
                 case Category.Style: return HudIcon.Kind.Ramp;
                 case Category.Races: return HudIcon.Kind.Flag;
                 default: return HudIcon.Kind.Coin;
@@ -318,12 +327,13 @@ namespace ChillRoad
             slot.Car.Impacted += (col, impact) => { if (impact > 2f) raceClean = false; };
         }
 
-        /// <summary>Courses et tremplins : créés après le HUD, on s'y abonne dès qu'ils existent.</summary>
+        /// <summary>Courses, tremplins et radars : créés après le HUD, on s'y abonne dès qu'ils existent.</summary>
         void Hook()
         {
-            if (hooked || !game.Stunts || !game.Races) return;
+            if (hooked || !game.Stunts || !game.Races || !game.Radars) return;
             hooked = true;
             game.Stunts.Completed += OnStunt;
+            game.Radars.Flashed += OnRadar;
             game.Races.Finished += OnRaceFinished;
         }
         bool hooked;
@@ -333,6 +343,7 @@ namespace ChillRoad
             Save();
             if (!hooked || !game) return;
             if (game.Stunts) game.Stunts.Completed -= OnStunt;
+            if (game.Radars) game.Radars.Flashed -= OnRadar;
             if (game.Races) game.Races.Finished -= OnRaceFinished;
         }
 
@@ -341,6 +352,11 @@ namespace ChillRoad
             if (!Counting) return;
             Raise(Stat.Stunts, 1f, true);
             CheckState(true);
+        }
+
+        void OnRadar(SpeedCameras.Radar r, float kmh)
+        {
+            if (Counting) CheckState(true);
         }
 
         void OnApplicationQuit() => Save();
@@ -407,7 +423,7 @@ namespace ChillRoad
             if (saveTimer <= 0f) { saveTimer = 10f; Save(); }
         }
 
-        /// <summary>Objectifs d'état relus dans le jeu : voitures, tuning, en ligne, courses et tremplins.</summary>
+        /// <summary>Objectifs d'état relus dans le jeu : voitures, tuning, en ligne, courses, tremplins et radars.</summary>
         void CheckState(bool notify)
         {
             var cars = game.assets ? game.assets.playerCars : null;
@@ -440,6 +456,14 @@ namespace ChillRoad
                 int done = game.Stunts.DoneCount, total = game.Stunts.All.Count;
                 if (done > 0) Raise(Stat.Stunts, done, false, notify);
                 if (total > 0 && done >= total) Raise(Stat.StuntsAll, 1f, false, notify);
+            }
+            if (game.Radars)
+            {
+                var radars = game.Radars.All;
+                int done = game.Radars.DoneCount;
+                if (done > 0) Raise(Stat.Radars, done, false, notify);
+                if (radars.Count > 0 && done >= radars.Count) Raise(Stat.RadarsAll, 1f, false, notify);
+                foreach (var r in radars) if (r.best > 0f) Raise(Stat.RadarBest, r.best, false, notify);
             }
         }
     }
