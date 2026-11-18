@@ -37,6 +37,8 @@ namespace ChillRoad
         static readonly Color GrassDry = new Color(0.45f, 0.39f, 0.25f), GrassWet = new Color(0.29f, 0.23f, 0.13f);
         /// <summary>Temps (s) pour que la pluie franche lave une voiture couverte de boue, de neige, à l'arrêt.</summary>
         const float RainMudTime = 70f, RainSnowTime = 45f;
+        /// <summary>Temps (s) pour que la terre d'une voiture couverte s'en aille d'elle-même, en roulant vite sur route.</summary>
+        const float DryMudTime = 260f;
 
         /// <summary>Boue et neige sur la voiture (0-1).</summary>
         public float Mud => mud;
@@ -153,6 +155,8 @@ namespace ChillRoad
                 snow = Mathf.Max(0f, snow - rinse * (1f - snowShare) / RainSnowTime);
             }
             if (snowShare < 0.05f) snow = Mathf.Max(0f, snow - dt * (1f + s01) / 240f);
+            // Hors des chemins, la terre sèche et s'envole peu à peu, plus vite en roulant
+            if (dirtShare < 0.05f) mud = Mathf.Max(0f, mud - dt * (0.35f + s01) / DryMudTime);
 
             // Dans l'eau : rinçage jusqu'à la ligne d'eau (un peu au-dessus à vive allure, la gerbe arrose)
             if (inWater)
