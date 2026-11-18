@@ -423,8 +423,10 @@ namespace ChillRoad
                 packMaterial = Copy(alp.material);
                 packMaterial.EnableKeyword("_EMISSION");
                 packMaterial.SetColor("_EmissionColor", Color.white * 1.6f);
-                // Sous la lumière de studio, le reflet dessiné couvrait les grandes surfaces planes : sols tout blancs
-                if (packMaterial.HasProperty("_SpecStrength")) packMaterial.SetFloat("_SpecStrength", 0f);
+                // Les décors sont loin hors de la carte, où la carte de neige déborde : sans ceci, tout ce qui regarde le
+                // ciel (les sols !) se couvrait de neige et ressortait tout blanc
+                packMaterial.SetFloat("_SnowCap", 0f);
+                packMaterial.DisableKeyword("_SNOWCAP_ON");
                 return packMaterial;
             }
         }
