@@ -200,8 +200,8 @@ namespace ChillRoad
             viewLift = 30f;
             viewTilt = 9f;        // l'horizon et le ciel dans la baie, pas seulement le versant d'en face
 
-            concrete = Flat(new Color(0.6f, 0.59f, 0.56f), 0.35f, 0.1f);
-            walkway = Flat(new Color(0.5f, 0.49f, 0.47f));
+            concrete = Flat(new Color(0.25f, 0.25f, 0.26f), 0.3f, 0.06f);
+            walkway = Flat(new Color(0.19f, 0.19f, 0.2f));
             paint = Flat(new Color(0.93f, 0.92f, 0.88f));
             hazard = Flat(new Color(0.98f, 0.72f, 0.16f));
             timber = Flat(new Color(0.3f, 0.2f, 0.14f));

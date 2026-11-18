@@ -4610,6 +4610,110 @@
    "note": "tremplin de cascade (ouvrage routier en béton, enrobé, glissière) : entrée au sol à l'arrière (-Z Unity), nez à l'avant (+Z Unity) à 2,05 m ; tablier 17 x 5,6 m ; collision = niveau lointain (volume plein)"
   },
   {
+   "id": "showroom_bay_a",
+   "file": "Showroom_Bay_A",
+   "category": "interior",
+   "tags": [
+    "shop",
+    "interior"
+   ],
+   "size": [
+    7.04,
+    6.9,
+    23.3
+   ],
+   "ymin": -0.3,
+   "footprint": [
+    7.0,
+    23.0
+   ],
+   "lods": 2,
+   "tris": [
+    2534,
+    1934
+   ],
+   "collider": "none",
+   "note": "travée du hall d'exposition (menu de la concession) : x -3,5..3,5, y -14..9 (fond), plafond 6,6 m ; podium au centre"
+  },
+  {
+   "id": "showroom_bay_b",
+   "file": "Showroom_Bay_B",
+   "category": "interior",
+   "tags": [
+    "shop",
+    "interior"
+   ],
+   "size": [
+    7.04,
+    6.9,
+    23.3
+   ],
+   "ymin": -0.3,
+   "footprint": [
+    7.0,
+    23.0
+   ],
+   "lods": 2,
+   "tris": [
+    2438,
+    2438
+   ],
+   "collider": "none",
+   "note": "travée du hall d'exposition (menu de la concession) : x -3,5..3,5, y -14..9 (fond), plafond 6,6 m ; podium au centre"
+  },
+  {
+   "id": "showroom_bay_c",
+   "file": "Showroom_Bay_C",
+   "category": "interior",
+   "tags": [
+    "shop",
+    "interior"
+   ],
+   "size": [
+    7.04,
+    6.9,
+    23.3
+   ],
+   "ymin": -0.3,
+   "footprint": [
+    7.0,
+    23.0
+   ],
+   "lods": 2,
+   "tris": [
+    3424,
+    3124
+   ],
+   "collider": "none",
+   "note": "travée du hall d'exposition (menu de la concession) : x -3,5..3,5, y -14..9 (fond), plafond 6,6 m ; podium au centre"
+  },
+  {
+   "id": "tuning_workshop",
+   "file": "Tuning_Workshop",
+   "category": "interior",
+   "tags": [
+    "shop",
+    "interior"
+   ],
+   "size": [
+    13.6,
+    5.9,
+    16.6
+   ],
+   "ymin": -0.3,
+   "footprint": [
+    13.0,
+    16.0
+   ],
+   "lods": 2,
+   "tris": [
+    66672,
+    66672
+   ],
+   "collider": "none",
+   "note": "atelier (menu du garage de tuning) : x -6,5..6,5, y -8..8 (porte en y = 8), plafond 5,6 m ; plateaux du pont à 0,2 m"
+  },
+  {
    "id": "snow_groomer",
    "file": "Snow_Groomer",
    "category": "ski",
@@ -5634,164 +5738,6 @@
    ],
    "collider": "none",
    "material": "AP_Flora"
-  },
-  {
-   "id": "showroom_bay_a",
-   "file": "Showroom_Bay_A",
-   "category": "interior",
-   "tags": [
-    "shop",
-    "interior"
-   ],
-   "size": [
-    7.04,
-    6.9,
-    23.3
-   ],
-   "ymin": -0.3,
-   "footprint": [
-    7.0,
-    23.0
-   ],
-   "lods": 2,
-   "tris": [
-    2534,
-    1934
-   ],
-   "collider": "none",
-   "note": "travée du hall d'exposition (menu de la concession) : x -3,5..3,5, y -14..9 (fond), plafond 6,6 m ; podium au centre"
-  },
-  {
-   "id": "showroom_bay_b",
-   "file": "Showroom_Bay_B",
-   "category": "interior",
-   "tags": [
-    "shop",
-    "interior"
-   ],
-   "size": [
-    7.04,
-    6.9,
-    23.3
-   ],
-   "ymin": -0.3,
-   "footprint": [
-    7.0,
-    23.0
-   ],
-   "lods": 2,
-   "tris": [
-    2438,
-    2438
-   ],
-   "collider": "none",
-   "note": "travée du hall d'exposition (menu de la concession) : x -3,5..3,5, y -14..9 (fond), plafond 6,6 m ; podium au centre"
-  },
-  {
-   "id": "showroom_bay_c",
-   "file": "Showroom_Bay_C",
-   "category": "interior",
-   "tags": [
-    "shop",
-    "interior"
-   ],
-   "size": [
-    7.04,
-    6.9,
-    23.3
-   ],
-   "ymin": -0.3,
-   "footprint": [
-    7.0,
-    23.0
-   ],
-   "lods": 2,
-   "tris": [
-    3376,
-    3076
-   ],
-   "collider": "none",
-   "note": "travée du hall d'exposition (menu de la concession) : x -3,5..3,5, y -14..9 (fond), plafond 6,6 m ; podium au centre"
-  },
-  {
-   "id": "showroom_end",
-   "file": "Showroom_End",
-   "category": "interior",
-   "tags": [
-    "shop",
-    "interior"
-   ],
-   "size": [
-    2.56,
-    6.9,
-    23.56
-   ],
-   "ymin": -0.3,
-   "footprint": [
-    1.2,
-    23.0
-   ],
-   "lods": 2,
-   "tris": [
-    1704,
-    1404
-   ],
-   "collider": "none",
-   "note": "mur de bout du hall (pièce côté +x), y -14..9 ; Unity : à gauche tel quel, à droite en miroir"
-  },
-  {
-   "id": "tuning_workshop",
-   "file": "Tuning_Workshop",
-   "category": "interior",
-   "tags": [
-    "shop",
-    "interior"
-   ],
-   "size": [
-    13.6,
-    5.9,
-    16.6
-   ],
-   "ymin": -0.3,
-   "footprint": [
-    13.0,
-    16.0
-   ],
-   "lods": 2,
-   "tris": [
-    66672,
-    66672
-   ],
-   "collider": "none",
-   "note": "atelier (menu du garage de tuning) : x -6,5..6,5, y -8..8 (porte en y = 8), plafond 5,6 m ; plateaux du pont à 0,2 m"
-  },
-  {
-   "id": "speed_camera",
-   "file": "Speed_Camera",
-   "category": "radar",
-   "tags": [
-    "radar",
-    "road"
-   ],
-   "size": [
-    0.86,
-    4.42,
-    1.17
-   ],
-   "ymin": -0.5,
-   "footprint": [
-    0.86,
-    0.86
-   ],
-   "lods": 3,
-   "tris": [
-    844,
-    348,
-    48
-   ],
-   "collider": "capsule",
-   "radius": 0.32,
-   "note": "radar de vitesse à deux faces (±Z Unity : le long de la route), lampes de flash à 4,06 m"
   }
  ]
 }

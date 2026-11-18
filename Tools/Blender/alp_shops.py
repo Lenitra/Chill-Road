@@ -83,8 +83,8 @@ RED = "sign_red"                 # couleur de la marque (comme la façade de la 
 
 
 def hall_floor(g, x0=-W / 2, x1=W / 2):
-    """Dalle de joints sombres, carreaux clairs de 1,75 m (légèrement en relief), filets rouges devant le podium."""
-    g.box(((x0 + x1) / 2, (YC + YB) / 2, -0.15), (x1 - x0, YB - YC, 0.3), "concrete_dark")
+    """Dalle de joints sombres, carreaux d'ardoise de 1,75 m (légèrement en relief), filets rouges devant le podium."""
+    g.box(((x0 + x1) / 2, (YC + YB) / 2, -0.15), (x1 - x0, YB - YC, 0.3), "asphalt")
     step = 1.75
     nx = int(round((x1 - x0) / step))
     ny = int(round((YB - YC) / step))
@@ -94,7 +94,7 @@ def hall_floor(g, x0=-W / 2, x1=W / 2):
             cx = x0 + step * (i + 0.5)
             cy = YC + sy * (j + 0.5)
             light = (i + j) % 2 == 0
-            g.slab((cx, cy, 0.01), (step - 0.03, sy - 0.03, 0.02), "plaster_white" if light else "sign_white")
+            g.slab((cx, cy, 0.01), (step - 0.03, sy - 0.03, 0.02), "stone_dark" if light else "roof_slate")
     # filets rouges et blancs au sol, devant et derrière les podiums (lignes de la vitrine)
     g.slab(((x0 + x1) / 2, -3.9, 0.025), (x1 - x0, 0.1, 0.01), RED)
     g.slab(((x0 + x1) / 2, -4.1, 0.025), (x1 - x0, 0.04, 0.01), "white")
@@ -339,8 +339,8 @@ WINDOWS = [(y - WIN_W / 2, y + WIN_W / 2) for y in WIN_Y]
 
 def ws_floor(g):
     """Sol béton, aire du pont en béton foncé bordée de jaune, hachures devant la porte, caniveau."""
-    g.box((0, 0, -0.15), (2 * HX + 0.6, 2 * HY + 0.6, 0.3), "concrete")
-    g.slab((0, 0, 0.005), (3.6, 6.8, 0.01), "concrete_dark")
+    g.box((0, 0, -0.15), (2 * HX + 0.6, 2 * HY + 0.6, 0.3), "stone_dark")
+    g.slab((0, 0, 0.005), (3.6, 6.8, 0.01), "asphalt")
     for s in (-1, 1):
         g.slab((s * 1.85, 0, 0.012), (0.1, 7.0, 0.012), "sign_yellow")
         g.slab((0, s * 3.45, 0.012), (3.6, 0.1, 0.012), "sign_yellow")

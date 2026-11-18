@@ -423,6 +423,8 @@ namespace ChillRoad
                 packMaterial = Copy(alp.material);
                 packMaterial.EnableKeyword("_EMISSION");
                 packMaterial.SetColor("_EmissionColor", Color.white * 1.6f);
+                // Sous la lumière de studio, le reflet dessiné couvrait les grandes surfaces planes : sols tout blancs
+                if (packMaterial.HasProperty("_SpecStrength")) packMaterial.SetFloat("_SpecStrength", 0f);
                 return packMaterial;
             }
         }
