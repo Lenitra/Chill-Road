@@ -163,6 +163,8 @@ namespace ChillRoad
         /// Menu pause (ou options ouvertes depuis la pause), carte : le joueur ne conduit pas. Seul, le monde est arrêté ;
         /// en réseau, il continue.
         /// </summary>
+        /// <summary>Photo du radar, en haut à droite.</summary>
+        public RadarPolaroid Polaroid { get; private set; }
         public bool Paused => WorldMap.IsOpen || inPause || Dealership.IsOpen || TuningGarage.IsOpen || RaceSetup.IsOpen;
 
         // Partie en réseau : à droite du menu, le tableau des joueurs (PlayerList) prend la place des contrôles
@@ -215,6 +217,8 @@ namespace ChillRoad
             BuildCenter();
             BuildBottomLeft();
             BuildPause();
+            Polaroid = gameObject.AddComponent<RadarPolaroid>();
+            Polaroid.Init(gm, canvas);
             gameObject.AddComponent<CheatCodes>().Init(gm);
             // Succès : suivi en jeu, notification en bas à droite (et son carillon)
             gameObject.AddComponent<Achievements>().Init(gm);

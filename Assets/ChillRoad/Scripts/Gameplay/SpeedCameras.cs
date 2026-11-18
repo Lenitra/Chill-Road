@@ -137,6 +137,7 @@ namespace ChillRoad
                 return;
             }
             Fire(flashAt);
+            if (game.Hud && game.Hud.Polaroid) game.Hud.Polaroid.Snap(r.lamp, r.Name, kmh);
             bool record = kmh > r.best + 1f;
             if (record)
             {
