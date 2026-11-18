@@ -306,7 +306,7 @@ namespace ChillRoad
         const string GlowName = "Underglow";
 
         /// <summary>Hauteur des lumières des néons au-dessus du sol (m) et leur intensité.</summary>
-        const float NeonHeight = 0.45f, NeonIntensity = 6f;
+        const float NeonHeight = 0.45f, NeonIntensity = 3.6f;
 
         static readonly List<Renderer> renderers = new List<Renderer>();
         static MaterialPropertyBlock mpb;
