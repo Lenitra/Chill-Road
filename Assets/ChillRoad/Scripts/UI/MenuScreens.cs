@@ -25,6 +25,7 @@ namespace ChillRoad
         static readonly Color PlateColor = new Color(0.03f, 0.04f, 0.06f, 0.86f);
         static readonly Color ButtonIdle = new Color(0.1f, 0.115f, 0.15f, 0.82f);
         static readonly Color ButtonSelected = new Color(0.95f, 0.66f, 0.14f, 1f);
+        const string EmblemResource = "Logo/ChillRoadLogo";
 
         static readonly (string fr, string en)[] Tips =
         {
@@ -96,6 +97,7 @@ namespace ChillRoad
         readonly List<MenuItem> items = new List<MenuItem>();
         RectTransform titleLogo, chipRow;
         CanvasGroup titleLogoGroup, footerGroup;
+        float logoTextX;
         Text carText, cashText;
         float titleT = -1f;
         bool chipsForPad, chipsFrench;
@@ -132,19 +134,27 @@ namespace ChillRoad
         // ------------------------------------------------------------------ logo
 
         /// <summary>
-        /// Logo du jeu : surtitre cyan espacé, « CHILL » blanc et « ROAD » or en gras italique, souligné d'un trait or
-        /// incliné prolongé d'un tiret cyan. Pivot à gauche (accueil) ou au centre (chargement).
+        /// Logo du jeu : emblème rond (Resources/Logo/ChillRoadLogo) à gauche du titre, puis surtitre cyan espacé,
+        /// « CHILL » blanc et « ROAD » or en gras italique, souligné d'un trait or incliné prolongé d'un tiret cyan.
+        /// Pivot à gauche (accueil) ou ensemble centré (chargement).
         /// </summary>
-        RectTransform Logo(RectTransform parent, Vector2 anchor, int size, bool centred, out CanvasGroup group)
+        RectTransform Logo(RectTransform parent, Vector2 anchor, int size, float emblemSize, bool centred, out CanvasGroup group)
         {
             float w = size * 4.6f, h = size * 1.75f;
-            var rt = Rect(parent, "Logo", anchor, anchor, Vector2.zero, Vector2.zero);
-            rt.sizeDelta = new Vector2(w, h);
-            rt.pivot = new Vector2(centred ? 0.5f : 0f, 0.5f);
-            group = rt.gameObject.AddComponent<CanvasGroup>();
+            var root = Rect(parent, "Logo", anchor, anchor, Vector2.zero, Vector2.zero);
+            root.sizeDelta = new Vector2(w, h);
+            root.pivot = new Vector2(centred ? 0.5f : 0f, 0.5f);
+            group = root.gameObject.AddComponent<CanvasGroup>();
             group.blocksRaycasts = false;
             var align = centred ? TextAnchor.MiddleCenter : TextAnchor.MiddleLeft;
             float px = centred ? 0.5f : 0f;
+
+            // Le titre a son propre bloc, décalé pour laisser la place à l'emblème
+            var emblem = Resources.Load<Texture2D>(EmblemResource);
+            float side = emblem ? emblemSize + size * 0.24f : 0f;
+            var rt = Rect(root, "Wordmark", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            logoTextX = centred ? side * 0.5f : side;
+            rt.anchoredPosition = new Vector2(logoTextX, 0f);
 
             var kicker = Label(rt, Mathf.RoundToInt(size * 0.16f), align, Info, FontStyle.Bold, new Vector2(px, 1f), new Vector2(centred ? 0f : size * 0.06f, -size * 0.1f), new Vector2(w, size * 0.25f));
             kicker.rectTransform.pivot = new Vector2(px, 1f);
@@ -165,7 +175,18 @@ namespace ChillRoad
             Plate(bar, Accent).Set(bh * 1.4f, 0f, 0f);
             var tick = Rect(rt, "Dash", new Vector2(px, 0.5f), new Vector2(px, 0.5f), new Vector2(x0 + barW + 14f, y - bh), new Vector2(x0 + barW + 14f + dash, y));
             Plate(tick, Info).Set(bh * 1.4f, 0f, 0f);
-            return rt;
+
+            if (emblem)
+            {
+                var badge = Rect(root, "Emblem", new Vector2(px, 0.5f), new Vector2(px, 0.5f), Vector2.zero, Vector2.zero);
+                badge.pivot = new Vector2(px, 0.5f);
+                badge.sizeDelta = new Vector2(emblemSize, emblemSize);
+                badge.anchoredPosition = new Vector2(centred ? (emblemSize - side - word.preferredWidth) * 0.5f : 0f, 0f);
+                var image = badge.gameObject.AddComponent<RawImage>();
+                image.texture = emblem;
+                image.raycastTarget = false;
+            }
+            return root;
         }
 
         /// <summary>Lettres espacées (le Text de uGUI n'a pas d'interlettrage).</summary>
@@ -188,7 +209,7 @@ namespace ChillRoad
             veil.texture = VerticalVeil();
             veil.raycastTarget = false;
 
-            loadingLogo = Logo(panel, new Vector2(0.5f, 0.8f), 128, true, out loadingLogoGroup);
+            loadingLogo = Logo(panel, new Vector2(0.5f, 0.8f), 108, 250f, true, out loadingLogoGroup);
 
             // Bas de l'écran : astuce sur sa plaque, puis étape, pourcentage et barre
             var box = Rect(panel, "Progress", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(-660f, 56f), new Vector2(660f, 236f));
@@ -354,8 +375,8 @@ namespace ChillRoad
             floor.texture = Ramp(false, 1.6f, 0.6f);
             floor.raycastTarget = false;
 
-            titleLogo = Logo(panel, new Vector2(0.065f, 0.765f), 150, false, out titleLogoGroup);
-            var tagline = Label(titleLogo, 28, TextAnchor.MiddleLeft, Dim, FontStyle.Italic, new Vector2(0f, 0f), new Vector2(8f, -18f), new Vector2(1100, 40));
+            titleLogo = Logo(panel, new Vector2(0.065f, 0.765f), 118, 300f, false, out titleLogoGroup);
+            var tagline = Label(titleLogo, 28, TextAnchor.MiddleLeft, Dim, FontStyle.Italic, new Vector2(0f, 0f), new Vector2(8f + logoTextX, -18f), new Vector2(1100, 40));
             tagline.rectTransform.pivot = new Vector2(0f, 0.5f);
             Loc.Bind(tagline, "Une vallée alpine, un col, des lacets : roule à ton rythme.", "An alpine valley, a mountain pass, hairpins: drive at your own pace.");
 
