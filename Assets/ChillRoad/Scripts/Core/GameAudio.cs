@@ -4,7 +4,8 @@ namespace ChillRoad
 {
     /// <summary>
     /// Sons synthétisés : moteur propre à chaque voiture (<see cref="EngineSynth"/>, en temps réel), vent, crissement,
-    /// frôlement, radar, sirène, klaxon, choc, retours de flamme.
+    /// frôlement, radar, sirène, klaxon, choc, retours de flamme. Les tampons viennent de <see cref="SfxSynth"/> ;
+    /// cette classe les joue et les dose selon la conduite.
     /// </summary>
     public class GameAudio : MonoBehaviour
     {
@@ -15,7 +16,7 @@ namespace ChillRoad
         static float Ambience => GameSettings.AmbienceVolume;
         static float Ui => GameSettings.UiVolume;
 
-        AudioSource wind, skid, siren, horn;
+        AudioSource windBody, windAir, skid, siren, horn;
         /// <summary>Klaxon tenu (R3 / H) : réglé par <see cref="GameManager"/> chaque image de conduite.</summary>
         public bool Horn;
         EngineSynth engine;
@@ -23,7 +24,11 @@ namespace ChillRoad
         bool revPop;
         AudioSource[] oneShots;
         int next;
-        AudioClip whoosh, flash, crash, blip, bonus, lose, pop;
+        AudioClip whoosh, flash, crashSoft, crashHard, shift, blip, bonus, lose;
+        AudioClip[] pops;
+        // Tampons de SfxSynth en cours de calcul hors du thread principal (près d'une seconde) : vent, crissement et
+        // sons ponctuels arrivent pendant le chargement ; d'ici là ils sont simplement muets
+        System.Threading.Tasks.Task<float[][]> synthesis;
         VehicleController car;
 
         public void Init(VehicleController c, ScoreSystem score)
@@ -33,36 +38,60 @@ namespace ChillRoad
             engineGo.transform.SetParent(transform, false);
             engineGo.AddComponent<AudioSource>();
             engine = engineGo.AddComponent<EngineSynth>();
-            wind = Loop(Noise(0.06f, 2.5f));
-            skid = Loop(Screech());
             siren = Loop(Siren());
             horn = Loop(HornClip);
             oneShots = new AudioSource[8];
             for (int i = 0; i < oneShots.Length; i++) { oneShots[i] = gameObject.AddComponent<AudioSource>(); oneShots[i].playOnAwake = false; }
-            whoosh = Whoosh();
-            flash = Tones(new[] { 2200f, 2200f }, 0.05f, 0.1f, 0.3f);
-            crash = Crash();
-            blip = Tones(new[] { 700f }, 0.04f, 0.05f, 0.35f);
-            bonus = Tones(new[] { 523f, 659f, 784f, 1047f }, 0.07f, 0.3f, 0.35f);
-            lose = Tones(new[] { 330f, 247f, 196f }, 0.12f, 0.3f, 0.35f);
-            pop = Pop();
+            synthesis = System.Threading.Tasks.Task.Run(() => new[]
+            {
+                SfxSynth.WindBody(), SfxSynth.WindAir(), SfxSynth.Skid(), SfxSynth.Whoosh(), SfxSynth.Flash(),
+                SfxSynth.Crash(false), SfxSynth.Crash(true), SfxSynth.Shift(), SfxSynth.Blip(), SfxSynth.Bonus(), SfxSynth.Lose(),
+                SfxSynth.Pop(0), SfxSynth.Pop(1), SfxSynth.Pop(2),
+            });
 
-            car.GearChanged += g => Play(blip, 0.1f * Ui, g > 1 ? 0.5f : 0.4f);
-            car.Impacted += (col, impact) => { if (impact > 3f) Play(crash, Mathf.Clamp01(impact / 15f) * Fx, Random.Range(0.85f, 1.1f)); };
+            car.GearChanged += g => Play(shift, 0.2f * Ui, g > 1 ? 1f : 0.85f);
+            // Petit choc : coup sourd ; gros choc : la tôle se froisse et des éclats retombent
+            car.Impacted += (col, impact) => { if (impact > 3f) Play(impact > 9f ? crashHard : crashSoft, Mathf.Clamp01(impact / 15f) * Fx, Random.Range(0.85f, 1.1f)); };
             score.NearMiss += (pts, gap) => Play(whoosh, 0.8f * Ui, Random.Range(0.9f, 1.2f));
-            score.Bonus += (pts, label) => Play(blip, 0.18f * Ui, 1.4f);       // vitesse : petite note, toutes les 5 s
+            score.Bonus += (pts, label) => Play(blip, 0.18f * Ui, 1f);         // vitesse : petite note, toutes les 5 s
             score.Banked += cash => Play(bonus, 0.5f * Ui, 1f);
             score.Lost += (pts, why) => Play(lose, 0.6f * Ui, 1f);
             score.DriftLost += pts => Play(lose, 0.45f * Ui, 1.1f);
             score.JumpScored += (pts, air, dist) => Play(bonus, 0.35f * Ui, 1.3f);   // réception d'un saut
         }
 
+        /// <summary>Les tampons sont calculés (même ordre que dans <see cref="Init"/>) : crée les clips, lance les boucles.</summary>
+        void Receive(float[][] d)
+        {
+            windBody = Loop(Stereo("WindBody", d[0], SfxSynth.HalfRate));
+            windAir = Loop(Stereo("WindAir", d[1]));
+            skid = Loop(Stereo("Skid", d[2]));
+            whoosh = Stereo("Whoosh", d[3]);
+            flash = Stereo("Flash", d[4]);
+            crashSoft = Stereo("CrashSoft", d[5]);
+            crashHard = Stereo("CrashHard", d[6]);
+            shift = Stereo("Shift", d[7]);
+            blip = Stereo("Blip", d[8]);
+            bonus = Stereo("Bonus", d[9]);
+            lose = Stereo("Lose", d[10]);
+            pops = new[] { Stereo("Pop", d[11]), Stereo("Pop", d[12]), Stereo("Pop", d[13]) };
+        }
+
         /// <summary>Carillon (achat à la concession).</summary>
         public void Chime() => Play(bonus, 0.55f * Ui, 1.12f);
+
+        /// <summary>Déclic double du flash d'un radar.</summary>
+        public void RadarFlash() => Play(flash, 0.7f * Ui, 1f);
 
         void Update()
         {
             if (!car) return;
+            if (synthesis != null && synthesis.IsCompleted)
+            {
+                if (synthesis.IsFaulted) Debug.LogException(synthesis.Exception);
+                else Receive(synthesis.Result);
+                synthesis = null;
+            }
             bool paused = Time.timeScale < 0.01f;
             // Moteur : voix de la voiture courante (change aux relais), régime réel, charge = accélérateur
             if (car.Spec != null) engine.SetVoice(car.Spec.Voice);
@@ -90,11 +119,20 @@ namespace ChillRoad
             // Soupape de décharge du turbo au lever de pied sous pression
             if ((engine.Voice == EngineVoice.Inline6Turbo || engine.Voice == EngineVoice.FlatPlaneV8Turbo) && lastThrottle > 0.6f && car.Throttle < 0.2f && engine.Boost > 0.35f) engine.BlowOff();
             lastThrottle = car.Throttle;
-            float speed01 = Mathf.Clamp01(car.Speed / 80f);
-            wind.volume = paused ? 0f : Ambience * speed01 * speed01 * 0.35f;
-            wind.pitch = 0.7f + speed01 * 0.6f;
-            float skidTarget = car.GroundedWheels > 0 && car.Speed > 4f ? Mathf.Clamp01((car.SkidAmount - 0.25f) * 1.6f) : 0f;
-            skid.volume = Mathf.Lerp(skid.volume, paused ? 0f : Fx * skidTarget * 0.35f, Time.unscaledDeltaTime * 10f);
+            if (skid)
+            {
+                float speed01 = Mathf.Clamp01(car.Speed / 80f);
+                // Vent : le fond gronde dès les vitesses moyennes, l'air ne siffle vraiment qu'à haute vitesse
+                float windVolume = paused ? 0f : Ambience;
+                windBody.volume = windVolume * 0.44f * speed01 * Mathf.Sqrt(speed01);
+                windBody.pitch = 0.85f + speed01 * 0.25f;
+                windAir.volume = windVolume * 0.28f * speed01 * speed01 * speed01;
+                windAir.pitch = 0.8f + speed01 * 0.4f;
+                // Crissement : plus aigu quand la voiture glisse davantage
+                float skidTarget = car.GroundedWheels > 0 && car.Speed > 4f ? Mathf.Clamp01((car.SkidAmount - 0.25f) * 1.6f) : 0f;
+                skid.volume = Mathf.Lerp(skid.volume, paused ? 0f : Fx * skidTarget * 0.35f, Time.unscaledDeltaTime * 10f);
+                skid.pitch = Mathf.Lerp(skid.pitch, 0.92f + 0.16f * skidTarget, Time.unscaledDeltaTime * 6f);
+            }
             // Klaxon : attaque franche, relâchement très court
             float hornTarget = Horn && !paused ? Fx * HornVolume : 0f;
             horn.volume = HornFade(horn.volume, hornTarget, Time.unscaledDeltaTime);
@@ -123,12 +161,16 @@ namespace ChillRoad
                 : engine.Voice == EngineVoice.Inline4 ? 1.25f : 0.95f;
             float volume = (engine.Voice == EngineVoice.V8 ? 0.7f : 0.55f) * loud;
             pitch /= Mathf.Lerp(1f, 1.25f, Mathf.Clamp01(loud - 1f));
-            Play(pop, volume * Fx, pitch * Random.Range(0.9f, 1.1f));
+            if (pops != null) Play(pops[Random.Range(0, pops.Length)], volume * Fx, pitch * Random.Range(0.9f, 1.1f));
         }
 
         /// <summary>Son ponctuel ; volume déjà multiplié par sa voie (effets ou sons du score).</summary>
         void Play(AudioClip clip, float volume, float pitch)
         {
+            if (!clip) return;      // pas encore synthétisé (tout début du chargement)
+            // Une source libre de préférence : changer la hauteur d'une source qui sonne encore tordrait la fin de
+            // son son précédent
+            for (int i = 0; i < oneShots.Length && oneShots[next].isPlaying; i++) next = (next + 1) % oneShots.Length;
             var s = oneShots[next];
             next = (next + 1) % oneShots.Length;
             s.pitch = pitch;
@@ -150,28 +192,12 @@ namespace ChillRoad
             return c;
         }
 
-        static AudioClip Noise(float smoothing, float gain)
+        /// <summary>Clip stéréo (échantillons entrelacés gauche, droite) synthétisé par <see cref="SfxSynth"/>.</summary>
+        static AudioClip Stereo(string name, float[] data, int rate = SfxSynth.Rate)
         {
-            var d = new float[Rate];
-            var rng = new System.Random(5);
-            float lp = 0f;
-            for (int i = 0; i < d.Length; i++) { lp += (((float)rng.NextDouble() * 2f - 1f) - lp) * smoothing; d[i] = lp * gain; }
-            return Clip("Noise", d);
-        }
-
-        static AudioClip Screech()
-        {
-            var d = new float[Rate];
-            var rng = new System.Random(3);
-            float lp = 0f;
-            for (int i = 0; i < d.Length; i++)
-            {
-                float t = i / (float)Rate;
-                float n = (float)rng.NextDouble() * 2f - 1f;
-                lp += (n - lp) * 0.3f;
-                d[i] = (Mathf.Sin(2f * Mathf.PI * 900f * t + 2f * Mathf.Sin(2f * Mathf.PI * 6f * t)) * 0.3f + (n - lp) * 0.35f) * 0.7f;
-            }
-            return Clip("Screech", d);
+            var c = AudioClip.Create(name, data.Length / 2, 2, rate, false);
+            c.SetData(data, 0);
+            return c;
         }
 
         static AudioClip Siren()
@@ -223,67 +249,6 @@ namespace ChillRoad
                 d[i] = v * 0.32f;
             }
             return Clip("Horn", d);
-        }
-
-        static AudioClip Whoosh()
-        {
-            int len = (int)(0.45f * Rate);
-            var d = new float[len];
-            var rng = new System.Random(13);
-            float lp = 0f;
-            for (int i = 0; i < len; i++)
-            {
-                float t = i / (float)len;
-                lp += (((float)rng.NextDouble() * 2f - 1f) - lp) * Mathf.Lerp(0.05f, 0.4f, Mathf.Sin(t * Mathf.PI));
-                d[i] = lp * Mathf.Sin(t * Mathf.PI) * 1.4f;
-            }
-            return Clip("Whoosh", d);
-        }
-
-        static AudioClip Pop()
-        {
-            int len = (int)(0.16f * Rate);
-            var d = new float[len];
-            var rng = new System.Random(21);
-            float lp = 0f;
-            for (int i = 0; i < len; i++)
-            {
-                float t = i / (float)Rate;
-                lp += (((float)rng.NextDouble() * 2f - 1f) - lp) * 0.45f;
-                // Claquement bref + grave qui décroît vite, parfois doublé
-                float env = Mathf.Exp(-t * 38f) + (t > 0.05f ? Mathf.Exp(-(t - 0.05f) * 45f) * 0.6f : 0f);
-                d[i] = Mathf.Clamp((lp * 1.4f + Mathf.Sin(2f * Mathf.PI * 70f * t) * 0.8f) * env, -1f, 1f);
-            }
-            return Clip("Pop", d);
-        }
-
-        static AudioClip Crash()
-        {
-            int len = (int)(0.6f * Rate);
-            var d = new float[len];
-            var rng = new System.Random(11);
-            float lp = 0f;
-            for (int i = 0; i < len; i++)
-            {
-                float t = i / (float)Rate;
-                lp += (((float)rng.NextDouble() * 2f - 1f) - lp) * 0.35f;
-                d[i] = (lp + Mathf.Sin(2f * Mathf.PI * 60f * t) * 0.6f) * Mathf.Exp(-t * 7f);
-            }
-            return Clip("Crash", d);
-        }
-
-        static AudioClip Tones(float[] freqs, float note, float tail, float volume)
-        {
-            int ns = (int)(note * Rate);
-            int total = ns * freqs.Length + (int)(tail * Rate);
-            var d = new float[total];
-            for (int n = 0; n < freqs.Length; n++)
-                for (int i = 0; n * ns + i < total; i++)
-                {
-                    float t = i / (float)Rate;
-                    d[n * ns + i] += Mathf.Sin(2f * Mathf.PI * freqs[n] * t) * Mathf.Exp(-t * 12f) * Mathf.Clamp01(i / 150f) * volume;
-                }
-            return Clip("Tones", d);
         }
     }
 }

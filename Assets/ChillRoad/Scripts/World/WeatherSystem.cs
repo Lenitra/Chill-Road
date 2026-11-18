@@ -58,9 +58,13 @@ namespace ChillRoad
         /// l'intérieur, averse étouffée.</summary>
         public float Shelter { get; private set; }
         AudioSource rainWash, rainPatter, rainDrops;
-        readonly List<AudioLowPassFilter> rainFilters = new List<AudioLowPassFilter>();
+        // Filtres d'étouffement sous un tunnel : un par couche de pluie, un pour le tonnerre
+        readonly List<AudioLowPassFilter> shelterFilters = new List<AudioLowPassFilter>();
         AudioSource[] thunderSources;
         AudioClip[] thunderFar, thunderClose;
+        // Tampons de pluie et de tonnerre en cours de calcul hors du thread principal (plus d'une seconde) : ils
+        // arrivent pendant le chargement ; d'ici là l'orage est muet
+        System.Threading.Tasks.Task<float[][]> synthesis;
         LineRenderer bolt;
         float boltT = 99f;
         readonly List<(float at, AudioClip clip, float volume)> pendingThunder = new List<(float, AudioClip, float)>();
@@ -299,9 +303,15 @@ namespace ChillRoad
         }
 
         /// <summary>Dosage des couches de pluie. En zone de neige, l'averse tombe en flocons, sans bruit ; sous un
-        /// tunnel, elle s'étouffe : moins forte et privée de ses aigus.</summary>
+        /// tunnel, elle s'étouffe : moins forte et privée de ses aigus (le tonnerre aussi).</summary>
         void UpdateRainAudio(float volume)
         {
+            if (synthesis != null && synthesis.IsCompleted)
+            {
+                if (synthesis.IsFaulted) Debug.LogException(synthesis.Exception);
+                else ReceiveAudio(synthesis.Result);
+                synthesis = null;
+            }
             if (!rainWash) return;
             RainSynth.Mix(Rain * (1f - SnowZone), out float wash, out float patter, out float drops);
             volume *= 1f - 0.5f * Shelter;
@@ -309,7 +319,7 @@ namespace ChillRoad
             rainPatter.volume = patter * volume;
             rainDrops.volume = drops * volume;
             float cutoff = Mathf.Lerp(22000f, 700f, Mathf.Sqrt(Shelter));
-            foreach (var filter in rainFilters) filter.cutoffFrequency = cutoff;
+            foreach (var filter in shelterFilters) filter.cutoffFrequency = cutoff;
         }
 
         // ------------------------------------------------------------------ éclairs et tonnerre
@@ -340,7 +350,7 @@ namespace ChillRoad
                 var src = thunderSources[nextThunderSource];
                 nextThunderSource = (nextThunderSource + 1) % thunderSources.Length;
                 src.pitch = UnityEngine.Random.Range(0.85f, 1.1f);
-                src.PlayOneShot(clip, volume * master);
+                src.PlayOneShot(clip, volume * master * (1f - 0.4f * Shelter));
             }
         }
 
@@ -353,7 +363,7 @@ namespace ChillRoad
             flashPeak = close ? 1f : Mathf.Lerp(0.8f, 0.4f, Mathf.InverseLerp(600f, 1600f, distance));
             float delay = distance / 343f;
             var clips = close ? thunderClose : thunderFar;
-            pendingThunder.Add((Time.time + delay, clips[UnityEngine.Random.Range(0, clips.Length)], close ? 0.9f : Mathf.Lerp(0.75f, 0.4f, Mathf.InverseLerp(600f, 1600f, distance))));
+            if (clips != null) pendingThunder.Add((Time.time + delay, clips[UnityEngine.Random.Range(0, clips.Length)], close ? 0.9f : Mathf.Lerp(0.75f, 0.4f, Mathf.InverseLerp(600f, 1600f, distance))));
             if (bolt && cam) PlaceBolt(distance);
         }
 
@@ -629,10 +639,12 @@ namespace ChillRoad
 
         void BuildAudio()
         {
-            const int rate = 44100;
-            rainWash = RainLayer("RainWash", RainSynth.Wash());
-            rainPatter = RainLayer("RainPatter", RainSynth.Patter());
-            rainDrops = RainLayer("RainDrops", RainSynth.Drops());
+            synthesis = System.Threading.Tasks.Task.Run(() => new[]
+            {
+                RainSynth.Wash(), RainSynth.Patter(), RainSynth.Drops(),
+                SfxSynth.Thunder(31, false), SfxSynth.Thunder(47, false), SfxSynth.Thunder(59, false),
+                SfxSynth.Thunder(71, true), SfxSynth.Thunder(83, true),
+            });
             var thunderGo = new GameObject("ThunderAudio");
             thunderGo.transform.SetParent(transform, false);
             thunderSources = new AudioSource[3];
@@ -642,8 +654,18 @@ namespace ChillRoad
                 thunderSources[i].playOnAwake = false;
                 thunderSources[i].spatialBlend = 0f;
             }
-            thunderFar = new[] { ThunderClip(rate, 31, false), ThunderClip(rate, 47, false), ThunderClip(rate, 59, false) };
-            thunderClose = new[] { ThunderClip(rate, 71, true), ThunderClip(rate, 83, true) };
+            // Après les sources : Unity refuse un filtre sur un objet qui n'a encore rien à filtrer
+            shelterFilters.Add(thunderGo.AddComponent<AudioLowPassFilter>());
+        }
+
+        /// <summary>Les tampons sont calculés (même ordre que dans <see cref="BuildAudio"/>) : crée les clips, lance la pluie.</summary>
+        void ReceiveAudio(float[][] d)
+        {
+            rainWash = RainLayer("RainWash", d[0]);
+            rainPatter = RainLayer("RainPatter", d[1]);
+            rainDrops = RainLayer("RainDrops", d[2]);
+            thunderFar = new[] { ThunderClip(d[3], false), ThunderClip(d[4], false), ThunderClip(d[5], false) };
+            thunderClose = new[] { ThunderClip(d[6], true), ThunderClip(d[7], true) };
         }
 
         /// <summary>Couche de pluie en boucle (échantillons stéréo entrelacés), avec son filtre d'étouffement.</summary>
@@ -651,55 +673,25 @@ namespace ChillRoad
         {
             var go = new GameObject(layerName);
             go.transform.SetParent(transform, false);
-            var clip = AudioClip.Create(layerName, samples.Length / 2, 2, RainSynth.Rate, false);
-            clip.SetData(samples, 0);
             var source = go.AddComponent<AudioSource>();
-            source.clip = clip;
+            source.clip = StereoClip(layerName, samples, RainSynth.Rate);
             source.loop = true;
             source.volume = 0f;
             source.spatialBlend = 0f;
-            rainFilters.Add(go.AddComponent<AudioLowPassFilter>());
+            shelterFilters.Add(go.AddComponent<AudioLowPassFilter>());
             source.Play();
             return source;
         }
 
-        /// <summary>
-        /// Tonnerre : grondement grave (bruit brun) qui roule par vagues et s'éteint en quelques secondes ;
-        /// un impact proche commence par un claquement sec.
-        /// </summary>
-        static AudioClip ThunderClip(int rate, int seed, bool close)
+        /// <summary>Coup de tonnerre lointain ou proche, synthétisé par <see cref="SfxSynth.Thunder"/>.</summary>
+        static AudioClip ThunderClip(float[] samples, bool close) =>
+            StereoClip(close ? "ThunderClose" : "Thunder", samples, SfxSynth.HalfRate);
+
+        static AudioClip StereoClip(string clipName, float[] samples, int rate)
         {
-            float len = close ? 5.5f : 7f;
-            int n = (int)(rate * len);
-            var d = new float[n];
-            var rng = new System.Random(seed);
-            float brown = 0f, lp = 0f, crack = 0f, roll = 0.6f, rollTarget = 1f, peak = 1e-4f;
-            for (int i = 0; i < n; i++)
-            {
-                float t = i / (float)rate;
-                float w = (float)rng.NextDouble() * 2f - 1f;
-                brown = (brown + w * 0.03f) * 0.9985f;
-                lp += (brown - lp) * 0.08f;
-                if (i % (rate / 12) == 0) rollTarget = 0.25f + (float)rng.NextDouble() * (t < 2.5f ? 1.1f : 0.6f);
-                roll += (rollTarget - roll) * 0.0009f;
-                float attack = close ? 0.03f : 0.35f;
-                float env = t < attack ? t / attack : Mathf.Exp(-(t - attack) * (close ? 0.8f : 0.6f));
-                float x = lp * roll * env;
-                if (close && t < 0.6f)
-                {
-                    crack += (w - crack) * 0.7f;
-                    x += crack * Mathf.Exp(-t * 9f) * 0.12f;
-                }
-                d[i] = x;
-                peak = Mathf.Max(peak, Mathf.Abs(x));
-            }
-            for (int i = 0; i < n; i++) d[i] = d[i] / peak * 0.95f;
-            // Fin en douceur
-            int tail = rate / 2;
-            for (int i = 0; i < tail; i++) d[n - 1 - i] *= i / (float)tail;
-            var c = AudioClip.Create(close ? "ThunderClose" : "Thunder", n, 1, rate, false);
-            c.SetData(d, 0);
-            return c;
+            var clip = AudioClip.Create(clipName, samples.Length / 2, 2, rate, false);
+            clip.SetData(samples, 0);
+            return clip;
         }
     }
 }
