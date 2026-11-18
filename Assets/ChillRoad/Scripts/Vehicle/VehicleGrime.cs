@@ -131,7 +131,7 @@ namespace ChillRoad
             float dirtShare = car.OnRoad ? car.SurfaceDirt : 1f;
             float snowShare = Mathf.Clamp01(car.SurfaceSnow);
 
-            float mudAdd = throw01 * dirtShare * (1f - snowShare) * (1f + wet * 0.8f) / 50f * dt;
+            float mudAdd = throw01 * dirtShare * (1f - snowShare) * (1f + wet * 0.8f) / 65f * dt;
             if (mudAdd > 0f)
             {
                 Color dep = car.OnRoad ? Color.Lerp(DirtDry, DirtWet, wet) : Color.Lerp(GrassDry, GrassWet, wet);
@@ -139,7 +139,7 @@ namespace ChillRoad
                 mud = Mathf.Min(1f, mud + mudAdd);
                 mudWash = Redirty(mudWash, mudAdd);
             }
-            float snowAdd = throw01 * snowShare * (car.OnRoad ? 0.6f : 1f) / 35f * dt;
+            float snowAdd = throw01 * snowShare * (car.OnRoad ? 0.6f : 1f) / 45f * dt;
             if (snowAdd > 0f)
             {
                 snow = Mathf.Min(1f, snow + snowAdd);
