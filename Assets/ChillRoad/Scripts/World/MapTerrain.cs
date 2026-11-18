@@ -768,12 +768,15 @@ namespace ChillRoad
             for (int i = 0; i < count; i++)
             {
                 Vector3 c = p[i], r = Right(i);
-                if (i > 0) along += Vector3.Distance(p[i - 1], c);
                 // Pente de l'eau sur ±2 sections : 4 % = encore calme, 25 % = cascade
                 int a = Mathf.Max(0, i - 2), b = Mathf.Min(count - 1, i + 2);
                 float run = 0f;
                 for (int k = a; k < b; k++) run += Vector2.Distance(new Vector2(p[k].x, p[k].z), new Vector2(p[k + 1].x, p[k + 1].z));
                 float rapid = Mathf.Clamp01(((p[a].y - p[b].y) / Mathf.Max(run, 1f) - 0.04f) / 0.21f);
+                // Longueur comptée en temps de parcours : le motif défile d'un pas constant, donc il file (et s'étire)
+                // là où l'eau va plus vite, dans les pentes et les resserrements, sans cisaillement au fil du temps
+                float narrow = Mathf.Clamp(Mathf.Sqrt((width + 2.4f) / Mathf.Max(reach[i, 0] + reach[i, 1], 1f)), 0.75f, 1.5f);
+                if (i > 0) along += Vector3.Distance(p[i - 1], c) / ((1f + 1.4f * rapid) * narrow);
                 for (int k = 0; k < 7; k++)
                 {
                     int s = k < 3 ? 0 : 1;

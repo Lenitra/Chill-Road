@@ -3,7 +3,8 @@
 // animée et ronds qui viennent mourir sur la berge, motif de surface au choix (crêtes, cellules, éclats, facettes,
 // risées), reflet du ciel en incidence rasante et scintillement dessiné du soleil. Opaque.
 // Maillage (MapTerrain) : UV0.x = profondeur (m), UV0.y = 1 + rapide (0-1) pour une rivière, 0 pour un lac ;
-// UV1 = (travers, long du cours) en mètres. Rapides : traînées d'écume étirées dans le sens du courant.
+// UV1 = (travers, temps de parcours vers l'aval, exprimé en mètres) : le motif défile vers l'aval, plus vite là où la
+// pente est forte et le lit étroit. Rapides : traînées d'écume étirées dans le sens du courant.
 Shader "ChillRoad/Water"
 {
     Properties
@@ -170,8 +171,8 @@ Shader "ChillRoad/Water"
 
                 // Repère du motif : monde qui dérive pour les lacs, cours de la rivière qui défile
                 float2 xz = input.positionWS.xz - _ChillRoadTexOrigin.xz;
-                float2 pa = lerp(xz + _Flow.xz * t, input.data.zw + float2(0, _RiverSpeed * t), river);
-                float2 pb = lerp(xz - _Flow.zx * t * 1.3, input.data.zw * 1.6 + float2(3.7, _RiverSpeed * 1.5 * t), river);
+                float2 pa = lerp(xz + _Flow.xz * t, input.data.zw - float2(0, _RiverSpeed * t), river);
+                float2 pb = lerp(xz - _Flow.zx * t * 1.3, input.data.zw * 1.6 + float2(3.7, -_RiverSpeed * 1.5 * t), river);
                 half a = SAMPLE_TEXTURE2D(_Noise, sampler_Noise, pa / _NoiseScale).b;
                 half b = SAMPLE_TEXTURE2D(_Noise, sampler_Noise, pb / (_NoiseScale * 0.625) + 0.41).b;
                 float w = a * 0.55 + b * 0.45;
@@ -240,15 +241,28 @@ Shader "ChillRoad/Water"
                 albedo *= 1.0 - shadeMark * _PatternStrength * patternFade * 0.45;
                 albedo = lerp(albedo, _PatternColor.rgb, mark);
 
+                // Rivière : veines de courant, plages à peine plus claires ou plus sombres étirées dans le sens de l'eau, qui
+                // filent vers l'aval, plus vite au milieu du lit que le long des berges (deux couches fondues en travers)
+                if (river > 0.5)
+                {
+                    float2 fast = input.data.zw - float2(0, _RiverSpeed * t);
+                    float2 slow = input.data.zw - float2(0, _RiverSpeed * 0.55 * t) + float2(5.3, 2.1);
+                    float sf = SAMPLE_TEXTURE2D(_Noise, sampler_Noise, float2(fast.x / 2.2, fast.y / 18.0)).b;
+                    float ss = SAMPLE_TEXTURE2D(_Noise, sampler_Noise, float2(slow.x / 1.7, slow.y / 11.0)).b;
+                    float vein = lerp(ss, sf, saturate(depth / 3.0));
+                    float vpx = max(fwidth(vein), 1e-4);
+                    albedo *= 1.0 + saturate((vein - 0.58) / vpx + 0.5) * 0.14 - saturate((0.42 - vein) / vpx + 0.5) * 0.1;
+                }
+
                 // Rapides et cascades : eau battue plus claire, traînées d'écume étirées dans le sens du courant, qui
                 // filent plus vite que le reste. Une seule vitesse partout (une vitesse qui varierait d'un sommet à
                 // l'autre cisaillerait le motif au fil du temps) : c'est le seuil qui fait apparaître les traînées.
                 half rapid = saturate(input.data.y - 1.0) * river;
                 if (rapid > 0.001)
                 {
-                    float2 q = input.data.zw + float2(0, _RiverSpeed * 2.6 * t);
+                    float2 q = input.data.zw - float2(0, _RiverSpeed * 2.6 * t);
                     float s = SAMPLE_TEXTURE2D(_Noise, sampler_Noise, float2(q.x / 2.4, q.y / 10.0)).b * 0.6
-                        + SAMPLE_TEXTURE2D(_Noise, sampler_Noise, float2(q.x / 1.3, q.y / 5.0 - t * 0.5) + 0.53).b * 0.4;
+                        + SAMPLE_TEXTURE2D(_Noise, sampler_Noise, float2(q.x / 1.3, q.y / 5.0 + t * 0.5) + 0.53).b * 0.4;
                     float px = max(fwidth(s), 1e-4);
                     half white = saturate((s - lerp(0.74, 0.6, rapid)) / px + 0.5) * smoothstep(0.0, 0.3, rapid);
                     albedo = lerp(albedo, lerp(albedo, _Shallow.rgb, 0.35), rapid * 0.3);
