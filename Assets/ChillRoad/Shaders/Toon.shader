@@ -212,6 +212,9 @@ Shader "ChillRoad/Toon"
                 return o;
             }
 
+            // Le code est réparti entre décors (_DETAIL_LINES) et voitures (salissure, vitres teintées) : réunis, ils
+            // dépassent ce que le compilateur d3d11 accepte d'analyser (« out of memory while parsing »)
+            #if defined(_DETAIL_LINES)
             // Trait fin et net sur les valeurs entières de x ; s'efface quand les traits deviennent trop serrés
             // à l'écran (au loin), pour éviter le moiré
             half Line(float x, half width)
@@ -254,6 +257,7 @@ Shader "ChillRoad/Toon"
                 return Line(s + 0.35 * sin(p.y * 1.7 + floor(s) * 2.3), 0.08) * 0.8;
             }
 
+            #else
             // Bruit de valeur 3D (0-1), pour des contours d'éclaboussures irréguliers
             float Hash31(float3 p) { p = frac(p * 0.1031); p += dot(p, p.yzx + 33.33); return frac((p.x + p.y) * p.z); }
             float Noise3(float3 p)
@@ -284,6 +288,7 @@ Shader "ChillRoad/Toon"
                 if (washed > -0.5) mask *= Above(h - (washed + (n - 0.5) * 0.12));
                 return mask;
             }
+            #endif
 
             // Passage lumière → ombre en aplat, bord légèrement adouci
             half Ramp(half ndl)
@@ -295,6 +300,7 @@ Shader "ChillRoad/Toon"
             {
                 UNITY_SETUP_INSTANCE_ID(input);
                 half3 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv).rgb * _BaseColor.rgb;
+                #if !defined(_DETAIL_LINES)
                 // Vitres teintées : la teinte garde le dégradé du verre (plus clair en haut)
                 UNITY_BRANCH
                 if (_GlassTint.a > 0.0 && input.uv.x > _GlassBand.x && input.uv.x < _GlassBand.y)
@@ -302,7 +308,7 @@ Shader "ChillRoad/Toon"
                     half lum = dot(albedo, half3(0.2126, 0.7152, 0.0722));
                     albedo = lerp(albedo, _GlassTint.rgb * (0.35 + 2.0 * lum), _GlassTint.a);
                 }
-                #if defined(_DETAIL_LINES)
+                #else
                     half id = SAMPLE_TEXTURE2D(_DetailMap, sampler_PointClamp, float2(input.uv.x, 0.5)).r * 255.0;
                     albedo *= 1.0 - DetailLines(id, input.positionOS, normalize(input.normalOS)) * _DetailStrength;
                 #endif
@@ -310,6 +316,7 @@ Shader "ChillRoad/Toon"
                 half3 n = normalize(input.normalWS);
                 n = frontFace ? n : -n;
                 half gloss = _Smoothness;
+                #if !defined(_DETAIL_LINES)
                 // Salissure de la voiture : boue (deux tons, terne) puis neige par-dessus
                 UNITY_BRANCH
                 if (_Grime.x + _Grime.y > 0.001)
@@ -323,6 +330,7 @@ Shader "ChillRoad/Toon"
                     albedo = lerp(albedo, half3(0.9, 0.93, 0.98), snowy * 0.95);
                     gloss *= 1.0 - max(mud, snowy) * 0.85;
                 }
+                #endif
                 // Décors des zones enneigées : la neige tient sur ce qui regarde le ciel (toits, branches, murets)
                 UNITY_BRANCH
                 if (_SnowCap > 0.5 && _ChillRoadSnowOn > 0.5)
