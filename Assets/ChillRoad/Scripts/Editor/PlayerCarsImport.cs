@@ -106,8 +106,8 @@ namespace ChillRoad.EditorTools
                 gearRatios = new[] { 3.827f, 2.36f, 1.685f, 1.312f, 1f, 0.793f }, finalDrive = 3.13f,
                 wheelRadius = 0.32f, tireGrip = 1.3f, dragArea = 0.62f, downforceArea = 0.3f, steerLock = 34f,
                 brakeForce = mass * 10.5f,
-                hoodCamera = new Vector3(0f, 1.10f, 0.98f),
-                bumperCamera = new Vector3(0f, 0.45f, 2.40f),
+                hoodCamera = new Vector3(0f, 1.10f, 1.10f),
+                bumperCamera = new Vector3(0f, 0.45f, 2.28f),
             };
         }
 
@@ -139,8 +139,8 @@ namespace ChillRoad.EditorTools
                 gearRatios = new[] { 2.32f, 1.69f, 1.29f, 1f }, finalDrive = 3.5f,
                 wheelRadius = 0.34f, tireGrip = 1.1f, dragArea = 0.84f, downforceArea = 0.1f, steerLock = 32f,
                 brakeForce = mass * 8.5f,
-                hoodCamera = new Vector3(0f, 1.12f, 0.85f),
-                bumperCamera = new Vector3(0f, 0.50f, 2.42f),
+                hoodCamera = new Vector3(0f, 1.12f, 1.15f),
+                bumperCamera = new Vector3(0f, 0.50f, 2.32f),
             };
         }
 

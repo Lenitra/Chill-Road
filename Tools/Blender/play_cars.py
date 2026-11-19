@@ -23,6 +23,44 @@ import hc_lib as H
 from pack_cars import reg, rect, ellipse, mirrors
 
 
+# ----------------------------------------------------------------- capot raccourci (2026-11-19)
+def xmap(pairs):
+    """Remappage de x par morceaux linéaires (paires (ancien x, nouveau x)), prolongé par les pentes extrêmes.
+    Sert à raccourcir un capot sans toucher aux essieux : garder l'identité sur les passages de roue."""
+    pts = sorted(pairs)
+
+    def f(x):
+        if len(pts) == 1:
+            return x + pts[0][1] - pts[0][0]
+        for (a, fa), (b, fb) in zip(pts, pts[1:]):
+            if x <= b:
+                break
+        if x < pts[0][0]:
+            (a, fa), (b, fb) = pts[0], pts[1]
+            return fa + (x - a)                      # en deçà : translation
+        return fa + (x - a) * (fb - fa) / (b - a)
+    return f
+
+
+def remap_x(spec, f):
+    """Applique f à toutes les abscisses d'une fiche (nez, poupe, courbes, vitrage, bandes) ; renvoie la fiche."""
+    spec["front"], spec["rear"] = f(spec["front"]), f(spec["rear"])
+    for grp in ("z", "w", "inset"):
+        for k, v in spec.get(grp, {}).items():
+            if isinstance(v, (list, tuple)):
+                spec[grp][k] = [(f(x), y) for x, y in v]
+    g = spec["glass"]
+    for k in ("cowl", "ws_top", "rw_top", "rw_bot"):
+        if g.get(k) is not None:
+            g[k] = f(g[k])
+    for k in ("side", "pillars", "roof_bars"):
+        if g.get(k):
+            g[k] = [(f(a), f(b)) for a, b in g[k]]
+    if spec.get("bands"):
+        spec["bands"] = [(j, f(x0), f(x1), c) for j, x0, x1, c in spec["bands"]]
+    return spec
+
+
 # ----------------------------------------------------------------- outils
 def limb(c, p0, p1, r, color, n=6, name="Limb"):
     """Tube de p0 à p1 (rayon r)."""
@@ -148,7 +186,11 @@ def popup(c, x0, x1, yc, half, h, export_name, lens="round"):
 
 
 # ================================================================= Toyota Supra (A80, 1993)
+SUPRA_X = xmap([(-0.85, -0.85), (0.12, 0.24), (0.92, 1.04), (1.70, 1.70), (2.345, 2.22)])
+
+
 def supra_details(c):
+    X = SUPRA_X
     # avant (photos de l'A80) : grandes optiques en amande au coin des ailes, sous le bord du capot qui plonge vers
     # le nez, trois projecteurs ronds chacune (le plus gros côté intérieur) ; clignotants d'angle en pilule sous les
     # phares ; plaque au centre devant la large prise d'air basse ; écopes de frein aux coins
@@ -173,9 +215,9 @@ def supra_details(c):
     c.decal([(0.0, 0.26), (0.70, 0.26), (0.66, 0.36), (0.0, 0.36)], 'rear', 'dark', name="Diffuser")
     c.decal(ellipse(0.30, 0.66, 0.05, 0.02, n=8), 'rear', 'lens', offset=0.009, name="Reverse")
     # flancs : poignées, repère latéral
-    c.decal(rect(-0.12, 0.80, 0.04, 0.83), 'side', 'dark', offset=0.006, name="Handle")
-    c.decal(rect(1.95, 0.50, 2.07, 0.53), 'side', 'amber', offset=0.006, name="Marker")
-    mirrors(c, 0.70, 0.90, 0.935, size=(0.15, 0.14, 0.09))
+    c.decal(rect(X(-0.12), 0.80, X(0.04), 0.83), 'side', 'dark', offset=0.006, name="Handle")
+    c.decal(rect(X(1.95), 0.50, X(2.07), 0.53), 'side', 'amber', offset=0.006, name="Marker")
+    mirrors(c, X(0.70), 0.90, 0.935, size=(0.15, 0.14, 0.09))
     # aileron arrière : deux montants et un profil sur toute la largeur
     zd = c.top(-1.98, 0.55)
     for y in (0.56, -0.56):
@@ -188,7 +230,7 @@ def supra_details(c):
     c.marker("exhaust-right", (-2.23, -0.42, 0.27))
 
 
-reg(dict(
+reg(remap_x(dict(
     id="supra", file="Supra", name="Toyota Supra", color=(0.89, 0.17, 0.006),
     front=2.345, rear=-2.175, height=1.275, axles=(1.275, -1.275),
     wheel=dict(rt=0.322, rr=0.23, w=0.235, y=0.76, style="alloy5"),
@@ -217,7 +259,7 @@ reg(dict(
     ),
     glass=dict(cowl=0.92, ws_top=0.12, rw_top=-0.85, rw_bot=-1.80, side=[(0.86, -1.10)], pillars=[(-0.44, -0.52)]),
     details=supra_details,
-))
+), SUPRA_X))
 
 
 # ================================================================= Mazda MX-5 (NA, 1989), capote repliée
@@ -316,16 +358,22 @@ reg(dict(
 ))
 
 # ================================================================= Ford Mustang fastback 1969 (John Wick)
+MUSTANG_X = xmap([(-0.98, -0.98), (-0.78, -0.62), (-0.14, 0.10), (0.56, 0.86), (1.00, 1.10), (1.80, 1.80),
+                  (2.34, 2.24)])
+
+
 def mustang_details(c):
+    X = MUSTANG_X
     # bandes de rallye noires mates (capot, pavillon, coffre), écart de 9 cm au centre
     for x0, x1 in ((2.35, 0.58), (-0.15, -0.79), (-1.69, -2.43)):
-        c.decal(rect(x1, 0.045, x0, 0.30), 'top', 'black', offset=0.006, name="Stripe", min_facing=0.3)
-    c.decal(ellipse(2.22, 0.60, 0.03, 0.03, n=8), 'top', 'chrome', offset=0.008, name="HoodPin", min_facing=0.3)
+        c.decal(rect(X(x1), 0.045, X(x0), 0.30), 'top', 'black', offset=0.006, name="Stripe", min_facing=0.3)
+    c.decal(ellipse(X(2.22), 0.60, 0.03, 0.03, n=8), 'top', 'chrome', offset=0.008, name="HoodPin", min_facing=0.3)
     # écope de capot (ouverture vers l'avant)
-    zf, zb = c.top(1.52, 0.0) - 0.01, c.top(0.92, 0.0) - 0.01
-    c.prism([(1.52, zf), (1.52, zf + 0.075), (1.05, zb + 0.04), (0.92, zb)], 'y', -0.20, 0.20, 'black',
+    xs0, xs1, xs2 = X(1.52), X(1.05), X(0.92)
+    zf, zb = c.top(xs0, 0.0) - 0.01, c.top(xs2, 0.0) - 0.01
+    c.prism([(xs0, zf), (xs0, zf + 0.075), (xs1, zb + 0.04), (xs2, zb)], 'y', -0.20, 0.20, 'black',
             name="HoodScoop")
-    c.box([((1.523, 0.0, zf + 0.04), (0.012, 0.36, 0.055), None)], 'dark', name="ScoopMouth")
+    c.box([((xs0 + 0.003, 0.0, zf + 0.04), (0.012, 0.36, 0.055), None)], 'dark', name="ScoopMouth")
     # avant : calandre noire, quatre phares ronds cerclés de chrome, feux de position sous le pare-chocs
     c.decal([(0.0, 0.47), (0.62, 0.47), (0.66, 0.50), (0.66, 0.73), (0.62, 0.76), (0.0, 0.76)], 'front', 'dark',
             name="Grille")
@@ -333,8 +381,8 @@ def mustang_details(c):
         c.decal(ellipse(yc, zc, r + 0.016, r + 0.016, n=14), 'front', 'chrome', offset=0.008, name="LampRing")
         c.decal(ellipse(yc, zc, r, r, n=14), 'front', 'led', offset=0.011, name="Headlight")
     c.decal(rect(0.34, 0.285, 0.52, 0.33), 'front', 'amber', offset=0.006, name="ParkLight")
-    c.box([((2.36, 0.0, 0.40), (0.07, 1.68, 0.085), None)], 'chrome', name="FrontBumper")
-    c.box([((2.31, 0.0, 0.215), (0.12, 1.56, 0.05), None)], 'black', name="ChinSpoiler")
+    c.box([((X(2.36), 0.0, 0.40), (0.07, 1.68, 0.085), None)], 'chrome', name="FrontBumper")
+    c.box([((X(2.31), 0.0, 0.215), (0.12, 1.56, 0.05), None)], 'black', name="ChinSpoiler")
     # arrière : panneau noir concave, trois feux verticaux par côté, bouchon d'essence, plaque sous le pare-chocs
     c.decal([(0.0, 0.49), (0.80, 0.49), (0.82, 0.52), (0.82, 0.72), (0.80, 0.745), (0.0, 0.745)], 'rear', 'dark',
             name="TailPanel")
@@ -354,17 +402,17 @@ def mustang_details(c):
         limb(c, (-2.36, y, 0.25), (-2.50, y, 0.25), 0.04, 'chrome', n=8, name="Exhaust")
         c.marker("exhaust-" + side, (-2.50, y, 0.25))
     # flancs : vitre de custode en pointe (montant large du fastback), fausse écope, poignée, feux latéraux
-    c.decal([(-0.52, 1.30), (-0.52, 1.24), (-1.06, 0.895), (-1.30, 0.895), (-1.30, 1.30)], 'side', 'paint',
+    c.decal([(X(-0.52), 1.30), (X(-0.52), 1.24), (-1.06, 0.895), (-1.30, 0.895), (-1.30, 1.30)], 'side', 'paint',
             offset=0.004, name="Sail", min_facing=0.6)
     c.decal([(-1.00, 0.79), (-1.24, 0.80), (-1.24, 0.86), (-1.00, 0.885)], 'side', 'dark', offset=0.006,
             name="SideScoop")
-    c.decal(rect(-0.34, 0.815, -0.22, 0.83), 'side', 'chrome', offset=0.006, name="Handle")
-    c.decal(rect(2.08, 0.585, 2.20, 0.615), 'side', 'amber', offset=0.006, name="MarkerFront")
+    c.decal(rect(X(-0.34), 0.815, X(-0.22), 0.83), 'side', 'chrome', offset=0.006, name="Handle")
+    c.decal(rect(X(2.08), 0.585, X(2.20), 0.615), 'side', 'amber', offset=0.006, name="MarkerFront")
     c.decal(rect(-2.30, 0.60, -2.18, 0.63), 'side', 'red', offset=0.006, name="MarkerRear")
-    mirrors(c, 0.42, 0.88, 0.935, size=(0.10, 0.09, 0.07))
+    mirrors(c, X(0.42), 0.88, 0.935, size=(0.10, 0.09, 0.07))
 
 
-reg(dict(
+reg(remap_x(dict(
     id="mustang", file="Mustang", name="Ford Mustang 1969", color=(0.089, 0.095, 0.10),
     front=2.34, rear=-2.42, height=1.27, axles=(1.3715, -1.3715),
     wheel=dict(rt=0.34, rr=0.19, w=0.225, y=0.745, style="alloy5"),
@@ -393,7 +441,7 @@ reg(dict(
     ),
     glass=dict(cowl=0.56, ws_top=-0.14, rw_top=-0.80, rw_bot=-1.68, side=[(0.52, -1.08)], pillars=[(-0.45, -0.48)]),
     details=mustang_details,
-))
+), MUSTANG_X))
 
 # ================================================================= Peel P50 (1962-1965) : tricycle, 2 roues avant, 1 arrière
 def p50_details(c):
@@ -626,6 +674,7 @@ def accent_material(c, color=(0.40, 0.78, 0.03)):
     if not m:
         m, _ = H.principled("PK_Accent", color, rough=0.45)
     c.M["accent"] = m
+
 
 
 def _lerp(a, b, t):
