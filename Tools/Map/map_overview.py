@@ -242,21 +242,27 @@ def _focus(img, edges, g, st):
         if len(pts) > 1:
             dr.line(pts, fill=255, width=max(1, int(260 * k)))
     m = m.filter(ImageFilter.MaxFilter(9)).filter(ImageFilter.GaussianBlur(lo * 0.035))
-    near = np.asarray(m.resize(img.size, Image.BICUBIC), dtype=np.float64) / 255.0
-    near = soft(near, 0.05, 0.55)[..., None]
-    a = np.asarray(img, dtype=np.float64)
-    grey = a.mean(axis=2, keepdims=True)
-    bg = np.array(st["bg"], dtype=np.float64)
+    near_all = np.asarray(m.resize(img.size, Image.BICUBIC))
+    src = np.asarray(img)
+    out = np.empty_like(src)
+    bg = np.array(st["bg"], dtype=np.float32)
     grey_part, bg_part = st["far"]
-    far = (a * (1 - grey_part) + grey * grey_part) * (1 - bg_part) + bg * bg_part
-    a = far * (1 - near) + a * near
-    # fondu carré vers BG sur les derniers 9 % de l'image
     s = img.size[0]
-    t = np.abs(np.linspace(-1.0, 1.0, s))
-    edge = soft(np.maximum(t[:, None], t[None, :]), 0.91, 0.995)
-    edge = (edge * edge * (3 - 2 * edge))[..., None]
-    a = a * (1 - edge) + bg * edge
-    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8))
+    t = np.abs(np.linspace(-1.0, 1.0, s)).astype(np.float32)
+    # par bandes : l'image entière en flottants (4096² × 3, plusieurs copies) ne tient pas toujours en mémoire
+    for r0 in range(0, src.shape[0], 256):
+        r1 = min(r0 + 256, src.shape[0])
+        near = soft(near_all[r0:r1].astype(np.float32) / 255.0, 0.05, 0.55)[..., None]
+        a = src[r0:r1].astype(np.float32)
+        grey = a.mean(axis=2, keepdims=True)
+        far = (a * (1 - grey_part) + grey * grey_part) * (1 - bg_part) + bg * bg_part
+        a = far * (1 - near) + a * near
+        # fondu carré vers BG sur les derniers 9 % de l'image
+        edge = soft(np.maximum(t[r0:r1, None], t[None, :]), 0.91, 0.995)
+        edge = (edge * edge * (3 - 2 * edge))[..., None]
+        a = a * (1 - edge) + bg * edge
+        out[r0:r1] = np.clip(a, 0, 255).astype(np.uint8)
+    return Image.fromarray(out)
 
 
 def pieces(e):

@@ -25,8 +25,9 @@ def street_distance(g, edges, kinds=("street",), radius=80.0):
     return d
 
 
-def masks(g, H, info, edge, water, edges, urban_pts=(), blocked=None, pads=()):
-    """Masques du sol : (RGBA sous-bois, herbe sèche, roche, terre) et (pavé, neige), plus densité de forêt."""
+def masks(g, H, info, edge, water, edges, urban_pts=(), blocked=None, pads=(), unpaved=()):
+    """Masques du sol : (RGBA sous-bois, herbe sèche, roche, terre) et (pavé, neige), plus densité de forêt.
+    unpaved : aires (même format que pads) laissées en herbe au milieu d'une aire revêtue (îlot d'un parking)."""
     X, Z = g.X, g.Z
     slope = L.slope_map(H, g.step)
     up = info["up"]
@@ -74,6 +75,8 @@ def masks(g, H, info, edge, water, edges, urban_pts=(), blocked=None, pads=()):
     from map_roads import pad_distance
     for (px, pz, pr, py) in pads:
         paved = np.maximum(paved, 1.0 - L.smoothstep(-3.0, 1.0, pad_distance(X, Z, px, pz, pr)))
+    for (px, pz, pr, py) in unpaved:
+        paved = np.minimum(paved, L.smoothstep(-3.0, 1.0, pad_distance(X, Z, px, pz, pr)))
     # limite de la neige : 760 m en général, plus basse autour de la station (map_station.SNOW)
     line = SK.snow_line(X, Z)
     snow = L.smoothstep(line - 70.0, line + 70.0, H + 70.0 * fn) * (1.0 - L.smoothstep(0.95, 1.35, slope))

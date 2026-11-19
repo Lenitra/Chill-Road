@@ -98,7 +98,7 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
     pads = pads + AP.paved() + ST.paved(stunts)             # bandes d'élan goudronnées (le relief, lui, est déjà terrassé)
     urban = [(v[2], v[3], v[4]) for v in D.VILLAGES + D.HAMLETS] + SC.zone(edges) + AP.zone(edges)
     rgba, paved, snow, forest, urban_m, slope = E.masks(g, Hc, info, edge, water, edges, urban_pts=urban,
-                                                        blocked=placer.blocked, pads=pads)
+                                                        blocked=placer.blocked, pads=pads, unpaved=AP.unpaved(edges))
     import map_signs as SG
     signs = SG.build(g, Hc, nodes, edges, villages=urban)
     print("signalisation : %d objets" % len(signs))
@@ -106,6 +106,8 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
     print("cascades : %d tremplins, %d objets retires des bandes" % (len(stunts), removed))
     places, removed = RD.clear(places, radars)
     print("radars : %d poses, %d objets retires autour des mats" % (len(radars), removed))
+    places, removed = AP.clear(places)
+    print("aeroport : %d balises de virage retirees de la boucle de depose" % removed)
     if export:
         E.export(g, Hc, info, nodes, edges, water, edge, rgba, paved, snow, places=places,
                  pois=D.pois(nodes, edges) + VL.pois() + SK.pois() + SC.pois(edges) + AP.pois(edges), blocked=placer.blocked, holes=hole,
@@ -121,10 +123,10 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
             if it["category"] in ("chalet", "townhouse", "landmark", "farm") and it["footprint"][0] > 3.0:
                 foot.append(PLC.Placer.corners(p_["x"], p_["z"], it["footprint"][0], it["footprint"][1], p_["yaw"]))
         OV.render(g, Hc, rgba, paved, snow, water, edges, info["rivers"], foot, os.path.join(E.OUT, "map_overview.png"))
-    if preview:
-        import map_place as PLC
         import map_grass as GR                 # carte d'herbe (GrassField), d'après la carte qui vient d'être exportée
         GR.bake()
+    if preview:
+        import map_place as PLC
         buildings = []
         for p_ in placer.places:
             it = placer.items[p_["item"]]

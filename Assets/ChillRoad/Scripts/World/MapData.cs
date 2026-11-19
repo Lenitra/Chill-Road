@@ -62,13 +62,15 @@ namespace ChillRoad
         /// piste, u le long de la piste (ax, az), v à gauche de u. half / hw : demi-longueur et demi-largeur de la piste ;
         /// taxi* : voie de circulation parallèle (axe v, demi-largeur, demi-longueur) ; links : abscisses des bretelles ;
         /// apron, park, gate : aires en béton (u0, v0, u1, v1) ; parkU : abscisse de l'allée d'arrivée du parking ;
-        /// heli : hélisurface (u, v, rayon) ; stands : postes (u, v, du, dv, longueur) ; west / east : numéros des seuils.
+        /// heli : hélisurface (u, v, rayon) ; stands : postes (u, v, du, dv, longueur) ; west / east : numéros des seuils ;
+        /// bays : rangées de places du parking (u0, v0, u1, v1, profondeur), ligne de fond de (u0, v0) à (u1, v1), les
+        /// places s'ouvrent à gauche de ce sens.
         /// </summary>
         [Serializable]
         public class AirfieldJson
         {
             public float x, y, z, ax, az, half, hw, taxiV, taxiHw, taxiHalf, parkU;
-            public float[] links, apron, park, gate, heli, stands;
+            public float[] links, apron, park, gate, heli, stands, bays;
             public string west, east;
         }
         [Serializable]

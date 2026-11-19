@@ -319,26 +319,22 @@ namespace ChillRoad
                 Mark(white, c.x - 0.45f, c.y - 1.65f, c.x + 0.45f, c.y + 1.65f, ground);
             }
 
-            // Parking : deux blocs de places de part et d'autre de l'allée d'arrivée, deux rangées par bloc
-            if (a.park != null && a.park.Length >= 4)
+            // Parking : rangées de places données par la carte (ligne de fond, places ouvertes à gauche de son sens),
+            // centrées sur la longueur de la rangée
+            if (a.bays != null)
             {
-                const float bay = 2.6f, depth = 5.2f, lw = 0.14f;
-                float v0 = a.park[1] + 2f, v1 = a.park[3] - 14f;
-                foreach (float s in new[] { -1f, 1f })
+                const float bay = 2.6f, lw = 0.14f;
+                for (int i = 0; i + 4 < a.bays.Length; i += 5)
                 {
-                    float from = a.parkU + s * 12f, to = s < 0f ? a.park[0] + 3f : a.park[2] - 3f;
-                    int count = Mathf.FloorToInt(Mathf.Abs(to - from) / bay);
-                    for (int row = 0; row < 2; row++)
-                    {
-                        float back = row == 0 ? v0 : v1, front = row == 0 ? v0 + depth : v1 - depth;
-                        for (int i = 0; i <= count; i++)
-                        {
-                            float u = from + s * i * bay;
-                            Mark(white, u - lw * 0.5f, Mathf.Min(back, front), u + lw * 0.5f, Mathf.Max(back, front), ground);
-                        }
-                        float end = from + s * count * bay;
-                        Mark(white, Mathf.Min(from, end), back - lw * 0.5f, Mathf.Max(from, end), back + lw * 0.5f, ground);
-                    }
+                    Vector2 p = new Vector2(a.bays[i], a.bays[i + 1]), q = new Vector2(a.bays[i + 2], a.bays[i + 3]);
+                    float length = (q - p).magnitude, depth = a.bays[i + 4];
+                    int count = Mathf.FloorToInt(length / bay);
+                    if (count < 1) continue;
+                    Vector2 d = (q - p) / length, n = new Vector2(-d.y, d.x);
+                    Vector2 from = p + d * ((length - count * bay) * 0.5f);
+                    for (int k = 0; k <= count; k++)
+                        Line(white, from + d * (k * bay), from + d * (k * bay) + n * depth, lw, ground);
+                    Line(white, from - d * (lw * 0.5f), from + d * (count * bay + lw * 0.5f), lw, ground);
                 }
             }
 

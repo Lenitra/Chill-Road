@@ -399,6 +399,8 @@ def _target(g, H, e):
         i0, i1 = max(i0 - 1, 0), min(i1 + 1, len(tgt) - 1)
         tgt[i0:i1 + 1] = np.linspace(tgt[i0], tgt[i1], i1 - i0 + 1)
     tgt = np.maximum(tgt, e["opts"].get("min_h", -1e9))
+    if "level" in e["opts"]:                 # route posée sur une aire réglée (parking) : profil à plat, à ce niveau
+        tgt[:] = e["opts"]["level"]
     # surélévations : (x, z, hauteur, rayon du palier, longueur de rampe) — passage au-dessus d'une autre route,
     # viaduc au-dessus de l'eau
     P = e["pts"]

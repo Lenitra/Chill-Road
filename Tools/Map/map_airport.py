@@ -1,6 +1,7 @@
 """Aéroport des Trois Vallons : petit aéroport de montagne dans la haute vallée nord, entre la route de la vallée et la
-rivière, à l'est de l'échangeur nord. On y arrive par la route de la vallée (carrefour, courte route d'accès, parking
-devant l'aérogare) ; un portail ouvert mène au tarmac, aux voies de circulation et à la piste : tout se roule.
+rivière, à l'est de l'échangeur nord. On y arrive par la route de la vallée : carrefour, route d'accès à deux voies
+dans l'axe de l'aérogare, puis boucle de dépose autour d'un îlot en herbe (mâts, avion exposé, bouleaux), le parking
+de part et d'autre ; un portail ouvert mène au tarmac, aux voies de circulation et à la piste : tout se roule.
 
 - piste 10/28 de 880 × 30 m et voie de circulation parallèle reliée par quatre bretelles : de l'enrobé (maillages du
   jeu, Airfield.cs) posé sur une plate-forme aplanie en herbe rase ;
@@ -26,12 +27,17 @@ TAXI_HALF = 432.0                  # elle va d'une bretelle d'extrémité à l'a
 LINKS = (-432.0, -150.0, 150.0, 432.0)        # bretelles vers la piste (abscisses u)
 # Aires en béton (u0, v0, u1, v1) : tarmac (jusque sous le bord de la voie de circulation), parking, passage du portail
 APRON = (-430.0, -128.0, -200.0, -62.0)
-PARK = (-400.0, -190.0, -300.0, -146.0)
+PARK = (-402.0, -190.0, -292.0, -146.0)
 GATE = (-398.0, -150.0, -374.0, -124.0)
 # Plate-forme aplanie (herbe rase hors des aires) : bande de piste et de voie de circulation, zone de l'aérogare
-FLAT = [(-470.0, -76.0, 470.0, 30.0), (-440.0, -160.0, -130.0, -70.0), (-402.0, -192.0, -298.0, -150.0)]
+FLAT = [(-470.0, -76.0, 470.0, 30.0), (-440.0, -160.0, -130.0, -70.0), (-404.0, -192.0, -290.0, -150.0)]
 JUNCTION = (-350.0, -210.0)        # carrefour sur la route de la vallée (recalé sur son tracé)
-ACCESS_END = -172.0                # bout de la route d'accès, dans le parking (v)
+# Boucle de dépose devant l'aérogare (dans le parking, dans l'axe du carrefour) : deux lignes droites reliées par deux
+# demi-cercles, autour d'un îlot en herbe. La route d'accès arrive au milieu de la ligne droite sud.
+LOOP_V = (-181.0, -157.0)          # axes des lignes droites sud et nord (v)
+LOOP_HALF = 14.0                   # demi-longueur des lignes droites
+LOOP_HW = 2.6                      # demi-largeur de la chaussée de la boucle (route « lane »)
+BAY, BAY_DEPTH = 2.6, 5.2          # places de parking : largeur, profondeur
 HELIPAD = (-410.0, -96.0, 10.5)    # hélisurface : centre et rayon du cercle
 NUMBERS = ("10", "28")             # numéros peints au seuil ouest (cap 095) et au seuil est (cap 275)
 
@@ -54,8 +60,8 @@ PARKED = [
     ("plane_glider", -152.0, -112.0, (0.34, 0.94)),
 ]
 # Mobilier du parvis, devant la façade de l'aérogare (objet, décalage le long de la façade) : l'entrée reste dégagée
-FORECOURT = [("bike_rack", -19.0), ("planter", -15.5), ("bench", -12.0), ("bin", -9.8), ("bin", 9.8), ("bench", 12.0),
-             ("planter", 15.5), ("info_board", 18.5)]
+FORECOURT = [("bike_rack", -19.0), ("planter", -15.5), ("bench", -12.0), ("bin", -9.8), ("bin", 8.6),
+             ("info_board", 19.0)]          # l'abribus prend la place du banc à l'est de l'entrée
 ZONE_R = 140.0                     # dégagement : plus d'arbre à moins de 85 m de l'axe, forêt entière au-delà de 140 m
 
 
@@ -100,6 +106,58 @@ def paved():
     return [_rect(r, LEVEL) for r in (APRON, PARK, GATE)]
 
 
+def junction(edges=()):
+    """Carrefour (u, v) tel que construit : il est recalé sur le tracé de la route de la vallée."""
+    acc = next((e for e in edges if e["id"] == "aero_acces"), None)
+    return local(float(acc["pts"][0, 0]), float(acc["pts"][0, 1])) if acc is not None else JUNCTION
+
+
+def junction_u(edges=()):
+    """Abscisse u de l'axe de la route d'accès."""
+    return junction(edges)[0]
+
+
+def loop():
+    """Boucle de dépose : (v de son centre, rayon de l'axe des demi-cercles)."""
+    return (LOOP_V[0] + LOOP_V[1]) / 2.0, (LOOP_V[1] - LOOP_V[0]) / 2.0
+
+
+def unpaved(edges=()):
+    """Îlot de la boucle de dépose, laissé en herbe au milieu du parking : rectangle et deux disques. Son bord passe
+    sous la chaussée de la boucle (le masque du sol n'a pas la finesse d'une bordure)."""
+    ju = junction_u(edges)
+    cv, r = loop()
+    r += 0.5
+    out = [(*loc(ju, cv), (LOOP_HALF, r, HEADING), LEVEL)]
+    for s in (-1.0, 1.0):
+        out.append((*loc(ju + s * LOOP_HALF, cv), r, LEVEL))
+    return out
+
+
+def bays(edges=()):
+    """Rangées de places du parking : (u0, v0, u1, v1, profondeur) — ligne de fond de (u0, v0) à (u1, v1), les places
+    s'ouvrent à gauche de ce sens. Deux colonnes aux bouts du parking, deux rangées le long de son bord sud, de part
+    et d'autre de la route d'accès."""
+    ju = junction_u(edges)
+    south, top, bottom = PARK[1] + 1.0, PARK[3] - 6.0, PARK[1] + 6.0
+    return [(PARK[0] + 1.5, top, PARK[0] + 1.5, bottom, BAY_DEPTH), (PARK[2] - 1.5, bottom, PARK[2] - 1.5, top, BAY_DEPTH),
+            (PARK[0] + 8.0, south, ju - 10.0, south, BAY_DEPTH), (ju + 10.0, south, PARK[2] - 8.0, south, BAY_DEPTH)]
+
+
+def clear(places):
+    """Retire les balises et panneaux de virage que la signalisation automatique pose autour de la boucle de dépose
+    (ses demi-cercles sont serrés comme une épingle, mais c'est une allée de parking)."""
+    u0, v0, u1, v1 = PARK
+    out = []
+    for p in places:
+        if p["item"] in ("chevron", "sign_hairpin", "sign_curve_l", "sign_curve_r", "delineator", "milestone"):
+            u, v = local(p["x"], p["z"])
+            if u0 - 6.0 <= u <= u1 + 6.0 and v0 - 6.0 <= v <= v1 + 6.0:
+                continue
+        out.append(p)
+    return out, len(places) - len(out)
+
+
 def strips():
     """Bandes d'enrobé (u0, v0, u1, v1) : piste, voie de circulation parallèle, bretelles."""
     out = [(-HALF, -HW, HALF, HW), (-TAXI_HALF - TAXI_HW, TAXI_V - TAXI_HW, TAXI_HALF + TAXI_HW, TAXI_V + TAXI_HW)]
@@ -114,7 +172,8 @@ def corners(r):
 
 
 def roads(net, vallee, VP, VT):
-    """Carrefour sur la route de la vallée et route d'accès jusqu'au parking de l'aérogare."""
+    """Carrefour sur la route de la vallée, route d'accès à deux voies jusqu'au parking, boucle de dépose devant
+    l'aérogare (plus de bout de route : on fait le tour de l'îlot et on repart)."""
     sx, sz = loc(*JUNCTION)
     i = int(np.argmin(np.hypot(VP[:, 0] - sx, VP[:, 1] - sz)))
     x, z = float(VP[i, 0]), float(VP[i, 1])
@@ -122,10 +181,20 @@ def roads(net, vallee, VP, VT):
     net.crossings.add("r_aero")
     vallee.split("r_aero", x, z)
     u, v = local(x, z)
-    net.node("aero_parvis", *loc(u, ACCESS_END))
+    cv, r = loop()
+    net.node("aero_parvis", *loc(u, LOOP_V[0]))        # arrivée de la route d'accès, au milieu de la ligne droite sud
+    net.node("aero_depose", *loc(u, LOOP_V[1]))        # devant l'entrée de l'aérogare (une boucle à une arête n'est pas gérée)
     net.fixed["aero_parvis"] = LEVEL
-    a = net.road("aero_acces", "lane", "r_aero", smooth=10.0)
-    a.to(loc(u, v + 14.0), loc(u, v + 26.0)).node("aero_parvis")
+    net.fixed["aero_depose"] = LEVEL
+    a = net.road("aero_acces", "main", "r_aero", smooth=10.0)
+    a.to(loc(u, v + 9.0), loc(u, LOOP_V[0] - 9.0)).node("aero_parvis")
+
+    def arc(cu, a0):
+        return [loc(cu + r * math.cos(math.radians(a)), cv + r * math.sin(math.radians(a))) for a in range(a0, a0 + 181, 30)]
+
+    b = net.road("aero_boucle", "lane", "aero_parvis", closed=True, smooth=10.0, level=LEVEL)
+    b.to(loc(u + LOOP_HALF * 0.5, LOOP_V[0]), *arc(u + LOOP_HALF, -90), loc(u + LOOP_HALF * 0.5, LOOP_V[1])).node("aero_depose")
+    b.to(loc(u - LOOP_HALF * 0.5, LOOP_V[1]), *arc(u - LOOP_HALF, 90), loc(u - LOOP_HALF * 0.5, LOOP_V[0]))
 
 
 def zone(edges=None):
@@ -146,11 +215,11 @@ def pois(edges=None):
 def export(edges=()):
     """Fiche « airfield » de map.json (Airfield.cs : enrobé et marquages). Tableaux à plat (JsonUtility)."""
     (ax, az), _ = axes()
-    acc = next((e for e in edges if e["id"] == "aero_acces"), None)
-    ju = local(float(acc["pts"][0, 0]), float(acc["pts"][0, 1]))[0] if acc is not None else JUNCTION[0]
+    ju = junction_u(edges)
     return dict(x=CENTER[0], z=CENTER[1], y=round(LEVEL - UNDER, 2), ax=round(ax, 6), az=round(az, 6), half=HALF, hw=HW,
                 taxiV=TAXI_V, taxiHw=TAXI_HW, taxiHalf=TAXI_HALF, links=list(LINKS), apron=list(APRON), park=list(PARK),
                 gate=list(GATE), parkU=round(ju, 2), heli=list(HELIPAD), west=NUMBERS[0], east=NUMBERS[1],
+                bays=[round(float(v), 2) for row in bays(edges) for v in row],
                 stands=[v for (item, u, w, f) in PARKED if item.startswith("plane_") and item != "plane_glider"
                         for v in (u, w, f[0], f[1], 9.0 if item == "plane_jet" else 6.5)])
 
@@ -199,21 +268,37 @@ def populate(pl, edges):
     for u in (GATE[0], GATE[2]):                       # potelets du portail
         put("bollard", u, FENCE_V, N)
 
-    # --- Parking : lampadaires, mâts, mobilier ; totem à l'entrée, au bord de la route de la vallée
-    acc = next((e for e in edges if e["id"] == "aero_acces"), None)
-    ju = local(float(acc["pts"][0, 0]), float(acc["pts"][0, 1]))[0] if acc is not None else JUNCTION[0]
-    for (u, v, face) in ((PARK[0] + 2.0, -168.0, E), (PARK[2] - 2.0, -168.0, W), (ju - 25.0, PARK[1] + 2.0, N),
-                         (ju + 25.0, PARK[1] + 2.0, N)):
+    # --- Parking : lampadaires aux bouts et au fond des rangées, projecteurs du tarmac
+    ju, jv = junction(edges)
+    cv, r = loop()
+    for (u, v, face) in ((PARK[0] + 0.7, cv, E), (PARK[2] - 0.7, cv, W), (ju - 26.0, PARK[1] + 0.5, N),
+                         (ju + 26.0, PARK[1] + 0.5, N)):
         put("lamp_road", u, v, face)
-    for (u, v) in ((-436.0, -131.0), (-298.0, -131.0), (-206.0, -131.0)):      # projecteurs du tarmac
+    for (u, v) in ((-436.0, -131.0), (-298.0, -131.0), (-206.0, -131.0)):
         put("lamp_road", u, v, N)
+    # --- Îlot de la boucle de dépose : mâts dans l'axe de l'arrivée, avion exposé à l'ouest, bouleaux et massifs à
+    # l'est, un lampadaire dans chaque bout arrondi
     for k, item in enumerate(("flagpole_blue", "flagpole_red", "flagpole_blue")):
-        put(item, TERMINAL[0] + 24.0 + k * 3.0, -152.0, S)
-    put("airport_sign", ju + 11.0, JUNCTION[1] + 15.0, E, ground=True)
-    put("sign_parking", ju + 5.0, PARK[1] + 3.0, S)
-    put("busstop", ju - 12.0, PARK[1] + 4.0, N)
+        put(item, ju + (k - 1) * 3.2, cv, S)
+    put("plane_trainer", ju - 11.5, cv + 0.5, (-0.94, -0.34))
+    for (item, du, dv) in (("birch_b", 9.0, 3.5), ("birch_a", 13.5, -4.0), ("birch_a", 17.5, 2.5), ("bush_rhodo", 7.0, -4.5),
+                           ("bush_rhodo", 11.0, 0.5), ("bush_rhodo", 16.0, -1.5), ("bush_rhodo", -4.5, 5.5),
+                           ("bush_rhodo", -18.5, -3.5)):
+        put(item, ju + du, cv + dv, S)
+    for s in (-1.0, 1.0):
+        put("lamp_road", ju + s * (LOOP_HALF + 6.5), cv, W if s < 0 else E)
+    # --- Dépose devant l'aérogare : abribus au bord de la boucle, à l'est de l'entrée ; mobilier du parvis
+    put("busstop", TERMINAL[0] + 13.5, LOOP_V[1] + LOOP_HW + 2.4, S)
     for (item, du) in FORECOURT:
         put(item, TERMINAL[0] + du, -150.5, S)
+    # --- Route d'accès : totem au coin du carrefour, cédez-le-passage pour qui repart, panneau du parking, bouleaux
+    # sur le talus entre la route de la vallée et le parking
+    put("airport_sign", ju + 13.0, jv + 9.5, E, ground=True)
+    put("sign_yield", ju - 5.0, jv + 11.0, N, ground=True)
+    put("sign_parking", ju + 5.2, PARK[1] - 1.6, S, ground=True)
+    for (item, du) in (("birch_a", -44.0), ("birch_b", -33.0), ("birch_a", -22.0), ("birch_b", 24.0), ("birch_a", 35.0),
+                       ("birch_b", 46.0)):
+        put(item, ju + du, PARK[1] - 5.0, S, ground=True)
 
     # --- Manches à air et PAPI (à gauche de la piste pour qui se pose)
     put("airport_windsock", -120.0, -34.0, E)
