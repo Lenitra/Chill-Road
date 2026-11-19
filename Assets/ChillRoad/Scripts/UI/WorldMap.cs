@@ -96,6 +96,16 @@ namespace ChillRoad
         readonly List<RectTransform> goalMarks = new List<RectTransform>();
         int goalHover = -1;
         readonly List<Text> radarLabels = new List<Text>(), stuntLabels = new List<Text>();
+        // Fiche du repère survolé (course, radar, tremplin) : plaque sombre posée à côté du repère, à la place de son nom
+        RectTransform card, cardBadge, cardRule, cardState, cardHint, cardHintChip;
+        HudShape cardBar;
+        CanvasGroup cardGroup;
+        Text cardKicker, cardName, cardStateText, cardHintKey, cardHintText;
+        GameObject cardCheck;
+        HudRing cardTodo;
+        readonly List<Text> cardKeys = new List<Text>(), cardValues = new List<Text>();
+        string cardFor;
+        const float CardPad = 22f, CardRow = 28f;
         bool pressed;
         float pressMoved;
         float zoom = 1.12f;
@@ -163,6 +173,8 @@ namespace ChillRoad
                 stuntChecks.Clear();
                 stuntLabels.Clear();
                 goalMarks.Clear();
+                cardKeys.Clear();
+                cardValues.Clear();
                 goalHover = -1;
                 raceHover = -1;
                 raceZoom = -1f;
@@ -174,6 +186,8 @@ namespace ChillRoad
             game.SetInputEnabled(!open);
             openedFrame = Time.frameCount;
             ChangedFrame = Time.frameCount;
+            // Fiche réécrite à la réouverture (un objectif a pu être réussi entre-temps)
+            cardFor = null;
             if (open)
             {
                 // Vue d'ensemble : toute la zone où l'on roule
@@ -534,6 +548,7 @@ namespace ChillRoad
             }
             RefreshRoute();
             UpdateHover();
+            RefreshCard();
             Declutter();
             RefreshScale();
             if (GameInput.UsingGamepad != hintsForPad) BuildHints(GameInput.UsingGamepad);
@@ -666,6 +681,8 @@ namespace ChillRoad
                 tick.raycastTarget = false;
             }
             cross.gameObject.SetActive(false);
+
+            BuildCard();
 
             // Voiles sombres sous les plaques (colonne de gauche, barre des touches) : le texte reste lisible sur la carte
             float veilWidth = openLeft + 180f;
@@ -1028,16 +1045,17 @@ namespace ChillRoad
             int first = -1;
             for (int i = 0; i < names.Count; i++)
                 if (names[i].race >= 0 && names[i].race == raceHover || names[i].goal >= 0 && names[i].goal == goalHover) first = i;
-            if (first >= 0) Place(first, true);
+            // Repère survolé : sa fiche (RefreshCard) remplace son nom
+            if (first >= 0) names[first].text.enabled = false;
             for (int i = 0; i < names.Count; i++)
-                if (i != first) Place(i, false);
+                if (i != first) Place(i);
         }
 
-        void Place(int i, bool hovered)
+        void Place(int i)
         {
             var n = names[i];
             if (!n.mark.gameObject.activeInHierarchy) return;
-            if (!hovered && zoom < n.minZoom)
+            if (zoom < n.minZoom)
             {
                 n.text.enabled = false;
                 return;
@@ -1048,7 +1066,7 @@ namespace ChillRoad
                 for (int k = 0; k < tries && chosen < 0; k++)
                 {
                     Arrange(n, k);
-                    if (hovered || Free(NameRect(n), i, pass == 0)) chosen = k;
+                    if (Free(NameRect(n), i, pass == 0)) chosen = k;
                 }
             if (chosen < 0)
             {
@@ -1112,17 +1130,12 @@ namespace ChillRoad
 
         static Rect Centered(Vector2 at, float size) => new Rect(at.x - size * 0.5f, at.y - size * 0.5f, size, size);
 
-        /// <summary>Étiquette de chaque départ : le nom du tracé ; au survol, aussi son genre, sa longueur et le record personnel.</summary>
+        /// <summary>Étiquette de chaque départ : le nom du tracé (le détail est sur la fiche du survol).</summary>
         void RefreshRaceLabels()
         {
             if (!game.Races) return;
             var races = game.Races.All;
-            for (int i = 0; i < raceLabels.Count && i < races.Count; i++)
-            {
-                var t = races[i];
-                string best = t.best > 0f ? Loc.T("record ", "best ") + Races.Clock(t.best) : Loc.T("pas encore de record", "no best time yet");
-                raceLabels[i].text = i == raceHover ? t.Name + "\n<size=16><color=#FFFFFFD8>" + t.Summary + "  ·  " + best + "</color></size>" : t.Name;
-            }
+            for (int i = 0; i < raceLabels.Count && i < races.Count; i++) raceLabels[i].text = races[i].Name;
         }
 
         /// <summary>
@@ -1159,29 +1172,20 @@ namespace ChillRoad
 
         /// <summary>
         /// État des objectifs : la pastille garde sa couleur ; une coche verte s'y ajoute une fois réussi, et l'étiquette
-        /// passe de ce qu'il faut atteindre au record. Au survol, l'étiquette se détaille : genre et objectif, puis réussi
-        /// (avec le record) ou la prime à gagner.
+        /// passe de ce qu'il faut atteindre au record (le détail est sur la fiche du survol).
         /// </summary>
         void RefreshGoals()
         {
-            int radarCount = 0;
             if (game.Radars)
             {
                 var all = game.Radars.All;
-                radarCount = radarChecks.Count;
                 for (int i = 0; i < radarChecks.Count && i < all.Count; i++)
                 {
                     var r = all[i];
                     if (radarChecks[i].activeSelf != r.done) radarChecks[i].SetActive(r.done);
-                    if (i == goalHover)
-                        radarLabels[i].text = GoalDetail(r.Name,
-                            Loc.F($"Radar  ·  {r.Target:0} km/h minimum", $"Speed camera  ·  {r.Target:0} km/h minimum"),
-                            r.done, r.done ? Loc.F($"record {r.best:0} km/h", $"best {r.best:0} km/h") : null,
-                            Loc.T($"Prime {Wallet.Format(r.data.reward)}  ·  pas encore flashé", $"Reward {Wallet.Format(r.data.reward)}  ·  not flashed yet"));
-                    else
-                        radarLabels[i].text = r.done
-                            ? Loc.F($"{r.Name}  ·  record {r.best:0} km/h", $"{r.Name}  ·  best {r.best:0} km/h")
-                            : Loc.F($"{r.Name}  ·  {r.Target:0} km/h");
+                    radarLabels[i].text = r.done
+                        ? Loc.F($"{r.Name}  ·  record {r.best:0} km/h", $"{r.Name}  ·  best {r.best:0} km/h")
+                        : Loc.F($"{r.Name}  ·  {r.Target:0} km/h");
                 }
             }
             if (game.Stunts)
@@ -1191,27 +1195,223 @@ namespace ChillRoad
                 {
                     var s = all[i];
                     if (stuntChecks[i].activeSelf != s.done) stuntChecks[i].SetActive(s.done);
-                    if (radarCount + i == goalHover)
-                        stuntLabels[i].text = GoalDetail(s.Name,
-                            Loc.F($"Tremplin  ·  {s.Target:0} m en l'air", $"Stunt jump  ·  {s.Target:0} m airborne"),
-                            s.done, s.done && s.best > 0f ? Loc.F($"record {s.best:0} m", $"best {s.best:0} m") : null,
-                            Loc.T($"Prime {Wallet.Format(s.data.reward)}  ·  pas encore réussi", $"Reward {Wallet.Format(s.data.reward)}  ·  not completed yet"));
-                    else
-                        stuntLabels[i].text = !s.done ? Loc.F($"{s.Name}  ·  {s.Target:0} m")
-                            : s.best > 0f ? Loc.F($"{s.Name}  ·  record {s.best:0} m", $"{s.Name}  ·  best {s.best:0} m")
-                            : s.Name;
+                    stuntLabels[i].text = !s.done ? Loc.F($"{s.Name}  ·  {s.Target:0} m")
+                        : s.best > 0f ? Loc.F($"{s.Name}  ·  record {s.best:0} m", $"{s.Name}  ·  best {s.best:0} m")
+                        : s.Name;
                 }
             }
         }
 
-        /// <summary>Étiquette détaillée d'un objectif survolé : nom, puis en petit son objectif et son état (réussi en vert).</summary>
-        static string GoalDetail(string name, string info, bool done, string best, string todo)
+        // ------------------------------------------------------------------ fiche du survol
+
+        /// <summary>
+        /// Fiche du repère survolé, construite une fois : ombre portée, plaque inclinée de la DA (barre de la couleur du
+        /// repère sur le bord gauche), pastille et genre, nom, filet, lignes libellé / valeur, état (coche verte quand
+        /// c'est réussi), puis la touche pour s'y rendre au GPS. Remplie par <see cref="FillCard"/>.
+        /// </summary>
+        void BuildCard()
         {
-            string state = done
-                ? "<color=#" + ColorUtility.ToHtmlStringRGB(HudIcon.CheckGreen * 1.25f) + ">" + Loc.T("Réussi", "Completed") + "</color>"
-                  + (best != null ? "  ·  " + best : "")
-                : todo;
-            return name + "\n<size=16><color=#FFFFFFD8>" + info + "\n" + state + "</color></size>";
+            card = Box(view, "HoverCard", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(320f, 200f));
+            card.pivot = new Vector2(0f, 1f);
+            cardGroup = card.gameObject.AddComponent<CanvasGroup>();
+            cardGroup.blocksRaycasts = false;
+            cardGroup.interactable = false;
+            // CanvasRenderer explicite : Rect() n'en met pas, et la HudShape ajoutée ensuite ne dessinerait rien
+            var drop = Rect(card, "Shadow", Vector2.zero, Vector2.one, new Vector2(5f, -7f), new Vector2(5f, -7f));
+            drop.gameObject.AddComponent<CanvasRenderer>();
+            AddShape(drop, new Color(0f, 0f, 0f, 0.42f)).Set(14f, 0f, 0f);
+            var plate = Rect(card, "Plate", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            plate.gameObject.AddComponent<CanvasRenderer>();
+            AddShape(plate, new Color(Plate.r, Plate.g, Plate.b, 0.97f)).Set(14f, 0f, 0f);
+            var bar = Rect(card, "Bar", Vector2.zero, new Vector2(0f, 1f), Vector2.zero, new Vector2(6f, 0f));
+            bar.gameObject.AddComponent<CanvasRenderer>();
+            cardBar = AddShape(bar, Accent).Set(14f, 0f, 0f);
+
+            cardBadge = Box(card, "Badge", new Vector2(0f, 1f), new Vector2(CardPad + 15f, -33f), new Vector2(30f, 30f));
+            cardKicker = Label(card, "", 15, TextAnchor.MiddleLeft, Accent, new Vector2(CardPad + 40f, -33f), new Vector2(10f, 24f), FontStyle.Bold, new Vector2(0f, 1f));
+            cardKicker.rectTransform.pivot = new Vector2(0f, 0.5f);
+            cardName = Label(card, "", 27, TextAnchor.MiddleLeft, Color.white, new Vector2(CardPad, -73f), new Vector2(10f, 36f), FontStyle.BoldAndItalic, new Vector2(0f, 1f));
+            cardName.rectTransform.pivot = new Vector2(0f, 0.5f);
+            cardRule = Box(card, "Rule", new Vector2(0f, 1f), new Vector2(CardPad, -97f), new Vector2(10f, 2f));
+            cardRule.pivot = new Vector2(0f, 0.5f);
+            cardRule.gameObject.AddComponent<Image>().raycastTarget = false;
+
+            cardState = Box(card, "State", new Vector2(0f, 1f), Vector2.zero, new Vector2(10f, 30f));
+            cardState.pivot = new Vector2(0f, 0.5f);
+            cardCheck = HudIcon.Check(cardState, new Vector2(11f - 5f, 0f), 22f);
+            cardTodo = Box(cardState, "Todo", new Vector2(0.5f, 0.5f), new Vector2(11f - 5f, 0f), Vector2.zero).gameObject.AddComponent<HudRing>();
+            cardTodo.inner = 6.5f;
+            cardTodo.outer = 9f;
+            cardTodo.color = Dim;
+            cardTodo.raycastTarget = false;
+            cardStateText = Label(cardState, "", 18, TextAnchor.MiddleLeft, Color.white, new Vector2(30f, 0f), new Vector2(10f, 28f), FontStyle.Bold, new Vector2(0f, 0.5f));
+
+            cardHint = Box(card, "Hint", new Vector2(0f, 1f), Vector2.zero, new Vector2(10f, 28f));
+            cardHint.pivot = new Vector2(0f, 0.5f);
+            cardHintChip = Box(cardHint, "Key", new Vector2(0f, 0.5f), Vector2.zero, new Vector2(30f, 26f));
+            AddShape(cardHintChip, Chip).Set(9f, 0f, 0f);
+            cardHintKey = Label(cardHintChip, "", 16, TextAnchor.MiddleCenter, Accent, Vector2.zero, new Vector2(30f, 26f), FontStyle.Bold);
+            cardHintText = Label(cardHint, "", 16, TextAnchor.MiddleLeft, Dim, Vector2.zero, new Vector2(10f, 26f), FontStyle.Normal, new Vector2(0f, 0.5f));
+            card.gameObject.SetActive(false);
+        }
+
+        /// <summary>Fiche du repère survolé : réécrite quand il change (ou la manette), posée chaque image à côté de lui.</summary>
+        void RefreshCard()
+        {
+            if (!card) return;
+            RectTransform mark = raceHover >= 0 && raceHover < raceStarts.Count ? raceStarts[raceHover]
+                : goalHover >= 0 && goalHover < goalMarks.Count ? goalMarks[goalHover] : null;
+            if (!mark)
+            {
+                if (card.gameObject.activeSelf) card.gameObject.SetActive(false);
+                cardFor = null;
+                return;
+            }
+            string key = (raceHover >= 0 ? "r" + raceHover : "g" + goalHover) + (GameInput.UsingGamepad ? "p" : "m");
+            if (key != cardFor)
+            {
+                bool fresh = cardFor == null || cardFor.Substring(0, cardFor.Length - 1) != key.Substring(0, key.Length - 1);
+                cardFor = key;
+                FillCard();
+                card.gameObject.SetActive(true);
+                if (fresh) cardGroup.alpha = 0f;
+            }
+            cardGroup.alpha = Mathf.MoveTowards(cardGroup.alpha, 1f, Time.unscaledDeltaTime * 9f);
+            // À droite du repère (grossi au survol), à gauche si la place manque ; toujours dans la zone libre
+            Vector2 at = content.anchoredPosition + mark.anchoredPosition * zoom;
+            Vector2 size = card.sizeDelta;
+            float gap = 26f + (1f - cardGroup.alpha) * 10f;
+            float x = at.x + gap;
+            if (x + size.x > openOffset.x + openHalf.x) x = at.x - gap - size.x;
+            float top = Mathf.Clamp(at.y + size.y * 0.5f, openOffset.y - openHalf.y + size.y, openOffset.y + openHalf.y);
+            card.anchoredPosition = new Vector2(x, top);
+        }
+
+        /// <summary>Contenu de la fiche selon le repère survolé (départ de course, radar ou tremplin) ; largeur et hauteur ajustées.</summary>
+        void FillCard()
+        {
+            for (int i = cardBadge.childCount - 1; i >= 0; i--) Destroy(cardBadge.GetChild(i).gameObject);
+            var rows = new List<(string key, string value, Color color)>();
+            Color tint;
+            string kicker, name, state = null;
+            bool done = false;
+            int radarCount = game.Radars ? game.Radars.All.Count : 0;
+            if (raceHover >= 0)
+            {
+                var t = game.Races.All[raceHover];
+                tint = t.Tint;
+                kicker = Loc.T("COURSE", "RACE") + "  ·  " + t.Kind;
+                name = t.Name;
+                Disc(cardBadge, 26f, Ink);
+                Disc(cardBadge, 20f, tint);
+                Disc(cardBadge, 7f, Color.white);
+                rows.Add((Loc.T("Distance", "Distance"), Loc.F($"{t.Distance / 1000f:0.0} km"), Color.white));
+                if (t.Loop) rows.Add((Loc.T("Tour", "Lap"), Loc.F($"{t.length / 1000f:0.0} km"), Color.white));
+                rows.Add((Loc.T("Record", "Best time"), t.best > 0f ? Races.Clock(t.best) : "—", t.best > 0f ? Accent : Dim));
+                if (t.best > 0f && !string.IsNullOrEmpty(t.bestCar)) rows.Add((Loc.T("Voiture", "Car"), t.bestCar, Color.white));
+            }
+            else if (goalHover < radarCount)
+            {
+                var r = game.Radars.All[goalHover];
+                tint = SpeedCameras.Tint;
+                kicker = Loc.T("RADAR", "SPEED CAMERA");
+                name = r.Name;
+                HudIcon.Badge(cardBadge, Vector2.zero, 28f, HudIcon.Kind.RadarPin, tint, false);
+                rows.Add((Loc.T("Objectif", "Target"), Loc.F($"{r.Target:0} km/h minimum"), Color.white));
+                rows.Add((Loc.T("Prime", "Reward"), Wallet.Format(r.data.reward), Accent));
+                if (r.done) rows.Add((Loc.T("Record", "Best"), Loc.F($"{r.best:0} km/h"), Color.white));
+                done = r.done;
+                state = done ? Loc.T("Réussi", "Completed") : Loc.T("Pas encore flashé", "Not flashed yet");
+            }
+            else
+            {
+                var s = game.Stunts.All[goalHover - radarCount];
+                tint = StuntJumps.Tint;
+                kicker = Loc.T("TREMPLIN", "STUNT JUMP");
+                name = s.Name;
+                HudIcon.Badge(cardBadge, Vector2.zero, 28f, HudIcon.Kind.RampPin, tint, true);
+                rows.Add((Loc.T("Objectif", "Target"), Loc.F($"{s.Target:0} m en l'air", $"{s.Target:0} m airborne"), Color.white));
+                rows.Add((Loc.T("Prime", "Reward"), Wallet.Format(s.data.reward), Accent));
+                if (s.done && s.best > 0f) rows.Add((Loc.T("Record", "Best"), Loc.F($"{s.best:0} m"), Color.white));
+                done = s.done;
+                state = done ? Loc.T("Réussi", "Completed") : Loc.T("Pas encore réussi", "Not completed yet");
+            }
+
+            cardBar.color = tint;
+            cardKicker.text = kicker;
+            cardKicker.color = tint;
+            cardName.text = name;
+            cardRule.GetComponent<Image>().color = new Color(tint.r, tint.g, tint.b, 0.45f);
+            float width = Mathf.Max(cardName.preferredWidth, 40f + cardKicker.preferredWidth);
+
+            // Lignes : libellé à gauche (atténué), valeur à droite (en gras)
+            float y = -120f;
+            while (cardKeys.Count < rows.Count)
+            {
+                var k = Label(card, "", 17, TextAnchor.MiddleLeft, Dim, Vector2.zero, new Vector2(10f, CardRow), FontStyle.Normal, new Vector2(0f, 1f));
+                k.rectTransform.pivot = new Vector2(0f, 0.5f);
+                var v = Label(card, "", 18, TextAnchor.MiddleRight, Color.white, Vector2.zero, new Vector2(10f, CardRow), FontStyle.Bold, new Vector2(1f, 1f));
+                v.rectTransform.pivot = new Vector2(1f, 0.5f);
+                cardKeys.Add(k);
+                cardValues.Add(v);
+            }
+            for (int i = 0; i < cardKeys.Count; i++)
+            {
+                bool on = i < rows.Count;
+                cardKeys[i].gameObject.SetActive(on);
+                cardValues[i].gameObject.SetActive(on);
+                if (!on) continue;
+                cardKeys[i].text = rows[i].key;
+                cardValues[i].text = rows[i].value;
+                cardValues[i].color = rows[i].color;
+                cardKeys[i].rectTransform.anchoredPosition = new Vector2(CardPad, y);
+                cardValues[i].rectTransform.anchoredPosition = new Vector2(-CardPad, y);
+                cardKeys[i].rectTransform.sizeDelta = new Vector2(cardKeys[i].preferredWidth + 4f, CardRow);
+                cardValues[i].rectTransform.sizeDelta = new Vector2(cardValues[i].preferredWidth + 4f, CardRow);
+                width = Mathf.Max(width, cardKeys[i].preferredWidth + 36f + cardValues[i].preferredWidth);
+                y -= CardRow;
+            }
+
+            // État : coche verte et « Réussi », ou cercle atténué et ce qu'il reste à faire
+            cardState.gameObject.SetActive(state != null);
+            if (state != null)
+            {
+                y -= 6f;
+                cardState.anchoredPosition = new Vector2(CardPad, y);
+                cardCheck.SetActive(done);
+                cardTodo.gameObject.SetActive(!done);
+                cardStateText.text = state;
+                cardStateText.color = done ? Color.Lerp(HudIcon.CheckGreen, Color.white, 0.25f) : Dim;
+                cardStateText.rectTransform.sizeDelta = new Vector2(cardStateText.preferredWidth + 4f, 28f);
+                width = Mathf.Max(width, 30f + cardStateText.preferredWidth);
+                y -= 30f;
+            }
+
+            // Touche pour s'y rendre (pas pendant une course : le GPS suit alors son parcours)
+            var nav = game.Nav;
+            bool hint = nav && !nav.OnCourse && !GameManager.DedicatedServer;
+            cardHint.gameObject.SetActive(hint);
+            if (hint)
+            {
+                y -= 10f;
+                cardHint.anchoredPosition = new Vector2(CardPad, y - 4f);
+                cardHintKey.text = GameInput.UsingGamepad ? "A" : Loc.T("Clic", "Click");
+                float chip = Mathf.Max(30f, cardHintKey.preferredWidth + 20f);
+                cardHintChip.sizeDelta = new Vector2(chip, 26f);
+                cardHintChip.anchoredPosition = new Vector2(chip * 0.5f, 0f);
+                cardHintKey.rectTransform.sizeDelta = cardHintChip.sizeDelta;
+                cardHintText.text = Loc.T("Y aller avec le GPS", "Set as GPS destination");
+                cardHintText.rectTransform.anchoredPosition = new Vector2(chip + 10f, 0f);
+                cardHintText.rectTransform.sizeDelta = new Vector2(cardHintText.preferredWidth + 4f, 26f);
+                width = Mathf.Max(width, chip + 10f + cardHintText.preferredWidth);
+                y -= 32f;
+            }
+
+            width = Mathf.Clamp(width + CardPad * 2f, 300f, 480f);
+            card.sizeDelta = new Vector2(width, -y + 14f);
+            cardName.rectTransform.sizeDelta = new Vector2(width - CardPad * 2f, 36f);
+            cardKicker.rectTransform.sizeDelta = new Vector2(cardKicker.preferredWidth + 4f, 24f);
+            cardRule.sizeDelta = new Vector2(width - CardPad * 2f, 2f);
         }
 
         /// <summary>Repère d'un joueur : flèche orientée cerclée de blanc sur un disque d'encre (or : soi ; couleur et pseudo : les autres).</summary>
