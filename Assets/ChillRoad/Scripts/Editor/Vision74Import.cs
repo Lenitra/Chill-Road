@@ -69,8 +69,8 @@ namespace ChillRoad.EditorTools
                 gearRatios = new[] { 3.3f, 2.2f, 1.62f, 1.28f, 1.04f, 0.86f }, finalDrive = 3.45f,
                 wheelRadius = 0.355f, tireGrip = 1.5f, dragArea = 0.66f, downforceArea = 0.95f, steerLock = 34f,
                 brakeForce = mass * 11.5f,
-                hoodCamera = new Vector3(0f, 1.10f, 0.9f),
-                bumperCamera = new Vector3(0f, 0.48f, 2.6f),
+                hoodCamera = new Vector3(0f, 1.10f, 1.15f),
+                bumperCamera = new Vector3(0f, 0.48f, 2.47f),
             };
             var list = new List<VehicleSpec>(a.playerCars ?? new VehicleSpec[0]);
             list.RemoveAll(s => s != null && s.id == spec.id);
