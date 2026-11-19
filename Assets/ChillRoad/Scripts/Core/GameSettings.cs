@@ -47,6 +47,8 @@ namespace ChillRoad
         // Flou de mouvement (léger) et secousses de caméra (chocs, vitesse)
         public static bool MotionBlur = false;
         public static bool CameraShake = true;
+        // Vibrations de la manette (0 = coupées, 1 = pleine force), voir GamepadRumble
+        public static float Rumble = 1f;
 
         // Écran (ordinateur) : synchro verticale (la limite d'images ne s'applique plus), mode d'affichage
         // (GraphicsQuality.WindowModes : 0 fenêtré, 1 plein écran sans bordure, 2 plein écran exclusif) et définition
@@ -88,6 +90,7 @@ namespace ChillRoad
             DetailDistance = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "detail", GraphicsQuality.DefaultDetail(Quality)), 0, GraphicsQuality.DetailLevels - 1);
             MotionBlur = PlayerPrefs.GetInt(Prefix + "motionblur", MotionBlur ? 1 : 0) == 1;
             CameraShake = PlayerPrefs.GetInt(Prefix + "camshake", CameraShake ? 1 : 0) == 1;
+            Rumble = Mathf.Clamp01(PlayerPrefs.GetFloat(Prefix + "rumble", Rumble));
             VSync = PlayerPrefs.GetInt(Prefix + "vsync", VSync ? 1 : 0) == 1;
             WindowMode = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "window", WindowMode), 0, GraphicsQuality.WindowModes.Length - 1);
             ScreenWidth = Mathf.Max(0, PlayerPrefs.GetInt(Prefix + "screenw", 0));
@@ -121,6 +124,7 @@ namespace ChillRoad
             PlayerPrefs.SetInt(Prefix + "detail", DetailDistance);
             PlayerPrefs.SetInt(Prefix + "motionblur", MotionBlur ? 1 : 0);
             PlayerPrefs.SetInt(Prefix + "camshake", CameraShake ? 1 : 0);
+            PlayerPrefs.SetFloat(Prefix + "rumble", Rumble);
             PlayerPrefs.SetInt(Prefix + "vsync", VSync ? 1 : 0);
             PlayerPrefs.SetInt(Prefix + "window", WindowMode);
             PlayerPrefs.SetInt(Prefix + "screenw", ScreenWidth);
@@ -151,6 +155,7 @@ namespace ChillRoad
             DetailDistance = GraphicsQuality.DefaultDetail(Quality);
             MotionBlur = false;
             CameraShake = true;
+            Rumble = 1f;
             VSync = false;
             WindowMode = 1;
             ScreenWidth = ScreenHeight = 0;

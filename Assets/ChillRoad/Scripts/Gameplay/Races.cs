@@ -634,8 +634,10 @@ namespace ChillRoad
                 shownBeat = beat;
                 if (game.Local.Audio) game.Local.Audio.Rev(beat == 1 ? 1f : 0.7f);
                 game.Camera.Shake(0.1f);
+                GamepadRumble.Kick(0.12f, 0.08f, 0.12f);
             }
             if (countdown > 0f) return;
+            GamepadRumble.Kick(0.45f, 0.3f, 0.35f);
             mode = Mode.Running;
             if (!menu) game.SetInputEnabled(true);
             elapsed = 0f;
@@ -785,6 +787,7 @@ namespace ChillRoad
             else game.Hud.Announce(Delta(time - old), finish, Bad, 4.5f, true);
             game.Hud.Flash(record ? Good : t.Tint, 0.3f);
             game.Camera.Shake(0.25f);
+            GamepadRumble.Kick(0.3f, 0.35f, 0.4f);
             if (game.Local.Audio) game.Local.Audio.Chime();
             if (netRace)
             {

@@ -87,6 +87,9 @@ namespace ChillRoad
         public float EspIntervention { get; private set; }
         /// <summary>Intervention de l'antipatinage (0-1).</summary>
         public float TcsIntervention { get; private set; }
+        /// <summary>L'ABS retient au moins une roue freinée à ce pas de physique (pour les vibrations de la manette).</summary>
+        public bool AbsActive { get; private set; }
+        bool absHolding;
         public bool OnRoad { get; set; } = true;
         /// <summary>Adhérence relative de la route sous la voiture (1 = goudron, moins sur la terre).</summary>
         public float RoadGrip { get; set; } = 1f;
@@ -577,7 +580,7 @@ namespace ChillRoad
                 if (abs && n > 0 && Mathf.Abs(vRef) > 1f)
                 {
                     float floor = Mathf.Abs(vRef) - sPeak * 0.9f * Mathf.Max(Mathf.Abs(vRef), 3f);
-                    if (Mathf.Abs(W) < floor) W = Mathf.Sign(vRef) * floor;
+                    if (Mathf.Abs(W) < floor) { W = Mathf.Sign(vRef) * floor; absHolding = true; }
                 }
                 GroupForce(drivenGroup, single, W, true);
             }
@@ -720,6 +723,7 @@ namespace ChillRoad
             bool coupled = !Shifting && !clutchOut;
             float r = Spec.wheelRadius;
             float driveMass = (nDriven * wheelInertia + (coupled ? engineInertia * TotalRatio * TotalRatio : 0f)) / (r * r);
+            absHolding = false;
             if (nDriven > 0) driveW = SpinWheels(true, null, driveW, driveMass, coupled, dt);
             float spinAmount = 0f, vDriven = 0f;
             int drivenGrounded = 0;
@@ -739,6 +743,7 @@ namespace ChillRoad
                 spinAmount = Mathf.Clamp01((driveW - vDriven) / Mathf.Max(Mathf.Abs(vDriven), 3f) / (sPeak * 4f));
             }
             WheelSpin = Mathf.Lerp(WheelSpin, spinAmount, 1f - Mathf.Exp(-dt * 10f));
+            AbsActive = absHolding && brakePedal > 0.05f;
             TcsIntervention = drivenGrounded > 0 && driveW - vDriven > sPeak * 1.1f * Mathf.Max(Mathf.Abs(vDriven), 3f) ? tcsNow : 0f;
 
             float skidSum = 0f;

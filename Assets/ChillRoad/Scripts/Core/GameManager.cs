@@ -189,6 +189,8 @@ namespace ChillRoad
             fx.Init(assets);
             // Secousses de caméra aux chocs
             Player.Impacted += (c, impact) => { if (impact > 3f) cameraRig.Shake(Mathf.Clamp01(impact / 20f)); };
+            // Vibrations de la manette (chocs, glisse, sol, ABS…)
+            gameObject.AddComponent<GamepadRumble>().Init(this, Player, Score);
 
             // Air de montagne : on voit l'autre versant et les sommets à plusieurs kilomètres
             RenderSettings.fogDensity = 0.00026f;
@@ -457,6 +459,7 @@ namespace ChillRoad
                 menus.ShowCountdown(i.ToString());
                 local.Audio.Rev(i == 1 ? 1f : 0.7f);
                 cameraRig.Shake(0.12f);
+                GamepadRumble.Kick(0.12f, 0.08f, 0.12f);
                 yield return new WaitForSeconds(beat);
             }
             menus.ShowCountdown(Loc.T("GO !", "GO!"));
@@ -464,6 +467,7 @@ namespace ChillRoad
             screenFx.Punch(1f);
             cameraRig.Kick(16f);
             cameraRig.Shake(0.45f);
+            GamepadRumble.Kick(0.45f, 0.3f, 0.35f);
             hud.SetVisible(true);
             hud.AnimateIn();
             Player.Autopilot = false;
