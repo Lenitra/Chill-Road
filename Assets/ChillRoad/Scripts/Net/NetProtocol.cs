@@ -17,7 +17,7 @@ namespace ChillRoad
     /// </summary>
     public static class NetProtocol
     {
-        public const byte Version = 6;
+        public const byte Version = 7;
         /// <summary>Port du serveur ; s'il est pris, les suivants sont essayés (et interrogés par la recherche locale).</summary>
         public const int DefaultPort = 47777;
         public const int PortTries = 4;
@@ -110,7 +110,7 @@ namespace ChillRoad
     /// <summary>Motifs de refus d'entrée.</summary>
     public static class NetRefuse
     {
-        public const byte Full = 1, Version = 2;
+        public const byte Full = 1, Version = 2, Content = 3;
     }
 
     /// <summary>État d'une voiture de joueur, tel qu'il voyage sur le réseau (39 octets).</summary>

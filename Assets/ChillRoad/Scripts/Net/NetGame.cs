@@ -334,6 +334,7 @@ namespace ChillRoad
                     writer.Byte((byte)PlayerCount);
                     writer.Byte((byte)MaxPlayers);
                     writer.Byte(Options);
+                    writer.UInt(ContentPacks.Signature(game.assets));
                     Send(from);
                     break;
                 case NetMsg.Hello:
@@ -354,6 +355,10 @@ namespace ChillRoad
             string name = NetProtocol.CleanName(reader.String());
             if (!reader.Ok) return;
             if (reader.Version != NetProtocol.Version) { Refuse(from, theirNonce, NetRefuse.Version); return; }
+            // Même version du protocole mais pas le même contenu (packs, voitures du garage) : une voiture serait prise pour une autre
+            uint content = reader.UInt();
+            if (!reader.Ok) return;
+            if (content != ContentPacks.Signature(game.assets)) { Refuse(from, theirNonce, NetRefuse.Content); return; }
             if (!peers.TryGetValue(from, out var p))
             {
                 if (PlayerCount >= MaxPlayers) { Refuse(from, theirNonce, NetRefuse.Full); return; }
@@ -721,6 +726,7 @@ namespace ChillRoad
             writer.Begin(NetMsg.Hello);
             writer.UInt(nonce);
             writer.String(PlayerName);
+            writer.UInt(ContentPacks.Signature(game.assets));
             Send(server);
         }
 
@@ -754,6 +760,7 @@ namespace ChillRoad
             // listée, marquée comme telle)
             bool compatible = reader.Version == NetProtocol.Version;
             byte options = compatible ? reader.Byte() : NetOptions.Collisions;
+            if (compatible) compatible = reader.UInt() == ContentPacks.Signature(game.assets);
             if (!reader.Ok) return;
             var info = Found.Find(f => f.instance == id);
             if (info == null) Found.Add(info = new ServerInfo { ep = from, instance = id });
@@ -798,6 +805,7 @@ namespace ChillRoad
             if (!reader.Ok || echoed != nonce) return;
             Fail(reason == NetRefuse.Full ? Loc.T("La partie est complète", "The game is full")
                 : reason == NetRefuse.Version ? Loc.T("Version du jeu différente de celle du serveur", "Game version differs from the server's")
+                : reason == NetRefuse.Content ? Loc.T("Contenu du jeu différent de celui du serveur : mettez-vous à jour tous les deux", "Game content differs from the server's: both of you should update")
                 : Loc.T("Entrée refusée par le serveur", "The server refused the connection"));
         }
 
