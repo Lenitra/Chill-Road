@@ -22,8 +22,12 @@ namespace ChillRoad
         static readonly Color Ink = new Color(0.03f, 0.04f, 0.06f);
 
         // Même largeur et, dans le menu, même place que le panneau des contrôles du HUD
-        const float Width = 740f, MenuHeight = 740f, HeaderHeight = 124f, FooterHeight = 46f, RowMax = 46f, Inset = 30f;
-        static readonly Vector2 HeldTop = new Vector2(0f, 330f), MenuTop = new Vector2(410f, 370f);
+        const float Width = 740f, HeaderHeight = 124f, FooterHeight = 46f, RowMax = 46f, Inset = 30f;
+        static readonly Vector2 HeldTop = new Vector2(0f, 330f);
+        // Dans le menu : à la place de la plaque des contrôles (même hauteur, même pente, voir Hud.ApplyLean)
+        static float MenuHeight => Hud.MenuHeight;
+        static Vector2 MenuTop => new Vector2(Hud.ControlsCenterX, Hud.MenuHeight * 0.5f);
+        HudShape plateShape;
 
         class Row
         {
@@ -111,7 +115,9 @@ namespace ChillRoad
                 if (row.rt.gameObject.activeSelf != used) row.rt.gameObject.SetActive(used);
                 if (!used) continue;
                 var p = players[i];
-                row.rt.anchoredPosition = new Vector2(Inset, -HeaderHeight - i * rowHeight);
+                // (dans le menu, les lignes suivent la pente de la plaque)
+                float lean = inMenu ? Hud.MenuLean * (MenuHeight * 0.5f - HeaderHeight - (i + 0.5f) * rowHeight) : 0f;
+                row.rt.anchoredPosition = new Vector2(Inset + lean, -HeaderHeight - i * rowHeight);
                 row.rt.sizeDelta = new Vector2(Width - Inset * 2f, rowHeight - 4f);
                 row.back.color = new Color(1f, 1f, 1f, p.local ? 0.1f : i % 2 == 0 ? 0.035f : 0f);
                 row.dot.color = RemoteCar.Colors[p.id % RemoteCar.Colors.Length];
@@ -141,6 +147,15 @@ namespace ChillRoad
             float height = inMenu ? MenuHeight : HeaderHeight + players.Count * rowHeight + 22f;
             panel.anchoredPosition = inMenu ? MenuTop : HeldTop;
             panel.sizeDelta = new Vector2(Width, height);
+            plateShape.Set(inMenu ? Hud.MenuLean * height : 24f, 0f, 0f);
+            // En-tête et pied suivent la pente (position verticale de leur centre sous le haut de la plaque)
+            float Lean(float fromTop) => inMenu ? Hud.MenuLean * (height * 0.5f - fromTop) : 0f;
+            title.rectTransform.anchoredPosition = new Vector2(50f + Lean(46f), -22f);
+            server.rectTransform.anchoredPosition = new Vector2(-50f + Lean(46f), -26f);
+            summary.rectTransform.anchoredPosition = new Vector2(50f + Lean(80f), -66f);
+            headName.rectTransform.anchoredPosition = new Vector2(Inset + 46f + Lean(109f), -98f);
+            headCar.rectTransform.anchoredPosition = new Vector2(Inset + 352f + Lean(109f), -98f);
+            footer.rectTransform.anchoredPosition = new Vector2(50f + Lean(height - 25f), 12f);
         }
 
         /// <summary>Où en est le joueur : sa course à plusieurs s'il en court une, sinon sa distance à notre voiture.</summary>
@@ -189,6 +204,7 @@ namespace ChillRoad
             Stretch(plate.rectTransform);
             plate.Set(24f, 0f, 0f);
             plate.raycastTarget = true;
+            plateShape = plate;
             // Sans graphisme cible : la teinte d'un bouton inactif (en conduisant) n'éclaircit pas la plaque
             toggle = pgo.AddComponent<Button>();
             toggle.transition = Selectable.Transition.None;

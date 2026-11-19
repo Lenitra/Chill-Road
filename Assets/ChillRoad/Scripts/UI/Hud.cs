@@ -162,7 +162,22 @@ namespace ChillRoad
         static readonly Color Ink = new Color(0.06f, 0.07f, 0.09f);
         static readonly Color InkDim = new Color(0.06f, 0.07f, 0.09f, 0.72f);
         static readonly Color Muted = new Color(0.46f, 0.48f, 0.52f);
-        const float HeroH = 124f, MidH = 196f, SetH = 96f, ExitH = 84f, RowGap = 14f;
+        const float HeroH = 132f, MidH = 214f, SetH = 104f, ExitH = 80f, RowGap = 14f;
+        // Disposition du menu pause : deux plaques de même hauteur, centrées ensemble (tuiles à gauche, contrôles ou
+        // joueurs à droite), toutes penchées du même angle (décalage horizontal par pixel de hauteur) ; les tuiles
+        // ont ce même angle et leurs rangées suivent la pente, d'où des bords droits et parallèles à ceux des plaques
+        public const float MenuLean = 0.1f;
+        const float PauseW = 720f, ControlsW = 740f, MenuGap = 36f;
+        const float MenuLeft = -(PauseW + MenuGap + ControlsW) * 0.5f, ControlsLeft = MenuLeft + PauseW + MenuGap;
+        /// <summary>Centre horizontal de la plaque de droite (contrôles, tableau des joueurs en réseau).</summary>
+        public const float ControlsCenterX = ControlsLeft + ControlsW * 0.5f;
+        /// <summary>Hauteur commune des plaques du menu pause (elle grandit en réseau avec la ligne d'état).</summary>
+        public static float MenuHeight { get; private set; } = 60f + 90f + HeroH + MidH + SetH + ExitH + RowGap * 4f;
+        HudShape pausePlate, controlsPlate;
+        RectTransform controlsPanelRt;
+        GameObject netRow;
+        // Rangées du menu dans l'ordre (titre, état réseau, tuiles) : chacune décalée selon sa hauteur (voir ApplyLean)
+        readonly List<HorizontalLayoutGroup> leanRows = new List<HorizontalLayoutGroup>();
         float netRefresh, inviteCopied = -10f, inviteClock;
         string inviteAnnounced;
         /// <summary>
@@ -770,22 +785,24 @@ namespace ChillRoad
             pausePanel = Rect(screen, "Pause", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
             pausePanel.AddComponent<Image>().color = new Color(0.01f, 0.01f, 0.03f, 0.62f);
             // Menu à gauche, contrôles à droite
-            var box = Rect(pausePanel.transform, "Box", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-760, -326), new Vector2(-40, 326));
-            Backdrop(box);
+            var box = Rect(pausePanel.transform, "Box", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(MenuLeft, -MenuHeight * 0.5f), new Vector2(MenuLeft + PauseW, MenuHeight * 0.5f));
+            pausePlate = Backdrop(box);
             pauseBox = box;
             var layout = box.gameObject.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(46, 46, 30, 30);
             layout.spacing = RowGap;
             layout.childControlHeight = true; layout.childControlWidth = true; layout.childForceExpandHeight = false;
-            var title = Label(box, "PAUSE", 64, TextAnchor.MiddleLeft, Accent, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600, 90), FontStyle.BoldAndItalic);
-            title.gameObject.AddComponent<LayoutElement>().preferredHeight = 90;
+            var titleRow = TileRow(box, 90f);
+            var title = Label(titleRow, "PAUSE", 64, TextAnchor.MiddleLeft, Accent, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600, 90), FontStyle.BoldAndItalic);
             pauseTitle = title;
             // Partie en réseau : nombre de joueurs, adresse et code d'invitation à donner aux autres (hôte) ; dessous,
             // l'option de collisions
-            netLabel = Label(box, "", 22, TextAnchor.MiddleLeft, Info, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600, 56), FontStyle.Bold);
-            netLayout = netLabel.gameObject.AddComponent<LayoutElement>();
-            netLayout.preferredHeight = 56;
-            netLabel.gameObject.SetActive(false);
+            var netRt = TileRow(box, 56f);
+            netRow = netRt.gameObject;
+            netLabel = Label(netRt, "", 22, TextAnchor.MiddleLeft, Info, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600, 56), FontStyle.Bold);
+            netLayout = netRt.GetComponent<LayoutElement>();
+            netRow.SetActive(false);
 
             var hero = TileRow(box, HeroH);
             var resume = Tile(hero, HeroH, HudIcon.Kind.Play, "Reprendre", "Resume", true, 1.45f, () => SetPaused(false));
@@ -815,11 +832,47 @@ namespace ChillRoad
             var quit = Tile(exits, ExitH, HudIcon.Kind.Power, "Quitter", "Quit", true, 1f, game.Quit);
             Loc.Bind(quit.sub, "Fermer le jeu", "Close the game");
             BuildControls(pausePanel.transform);
+            ApplyLean(MenuHeight);
             pausePanel.SetActive(false);
         }
 
-        /// <summary>Rangée de tuiles de hauteur fixe (elle n'absorbe pas la place libre de la plaque).</summary>
-        static RectTransform TileRow(Transform parent, float height)
+        /// <summary>
+        /// Plaques du menu à la hauteur donnée : même hauteur et même pente pour les deux ; chaque rangée de tuiles (et
+        /// chaque ligne de la liste des contrôles) glisse selon sa hauteur, le titre et les onglets des contrôles aussi.
+        /// </summary>
+        void ApplyLean(float height)
+        {
+            MenuHeight = height;
+            float skew = MenuLean * height;
+            foreach (var rt in new[] { pauseBox, controlsPanelRt })
+            {
+                rt.offsetMin = new Vector2(rt.offsetMin.x, -height * 0.5f);
+                rt.offsetMax = new Vector2(rt.offsetMax.x, height * 0.5f);
+            }
+            pausePlate.Set(skew, 0f, 0f);
+            controlsPlate.Set(skew, 0f, 0f);
+            // Tuiles : du haut (marge de 30) vers le bas, les rangées affichées et leur espacement
+            float y = 30f;
+            foreach (var row in leanRows)
+            {
+                if (!row.gameObject.activeSelf) continue;
+                float h = row.GetComponent<LayoutElement>().preferredHeight;
+                int off = Mathf.RoundToInt(MenuLean * (height * 0.5f - (y + h * 0.5f)));
+                row.padding = new RectOffset(off, -off, 0, 0);
+                y += h + RowGap;
+            }
+            // Contrôles : titre (centre 52 px sous le haut), lignes de la liste (sous les 100 px du haut, 43 px chacune)
+            controlsTitle.rectTransform.anchoredPosition = new Vector2(50f + MenuLean * (height * 0.5f - 52f), -22f);
+            for (int i = 0; i < controlRows.Count; i++)
+            {
+                var h = controlRows[i].action.transform.parent.GetComponent<HorizontalLayoutGroup>();
+                int off = Mathf.RoundToInt(MenuLean * (height * 0.5f - 100f - i * 43f - 20f));
+                h.padding = new RectOffset(off, -off, 0, 0);
+            }
+        }
+
+        /// <summary>Rangée de tuiles de hauteur fixe (elle n'absorbe pas la place libre de la plaque), penchée avec la plaque.</summary>
+        RectTransform TileRow(Transform parent, float height)
         {
             var row = Rect(parent, "Row", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             var le = row.gameObject.AddComponent<LayoutElement>();
@@ -829,6 +882,7 @@ namespace ChillRoad
             h.spacing = RowGap;
             h.childControlWidth = h.childControlHeight = true;
             h.childForceExpandWidth = h.childForceExpandHeight = true;
+            leanRows.Add(h);
             return row;
         }
 
@@ -844,7 +898,7 @@ namespace ChillRoad
             go.GetComponent<LayoutElement>().flexibleWidth = flex;
             var t = new PauseTile();
             t.plate = go.GetComponent<HudShape>();
-            t.plate.Set(18f, 0f, 0f);
+            t.plate.Set(height * MenuLean, 0f, 0f);
             t.plate.color = TileNormal;
             t.button = go.GetComponent<Button>();
             t.button.targetGraphic = t.plate;
@@ -927,7 +981,6 @@ namespace ChillRoad
             canvas.gameObject.SetActive(false);
             picker.Open(chosen =>
             {
-                canvas.gameObject.SetActive(true);
                 if (chosen)
                 {
                     SetPaused(false);
@@ -946,9 +999,11 @@ namespace ChillRoad
         /// <summary>Panneau des contrôles, à droite du menu pause.</summary>
         void BuildControls(Transform parent)
         {
-            var panel = Rect(parent, "Controls", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(40, -370), new Vector2(780, 370));
-            Backdrop(panel);
+            var panel = Rect(parent, "Controls", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(ControlsLeft, -MenuHeight * 0.5f), new Vector2(ControlsLeft + ControlsW, MenuHeight * 0.5f));
+            controlsPlate = Backdrop(panel);
             controlsPanel = panel.gameObject;
+            controlsPanelRt = panel;
             controlsTitle = Label(panel, "", 30, TextAnchor.MiddleLeft, Info, new Vector2(0f, 1f), new Vector2(50f, -22f), new Vector2(300, 60), FontStyle.BoldAndItalic);
             // Onglets : liste, manette, clavier (en réseau, d'abord le tableau des joueurs, qui prend la place du panneau)
             foreach (var (view, fr, en) in new[] { (ViewPlayers, "JOUEURS", "PLAYERS"), (ViewList, "LISTE", "LIST"), (ViewPad, "MANETTE", "GAMEPAD"), (ViewKeys, "CLAVIER", "KEYBOARD") })
@@ -1046,7 +1101,7 @@ namespace ChillRoad
         /// <summary>Onglets des vues, alignés à droite du titre ; l'onglet affiché passe à l'or. « Joueurs » : en réseau seulement.</summary>
         void LayoutViewChips(int view, bool online)
         {
-            float x = -50f;
+            float x = -50f + MenuLean * (MenuHeight * 0.5f - 33f);
             for (int i = viewChips.Count - 1; i >= 0; i--)
             {
                 var (button, plate, text, v) = viewChips[i];
@@ -1117,7 +1172,7 @@ namespace ChillRoad
             bool online = game.Online, host = online && net.IsHost;
             netRefresh = 0.5f;
             int lines = 0;
-            netLabel.gameObject.SetActive(online);
+            netRow.SetActive(online);
             inviteTile.button.gameObject.SetActive(host);
             if (online)
             {
@@ -1147,12 +1202,11 @@ namespace ChillRoad
                 }
                 lines = invite.Length > 0 ? 3 : 2;
                 netLabel.text = first + "\n" + (invite.Length > 0 ? invite + "\n" : "") + collisions;
-                netLayout.preferredHeight = lines * 28f;
+                netLayout.preferredHeight = netLayout.minHeight = lines * 28f;
             }
             // Hauteur de la plaque : marges, titre, ligne d'état (en réseau), quatre rangées de tuiles et leurs espaces
             float height = 60f + 90f + HeroH + MidH + SetH + ExitH + RowGap * 4f + (online ? lines * 28f + RowGap : 0f);
-            pauseBox.offsetMin = new Vector2(pauseBox.offsetMin.x, -height * 0.5f);
-            pauseBox.offsetMax = new Vector2(pauseBox.offsetMax.x, height * 0.5f);
+            ApplyLean(height);
         }
 
         /// <summary>Bouton du code d'invitation (hôte) : le copie dans le presse-papiers ; sans code (panne, expiré), en demande un.</summary>
@@ -1172,6 +1226,7 @@ namespace ChillRoad
         public void SetPaused(bool paused)
         {
             pausePanel.SetActive(paused);
+            canvas.gameObject.SetActive(!paused);
             inPause = paused;
             // En réseau, le monde continue pour tous : seule notre voiture n'est plus conduite
             Time.timeScale = paused && !game.Online ? 0f : 1f;
@@ -1282,7 +1337,7 @@ namespace ChillRoad
         }
 
         /// <summary>Fond d'un panneau à mise en page automatique : plaque inclinée hors de la mise en page, sur toute la surface.</summary>
-        static void Backdrop(RectTransform panel)
+        static HudShape Backdrop(RectTransform panel)
         {
             var s = Shape(panel, "Plate", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(0.03f, 0.04f, 0.06f, 0.92f));
             s.Set(24f, 0f, 0f);
@@ -1292,6 +1347,7 @@ namespace ChillRoad
             rt.anchorMax = Vector2.one;
             rt.offsetMin = rt.offsetMax = Vector2.zero;
             rt.SetAsFirstSibling();
+            return s;
         }
 
         static Image Img(Transform parent, string name, Sprite sprite, Vector2 size, Vector2 pos, Color color)
