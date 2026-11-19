@@ -745,7 +745,7 @@ namespace ChillRoad
             rt.anchoredPosition = pos;
             rt.sizeDelta = box;
             var t = go.GetComponent<Text>();
-            t.font = HudArt.Font; t.fontSize = size; t.alignment = align; t.color = color; t.fontStyle = style;
+            t.font = HudArt.Font; t.fontSize = size; t.alignment = align; t.color = color; t.fontStyle = style; Glass.Adopt(t, style);
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
             t.verticalOverflow = VerticalWrapMode.Overflow;
             t.supportRichText = true;

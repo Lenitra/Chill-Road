@@ -74,7 +74,7 @@ namespace ChillRoad
             var t = Graphic<Text>(Node(root, name, new Vector2(0.5f, 1f), new Vector2(0f, y - h * 0.5f + 6f), new Vector2(Width - 24f, h)));
             t.font = HudArt.Font;
             t.fontSize = size;
-            t.fontStyle = style;
+            t.fontStyle = style; Glass.Adopt(t, style);
             t.alignment = TextAnchor.MiddleCenter;
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
             t.color = color;

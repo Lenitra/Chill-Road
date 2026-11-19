@@ -21,10 +21,27 @@ namespace ChillRoad
             return this;
         }
 
+        /// <summary>
+        /// Style verre (refonte 2026-11-19) : les plaques inclinées sont dessinées en rectangles arrondis ; les plaques
+        /// sombres gagnent un liseré clair et deviennent translucides, les filets fins deviennent des pilules.
+        /// false : ancien dessin (parallélogramme aux bords fondus).
+        /// </summary>
+        public static bool GlassStyle = true;
+
         protected override void OnPopulateMesh(VertexHelper vh)
         {
             vh.Clear();
             Rect r = GetPixelAdjustedRect();
+            if (GlassStyle)
+            {
+                var c = color;
+                bool dark = Mathf.Max(c.r, Mathf.Max(c.g, c.b)) < 0.3f;
+                if (dark) c.a *= 0.8f;
+                float h = Mathf.Min(r.width, r.height);
+                float radius = h <= 10f ? h * 0.5f : Mathf.Min(22f, h * 0.5f);
+                GlassRect.Draw(vh, r, radius, c, dark && h > 10f ? 1.5f : 0f, new Color(1f, 1f, 1f, 0.2f * color.a), 0f, Color.clear);
+                return;
+            }
             float[] xs = { r.xMin, r.xMin + fadeLeft, r.xMax - fadeRight, r.xMax };
             float[] a = { fadeLeft > 0f ? 0f : 1f, 1f, 1f, fadeRight > 0f ? 0f : 1f };
             for (int i = 0; i < 4; i++)
