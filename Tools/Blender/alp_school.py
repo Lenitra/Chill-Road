@@ -44,6 +44,21 @@ reg(dict(id="school_tires", file="School_Tires", cat="street", tags=["school"], 
          collider="capsule", radius=0.38, build=school_tires))
 
 
+def school_tire(g, color):
+    """Pneu seul (débris d'une pile ou d'un mur cassé, posé par le jeu) : 0,35 m de rayon, 0,24 m de haut, trou noir
+    visible dessus et dessous."""
+    n = lv(g, 14, 10, 7)
+    g.frustum((0, 0, 0), 0.35, 0.35, 0.24, n, color, auto=False)
+    g.frustum((0, 0, 0.236), 0.19, 0.19, 0.008, n, "black", cap0=False, auto=False)
+    g.frustum((0, 0, -0.004), 0.19, 0.19, 0.008, n, "black", cap1=False, auto=False)
+
+
+reg(dict(id="school_tire_red", file="School_TireRed", cat="street", tags=["school"], seed=619, fp=(0.7, 0.7),
+         collider="none", build=lambda g: school_tire(g, "sign_red")))
+reg(dict(id="school_tire_white", file="School_TireWhite", cat="street", tags=["school"], seed=620, fp=(0.7, 0.7),
+         collider="none", build=lambda g: school_tire(g, "white")))
+
+
 def school_arch(g):
     """Portique d'entrée : deux mâts, poutre bleue, damier de course."""
     H, W = 5.4, 15.0
@@ -131,36 +146,6 @@ reg(dict(id="school_gantry", file="School_Gantry", cat="street", tags=["school"]
          collider="none", build=school_gantry))
 
 
-def school_grandstand(g):
-    """Tribune de 24 m : gradins de béton, sièges de couleur, public stylisé (petits blocs), toit sur poteaux."""
-    import random
-    rnd = random.Random(7)
-    L, steps, d, h = 24.0, 6, 1.0, 0.45
-    for k in range(steps):
-        y = -2.5 + k * d                                   # le premier rang côté piste (-y = façade)
-        g.box((0, y, (k + 1) * h / 2), (L, d, (k + 1) * h), "concrete")
-        g.box((0, y - 0.25, (k + 1) * h + 0.06), (L - 0.4, 0.35, 0.12), "sign_blue" if k % 2 == 0 else "white")
-        for i in range(int(L / 0.9)):
-            if rnd.random() < 0.35:
-                continue
-            x = -L / 2 + 0.6 + i * 0.9
-            col = rnd.choice(["red", "yellow", "white", "sign_blue", "green", "orange", "black"])
-            g.box((x, y - 0.1, (k + 1) * h + 0.4), (0.42, 0.32, 0.55), col)
-            g.box((x, y - 0.1, (k + 1) * h + 0.8), (0.28, 0.28, 0.26), "skin_pink")
-    top = steps * h
-    g.box((0, -2.5 + steps * d - 0.5, top + 0.6), (L, 0.3, 1.2), "concrete")          # dossier du dernier rang
-    for s in (-1, 1):
-        g.box((s * (L / 2 + 0.15), -2.5 + steps * d / 2 - 0.5, (top + 1.2) / 2), (0.3, steps * d, top + 1.2), "concrete")
-    for x in (-L / 2 + 0.5, 0.0, L / 2 - 0.5):
-        g.box((x, -2.5 + steps * d - 0.4, top + 2.2), (0.25, 0.25, 4.4), "metal_dark")
-    g.box((0, -0.6, top + 4.5), (L + 1.0, steps * d + 2.4, 0.2), "sign_blue")
-    g.box((0, -3.7, top + 4.35), (L + 1.0, 0.1, 0.5), "white")
-
-
-reg(dict(id="school_grandstand", file="School_Grandstand", cat="street", tags=["school"], seed=618, fp=(24.6, 8.2),
-         collider="box", build=school_grandstand))
-
-
 def school_banner(g):
     """Banderole de bord de piste sans texte : panneau de 6 m sur pieds, bandes aux couleurs de l'école."""
     for s in (-1, 1):
@@ -186,5 +171,5 @@ def school_flag(g):
 reg(dict(id="school_flag", file="School_Flag", cat="street", tags=["school"], seed=620, fp=(0.4, 0.4),
          collider="capsule", radius=0.1, build=school_flag))
 
-IDS = ["school_board", "school_cone", "school_tires", "school_arch", "school_kiosk", "school_pylon", "school_tirewall",
-       "school_gantry", "school_grandstand", "school_banner", "school_flag"]
+IDS = ["school_board", "school_cone", "school_tires", "school_tire_red", "school_tire_white", "school_arch", "school_kiosk",
+       "school_pylon", "school_tirewall", "school_gantry", "school_banner", "school_flag"]

@@ -2302,6 +2302,30 @@ MonoBehaviour:
     module: 0
     ymin: 0
     lights: []
+  - id: school_tire_red
+    category: street
+    tags:
+    - school
+    prefab: {fileID: 919132149155446097, guid: b824db22589acac4da43a4261076e155, type: 3}
+    size: {x: 0.7, y: 0.26, z: 0.68}
+    footprint: {x: 0.7, y: 0.7}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
+  - id: school_tire_white
+    category: street
+    tags:
+    - school
+    prefab: {fileID: 919132149155446097, guid: 47f8699bdcd0b7d4ea0771b5c15cbd42, type: 3}
+    size: {x: 0.7, y: 0.26, z: 0.68}
+    footprint: {x: 0.7, y: 0.7}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
   - id: school_arch
     category: street
     tags:
@@ -2358,18 +2382,6 @@ MonoBehaviour:
     size: {x: 17.1, y: 6.8, z: 1.1}
     footprint: {x: 16.6, y: 1.1}
     collider: none
-    radius: 0
-    module: 0
-    ymin: 0
-    lights: []
-  - id: school_grandstand
-    category: street
-    tags:
-    - school
-    prefab: {fileID: 919132149155446097, guid: b8d52d9c5d92d3446a8288c39d41927d, type: 3}
-    size: {x: 25, y: 7.3, z: 8.4}
-    footprint: {x: 24.6, y: 8.2}
-    collider: box
     radius: 0
     module: 0
     ymin: 0

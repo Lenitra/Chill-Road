@@ -3582,6 +3582,44 @@
    "material": ""
   },
   {
+   "id": "school_tire_red",
+   "file": "School_TireRed",
+   "category": "street",
+   "tags": [
+    "school"
+   ],
+   "sx": 0.7,
+   "sy": 0.26,
+   "sz": 0.68,
+   "fw": 0.7,
+   "fd": 0.7,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "school_tire_white",
+   "file": "School_TireWhite",
+   "category": "street",
+   "tags": [
+    "school"
+   ],
+   "sx": 0.7,
+   "sy": 0.26,
+   "sz": 0.68,
+   "fw": 0.7,
+   "fd": 0.7,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
    "id": "school_arch",
    "file": "School_Arch",
    "category": "street",
@@ -3670,25 +3708,6 @@
    "fw": 16.6,
    "fd": 1.1,
    "collider": "none",
-   "radius": 0.0,
-   "module": 0.0,
-   "ymin": 0.0,
-   "lights": [],
-   "material": ""
-  },
-  {
-   "id": "school_grandstand",
-   "file": "School_Grandstand",
-   "category": "street",
-   "tags": [
-    "school"
-   ],
-   "sx": 25.0,
-   "sy": 7.3,
-   "sz": 8.4,
-   "fw": 24.6,
-   "fd": 8.2,
-   "collider": "box",
    "radius": 0.0,
    "module": 0.0,
    "ymin": 0.0,

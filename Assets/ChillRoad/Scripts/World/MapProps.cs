@@ -30,6 +30,8 @@ namespace ChillRoad
             if (places == null || !pack) yield break;
             var cells = new Dictionary<Vector2Int, Transform>();
             float last = Time.realtimeSinceStartup;
+            // Pneus seuls : débris des piles et murs de pneus cassés (BreakableProp.UseTires)
+            GameObject redTire = pack.Find("school_tire_red")?.prefab, whiteTire = pack.Find("school_tire_white")?.prefab;
             for (int i = 0; i < places.Length; i++)
             {
                 var p = places[i];
@@ -60,7 +62,12 @@ namespace ChillRoad
                 go.transform.localScale = Vector3.one * scale;
                 TuneLods(go);
                 AddCollider(go, item);
-                if (breakable) go.AddComponent<BreakableProp>().Init(go.GetComponent<Collider>(), item.size * scale);
+                if (breakable)
+                {
+                    var prop = go.AddComponent<BreakableProp>();
+                    prop.Init(go.GetComponent<Collider>(), item.size * scale);
+                    if (BreakableProp.IsTires(item)) prop.UseTires(item.id, redTire, whiteTire);
+                }
                 if (item.lights != null && item.lights.Length > 0) road.RegisterLamp(go.transform, item.lights);
                 if (Time.realtimeSinceStartup - last > 0.03f)
                 {

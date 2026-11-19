@@ -4792,6 +4792,56 @@
    "radius": 0.38
   },
   {
+   "id": "school_tire_red",
+   "file": "School_TireRed",
+   "category": "street",
+   "tags": [
+    "school"
+   ],
+   "size": [
+    0.7,
+    0.26,
+    0.68
+   ],
+   "ymin": -0.0,
+   "footprint": [
+    0.7,
+    0.7
+   ],
+   "lods": 3,
+   "tris": [
+    132,
+    92,
+    62
+   ],
+   "collider": "none"
+  },
+  {
+   "id": "school_tire_white",
+   "file": "School_TireWhite",
+   "category": "street",
+   "tags": [
+    "school"
+   ],
+   "size": [
+    0.7,
+    0.26,
+    0.68
+   ],
+   "ymin": -0.0,
+   "footprint": [
+    0.7,
+    0.7
+   ],
+   "lods": 3,
+   "tris": [
+    132,
+    92,
+    62
+   ],
+   "collider": "none"
+  },
+  {
    "id": "school_arch",
    "file": "School_Arch",
    "category": "street",
@@ -4916,31 +4966,6 @@
     900
    ],
    "collider": "none"
-  },
-  {
-   "id": "school_grandstand",
-   "file": "School_Grandstand",
-   "category": "street",
-   "tags": [
-    "school"
-   ],
-   "size": [
-    25.0,
-    7.3,
-    8.4
-   ],
-   "ymin": 0.0,
-   "footprint": [
-    24.6,
-    8.2
-   ],
-   "lods": 3,
-   "tris": [
-    2592,
-    2592,
-    2592
-   ],
-   "collider": "box"
   },
   {
    "id": "school_banner",
