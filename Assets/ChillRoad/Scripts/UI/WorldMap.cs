@@ -9,8 +9,8 @@ namespace ChillRoad
     /// Carte globale : plein écran, ouverte par la touche « , » (ou Select à la manette) pendant la balade. Le jeu est
     /// en pause tant qu'elle est affichée (sauf en réseau : le monde continue, les autres joueurs s'y déplacent).
     /// La carte (image générée avec la carte, Tools/Map/map_overview.py) remplit l'écran et se fond dans le fond ; des
-    /// plaques inclinées (DA du HUD) flottent par-dessus : titre et lieu actuel, légende, destination du GPS à gauche,
-    /// boussole et échelle en haut à droite, touches en bas. Molette (vers le curseur) ou gâchettes pour zoomer,
+    /// plaques de verre (style de l'interface, <see cref="Glass"/>) flottent par-dessus : titre, lieu actuel et légende
+    /// en haut à gauche, échelle et boussole en haut à droite, touches en bas à droite. Molette (vers le curseur) ou gâchettes pour zoomer,
     /// flèches / joystick / glisser pour se déplacer ; les noms secondaires (hameaux, sites, courses) apparaissent en
     /// zoomant.
     /// GPS : un clic sur la carte (ou A / Entrée sur le viseur) y pose la destination, l'itinéraire le plus rapide
@@ -34,9 +34,6 @@ namespace ChillRoad
         static readonly Color Accent = new Color(1f, 0.76f, 0.2f);
         static readonly Color Info = new Color(0.35f, 0.85f, 1f);
         static readonly Color Tuning = new Color(1f, 0.42f, 0.82f);
-        // Plaques un peu plus claires que le fond (presque noir) du menu
-        static readonly Color Plate = new Color(0.075f, 0.085f, 0.11f, 0.94f);
-        static readonly Color Chip = new Color(0.14f, 0.16f, 0.2f, 0.95f);
         static readonly Color Dim = new Color(1f, 1f, 1f, 0.7f);
         static readonly Color Ink = new Color(0.02f, 0.03f, 0.05f, 0.92f);
         /// <summary>Fond du menu : les bords de l'image de la carte s'y fondent (map_overview.py, BG).</summary>
@@ -47,6 +44,8 @@ namespace ChillRoad
         const float Reach = 0.9f;
         /// <summary>Zoom à partir duquel s'écrivent les noms secondaires.</summary>
         const float SiteZoom = 1.5f, HamletZoom = 1.9f, RaceNameZoom = 2.4f;
+        // Plaques de verre (unités du canevas 1920×1080) : arrondi, largeur de la plaque de gauche, boussole, échelle, touches
+        const float PlateRadius = 39f, SideWidth = 480f, CompassSize = 87f, PillHeight = 66f, HintHeight = 60f;
 
         GameManager game;
         GameObject root;
@@ -68,8 +67,9 @@ namespace ChillRoad
         RemoteCar hoveredPlayer;
         /// <summary>Distance à un repère de joueur (unités d'écran) sous laquelle le curseur ou le viseur le désigne.</summary>
         const float PlayerHoverRadius = 22f;
-        Text placeText, destName, destDetail, scaleText;
-        RectTransform scaleBar, hintRow;
+        Text placeText, scaleText;
+        RectTransform scaleBar, scalePill, hintRow;
+        float hintMaxWidth;
         bool hintsForPad;
         float minZoom = 1f;
         // Zone de la carte non couverte par les plaques : centre (par rapport au centre de l'écran) et demi-taille
@@ -96,16 +96,16 @@ namespace ChillRoad
         readonly List<RectTransform> goalMarks = new List<RectTransform>();
         int goalHover = -1;
         readonly List<Text> radarLabels = new List<Text>(), stuntLabels = new List<Text>();
-        // Fiche du repère survolé (course, radar, tremplin) : plaque sombre posée à côté du repère, à la place de son nom
-        RectTransform card, cardBadge, cardRule, cardState, cardHint, cardHintChip;
-        HudShape cardBar;
+        // Fiche du repère survolé (course, radar, tremplin) : carte de verre posée à côté du repère, à la place de son nom
+        RectTransform card, cardRule, cardState, cardHint;
+        GlassRect cardDot, cardHintChip;
         CanvasGroup cardGroup;
         Text cardKicker, cardName, cardStateText, cardHintKey, cardHintText;
         GameObject cardCheck;
         HudRing cardTodo;
         readonly List<Text> cardKeys = new List<Text>(), cardValues = new List<Text>();
         string cardFor;
-        const float CardPad = 22f, CardRow = 28f;
+        const float CardPad = 33f, CardRow = 33f;
         bool pressed;
         float pressMoved;
         float zoom = 1.12f;
@@ -456,27 +456,6 @@ namespace ChillRoad
                 mapRoute.SetVerticesDirty();
             }
             cross.gameObject.SetActive(GameInput.UsingGamepad || Keyboard.current != null && (Keyboard.current.upArrowKey.isPressed || Keyboard.current.downArrowKey.isPressed || Keyboard.current.leftArrowKey.isPressed || Keyboard.current.rightArrowKey.isPressed));
-            if (!has)
-            {
-                destName.text = Loc.T("Aucune", "None");
-                destName.color = Dim;
-                // En réseau avec d'autres joueurs : on peut aussi choisir l'un d'eux
-                bool others = game.Net && game.Net.Remotes.Count > 0;
-                destDetail.text = GameInput.UsingGamepad
-                    ? (others ? Loc.T("A : poser la destination sur le viseur, ou rejoindre le joueur visé", "A: set the destination at the crosshair, or drive to the player under it")
-                              : Loc.T("A : poser la destination sur le viseur", "A: set the destination at the crosshair"))
-                    : others ? Loc.T("Clic sur la carte ou sur un joueur : choisir où aller", "Click the map or a player to choose where to go")
-                             : Loc.T("Clic sur la carte : choisir où aller", "Click the map to choose where to go");
-            }
-            else
-            {
-                destName.text = nav.DestinationName;
-                destName.color = Color.white;
-                destDetail.text = nav.OnCourse ? Loc.T("Course en cours : suivre le parcours", "Race in progress: follow the course")
-                    : !nav.HasRoute ? Loc.T("Pas d'itinéraire", "No route")
-                    : Loc.F($"{nav.Remaining / 1000f:0.0} km  ·  ≈ {Mathf.Max(1, Mathf.RoundToInt(nav.RemainingTime / 60f))} min");
-                if (friend) destDetail.text += Loc.T("\nLe GPS suit ce joueur", "\nThe GPS follows this player");
-            }
         }
 
         Vector2 Local(float x, float z) => new Vector2(x, z) / MetresPerUnit;
@@ -554,15 +533,21 @@ namespace ChillRoad
             if (GameInput.UsingGamepad != hintsForPad) BuildHints(GameInput.UsingGamepad);
         }
 
-        /// <summary>Échelle : une barre d'une longueur ronde (100 m … 2 km) d'au plus 150 unités à l'écran.</summary>
+        /// <summary>Échelle : une barre d'une longueur ronde (100 m … 2 km) d'au plus 150 unités à l'écran ; la pilule suit sa longueur.</summary>
         void RefreshScale()
         {
             float unitsPerMetre = zoom / MetresPerUnit;
             float best = 100f;
             foreach (float len in new[] { 100f, 200f, 250f, 500f, 1000f, 2000f })
                 if (len * unitsPerMetre <= 150f) best = len;
-            scaleBar.sizeDelta = new Vector2(best * unitsPerMetre, scaleBar.sizeDelta.y);
+            float bar = best * unitsPerMetre;
+            scaleBar.sizeDelta = new Vector2(bar, scaleBar.sizeDelta.y);
             scaleText.text = best >= 1000f ? Loc.F($"{best / 1000f:0} km") : Loc.F($"{best:0} m");
+            const float pad = 24f, gap = 15f;
+            float textWidth = scaleText.preferredWidth + 4f;
+            scaleText.rectTransform.anchoredPosition = new Vector2(pad + bar + gap, 0f);
+            scaleText.rectTransform.sizeDelta = new Vector2(textWidth, 30f);
+            scalePill.sizeDelta = new Vector2(pad + bar + gap + textWidth + pad - 4f, PillHeight);
         }
 
         // ------------------------------------------------------------------ construction
@@ -582,12 +567,13 @@ namespace ChillRoad
             shade = Rect(root.transform, "Shade", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             shade.gameObject.AddComponent<Image>().color = Back;
 
-            // Mise en page : colonne de plaques à gauche, la carte occupe le reste (écrans 16:9 comme 4:3)
+            // Mise en page : plaque de verre en haut à gauche, la carte occupe la zone à sa droite, entre la rangée
+            // échelle / boussole en haut et la pilule des touches en bas (écrans 16:9 comme 4:3)
             builtAspect = Screen.width / (float)Mathf.Max(Screen.height, 1);
             float canvasWidth = 1080f * builtAspect;
-            float sideWidth = Mathf.Clamp(canvasWidth - ViewSize - Margin * 3f, 360f, 470f);
+            float sideWidth = Mathf.Clamp(canvasWidth - ViewSize - Margin * 3f, 400f, SideWidth);
             float openLeft = Margin * 2f + sideWidth, openRight = canvasWidth - Margin;
-            float openTop = 1080f - Margin - 70f, openBottom = Margin + 52f;
+            float openTop = 1080f - Margin - CompassSize - 12f, openBottom = Margin + HintHeight + 12f;
             openOffset = new Vector2((openLeft + openRight) * 0.5f - canvasWidth * 0.5f, (openTop + openBottom) * 0.5f - 540f);
             openHalf = new Vector2((openRight - openLeft) * 0.5f, (openTop - openBottom) * 0.5f);
             // Au plus loin : la zone où l'on roule (le centre de l'image) remplit la hauteur libre
@@ -684,20 +670,12 @@ namespace ChillRoad
 
             BuildCard();
 
-            // Voiles sombres sous les plaques (colonne de gauche, barre des touches) : le texte reste lisible sur la carte
-            float veilWidth = openLeft + 180f;
-            var veil = Box(shade, "VeilLeft", new Vector2(0f, 0.5f), new Vector2(veilWidth * 0.5f, 0f), new Vector2(veilWidth, 1200f));
-            AddShape(veil, new Color(Back.r, Back.g, Back.b, 0.7f)).Set(0f, 0f, 240f);
-            var veilLow = Box(shade, "VeilBottom", new Vector2(0.5f, 0f), new Vector2(0f, 60f), new Vector2(canvasWidth + 40f, 120f));
-            AddShape(veilLow, new Color(Back.r, Back.g, Back.b, 0.65f)).Set(0f, 0f, 0f, 0f, 1f);
-
             BuildSide(sideWidth);
             BuildCompass();
 
-            // Touches : petites plaques au bas de la zone libre (BuildHints)
-            hintRow = Box(shade, "Hints", new Vector2(0f, 0f), Vector2.zero, new Vector2(openRight - openLeft, 34f));
-            hintRow.pivot = new Vector2(0f, 0.5f);
-            hintRow.anchoredPosition = new Vector2(openLeft, Margin + 17f);
+            // Touches : pilule de verre en bas à droite (BuildHints), rétrécie si elle ne tient pas dans la largeur
+            hintRow = Panel(shade, "Hints", new Vector2(1f, 0f), new Vector2(-Margin, Margin), new Vector2(200f, HintHeight), HintHeight * 0.5f);
+            hintMaxWidth = canvasWidth - Margin * 2f;
             root.SetActive(false);
         }
 
@@ -750,33 +728,49 @@ namespace ChillRoad
             }
         }
 
-        /// <summary>Colonne de gauche : titre et lieu actuel, légende, destination du GPS.</summary>
+        /// <summary>
+        /// Plaque de gauche : titre « CARTE » fin et espacé, filet or et cyan, nom du massif, lieu actuel, puis la légende
+        /// sur deux colonnes (mêmes couleurs que l'image : Tools/Map/map_overview.py). Hauteur ajustée au contenu.
+        /// </summary>
         void BuildSide(float width)
         {
-            float x = Margin + width * 0.5f;
-            float inner = width - 64f;
+            const float pad = 33f;
+            float inner = width - pad * 2f;
+            var plate = Panel(shade, "Side", new Vector2(0f, 1f), new Vector2(Margin, -Margin), new Vector2(width, 400f), PlateRadius);
 
-            // Titre
-            const float headHeight = 206f;
-            var head = Panel(shade, "Head", new Vector2(0f, 1f), new Vector2(x, -Margin - headHeight * 0.5f), new Vector2(width, headHeight));
-            var title = Label(head, "", 62, TextAnchor.UpperLeft, Accent, new Vector2(30f, -12f), new Vector2(inner, 76f), FontStyle.BoldAndItalic, new Vector2(0f, 1f));
-            Loc.Bind(title, "CARTE", "MAP");
-            var sub = Label(head, "", 22, TextAnchor.UpperLeft, Info, new Vector2(34f, -84f), new Vector2(inner, 30f), FontStyle.BoldAndItalic, new Vector2(0f, 1f));
-            Loc.Bind(sub, "LES TROIS VALLONS", "THREE VALLEYS");
-            var bar = Box(head, "Bar", new Vector2(0f, 1f), new Vector2(34f + 60f, -122f), new Vector2(120f, 4f));
-            AddShape(bar, Accent).Set(4f, 0f, 70f);
-            var here = Label(head, "", 16, TextAnchor.UpperLeft, Dim, new Vector2(34f, -134f), new Vector2(inner, 24f), FontStyle.Normal, new Vector2(0f, 1f));
-            Loc.Bind(here, "VOUS ÊTES ICI", "YOU ARE HERE");
-            placeText = Label(head, "", 28, TextAnchor.UpperLeft, Color.white, new Vector2(34f, -156f), new Vector2(inner, 38f), FontStyle.Bold, new Vector2(0f, 1f));
+            float y = -24f;
+            var title = Glass.Label(plate, "", 48, Glass.Weight.Light, Glass.White, TextAnchor.UpperLeft, new Vector2(0f, 1f), new Vector2(pad - 2f, y), new Vector2(inner, 62f));
+            Loc.Bind(title, Glass.Spaced("CARTE", 2), Glass.Spaced("MAP", 2));
+            y -= 66f;
+            // Filet or puis cyan sous le titre
+            Shape(plate, "RuleGold", new Vector2(0f, 1f), new Vector2(pad + 60f, y), new Vector2(120f, 4.5f), 2.25f, Glass.Gold);
+            Shape(plate, "RuleCyan", new Vector2(0f, 1f), new Vector2(pad + 127.5f + 19.5f, y), new Vector2(39f, 4.5f), 2.25f, Glass.Cyan);
+            y -= 14f;
+            var sub = Glass.Label(plate, "", 15, Glass.Weight.Semilight, Glass.Faint, TextAnchor.UpperLeft, new Vector2(0f, 1f), new Vector2(pad, y), new Vector2(inner, 22f));
+            Loc.Bind(sub, Glass.Spaced("LES TROIS VALLONS", 1), Glass.Spaced("THREE VALLEYS", 1));
+            y -= 40f;
+            var here = Glass.Kicker(plate, "", 17);
+            TopLeft(here.rectTransform, new Vector2(pad, y), new Vector2(inner, 24f));
+            Loc.Bind(here, Glass.Spaced("VOUS ÊTES ICI", 2), Glass.Spaced("YOU ARE HERE", 2));
+            y -= 28f;
+            placeText = Glass.Label(plate, "", 28, Glass.Weight.Regular, Glass.White, TextAnchor.UpperLeft, new Vector2(0f, 1f), new Vector2(pad, y), new Vector2(inner, 40f));
             placeText.horizontalOverflow = HorizontalWrapMode.Wrap;
             placeText.verticalOverflow = VerticalWrapMode.Truncate;
             placeText.resizeTextForBestFit = true;
             placeText.resizeTextMinSize = 16;
             placeText.resizeTextMaxSize = 28;
+            y -= 40f + 16f;
+            // Filet fin entre le lieu et la légende
+            var line = Glass.Bar(plate, "Line", Glass.A(Color.white, 0.22f));
+            TopLeft(line.rectTransform, new Vector2(pad, y), new Vector2(inner, 1.5f));
+            y -= 16f;
+            var legendTitle = Glass.Kicker(plate, "", 15);
+            TopLeft(legendTitle.rectTransform, new Vector2(pad, y), new Vector2(inner, 22f));
+            Loc.Bind(legendTitle, Glass.Spaced("LÉGENDE", 2), Glass.Spaced("LEGEND", 2));
+            y -= 30f;
 
-            // Légende sur deux colonnes : routes à gauche ; eau, forêt, village, courses et voiture à droite
-            // (mêmes couleurs que l'image : Tools/Map/map_overview.py)
-            const float rowStep = 31f;
+            // Légende sur deux colonnes : routes, tunnel et voiture à gauche ; eau, forêt, village, courses, objectifs à droite
+            const float rowStep = 34f;
             var roads = new (Color32 fill, Color32 edge, float w, string fr, string en)[]
             {
                 (new Color32(255, 168, 60, 255), new Color32(96, 44, 14, 255), 9f, "Autoroute", "Motorway"),
@@ -785,100 +779,80 @@ namespace ChillRoad
                 (new Color32(238, 234, 224, 255), new Color32(92, 92, 98, 255), 4.5f, "Chemin", "Lane"),
                 (new Color32(212, 176, 128, 255), new Color32(104, 76, 48, 255), 3.5f, "Chemin de terre", "Dirt track"),
             };
-            int rows = roads.Length + 3;
-            float legendHeight = 62f + rows * rowStep + 14f;
-            float legendTop = -Margin - headHeight - 14f;
-            var legend = Panel(shade, "Legend", new Vector2(0f, 1f), new Vector2(x, legendTop - legendHeight * 0.5f), new Vector2(width, legendHeight));
-            var legendTitle = Label(legend, "", 20, TextAnchor.UpperLeft, Info, new Vector2(30f, -16f), new Vector2(inner, 28f), FontStyle.BoldAndItalic, new Vector2(0f, 1f));
-            Loc.Bind(legendTitle, "LÉGENDE", "LEGEND");
-            float colW = (width - 56f) * 0.5f, col0 = 26f, col1 = 26f + colW + 6f, top = -62f;
+            float colW = (inner - 16f) * 0.5f, col0 = pad, col1 = pad + colW + 16f, top = y - rowStep * 0.5f;
             for (int i = 0; i < roads.Length; i++)
             {
                 var r = roads[i];
-                var row = LegendRow(legend, col0, top - i * rowStep, colW, r.fr, r.en);
-                Swatch(row, r.edge, new Vector2(34f, r.w + 4f), 0f);
-                Swatch(row, r.fill, new Vector2(30f, r.w), 0f);
+                var row = LegendRow(plate, col0, top - i * rowStep, colW, r.fr, r.en);
+                // Trait arrondi de la couleur de la route, cerné de son bord (comme sur l'image)
+                Shape(row, "Swatch", new Vector2(0f, 0.5f), new Vector2(17f, 0f), new Vector2(32f, r.w + 3f), 8f, r.fill, 1.5f, r.edge);
             }
             {
                 // Tunnel : pointillé
-                var row = LegendRow(legend, col0, top - roads.Length * rowStep, colW, "Tunnel", "Tunnel");
+                var row = LegendRow(plate, col0, top - roads.Length * rowStep, colW, "Tunnel", "Tunnel");
                 for (int k = 0; k < 3; k++)
-                {
-                    Swatch(row, new Color32(96, 44, 14, 255), new Vector2(8f, 8f), -12f + k * 12f);
-                    Swatch(row, new Color32(255, 168, 60, 255), new Vector2(5f, 4f), -12f + k * 12f);
-                }
+                    Shape(row, "Dash", new Vector2(0f, 0.5f), new Vector2(5f + k * 12f, 0f), new Vector2(8f, 7f), 2f, new Color32(255, 168, 60, 255), 1.5f, new Color32(96, 44, 14, 255));
             }
             {
-                var row = LegendRow(legend, col1, top, colW, "Lac, rivière", "Lake, river");
-                Swatch(row, new Color32(206, 232, 246, 255), new Vector2(32f, 16f), 0f);
-                Swatch(row, new Color32(78, 150, 212, 255), new Vector2(29f, 13f), 0f);
+                var row = LegendRow(plate, col0, top - (roads.Length + 1) * rowStep, colW, "Votre voiture", "Your car");
+                // Repère du joueur en petit : disque blanc cerclé d'or, flèche d'encre
+                var disc = Shape(row, "Player", new Vector2(0f, 0.5f), new Vector2(17f, 0f), new Vector2(23f, 23f), 11.5f, Color.white, 3f, Glass.Gold);
+                disc.halo = 4f;
+                disc.haloColor = Glass.A(Glass.Gold, 0.4f);
+                var arrow = Box(row, "Arrow", new Vector2(0f, 0.5f), new Vector2(17f, 0.5f), new Vector2(10f, 11f)).gameObject.AddComponent<HudArrow>();
+                arrow.color = Glass.Ink;
+                arrow.raycastTarget = false;
             }
             {
-                var row = LegendRow(legend, col1, top - rowStep, colW, "Forêt", "Forest");
-                Swatch(row, new Color32(62, 112, 74, 255), new Vector2(30f, 15f), 0f);
+                var row = LegendRow(plate, col1, top, colW, "Lac, rivière", "Lake, river");
+                Shape(row, "Swatch", new Vector2(0f, 0.5f), new Vector2(17f, 0f), new Vector2(32f, 16f), 5f, new Color32(78, 150, 212, 255), 1.5f, new Color32(206, 232, 246, 255));
             }
             {
-                var row = LegendRow(legend, col1, top - 2f * rowStep, colW, "Village", "Village");
+                var row = LegendRow(plate, col1, top - rowStep, colW, "Forêt", "Forest");
+                Shape(row, "Swatch", new Vector2(0f, 0.5f), new Vector2(17f, 0f), new Vector2(30f, 15f), 5f, new Color32(62, 112, 74, 255));
+            }
+            {
+                var row = LegendRow(plate, col1, top - 2f * rowStep, colW, "Village", "Village");
                 Swatch(row, new Color32(104, 88, 84, 255), new Vector2(9f, 9f), -10f);
                 Swatch(row, new Color32(104, 88, 84, 255), new Vector2(7f, 12f), 1f);
                 Swatch(row, new Color32(104, 88, 84, 255), new Vector2(8f, 7f), 11f);
             }
             // Courses : une ligne par genre (le nom est écrit au départ en zoomant, le détail et le record au survol)
-            RaceSwatch(LegendRow(legend, col1, top - 3f * rowStep, colW, "Course : sprint", "Race: sprint"), Races.SprintTint);
-            RaceSwatch(LegendRow(legend, col1, top - 4f * rowStep, colW, "Course : tours", "Race: laps"), Races.LapsTint);
-            GoalSwatch(LegendRow(legend, col1, top - 5f * rowStep, colW, "Radar", "Speed camera"), HudIcon.Kind.RadarPin, SpeedCameras.Tint, false);
-            GoalSwatch(LegendRow(legend, col1, top - 6f * rowStep, colW, "Tremplin", "Stunt jump"), HudIcon.Kind.RampPin, StuntJumps.Tint, true);
-            DoneSwatch(LegendRow(legend, col1, top - 7f * rowStep, colW, "Réussi", "Completed"));
-            {
-                var row = LegendRow(legend, col0, top - (roads.Length + 1) * rowStep, colW, "Votre voiture", "Your car");
-                var arrow = Box(row, "Arrow", new Vector2(0f, 0.5f), new Vector2(17f, 0f), new Vector2(17f, 19f)).gameObject.AddComponent<HudArrow>();
-                arrow.color = Accent;
-                arrow.raycastTarget = false;
-            }
-
-            // Destination du GPS : au bas de la colonne, liseré cyan
-            var dest = Panel(shade, "Destination", new Vector2(0f, 0f), new Vector2(x, Margin + 70f), new Vector2(width, 140f));
-            var stripe = Box(dest, "Stripe", new Vector2(0f, 0.5f), new Vector2(18f, 0f), new Vector2(5f, 104f));
-            AddShape(stripe, Info).Set(1.5f, 0f, 0f);
-            var destTitle = Label(dest, "", 20, TextAnchor.UpperLeft, Info, new Vector2(34f, -14f), new Vector2(inner, 28f), FontStyle.BoldAndItalic, new Vector2(0f, 1f));
-            Loc.Bind(destTitle, "DESTINATION", "DESTINATION");
-            destName = Label(dest, "", 28, TextAnchor.UpperLeft, Color.white, new Vector2(34f, -42f), new Vector2(inner, 38f), FontStyle.Bold, new Vector2(0f, 1f));
-            destName.horizontalOverflow = HorizontalWrapMode.Wrap;
-            destName.verticalOverflow = VerticalWrapMode.Truncate;
-            destName.resizeTextForBestFit = true;
-            destName.resizeTextMinSize = 16;
-            destName.resizeTextMaxSize = 28;
-            destDetail = Label(dest, "", 18, TextAnchor.UpperLeft, Dim, new Vector2(34f, -84f), new Vector2(inner, 46f), FontStyle.Normal, new Vector2(0f, 1f));
-            destDetail.horizontalOverflow = HorizontalWrapMode.Wrap;
+            RaceSwatch(LegendRow(plate, col1, top - 3f * rowStep, colW, "Course : sprint", "Race: sprint"), Races.SprintTint);
+            RaceSwatch(LegendRow(plate, col1, top - 4f * rowStep, colW, "Course : tours", "Race: laps"), Races.LapsTint);
+            GoalSwatch(LegendRow(plate, col1, top - 5f * rowStep, colW, "Radar", "Speed camera"), HudIcon.Kind.RadarPin, SpeedCameras.Tint, false);
+            GoalSwatch(LegendRow(plate, col1, top - 6f * rowStep, colW, "Tremplin", "Stunt jump"), HudIcon.Kind.RampPin, StuntJumps.Tint, true);
+            DoneSwatch(LegendRow(plate, col1, top - 7f * rowStep, colW, "Réussi", "Completed"));
+            y -= 8f * rowStep;
+            plate.sizeDelta = new Vector2(width, -y + 26f);
         }
 
-        /// <summary>Boussole et échelle, en haut à droite.</summary>
+        /// <summary>En haut à droite : pilule de l'échelle (longueur suivie par RefreshScale) et boussole ronde, nord en triangle doré.</summary>
         void BuildCompass()
         {
-            var plate = Panel(shade, "Compass", new Vector2(1f, 1f), new Vector2(-Margin - 140f, -Margin - 32f), new Vector2(280f, 64f));
-            Disc(plate, 44f, Chip, new Vector2(-104f, 0f));
-            var north = Box(plate, "North", new Vector2(0.5f, 0.5f), new Vector2(-104f, 9f), new Vector2(12f, 12f)).gameObject.AddComponent<HudArrow>();
-            north.color = Accent;
+            var compass = Panel(shade, "Compass", new Vector2(1f, 1f), new Vector2(-Margin, -Margin), new Vector2(CompassSize, CompassSize), CompassSize * 0.5f);
+            var north = Box(compass, "North", new Vector2(0.5f, 0.5f), new Vector2(0f, 11f), new Vector2(18f, 18f)).gameObject.AddComponent<HudArrow>();
+            north.color = Glass.Gold;
             north.raycastTarget = false;
-            Label(plate, "N", 15, TextAnchor.MiddleCenter, Color.white, new Vector2(-104f, -7f), new Vector2(30f, 20f), FontStyle.Bold);
-            // Barre d'échelle : longueur ronde mise à jour au zoom (RefreshScale), extrémités marquées
-            scaleBar = Box(plate, "Scale", new Vector2(0f, 0.5f), Vector2.zero, new Vector2(100f, 4f));
+            Glass.Label(compass, "N", 19, Glass.Weight.Semibold, Glass.White, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0f, -12f), new Vector2(30f, 24f));
+
+            scalePill = Panel(shade, "Scale", new Vector2(1f, 1f), new Vector2(-Margin - CompassSize - 15f, -Margin - (CompassSize - PillHeight) * 0.5f), new Vector2(200f, PillHeight), PillHeight * 0.5f);
+            // Barre d'échelle en crochet : base fine, extrémités relevées
+            scaleBar = Box(scalePill, "Bar", new Vector2(0f, 0.5f), new Vector2(24f, -1f), new Vector2(100f, 10f));
             scaleBar.pivot = new Vector2(0f, 0.5f);
-            scaleBar.anchoredPosition = new Vector2(84f, -12f);
-            var barImage = scaleBar.gameObject.AddComponent<Image>();
-            barImage.color = Color.white;
-            barImage.raycastTarget = false;
+            var baseLine = Glass.Bar(scaleBar, "Base", Color.white).rectTransform;
+            baseLine.anchorMin = Vector2.zero; baseLine.anchorMax = new Vector2(1f, 0f);
+            baseLine.offsetMin = Vector2.zero; baseLine.offsetMax = new Vector2(0f, 2f);
             foreach (float end in new[] { 0f, 1f })
             {
-                var tick = Box(scaleBar, "Tick", new Vector2(end, 0.5f), new Vector2(end > 0f ? -1.5f : 1.5f, 3f), new Vector2(3f, 12f)).gameObject.AddComponent<Image>();
-                tick.color = Color.white;
-                tick.raycastTarget = false;
+                var tick = Glass.Bar(scaleBar, "Tick", Color.white).rectTransform;
+                tick.anchorMin = new Vector2(end, 0f); tick.anchorMax = new Vector2(end, 1f);
+                tick.offsetMin = new Vector2(end > 0f ? -2f : 0f, 0f); tick.offsetMax = new Vector2(end > 0f ? 0f : 2f, 0f);
             }
-            scaleText = Label(plate, "", 19, TextAnchor.LowerLeft, Color.white, new Vector2(84f, -6f), new Vector2(160f, 26f), FontStyle.Bold, new Vector2(0f, 0.5f));
-            scaleText.rectTransform.pivot = new Vector2(0f, 0f);
+            scaleText = Glass.Label(scalePill, "", 19, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleLeft, new Vector2(0f, 0.5f), new Vector2(140f, 0f), new Vector2(80f, 30f));
         }
 
-        /// <summary>Touches de la carte, en petites plaques (touche dorée, action en blanc), selon la manette ou le clavier.</summary>
+        /// <summary>Touches de la carte dans la pilule du bas (touche dorée, action en blanc fin), selon la manette ou le clavier.</summary>
         void BuildHints(bool pad)
         {
             hintsForPad = pad;
@@ -888,26 +862,23 @@ namespace ChillRoad
                           ("X", Loc.T("Ma position", "My position")), ("B", Loc.T("Fermer", "Close")) }
                 : new[] { (Loc.T("Glisser", "Drag"), Loc.T("Déplacer", "Move")), (Loc.T("Molette", "Wheel"), "Zoom"), (Loc.T("Clic", "Click"), "Destination"),
                           (Loc.T("Suppr", "Del"), Loc.T("Effacer", "Clear")), (Loc.T("Espace", "Space"), Loc.T("Ma position", "My position")), (Loc.T("Échap", "Esc"), Loc.T("Fermer", "Close")) };
-            float xPos = 0f;
+            const float side = 36f, gap = 27f;
+            float xPos = side;
             foreach (var (key, action) in keys)
             {
-                var chip = Box(hintRow, "Key", new Vector2(0f, 0.5f), Vector2.zero, new Vector2(30f, 30f));
-                var keyText = Label(hintRow, key, 18, TextAnchor.MiddleCenter, Accent, Vector2.zero, new Vector2(10f, 30f), FontStyle.Bold, new Vector2(0f, 0.5f));
-                float keyWidth = Mathf.Max(32f, keyText.preferredWidth + 24f);
-                chip.sizeDelta = new Vector2(keyWidth, 30f);
-                chip.anchoredPosition = new Vector2(xPos + keyWidth * 0.5f, 0f);
-                AddShape(chip, Chip).Set(10f, 0f, 0f);
-                keyText.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                var keyText = Glass.Label(hintRow, key, 21, Glass.Weight.Semibold, Glass.Gold, TextAnchor.MiddleLeft, new Vector2(0f, 0.5f), new Vector2(xPos, 0f), new Vector2(10f, 30f));
+                float keyWidth = keyText.preferredWidth + 2f;
                 keyText.rectTransform.sizeDelta = new Vector2(keyWidth, 30f);
-                keyText.rectTransform.anchoredPosition = new Vector2(xPos + keyWidth * 0.5f, 0f);
                 xPos += keyWidth + 9f;
-                var act = Label(hintRow, action, 18, TextAnchor.MiddleLeft, Color.white, new Vector2(xPos, 0f), new Vector2(10f, 30f), FontStyle.Normal, new Vector2(0f, 0.5f));
-                float actWidth = act.preferredWidth;
-                act.rectTransform.sizeDelta = new Vector2(actWidth + 4f, 30f);
-                xPos += actWidth + 28f;
+                var act = Glass.Label(hintRow, action, 21, Glass.Weight.Light, Glass.White, TextAnchor.MiddleLeft, new Vector2(0f, 0.5f), new Vector2(xPos, 0f), new Vector2(10f, 30f));
+                float actWidth = act.preferredWidth + 2f;
+                act.rectTransform.sizeDelta = new Vector2(actWidth, 30f);
+                xPos += actWidth + gap;
             }
-            // Trop large pour la zone libre (écran étroit) : la rangée rétrécit
-            hintRow.localScale = Vector3.one * Mathf.Min(1f, hintRow.sizeDelta.x / Mathf.Max(xPos, 1f));
+            float width = xPos - gap + side;
+            hintRow.sizeDelta = new Vector2(width, HintHeight);
+            // Trop large pour l'écran (écran étroit) : la pilule rétrécit depuis son coin
+            hintRow.localScale = Vector3.one * Mathf.Min(1f, hintMaxWidth / Mathf.Max(width, 1f));
         }
 
         /// <summary>
@@ -1028,7 +999,7 @@ namespace ChillRoad
             dots.Clear();
             dotOwners.Clear();
             foreach (var p in playerMarks)
-                if (p.gameObject.activeSelf) taken.Add(Centered(p.anchoredPosition * zoom, 38f));
+                if (p.gameObject.activeSelf) taken.Add(Centered(p.anchoredPosition * zoom, 56f));
             if (pin.gameObject.activeSelf) taken.Add(Centered(pin.anchoredPosition * zoom, 28f));
             for (int i = 0; i < names.Count; i++)
                 if (names[i].dot > 0f && names[i].mark.gameObject.activeInHierarchy)
@@ -1205,53 +1176,43 @@ namespace ChillRoad
         // ------------------------------------------------------------------ fiche du survol
 
         /// <summary>
-        /// Fiche du repère survolé, construite une fois : ombre portée, plaque inclinée de la DA (barre de la couleur du
-        /// repère sur le bord gauche), pastille et genre, nom, filet, lignes libellé / valeur, état (coche verte quand
-        /// c'est réussi), puis la touche pour s'y rendre au GPS. Remplie par <see cref="FillCard"/>.
+        /// Fiche du repère survolé, construite une fois : carte de verre, genre en petit titre de la couleur du repère
+        /// (avec sa pastille), nom en texte fin, filet, lignes libellé / valeur, état (coche verte quand c'est réussi),
+        /// puis la touche dorée pour s'y rendre au GPS. Remplie par <see cref="FillCard"/>.
         /// </summary>
         void BuildCard()
         {
-            card = Box(view, "HoverCard", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(320f, 200f));
+            card = Box(view, "HoverCard", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(435f, 200f));
             card.pivot = new Vector2(0f, 1f);
             cardGroup = card.gameObject.AddComponent<CanvasGroup>();
             cardGroup.blocksRaycasts = false;
             cardGroup.interactable = false;
-            // CanvasRenderer explicite : Rect() n'en met pas, et la HudShape ajoutée ensuite ne dessinerait rien
-            var drop = Rect(card, "Shadow", Vector2.zero, Vector2.one, new Vector2(5f, -7f), new Vector2(5f, -7f));
-            drop.gameObject.AddComponent<CanvasRenderer>();
-            AddShape(drop, new Color(0f, 0f, 0f, 0.42f)).Set(14f, 0f, 0f);
-            var plate = Rect(card, "Plate", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            plate.gameObject.AddComponent<CanvasRenderer>();
-            AddShape(plate, new Color(Plate.r, Plate.g, Plate.b, 0.97f)).Set(14f, 0f, 0f);
-            var bar = Rect(card, "Bar", Vector2.zero, new Vector2(0f, 1f), Vector2.zero, new Vector2(6f, 0f));
-            bar.gameObject.AddComponent<CanvasRenderer>();
-            cardBar = AddShape(bar, Accent).Set(14f, 0f, 0f);
+            Glass.Backdrop(card, 33f, Glass.A(Glass.PanelStrong, 0.93f));   // posée sur la carte chargée : presque opaque pour rester lisible
 
-            cardBadge = Box(card, "Badge", new Vector2(0f, 1f), new Vector2(CardPad + 15f, -33f), new Vector2(30f, 30f));
-            cardKicker = Label(card, "", 15, TextAnchor.MiddleLeft, Accent, new Vector2(CardPad + 40f, -33f), new Vector2(10f, 24f), FontStyle.Bold, new Vector2(0f, 1f));
+            cardDot = Shape(card, "Dot", new Vector2(0f, 1f), new Vector2(CardPad + 7.5f, -38f), new Vector2(15f, 15f), 7.5f, Accent);
+            cardKicker = Glass.Label(card, "", 16, Glass.Weight.Semibold, Accent, TextAnchor.MiddleLeft, new Vector2(0f, 1f), new Vector2(CardPad + 27f, -38f), new Vector2(10f, 24f));
             cardKicker.rectTransform.pivot = new Vector2(0f, 0.5f);
-            cardName = Label(card, "", 27, TextAnchor.MiddleLeft, Color.white, new Vector2(CardPad, -73f), new Vector2(10f, 36f), FontStyle.BoldAndItalic, new Vector2(0f, 1f));
+            cardName = Glass.Label(card, "", 36, Glass.Weight.Light, Glass.White, TextAnchor.MiddleLeft, new Vector2(0f, 1f), new Vector2(CardPad, -80f), new Vector2(10f, 46f));
             cardName.rectTransform.pivot = new Vector2(0f, 0.5f);
-            cardRule = Box(card, "Rule", new Vector2(0f, 1f), new Vector2(CardPad, -97f), new Vector2(10f, 2f));
-            cardRule.pivot = new Vector2(0f, 0.5f);
-            cardRule.gameObject.AddComponent<Image>().raycastTarget = false;
+            cardRule = Glass.Bar(card, "Rule", Glass.A(Color.white, 0.22f)).rectTransform;
+            TopLeft(cardRule, new Vector2(CardPad, -112f), new Vector2(10f, 1.5f));
 
             cardState = Box(card, "State", new Vector2(0f, 1f), Vector2.zero, new Vector2(10f, 30f));
             cardState.pivot = new Vector2(0f, 0.5f);
             cardCheck = HudIcon.Check(cardState, new Vector2(11f - 5f, 0f), 22f);
             cardTodo = Box(cardState, "Todo", new Vector2(0.5f, 0.5f), new Vector2(11f - 5f, 0f), Vector2.zero).gameObject.AddComponent<HudRing>();
-            cardTodo.inner = 6.5f;
-            cardTodo.outer = 9f;
+            cardTodo.inner = 8.2f;
+            cardTodo.outer = 10.5f;
             cardTodo.color = Dim;
             cardTodo.raycastTarget = false;
-            cardStateText = Label(cardState, "", 18, TextAnchor.MiddleLeft, Color.white, new Vector2(30f, 0f), new Vector2(10f, 28f), FontStyle.Bold, new Vector2(0f, 0.5f));
+            cardStateText = Glass.Label(cardState, "", 22, Glass.Weight.Light, Glass.White, TextAnchor.MiddleLeft, new Vector2(0f, 0.5f), new Vector2(30f, 0f), new Vector2(10f, 30f));
 
-            cardHint = Box(card, "Hint", new Vector2(0f, 1f), Vector2.zero, new Vector2(10f, 28f));
+            cardHint = Box(card, "Hint", new Vector2(0f, 1f), Vector2.zero, new Vector2(10f, 30f));
             cardHint.pivot = new Vector2(0f, 0.5f);
-            cardHintChip = Box(cardHint, "Key", new Vector2(0f, 0.5f), Vector2.zero, new Vector2(30f, 26f));
-            AddShape(cardHintChip, Chip).Set(9f, 0f, 0f);
-            cardHintKey = Label(cardHintChip, "", 16, TextAnchor.MiddleCenter, Accent, Vector2.zero, new Vector2(30f, 26f), FontStyle.Bold);
-            cardHintText = Label(cardHint, "", 16, TextAnchor.MiddleLeft, Dim, Vector2.zero, new Vector2(10f, 26f), FontStyle.Normal, new Vector2(0f, 0.5f));
+            // Touche : pastille dorée, texte d'encre
+            cardHintChip = Shape(cardHint, "Key", new Vector2(0f, 0.5f), Vector2.zero, new Vector2(30f, 30f), 15f, Glass.Gold);
+            cardHintKey = Glass.Label(cardHintChip.rectTransform, "", 19, Glass.Weight.Semibold, Glass.Ink, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(30f, 30f));
+            cardHintText = Glass.Label(cardHint, "", 21, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleLeft, new Vector2(0f, 0.5f), Vector2.zero, new Vector2(10f, 30f));
             card.gameObject.SetActive(false);
         }
 
@@ -1290,7 +1251,6 @@ namespace ChillRoad
         /// <summary>Contenu de la fiche selon le repère survolé (départ de course, radar ou tremplin) ; largeur et hauteur ajustées.</summary>
         void FillCard()
         {
-            for (int i = cardBadge.childCount - 1; i >= 0; i--) Destroy(cardBadge.GetChild(i).gameObject);
             var rows = new List<(string key, string value, Color color)>();
             Color tint;
             string kicker, name, state = null;
@@ -1300,15 +1260,12 @@ namespace ChillRoad
             {
                 var t = game.Races.All[raceHover];
                 tint = t.Tint;
-                kicker = Loc.T("COURSE", "RACE") + "  ·  " + t.Kind;
+                kicker = Loc.T("COURSE", "RACE") + " · " + t.Kind;
                 name = t.Name;
-                Disc(cardBadge, 26f, Ink);
-                Disc(cardBadge, 20f, tint);
-                Disc(cardBadge, 7f, Color.white);
-                rows.Add((Loc.T("Distance", "Distance"), Loc.F($"{t.Distance / 1000f:0.0} km"), Color.white));
-                if (t.Loop) rows.Add((Loc.T("Tour", "Lap"), Loc.F($"{t.length / 1000f:0.0} km"), Color.white));
-                rows.Add((Loc.T("Record", "Best time"), t.best > 0f ? Races.Clock(t.best) : "—", t.best > 0f ? Accent : Dim));
-                if (t.best > 0f && !string.IsNullOrEmpty(t.bestCar)) rows.Add((Loc.T("Voiture", "Car"), t.bestCar, Color.white));
+                rows.Add((Loc.T("Distance", "Distance"), Loc.F($"{t.Distance / 1000f:0.0} km"), Glass.White));
+                if (t.Loop) rows.Add((Loc.T("Tour", "Lap"), Loc.F($"{t.length / 1000f:0.0} km"), Glass.White));
+                rows.Add((Loc.T("Record", "Best time"), t.best > 0f ? Races.Clock(t.best) : "—", t.best > 0f ? Glass.Gold : Glass.Dim));
+                if (t.best > 0f && !string.IsNullOrEmpty(t.bestCar)) rows.Add((Loc.T("Voiture", "Car"), t.bestCar, Glass.White));
             }
             else if (goalHover < radarCount)
             {
@@ -1316,10 +1273,9 @@ namespace ChillRoad
                 tint = SpeedCameras.Tint;
                 kicker = Loc.T("RADAR", "SPEED CAMERA");
                 name = r.Name;
-                HudIcon.Badge(cardBadge, Vector2.zero, 28f, HudIcon.Kind.RadarPin, tint, false);
-                rows.Add((Loc.T("Objectif", "Target"), Loc.F($"{r.Target:0} km/h minimum"), Color.white));
-                rows.Add((Loc.T("Prime", "Reward"), Wallet.Format(r.data.reward), Accent));
-                if (r.done) rows.Add((Loc.T("Record", "Best"), Loc.F($"{r.best:0} km/h"), Color.white));
+                rows.Add((Loc.T("Objectif", "Target"), Loc.F($"{r.Target:0} km/h minimum"), Glass.White));
+                rows.Add((Loc.T("Prime", "Reward"), Wallet.Format(r.data.reward), Glass.Gold));
+                if (r.done) rows.Add((Loc.T("Record", "Best"), Loc.F($"{r.best:0} km/h"), Glass.White));
                 done = r.done;
                 state = done ? Loc.T("Réussi", "Completed") : Loc.T("Pas encore flashé", "Not flashed yet");
             }
@@ -1329,28 +1285,27 @@ namespace ChillRoad
                 tint = StuntJumps.Tint;
                 kicker = Loc.T("TREMPLIN", "STUNT JUMP");
                 name = s.Name;
-                HudIcon.Badge(cardBadge, Vector2.zero, 28f, HudIcon.Kind.RampPin, tint, true);
-                rows.Add((Loc.T("Objectif", "Target"), Loc.F($"{s.Target:0} m en l'air", $"{s.Target:0} m airborne"), Color.white));
-                rows.Add((Loc.T("Prime", "Reward"), Wallet.Format(s.data.reward), Accent));
-                if (s.done && s.best > 0f) rows.Add((Loc.T("Record", "Best"), Loc.F($"{s.best:0} m"), Color.white));
+                rows.Add((Loc.T("Objectif", "Target"), Loc.F($"{s.Target:0} m en l'air", $"{s.Target:0} m airborne"), Glass.White));
+                rows.Add((Loc.T("Prime", "Reward"), Wallet.Format(s.data.reward), Glass.Gold));
+                if (s.done && s.best > 0f) rows.Add((Loc.T("Record", "Best"), Loc.F($"{s.best:0} m"), Glass.White));
                 done = s.done;
                 state = done ? Loc.T("Réussi", "Completed") : Loc.T("Pas encore réussi", "Not completed yet");
             }
 
-            cardBar.color = tint;
-            cardKicker.text = kicker;
+            // Petit titre de la couleur du repère, précédé de sa pastille
+            cardDot.color = tint;
+            cardKicker.text = Glass.Spaced(kicker, 2);
             cardKicker.color = tint;
             cardName.text = name;
-            cardRule.GetComponent<Image>().color = new Color(tint.r, tint.g, tint.b, 0.45f);
-            float width = Mathf.Max(cardName.preferredWidth, 40f + cardKicker.preferredWidth);
+            float width = Mathf.Max(cardName.preferredWidth, 27f + cardKicker.preferredWidth);
 
-            // Lignes : libellé à gauche (atténué), valeur à droite (en gras)
-            float y = -120f;
+            // Lignes : libellé fin à gauche, valeur plus marquée à droite (primes et records en or)
+            float y = -137f, bottom = -114f;
             while (cardKeys.Count < rows.Count)
             {
-                var k = Label(card, "", 17, TextAnchor.MiddleLeft, Dim, Vector2.zero, new Vector2(10f, CardRow), FontStyle.Normal, new Vector2(0f, 1f));
+                var k = Glass.Label(card, "", 22, Glass.Weight.Light, Glass.White, TextAnchor.MiddleLeft, new Vector2(0f, 1f), Vector2.zero, new Vector2(10f, CardRow));
                 k.rectTransform.pivot = new Vector2(0f, 0.5f);
-                var v = Label(card, "", 18, TextAnchor.MiddleRight, Color.white, Vector2.zero, new Vector2(10f, CardRow), FontStyle.Bold, new Vector2(1f, 1f));
+                var v = Glass.Label(card, "", 22, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleRight, new Vector2(1f, 1f), Vector2.zero, new Vector2(10f, CardRow));
                 v.rectTransform.pivot = new Vector2(1f, 0.5f);
                 cardKeys.Add(k);
                 cardValues.Add(v);
@@ -1369,6 +1324,7 @@ namespace ChillRoad
                 cardKeys[i].rectTransform.sizeDelta = new Vector2(cardKeys[i].preferredWidth + 4f, CardRow);
                 cardValues[i].rectTransform.sizeDelta = new Vector2(cardValues[i].preferredWidth + 4f, CardRow);
                 width = Mathf.Max(width, cardKeys[i].preferredWidth + 36f + cardValues[i].preferredWidth);
+                bottom = y - CardRow * 0.5f;
                 y -= CardRow;
             }
 
@@ -1376,15 +1332,15 @@ namespace ChillRoad
             cardState.gameObject.SetActive(state != null);
             if (state != null)
             {
-                y -= 6f;
                 cardState.anchoredPosition = new Vector2(CardPad, y);
                 cardCheck.SetActive(done);
                 cardTodo.gameObject.SetActive(!done);
                 cardStateText.text = state;
-                cardStateText.color = done ? Color.Lerp(HudIcon.CheckGreen, Color.white, 0.25f) : Dim;
-                cardStateText.rectTransform.sizeDelta = new Vector2(cardStateText.preferredWidth + 4f, 28f);
+                cardStateText.color = done ? Glass.Good : Glass.Dim;
+                cardStateText.rectTransform.sizeDelta = new Vector2(cardStateText.preferredWidth + 4f, 30f);
                 width = Mathf.Max(width, 30f + cardStateText.preferredWidth);
-                y -= 30f;
+                bottom = y - 15f;
+                y -= CardRow;
             }
 
             // Touche pour s'y rendre (pas pendant une course : le GPS suit alors son parcours)
@@ -1394,45 +1350,52 @@ namespace ChillRoad
             if (hint)
             {
                 y -= 10f;
-                cardHint.anchoredPosition = new Vector2(CardPad, y - 4f);
+                cardHint.anchoredPosition = new Vector2(CardPad, y);
                 cardHintKey.text = GameInput.UsingGamepad ? "A" : Loc.T("Clic", "Click");
-                float chip = Mathf.Max(30f, cardHintKey.preferredWidth + 20f);
-                cardHintChip.sizeDelta = new Vector2(chip, 26f);
-                cardHintChip.anchoredPosition = new Vector2(chip * 0.5f, 0f);
-                cardHintKey.rectTransform.sizeDelta = cardHintChip.sizeDelta;
+                float chip = Mathf.Max(30f, cardHintKey.preferredWidth + 36f);
+                var chipRect = cardHintChip.rectTransform;
+                chipRect.sizeDelta = new Vector2(chip, 30f);
+                chipRect.anchoredPosition = new Vector2(chip * 0.5f, 0f);
+                cardHintKey.rectTransform.sizeDelta = chipRect.sizeDelta;
                 cardHintText.text = Loc.T("Y aller avec le GPS", "Set as GPS destination");
-                cardHintText.rectTransform.anchoredPosition = new Vector2(chip + 10f, 0f);
-                cardHintText.rectTransform.sizeDelta = new Vector2(cardHintText.preferredWidth + 4f, 26f);
-                width = Mathf.Max(width, chip + 10f + cardHintText.preferredWidth);
-                y -= 32f;
+                cardHintText.rectTransform.anchoredPosition = new Vector2(chip + 15f, 0f);
+                cardHintText.rectTransform.sizeDelta = new Vector2(cardHintText.preferredWidth + 4f, 30f);
+                width = Mathf.Max(width, chip + 15f + cardHintText.preferredWidth);
+                bottom = y - 15f;
             }
 
-            width = Mathf.Clamp(width + CardPad * 2f, 300f, 480f);
-            card.sizeDelta = new Vector2(width, -y + 14f);
-            cardName.rectTransform.sizeDelta = new Vector2(width - CardPad * 2f, 36f);
+            width = Mathf.Clamp(width + CardPad * 2f, 380f, 540f);
+            card.sizeDelta = new Vector2(width, -bottom + 27f);
+            cardName.rectTransform.sizeDelta = new Vector2(width - CardPad * 2f, 46f);
             cardKicker.rectTransform.sizeDelta = new Vector2(cardKicker.preferredWidth + 4f, 24f);
-            cardRule.sizeDelta = new Vector2(width - CardPad * 2f, 2f);
+            cardRule.sizeDelta = new Vector2(width - CardPad * 2f, 1.5f);
         }
 
-        /// <summary>Repère d'un joueur : flèche orientée cerclée de blanc sur un disque d'encre (or : soi ; couleur et pseudo : les autres).</summary>
+        /// <summary>
+        /// Repère d'un joueur : disque blanc et flèche orientée. Soi : cerclé d'or dans un halo doré, flèche d'encre ;
+        /// les autres : plus petit, cerné d'encre, flèche de leur couleur et pseudo.
+        /// </summary>
         RectTransform PlayerMark(int index)
         {
             var mark = Box(content, "Player" + index, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(10f, 10f));
-            if (index == 0) Disc(mark, 44f, new Color(Accent.r, Accent.g, Accent.b, 0.28f));
-            Disc(mark, 32f, Ink);
+            bool self = index == 0;
+            float size = self ? 60f : 40f;
+            var disc = Shape(mark, "Disc", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size, size), size * 0.5f, Color.white, self ? 6f : 2.5f, self ? Glass.Gold : Glass.Ink);
+            if (self)
+            {
+                disc.halo = 10f;
+                disc.haloColor = Glass.A(Glass.Gold, 0.4f);
+            }
             var turn = Box(mark, "Heading", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(10f, 10f));
-            var edge = Box(turn, "Edge", new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(23f, 26f)).gameObject.AddComponent<HudArrow>();
-            edge.color = Color.white;
-            edge.raycastTarget = false;
-            var core = Box(turn, "Core", new Vector2(0.5f, 0.5f), new Vector2(0f, 0.5f), new Vector2(17f, 19f)).gameObject.AddComponent<HudArrow>();
-            core.color = Accent;
+            var core = Box(turn, "Core", new Vector2(0.5f, 0.5f), new Vector2(0f, 1f), self ? new Vector2(23f, 26f) : new Vector2(18f, 21f)).gameObject.AddComponent<HudArrow>();
+            core.color = Glass.Ink;
             core.raycastTarget = false;
-            var name = MapLabel(mark, 20, TextAnchor.MiddleLeft, Color.white, new Vector2(24f, 0f), FontStyle.BoldAndItalic);
+            var name = MapLabel(mark, 20, TextAnchor.MiddleLeft, Color.white, new Vector2(size * 0.5f + 10f, 0f), FontStyle.Bold);
             name.rectTransform.pivot = new Vector2(0f, 0.5f);
             // Cercle du joueur suivi par le GPS (masqué sinon)
             var ring = Box(mark, "Followed", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero).gameObject.AddComponent<HudRing>();
-            ring.inner = 19f;
-            ring.outer = 22.5f;
+            ring.inner = size * 0.5f + 3f;
+            ring.outer = size * 0.5f + 6.5f;
             ring.color = Info;
             ring.gameObject.SetActive(false);
             markRings.Add(ring);
@@ -1444,33 +1407,49 @@ namespace ChillRoad
 
         // ------------------------------------------------------------------ éléments
 
-        /// <summary>Plaque inclinée de la DA du HUD ; la carte ne réagit pas au curseur dessus.</summary>
-        RectTransform Panel(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size)
+        /// <summary>Plaque de verre posée (ancre = pivot) ; la carte ne réagit pas au curseur dessus.</summary>
+        RectTransform Panel(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size, float radius)
         {
-            var rt = Box(parent, name, anchor, pos, size);
-            AddShape(rt, Plate).Set(18f, 0f, 0f);
+            var glass = Glass.Make(parent, name, radius, Glass.PanelStrong);
+            var rt = glass.rectTransform;
+            rt.anchorMin = rt.anchorMax = rt.pivot = anchor;
+            rt.anchoredPosition = pos;
+            rt.sizeDelta = size;
             panels.Add(rt);
             return rt;
         }
 
-        static HudShape AddShape(RectTransform rt, Color color)
+        /// <summary>Rectangle arrondi de verre centré sur <paramref name="pos"/> (pastilles, traits de légende, touches).</summary>
+        static GlassRect Shape(RectTransform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size, float radius, Color fill, float edge = 0f, Color? edgeColor = null)
         {
-            var shape = rt.gameObject.AddComponent<HudShape>();
-            shape.color = color;
-            shape.raycastTarget = false;
-            return shape;
+            var g = Glass.Make(parent, name, radius, fill, edge);
+            if (edgeColor.HasValue) g.borderColor = edgeColor.Value;
+            var rt = g.rectTransform;
+            rt.anchorMin = rt.anchorMax = anchor;
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = pos;
+            rt.sizeDelta = size;
+            return g;
+        }
+
+        /// <summary>Ancre et pivot en haut à gauche, à la position et à la taille données.</summary>
+        static void TopLeft(RectTransform rt, Vector2 pos, Vector2 size)
+        {
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0f, 1f);
+            rt.anchoredPosition = pos;
+            rt.sizeDelta = size;
         }
 
         /// <summary>Ligne de légende : le motif se pose à gauche de la ligne (Swatch), le libellé à sa droite.</summary>
         static RectTransform LegendRow(RectTransform parent, float x, float y, float width, string fr, string en)
         {
-            var row = Box(parent, "Row", new Vector2(0f, 1f), new Vector2(x + width * 0.5f, y), new Vector2(width, 28f));
-            var text = Label(row, "", 18, TextAnchor.MiddleLeft, Color.white, new Vector2(44f, 0f), new Vector2(width - 44f, 28f), FontStyle.Normal, new Vector2(0f, 0.5f));
+            var row = Box(parent, "Row", new Vector2(0f, 1f), new Vector2(x + width * 0.5f, y), new Vector2(width, 30f));
+            var text = Glass.Label(row, "", 20, Glass.Weight.Light, Glass.White, TextAnchor.MiddleLeft, new Vector2(0f, 0.5f), new Vector2(42f, 0f), new Vector2(width - 42f, 30f));
             text.horizontalOverflow = HorizontalWrapMode.Wrap;
             text.verticalOverflow = VerticalWrapMode.Truncate;
             text.resizeTextForBestFit = true;
-            text.resizeTextMinSize = 12;
-            text.resizeTextMaxSize = 18;
+            text.resizeTextMinSize = 13;
+            text.resizeTextMaxSize = 20;
             Loc.Bind(text, fr, en);
             return row;
         }
@@ -1544,12 +1523,15 @@ namespace ChillRoad
             var go = new GameObject("Text", typeof(RectTransform), typeof(CanvasRenderer));
             go.transform.SetParent(parent, false);
             var t = go.AddComponent<Text>();
-            t.font = HudArt.Font;
+            // Polices fines du style verre : le gras devient Semibold (pas de gras synthétique), l'italique reste
+            // pour les sites naturels
+            bool strong = style == FontStyle.Bold || style == FontStyle.BoldAndItalic;
+            t.font = Glass.FontOf(strong ? Glass.Weight.Semibold : Glass.Weight.Regular);
             t.text = text;
             t.fontSize = size;
             t.alignment = align;
             t.color = color;
-            t.fontStyle = style;
+            t.fontStyle = style == FontStyle.Italic ? FontStyle.Italic : FontStyle.Normal;
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
             t.verticalOverflow = VerticalWrapMode.Overflow;
             t.raycastTarget = false;
