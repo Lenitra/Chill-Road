@@ -51,12 +51,12 @@ namespace ChillRoad
         /// Cascade : tremplin au bord d'une route. (x, y, z) = pied du nez du tremplin (au sol), yaw = sens de la
         /// course (degrés), length / width = tablier ; target = distance à parcourir en l'air (m), reward = prime.
         /// </summary>
-        [Serializable] public class StuntJson { public string id, fr, en; public float x, y, z, yaw, length, width, target; public int reward; }
+        [Serializable] public class StuntJson { public string id, fr, en, pack; public float x, y, z, yaw, length, width, target; public int reward; }
         /// <summary>
         /// Radar de vitesse : (x, y, z) = point de l'axe de la route, yaw = sens de la route (degrés), halfWidth = demi-largeur
         /// contrôlée, flash* = position des lampes ; target = vitesse à atteindre (km/h), reward = prime.
         /// </summary>
-        [Serializable] public class RadarJson { public string id, fr, en; public float x, y, z, yaw, halfWidth, flashX, flashY, flashZ, target; public int reward; }
+        [Serializable] public class RadarJson { public string id, fr, en, pack; public float x, y, z, yaw, halfWidth, flashX, flashY, flashZ, target; public int reward; }
         [Serializable]
         public class MapJson
         {

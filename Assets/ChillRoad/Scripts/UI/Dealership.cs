@@ -231,6 +231,8 @@ namespace ChillRoad
                 : s.drivetrain == Drivetrain.FWD ? Loc.T("Traction", "FWD") : Loc.T("Propulsion", "RWD");
             int gears = s.gearRatios != null ? s.gearRatios.Length : 0;
             subText.text = Loc.F($"{drive}  ·  {gears} rapports  ·  {s.mass:N0} kg", $"{drive}  ·  {gears} speeds  ·  {s.mass:N0} kg");
+            // Voiture arrivée avec un pack de contenu : son nom en tête (« Pack Rallye  ·  Intégrale  ·  ... »)
+            if (ContentPacks.IsExtra(s.pack)) subText.text = ContentPacks.Find(s.pack).Name + "  ·  " + subText.text;
             float power = Power(s), top = s.TopSpeed * 3.6f;
             SetBar(0, power / maxPower, Loc.F($"{power:0} ch", $"{power:0} hp"));
             SetBar(1, top / maxTop, Loc.F($"{top:0} km/h"));

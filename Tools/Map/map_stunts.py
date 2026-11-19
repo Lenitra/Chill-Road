@@ -28,6 +28,10 @@ UNDER = 0.3              # comme map_roads.UNDER : le sol passe 30 cm sous la ch
 OPEN_BEFORE = 30.0       # glissière ouverte avant la bande d'élan (de quoi quitter la route en biais)
 OPEN_AFTER = 20.0        # et après la réception (de quoi revenir sur la route)
 
+# Pack de contenu de chaque tremplin ajouté par un pack (Scripts/Core/ContentPacks.cs) : id du site -> id du pack.
+# Absent : jeu de base (la clé « pack » n'est alors pas écrite dans map.json).
+PACK = {}
+
 # id, noms, point près de la route (x, z), cap approximatif (dx, dz), distance à franchir (m), prime ($)
 # (+ habillage imposé en option : "stone" ou "road" ; sinon choisi par style())
 SITES = [
@@ -253,4 +257,6 @@ def export(sites):
         out.append(dict(id=f["id"], fr=f["fr"], en=f["en"], x=round(f["ox"] + f["tx"] * RAMP_L, 2), y=round(f["y"], 2),
                         z=round(f["oz"] + f["tz"] * RAMP_L, 2), yaw=round(f["yaw"], 1), length=RAMP_L, width=RAMP_W,
                         target=float(f["target"]), reward=int(f["reward"])))
+        if f["id"] in PACK:
+            out[-1]["pack"] = PACK[f["id"]]
     return out

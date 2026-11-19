@@ -14,6 +14,7 @@ namespace ChillRoad
     {
         public string id;
         public string displayName;
+        [Tooltip("Pack de contenu qui l'a ajoutée (ContentPacks), vide = jeu de base")] public string pack;
         public GameObject prefab;
         [Tooltip("Échelle appliquée au modèle (les modèles Kenney sont petits)")] public float modelScale = 1.72f;
         public Drivetrain drivetrain = Drivetrain.RWD;

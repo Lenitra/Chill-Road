@@ -56,6 +56,8 @@ namespace ChillRoad
         class Def
         {
             public string id, fr, en;
+            /// <summary>Pack de contenu qui l'a ajoutée (<see cref="ContentPacks"/>), vide = jeu de base.</summary>
+            public string pack;
             public int laps = 1;
             /// <summary>Distance visée entre deux portes (m).</summary>
             public float spacing = 500f;
@@ -180,6 +182,8 @@ namespace ChillRoad
         public class Track
         {
             public string id, fr, en;
+            /// <summary>Pack de contenu qui l'a ajoutée (<see cref="ContentPacks"/>), vide = jeu de base.</summary>
+            public string pack;
             public int laps;
             /// <summary>Côté de l'étiquette du départ sur la carte globale (-1 à gauche, 0 au-dessus, 1 à droite).</summary>
             public int side;
@@ -313,8 +317,8 @@ namespace ChillRoad
         Track Build(Def def, bool reverse, Vector3 heading)
         {
             var t = reverse
-                ? new Track { id = def.id + "_r", fr = def.fr2, en = def.en2, laps = 1, side = def.side2 }
-                : new Track { id = def.id, fr = def.fr, en = def.en, laps = Mathf.Max(1, def.laps), side = def.side };
+                ? new Track { id = def.id + "_r", fr = def.fr2, en = def.en2, pack = def.pack, laps = 1, side = def.side2 }
+                : new Track { id = def.id, fr = def.fr, en = def.en, pack = def.pack, laps = Mathf.Max(1, def.laps), side = def.side };
             heading.y = 0f;
             heading = heading.sqrMagnitude > 1e-6f ? heading.normalized : Vector3.forward;
             var points = (Vector2[])def.points.Clone();

@@ -18,6 +18,10 @@ FLASH_H = 4.06           # hauteur des lampes au-dessus du pied (comme alp_radar
 CLEAR = 3.5              # rayon autour du mât sans autre objet ni végétation
 MAX_DROP = 1.0           # écart toléré entre le sol au pied du mât et la chaussée
 
+# Pack de contenu de chaque radar ajouté par un pack (Scripts/Core/ContentPacks.cs) : id du site -> id du pack.
+# Absent : jeu de base (la clé « pack » n'est alors pas écrite dans map.json).
+PACK = {}
+
 # id, noms, point de l'axe (x, z), cap (dx, dz), seuil (km/h), prime ($)
 SITES = [
     ("plan", "Radar du Plan", "Le Plan Speed Camera", (-320.5, -1784.0), (0.76, -0.66), 40.0, 300),
@@ -106,4 +110,6 @@ def export(sites):
                         yaw=round(f["yaw"], 1), halfWidth=round(f["half"], 2), flashX=round(f["px"], 2),
                         flashY=round(f["y"] + FLASH_H, 2), flashZ=round(f["pz"], 2), target=float(f["target"]),
                         reward=int(f["reward"])))
+        if f["id"] in PACK:
+            out[-1]["pack"] = PACK[f["id"]]
     return out
