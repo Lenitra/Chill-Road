@@ -491,6 +491,8 @@ namespace ChillRoad
             }
             // Places et cours pavées de la ville : on y roule comme sur la route
             if (!r.onRoad && Map.Paved(pos.x, pos.z) > 0.45f) r.onRoad = true;
+            // Piste et voies de circulation de l'aéroport : de l'enrobé hors du réseau routier
+            if (!r.onRoad && Airfield.OnAsphalt(pos)) r.onRoad = true;
             r.grip = Mathf.Lerp(1f, DirtGrip, r.dirt);
             // Chaussée enneigée (station de ski) : la neige tassée glisse, franchement au cœur de la zone
             r.snow = Mathf.InverseLerp(0.35f, 0.75f, Map.Snow(pos.x, pos.z));

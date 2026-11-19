@@ -117,6 +117,9 @@ def render(g, H, rgba, snow, water, edges, rivers, out_path, style=None):
         p = rv["pts"]
         w = max(2, int(float(p[0][3]) * 1.2 * k))
         stroke(dr, [px(a[0], a[1]) for a in p], w, c4(st["water"], st.get("water_alpha", 255)))
+    # Aéroport : piste et voies de circulation à leur largeur réelle, sous les routes
+    import map_airport as AP
+    AP.draw(dr, px, k, c4(st["roads"]["main"]), c4(st["outline"]), max(2, int(6 * k)) / 2.0)
     # Bords d'abord (toutes les routes), puis le corps, de la moins importante à la plus importante
     for outline in (True, False):
         for kind in ORDER:

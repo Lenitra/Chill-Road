@@ -63,9 +63,11 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
     import map_station as SK
     import map_radars as RD
     import map_school as SC
+    import map_airport as AP
     pads = VL.pads(g, H, edges) + SK.pads(g, H, edges) + SC.pads(edges)
     stunts = ST.resolve(edges)
-    Hc, edge = R.carve(g, H, nodes, edges, pads, ST.strips(stunts))
+    # la plate-forme de l'aéroport est aplanie mais reste en herbe : seuls son tarmac et son parking sont revêtus
+    Hc, edge = R.carve(g, H, nodes, edges, pads + AP.pads(), ST.strips(stunts))
     Hc = SK.groom(g, Hc, edge)                 # pistes damées de la station
     water = water_masks(g, Hc)
     Hc = clear_water(g, Hc, water)
@@ -73,7 +75,7 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
     Hc, info["rivers"] = E.river_beds(g, Hc, edge, info["rivers"], water)
     hole = R.holes(g, Hc, edges, edge)
     print("tetes de tunnel : %d mailles ouvertes" % int(hole.sum()))
-    villages = [(v[2], v[3], v[4]) for v in D.VILLAGES + D.HAMLETS] + SC.zone(edges)
+    villages = [(v[2], v[3], v[4]) for v in D.VILLAGES + D.HAMLETS] + SC.zone(edges) + AP.zone(edges)
     for e in edges:
         e["rail"] = E.rails(g, Hc, e)
         # dans les villages : ni glissières ni murets de route (bits 0-1), les maisons bordent la chaussée
@@ -92,8 +94,9 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
     SK.populate(placer, g, Hc, nodes, edges)
     radars = RD.populate(placer, RD.resolve(edges))
     SC.populate(placer, edges)
-    pads = pads + ST.paved(stunts)             # bandes d'élan goudronnées (le relief, lui, est déjà terrassé)
-    urban = [(v[2], v[3], v[4]) for v in D.VILLAGES + D.HAMLETS] + SC.zone(edges)
+    AP.populate(placer, edges)
+    pads = pads + AP.paved() + ST.paved(stunts)             # bandes d'élan goudronnées (le relief, lui, est déjà terrassé)
+    urban = [(v[2], v[3], v[4]) for v in D.VILLAGES + D.HAMLETS] + SC.zone(edges) + AP.zone(edges)
     rgba, paved, snow, forest, urban_m, slope = E.masks(g, Hc, info, edge, water, edges, urban_pts=urban,
                                                         blocked=placer.blocked, pads=pads)
     import map_signs as SG
@@ -105,8 +108,8 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
     print("radars : %d poses, %d objets retires autour des mats" % (len(radars), removed))
     if export:
         E.export(g, Hc, info, nodes, edges, water, edge, rgba, paved, snow, places=places,
-                 pois=D.pois(nodes, edges) + VL.pois() + SK.pois() + SC.pois(edges), blocked=placer.blocked, holes=hole, tunnels=R.tunnel_zone(g, edges),
-                 stunts=ST.export(stunts), radars=RD.export(radars))
+                 pois=D.pois(nodes, edges) + VL.pois() + SK.pois() + SC.pois(edges) + AP.pois(edges), blocked=placer.blocked, holes=hole,
+                 tunnels=R.tunnel_zone(g, edges), stunts=ST.export(stunts), radars=RD.export(radars), airfield=AP.export(edges))
         import map_overview as OV
         for e in edges:
             tun = np.where(R.tunnel_mask(e))[0]

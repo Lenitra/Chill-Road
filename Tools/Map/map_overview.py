@@ -163,6 +163,9 @@ def render(g, H, rgba, paved, snow, water, edges, rivers, buildings, out_path, p
     for b in buildings:
         dr.polygon([px(q[0], q[1]) for q in b], fill=tuple(st["building"]))
     cas = max(2, int(round(st["casing"] * k)))
+    # aéroport : piste et voies de circulation à leur largeur réelle, sous les routes
+    import map_airport as AP
+    AP.draw(dr, px, k, st["roads"]["main"][1], st["roads"]["main"][2], cas)
     for layer in ("bridge", "casing", "fill"):
         for kind in ORDER:
             w_m, fill, edge_col = st["roads"][kind]
@@ -192,7 +195,8 @@ def render(g, H, rgba, paved, snow, water, edges, rivers, buildings, out_path, p
     # le domaine skiable reste éclairé comme les abords des routes (sinon la carte s'y éteint)
     import map_station as SK
     ski = [dict(pts=[(float(q[0]), float(q[1])) for q in pts]) for (_, _, _, pts) in SK.PISTES]
-    img = _focus(img, list(edges) + ski, g, st)
+    runway = [dict(pts=[AP.loc(-AP.HALF, 0.0), AP.loc(AP.HALF, 0.0)])]
+    img = _focus(img, list(edges) + ski + runway, g, st)
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     img.save(out_path, optimize=True)
     # Au bake, la minicarte suit la carte globale

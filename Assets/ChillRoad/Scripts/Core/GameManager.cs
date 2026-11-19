@@ -668,6 +668,16 @@ namespace ChillRoad
         public void ResetPlayer()
         {
             Vector3 from = Player.transform.position;
+            // Aéroport (piste, voies, tarmac, parking : hors du réseau routier) : la voiture est redressée sur place
+            if (Airfield.Inside(from))
+            {
+                Vector3 facing = Player.transform.forward;
+                facing.y = 0f;
+                if (facing.sqrMagnitude < 0.01f) facing = Vector3.forward;
+                Player.Teleport(new Vector3(from.x, Map.Height(from.x, from.z) + 0.6f, from.z), Quaternion.LookRotation(facing.normalized, Vector3.up), 0f);
+                local.UpsideDown = 0f;
+                return;
+            }
             var hit = Road.Nearest(from, 4000f);
             if (!hit.Found) return;
             var e = hit.edge;

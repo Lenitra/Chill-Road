@@ -546,6 +546,10 @@ def roads(net):
     import map_school
     map_school.roads(net, v, VP, VT)
 
+    # Aéroport : carrefour sur la route de la vallée (haute vallée nord) et route d'accès au parking de l'aérogare
+    import map_airport
+    map_airport.roads(net, v, VP, VT)
+
 
 def pois(nodes, edges):
     """Lieux-dits affichés par le jeu (id, noms, position, rayon) ; « depart » : point de départ, r = cap (degrés,

@@ -57,6 +57,20 @@ namespace ChillRoad
         /// contrôlée, flash* = position des lampes ; target = vitesse à atteindre (km/h), reward = prime.
         /// </summary>
         [Serializable] public class RadarJson { public string id, fr, en, pack; public float x, y, z, yaw, halfWidth, flashX, flashY, flashZ, target; public int reward; }
+        /// <summary>
+        /// Aéroport (Tools/Map/map_airport.py, Airfield.cs). Repère local : origine (x, y = sol aplani, z) au milieu de la
+        /// piste, u le long de la piste (ax, az), v à gauche de u. half / hw : demi-longueur et demi-largeur de la piste ;
+        /// taxi* : voie de circulation parallèle (axe v, demi-largeur, demi-longueur) ; links : abscisses des bretelles ;
+        /// apron, park, gate : aires en béton (u0, v0, u1, v1) ; parkU : abscisse de l'allée d'arrivée du parking ;
+        /// heli : hélisurface (u, v, rayon) ; stands : postes (u, v, du, dv, longueur) ; west / east : numéros des seuils.
+        /// </summary>
+        [Serializable]
+        public class AirfieldJson
+        {
+            public float x, y, z, ax, az, half, hw, taxiV, taxiHw, taxiHalf, parkU;
+            public float[] links, apron, park, gate, heli, stands;
+            public string west, east;
+        }
         [Serializable]
         public class MapJson
         {
@@ -71,6 +85,7 @@ namespace ChillRoad
             public PoiJson[] pois;
             public StuntJson[] stunts;
             public RadarJson[] radars;
+            public AirfieldJson airfield;
         }
 
         public MapJson Json { get; private set; }

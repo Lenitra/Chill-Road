@@ -244,7 +244,7 @@ def fix_rivers(g, H, edge, rivers, edges=(), water=None):
 
 
 def export(g, H, info, nodes, edges, water, edge, rgba, paved, snow, places=(), pois=(), blocked=None, holes=None,
-           tunnels=None, stunts=(), radars=()):
+           tunnels=None, stunts=(), radars=(), airfield=None):
     os.makedirs(OUT, exist_ok=True)
     hmin = float(math.floor(H.min() - 1.0))
     hmax = float(math.ceil(H.max() + 1.0))
@@ -295,6 +295,8 @@ def export(g, H, info, nodes, edges, water, edge, rgba, paved, snow, places=(), 
         rivers=[dict(id=rv["id"], width=float(rv["pts"][0][3]),
                      pts=[r2(v) for q in rv["pts"] for v in (q[0], q[2], q[1])]) for rv in fix_rivers(g, H, edge, info["rivers"], edges, water)],
         places=list(places), pois=list(pois), stunts=list(stunts), radars=list(radars))
+    if airfield:
+        data["airfield"] = airfield               # piste et voies de l'aéroport (map_airport.export, Airfield.cs)
     with open(os.path.join(OUT, "map.json"), "w", encoding="utf-8") as f:
         json.dump(data, f, separators=(",", ":"))
     print("export : %s (%d aretes, %d objets)" % (OUT, len(edges), len(places)))
