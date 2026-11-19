@@ -1093,8 +1093,10 @@ namespace ChillRoad
         Rect NameRect(MapName n)
         {
             var rt = n.text.rectTransform;
-            float w = n.text.preferredWidth, h = n.text.preferredHeight * 0.85f;
-            Vector2 at = n.mark.anchoredPosition * zoom + rt.anchoredPosition;
+            // Repère grossi (survolé) : son nom l'est aussi
+            float s = n.mark.localScale.x * zoom;
+            float w = n.text.preferredWidth * s, h = n.text.preferredHeight * 0.85f * s;
+            Vector2 at = n.mark.anchoredPosition * zoom + rt.anchoredPosition * s;
             return new Rect(at.x - rt.pivot.x * w + 2f, at.y - rt.pivot.y * h + 2f, w - 4f, h - 4f);
         }
 
@@ -1157,8 +1159,8 @@ namespace ChillRoad
 
         /// <summary>
         /// État des objectifs : la pastille garde sa couleur ; une coche verte s'y ajoute une fois réussi, et l'étiquette
-        /// passe de ce qu'il faut atteindre au record. Au survol, l'étiquette se détaille : genre, objectif, prime, puis
-        /// réussi (avec le record) ou pas encore.
+        /// passe de ce qu'il faut atteindre au record. Au survol, l'étiquette se détaille : genre et objectif, puis réussi
+        /// (avec le record) ou la prime à gagner.
         /// </summary>
         void RefreshGoals()
         {
@@ -1173,10 +1175,9 @@ namespace ChillRoad
                     if (radarChecks[i].activeSelf != r.done) radarChecks[i].SetActive(r.done);
                     if (i == goalHover)
                         radarLabels[i].text = GoalDetail(r.Name,
-                            Loc.F($"Radar  ·  {r.Target:0} km/h minimum  ·  prime {Wallet.Format(r.data.reward)}",
-                                  $"Speed camera  ·  {r.Target:0} km/h minimum  ·  reward {Wallet.Format(r.data.reward)}"),
+                            Loc.F($"Radar  ·  {r.Target:0} km/h minimum", $"Speed camera  ·  {r.Target:0} km/h minimum"),
                             r.done, r.done ? Loc.F($"record {r.best:0} km/h", $"best {r.best:0} km/h") : null,
-                            Loc.T("pas encore flashé", "not flashed yet"));
+                            Loc.T($"Prime {Wallet.Format(r.data.reward)}  ·  pas encore flashé", $"Reward {Wallet.Format(r.data.reward)}  ·  not flashed yet"));
                     else
                         radarLabels[i].text = r.done
                             ? Loc.F($"{r.Name}  ·  record {r.best:0} km/h", $"{r.Name}  ·  best {r.best:0} km/h")
@@ -1192,10 +1193,9 @@ namespace ChillRoad
                     if (stuntChecks[i].activeSelf != s.done) stuntChecks[i].SetActive(s.done);
                     if (radarCount + i == goalHover)
                         stuntLabels[i].text = GoalDetail(s.Name,
-                            Loc.F($"Tremplin  ·  {s.Target:0} m en l'air  ·  prime {Wallet.Format(s.data.reward)}",
-                                  $"Stunt jump  ·  {s.Target:0} m airborne  ·  reward {Wallet.Format(s.data.reward)}"),
+                            Loc.F($"Tremplin  ·  {s.Target:0} m en l'air", $"Stunt jump  ·  {s.Target:0} m airborne"),
                             s.done, s.done && s.best > 0f ? Loc.F($"record {s.best:0} m", $"best {s.best:0} m") : null,
-                            Loc.T("pas encore réussi", "not completed yet"));
+                            Loc.T($"Prime {Wallet.Format(s.data.reward)}  ·  pas encore réussi", $"Reward {Wallet.Format(s.data.reward)}  ·  not completed yet"));
                     else
                         stuntLabels[i].text = !s.done ? Loc.F($"{s.Name}  ·  {s.Target:0} m")
                             : s.best > 0f ? Loc.F($"{s.Name}  ·  record {s.best:0} m", $"{s.Name}  ·  best {s.best:0} m")
@@ -1204,7 +1204,7 @@ namespace ChillRoad
             }
         }
 
-        /// <summary>Étiquette détaillée d'un objectif survolé : nom, puis en petit sa fiche et son état (réussi en vert).</summary>
+        /// <summary>Étiquette détaillée d'un objectif survolé : nom, puis en petit son objectif et son état (réussi en vert).</summary>
         static string GoalDetail(string name, string info, bool done, string best, string todo)
         {
             string state = done
