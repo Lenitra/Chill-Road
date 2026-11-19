@@ -60,6 +60,7 @@ namespace ChillRoad.EditorTools
                 ("Ami", new Color(0.60f, 0.80f, 0.87f), Ami),         // « Bleu Ciel », boucliers et bas de caisse gris foncé
                 ("GRYaris", new Color(0.94f, 0.94f, 0.93f), GRYaris), // blanc nacré, toit carbone noir
                 ("AlpineA110", new Color(0.07f, 0.31f, 0.73f), AlpineA110), // bleu Alpine
+                ("FocusST", new Color(0.97f, 0.60f, 0.10f), FocusST), // « Orange Fury »
             };
             // Accents hors palette (matériau « PK_Accent » du modèle) : couleur unie par voiture
             var accents = new Dictionary<string, Color>
@@ -302,6 +303,24 @@ namespace ChillRoad.EditorTools
                 brakeForce = mass * 11.5f,
                 hoodCamera = new Vector3(0f, 0.98f, 0.55f),
                 bumperCamera = new Vector3(0f, 0.40f, 1.92f),
+                engineVoice = EngineVoice.Inline4,
+            };
+        }
+
+        /// <summary>Ford Focus ST (4e génération, 2019) : 1 433 kg + le conducteur, 4 cylindres 2.3 EcoBoost (280 ch,
+        /// 420 N·m), traction avec différentiel piloté, boîte manuelle 6 rapports, pneus 235/35 R19.</summary>
+        static VehicleSpec FocusST(GameObject model)
+        {
+            const float mass = 1510f;
+            return new VehicleSpec
+            {
+                id = "focusst", displayName = "Ford Focus ST", prefab = model, modelScale = 1f,
+                drivetrain = Drivetrain.FWD, mass = mass, maxTorque = 420f, redline = 6500f,
+                gearRatios = new[] { 3.727f, 2.048f, 1.393f, 1.029f, 0.821f, 0.672f }, finalDrive = 3.82f,
+                wheelRadius = 0.323f, tireGrip = 1.25f, dragArea = 0.68f, downforceArea = 0.15f, steerLock = 36f,
+                brakeForce = mass * 11f,
+                hoodCamera = new Vector3(0f, 1.17f, 1.10f),
+                bumperCamera = new Vector3(0f, 0.47f, 2.29f),
                 engineVoice = EngineVoice.Inline4,
             };
         }

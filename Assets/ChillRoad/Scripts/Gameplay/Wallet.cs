@@ -26,6 +26,7 @@ namespace ChillRoad
             { "ae86", 15000 },
             { "miata", 20000 },
             { "dmc12", 40000 },
+            { "focusst", 42000 },
             { "gryaris", 45000 },
             { "a110", 50000 },
             { "supra", 55000 },
