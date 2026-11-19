@@ -27,7 +27,7 @@ namespace ChillRoad.EditorTools
             int index = AddTo(assets, model);
             AssetDatabase.SaveAssets();
             // Sélectionnée pour la prochaine partie
-            PlayerPrefs.SetInt("chillroad_car", index);
+            PlayerPrefs.SetString("chillroad_car_id", assets.playerCars[index].id ?? "");
             PlayerPrefs.Save();
             Debug.Log($"Vision 74 ajoutée au garage (voiture {index + 1}/{assets.playerCars.Length}) et sélectionnée");
         }

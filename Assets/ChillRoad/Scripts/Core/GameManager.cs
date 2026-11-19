@@ -19,7 +19,11 @@ namespace ChillRoad
         /// <summary>Après rechargement de la scène, on passe directement du chargement à la partie.</summary>
         static bool skipTitle;
 
-        const string CarKey = "chillroad_car";
+        /// <summary>
+        /// Voiture au volant, par identifiant : l'ordre du garage change quand un pack ajoute des voitures.
+        /// <see cref="OldCarKey"/> (son indice, avant les packs) n'est plus que lu, une fois, pour reprendre l'ancienne.
+        /// </summary>
+        const string CarKey = "chillroad_car_id", OldCarKey = "chillroad_car";
         /// <summary>Départ à plusieurs : les joueurs sont rangés en file, espacés de cette distance (m).</summary>
         const float GridSpacing = 9f;
 
@@ -123,9 +127,8 @@ namespace ChillRoad
             Player = playerGo.AddComponent<VehicleController>();
             local.Car = Player;
             // Voiture gardée de la dernière partie, si elle a été achetée ; sinon la voiture de départ (Ami)
-            int saved = PlayerPrefs.GetInt(CarKey, -1);
-            local.CarIndex = saved >= 0 && saved < assets.playerCars.Length && Wallet.Owns(assets.playerCars[saved])
-                ? saved : Wallet.StarterIndex(assets.playerCars);
+            int saved = SavedCar(assets.playerCars);
+            local.CarIndex = saved >= 0 && Wallet.Owns(assets.playerCars[saved]) ? saved : Wallet.StarterIndex(assets.playerCars);
             ShownCar = local.CarIndex;
             Player.Setup(CarTuning.Apply(assets.playerCars[local.CarIndex]));
             CarPaint.Apply(Player.Model, CarPaint.Selected(assets.playerCars[local.CarIndex]));
@@ -712,8 +715,20 @@ namespace ChillRoad
         {
             var p = local;
             p.CarIndex = Mathf.Clamp(index, 0, assets.playerCars.Length - 1);
-            if (remember) PlayerPrefs.SetInt(CarKey, p.CarIndex);
+            if (remember) PlayerPrefs.SetString(CarKey, assets.playerCars[p.CarIndex].id ?? "");
             ShowCar(p.CarIndex);
+        }
+
+        /// <summary>Indice de la voiture gardée de la dernière partie (-1 : aucune, ou plus au garage).</summary>
+        static int SavedCar(VehicleSpec[] cars)
+        {
+            if (PlayerPrefs.HasKey(CarKey)) return ContentPacks.CarIndex(cars, PlayerPrefs.GetString(CarKey, ""));
+            // Sauvegarde d'avant les packs : un indice dans l'ordre du garage, repris tel quel puis converti
+            int old = PlayerPrefs.GetInt(OldCarKey, -1);
+            if (old < 0 || old >= cars.Length) return -1;
+            PlayerPrefs.SetString(CarKey, cars[old].id ?? "");
+            PlayerPrefs.DeleteKey(OldCarKey);
+            return old;
         }
 
         /// <summary>
