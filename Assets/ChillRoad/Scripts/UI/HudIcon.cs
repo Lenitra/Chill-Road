@@ -278,7 +278,8 @@ namespace ChillRoad
 
         static RectTransform Node(RectTransform parent, string name, Vector2 pos, Vector2 size)
         {
-            var go = new GameObject(name, typeof(RectTransform));
+            // CanvasRenderer explicite : un Graphic ajouté ensuite (HudIcon) ne l'ajoute pas lui-même et ne dessinerait rien
+            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer));
             go.transform.SetParent(parent, false);
             var rt = (RectTransform)go.transform;
             rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
