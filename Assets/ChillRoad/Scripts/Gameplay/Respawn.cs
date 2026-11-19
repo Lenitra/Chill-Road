@@ -5,11 +5,8 @@ namespace ChillRoad
 {
     /// <summary>
     /// Replacement de la voiture sur la route (bouton Y / R, voiture retournée, tombée à l'eau, sous la carte ou
-    /// sortie des limites). Un replacement coûte :
-    /// - le combo en cours (cagnotte, drift, vitesse pas encore encaissés), perdu comme après un accident ;
-    /// - en balade, le dépannage : une somme qui grandit un peu avec l'argent du joueur (jamais plus qu'il n'a) ;
-    /// - le temps : commandes coupées près de deux secondes, et l'on repart arrêté. En course, retour juste après la
-    ///   dernière porte franchie, chrono en marche.
+    /// sortie des limites). La seule pénalité est le temps (rien à payer, combo gardé) : commandes coupées près de
+    /// trois secondes, et l'on repart arrêté. En course, retour juste après la dernière porte franchie, chrono en marche.
     /// Transition : la voiture freine pendant un fondu au noir, elle est reposée dans le noir (le trafic s'écarte),
     /// puis l'image revient pendant que la caméra descend de haut derrière elle ; on reprend la main un instant après.
     /// Sens de la voiture reposée : celui du parcours en course, celui de l'itinéraire si le GPS en affiche un,
@@ -18,14 +15,11 @@ namespace ChillRoad
     public class Respawn : MonoBehaviour
     {
         /// <summary>Fondu au noir, noir complet (voiture reposée au début), retour de l'image, attente à l'arrêt (s).</summary>
-        const float FadeOut = 0.45f, Black = 0.3f, FadeIn = 0.55f, Hold = 0.55f;
-        /// <summary>Dépannage : forfait, part de l'argent du joueur, plafond ($).</summary>
-        const int FeeBase = 200, FeeMax = 2500;
-        const float FeeShare = 0.015f;
+        const float FadeOut = 0.5f, Black = 0.5f, FadeIn = 0.6f, Hold = 1.2f;
         /// <summary>Itinéraire du GPS plus loin que ceci (m) : on se replace sur la route la plus proche, sans lui.</summary>
         const float RouteReach = 400f;
         static readonly Color Night = new Color(0.015f, 0.02f, 0.04f);
-        static readonly Color TowTint = new Color(1f, 0.45f, 0.18f);
+        static readonly Color Tint = new Color(1f, 0.45f, 0.18f);
 
         enum Step { Idle, Out, Dark, In }
 
@@ -33,7 +27,6 @@ namespace ChillRoad
         Step step;
         float t;
         bool racing;
-        int fee;
         CanvasGroup veil;
 
         /// <summary>Replacement en cours (de l'appui jusqu'au retour des commandes).</summary>
@@ -74,16 +67,6 @@ namespace ChillRoad
             step = Step.Out;
             t = 0f;
             game.SetInputEnabled(false);
-
-            // Pénalités : le combo en jeu, et en balade le dépannage
-            game.Score.Forfeit(Loc.T("REPLACEMENT", "RESPAWN"));
-            fee = 0;
-            if (!racing)
-            {
-                int cash = Wallet.Cash;
-                fee = Mathf.Min(cash, Mathf.Min(FeeMax, Mathf.RoundToInt((FeeBase + cash * FeeShare) / 10f) * 10));
-                if (fee > 0 && !Wallet.Spend(fee)) fee = 0;
-            }
             if (game.Local.Audio) game.Local.Audio.RespawnOut();
             GamepadRumble.Kick(0.25f, 0.1f, 0.25f);
             if (veil) veil.gameObject.SetActive(true);
@@ -144,11 +127,8 @@ namespace ChillRoad
         void Announce()
         {
             if (!game.Hud) return;
-            if (racing)
-                game.Hud.Announce(Loc.T("REPLACEMENT", "RESPAWN"), Loc.T("Retour à la dernière porte", "Back to the last gate"), TowTint);
-            else
-                game.Hud.Announce(Loc.T("DÉPANNAGE", "TOWED"),
-                    fee > 0 ? "- " + Wallet.Format(fee) : Loc.T("Aux frais de la maison", "On the house"), TowTint);
+            game.Hud.Announce(Loc.T("REPLACEMENT", "RESPAWN"),
+                racing ? Loc.T("Retour à la dernière porte", "Back to the last gate") : Loc.T("Retour sur la route", "Back on the road"), Tint);
         }
 
         /// <summary>
