@@ -9,27 +9,17 @@ namespace ChillRoad
     /// <summary>
     /// Garage du joueur, ouvert depuis le menu pause (tuile « Voiture ») : ses voitures alignées sur leurs plateaux tournants
     /// dans son garage-chalet à baie vitrée (<see cref="ShowroomStage"/>, variante garage), la voiture regardée tourne au centre de l'écran.
-    /// En bas, une rangée de tuiles (vignette rendue de chaque voiture, nom, « au volant ») ; au-dessus, le nom, la
-    /// transmission et la fiche technique de la voiture regardée.
+    /// Style verre : en haut à gauche, « GARAGE · n / N », le nom en grand et les puces (état, transmission) ; en haut à
+    /// droite, la fiche technique ; en bas, un plateau de verre avec les vignettes des voitures et ses flèches.
     /// ← → (ou molette, flèches à l'écran) pour passer d'une voiture à l'autre, Entrée / A (ou un deuxième clic sur la
     /// tuile) pour prendre le volant et repartir, Échap / B pour revenir au menu pause.
     /// </summary>
     public class CarPicker : MonoBehaviour
     {
-        static readonly Color White = new Color(0.96f, 0.97f, 0.98f);
-        static readonly Color Accent = new Color(1f, 0.76f, 0.2f);
-        static readonly Color Gold = new Color(0.95f, 0.62f, 0.12f);
-        static readonly Color Info = new Color(0.35f, 0.85f, 1f);
-        static readonly Color Dim = new Color(1f, 1f, 1f, 0.6f);
-        static readonly Color Money = new Color(0.5f, 1f, 0.6f);
-        static readonly Color Ink = new Color(0.06f, 0.07f, 0.09f);
-        static readonly Color TilePlate = new Color(0.1f, 0.12f, 0.15f, 0.94f);
-        static readonly Color PanelPlate = new Color(0.025f, 0.03f, 0.045f, 0.8f);
-
-        const float Slope = 0.14f;
-        const float TileW = 236f, TileH = 158f, TileGap = 16f, StripY = 26f;
-        const float ThumbH = 116f;
-        const float InfoH = 214f, CardH = 214f, PanelY = StripY + TileH + 26f;
+        const float ThumbW = 240f, ThumbH = 135f, NameH = 32f;
+        const float TileW = ThumbW, TileH = ThumbH + 9f + NameH, TileGap = 21f;
+        const float TrayY = 96f, TrayPadTop = 24f, TrayPadBottom = 18f, TrayH = TrayPadTop + TileH + TrayPadBottom;
+        const float ViewInset = 89f, ViewPad = 6f;
 
         public static bool IsOpen { get; private set; }
         /// <summary>Image où l'écran s'est ouvert ou fermé (la touche de fermeture ne doit pas rouvrir la pause).</summary>
@@ -39,20 +29,32 @@ namespace ChillRoad
         {
             public Button button;
             public RectTransform rt;
-            public HudShape plate, bar;
+            public GlassRect frame;
             public RawImage thumb;
             public RenderTexture texture;
-            public Text name, badge;
+            public Text name;
             public GameObject badgeGo;
-            public float lift;
+            public float lift, drawn = -1f;
+        }
+
+        /// <summary>Bouton pilule (souris, doigt) : liseré doré au survol.</summary>
+        class Pill
+        {
+            public RectTransform rt;
+            public GlassRect plate;
+            public Text label;
+            public int hover = -1;
         }
 
         GameManager game;
-        Font font;
         GameObject root;
         ShowroomStage stage;
-        RectTransform screenRt, viewRt, contentRt, infoRt, cardRt;
-        Text countText, nameText, subText, stateText, hintText, actionText;
+        RectTransform screenRt, viewRt, contentRt, headRt, cardRt;
+        Text countText, nameText, subText, stateText, driveText, hintText;
+        GlassRect stateChip, driveChip;
+        Pill action, back;
+        Text prevText, nextText;
+        RectTransform prevRt, nextRt;
         readonly List<Tile> tiles = new List<Tile>();
         readonly List<(RectTransform fill, Text value)> bars = new List<(RectTransform, Text)>();
         /// <summary>order[k] = indice (dans le garage) de la voiture à la place k ; builtFor : rangée construite.</summary>
@@ -68,7 +70,6 @@ namespace ChillRoad
         public void Init(GameManager g)
         {
             game = g;
-            font = HudArt.Font;
         }
 
         void OnDestroy()
@@ -101,7 +102,7 @@ namespace ChillRoad
             scrollVel = 0f;
             nameAnim = 0f;
             pointerPending = false;
-            foreach (var t in tiles) t.lift = 0f;
+            foreach (var t in tiles) { t.lift = 0f; t.drawn = -1f; }
             // Vignettes : rendues une à une dès l'image suivante (l'éclairage du studio est alors en place)
             thumbNext = 0;
             thumbWait = 1;
@@ -220,52 +221,79 @@ namespace ChillRoad
         float TargetScroll(int k)
         {
             float width = viewRt.rect.width, total = tiles.Count * (TileW + TileGap) - TileGap;
-            if (total <= width - 40f) return (width - total) * 0.5f;
+            if (total <= width - 24f) return (width - total) * 0.5f;
             float x = width * 0.5f - (k * (TileW + TileGap) + TileW * 0.5f);
-            return Mathf.Clamp(x, width - total - 40f, 40f);
+            return Mathf.Clamp(x, width - total - 12f, 12f);
         }
 
         void Refresh(float dt)
         {
             var cars = game.assets.playerCars;
-            float fit = screenRt.rect.width < 1f ? 1f : Mathf.Min(1f, Mathf.Min(screenRt.rect.width / 1500f, screenRt.rect.height / 820f));
-            infoRt.localScale = cardRt.localScale = Vector3.one * fit;
+            // Écrans plus étroits que 16:9 : l'en-tête et la fiche rétrécissent pour ne pas se chevaucher
+            float fit = screenRt.rect.width < 1f ? 1f : Mathf.Min(1f, Mathf.Min(screenRt.rect.width / 1700f, screenRt.rect.height / 900f));
+            headRt.localScale = cardRt.localScale = back.rt.localScale = Vector3.one * fit;
             bool pad = GameInput.UsingGamepad;
             string ok = pad ? "A" : Loc.T("Entrée", "Enter");
 
-            // Rangée : la tuile regardée se lève et passe à l'or, la rangée défile pour la garder à l'écran
+            // Rangée : la vignette regardée prend le liseré doré et son halo, la rangée défile pour la garder à l'écran
             scroll = dt > 0f ? Mathf.SmoothDamp(scroll, TargetScroll(shown), ref scrollVel, 0.18f, Mathf.Infinity, dt) : TargetScroll(shown);
-            contentRt.anchoredPosition = new Vector2(scroll, 16f);
+            contentRt.anchoredPosition = new Vector2(scroll, TrayPadBottom - ViewPad);
             float ease = dt > 0f ? 1f - Mathf.Exp(-dt * 14f) : 1f;
             for (int k = 0; k < tiles.Count; k++)
             {
                 var t = tiles[k];
                 bool on = k == shown, driving = order[k] == game.Local.CarIndex;
                 t.lift = Mathf.Lerp(t.lift, on ? 1f : 0f, ease);
-                t.rt.anchoredPosition = new Vector2(k * (TileW + TileGap) + TileW * 0.5f, t.lift * 12f);
-                t.rt.localScale = Vector3.one * (1f + t.lift * 0.04f);
-                t.plate.color = Color.Lerp(TilePlate, Gold, t.lift);
-                t.name.color = Color.Lerp(White, Ink, t.lift);
-                t.bar.color = driving ? Money : new Color(1f, 1f, 1f, 0f);
+                t.rt.anchoredPosition = new Vector2(k * (TileW + TileGap) + TileW * 0.5f, 0f);
+                t.rt.localScale = Vector3.one * (1f + t.lift * 0.03f);
+                // Maillage refait seulement pendant la transition
+                if (Mathf.Abs(t.lift - t.drawn) > 0.002f)
+                {
+                    t.drawn = t.lift;
+                    t.frame.Set(Color.clear, Color.Lerp(Glass.Edge, Glass.Gold, t.lift), Mathf.Lerp(1.5f, 3f, t.lift), 9f * t.lift, Glass.A(Glass.GoldHalo, Glass.GoldHalo.a * t.lift));
+                }
+                t.name.color = on ? Glass.Gold : Glass.Dim;
+                t.name.font = Glass.FontOf(on ? Glass.Weight.Regular : Glass.Weight.Light);
                 t.badgeGo.SetActive(driving);
             }
 
-            countText.text = Loc.F($"{shown + 1} / {tiles.Count}  ·  {tiles.Count} voitures au garage", $"{shown + 1} / {tiles.Count}  ·  {tiles.Count} cars owned");
+            // Flèches : dorées tant qu'il reste des voitures de ce côté
+            prevText.color = Hover(prevRt) ? Glass.White : shown > 0 ? Glass.Gold : Glass.Faint;
+            nextText.color = Hover(nextRt) ? Glass.White : shown < tiles.Count - 1 ? Glass.Gold : Glass.Faint;
+            HoverPill(back);
+            HoverPill(action);
+
+            countText.text = Glass.Spaced(Loc.F($"GARAGE · {shown + 1} / {tiles.Count}"), 2);
             if (shown < 0 || shown >= order.Length) return;
             var basic = cars[order[shown]];
             var s = CarTuning.Apply(basic);
             nameText.text = basic.displayName;
             float e = 1f - (1f - nameAnim) * (1f - nameAnim);
-            nameText.rectTransform.localScale = Vector3.one * Mathf.Lerp(1.07f, 1f, e);
-            nameText.color = new Color(White.r, White.g, White.b, e);
+            nameText.rectTransform.localScale = Vector3.one * Mathf.Lerp(1.05f, 1f, e);
+            nameText.color = Glass.A(Glass.White, e);
+
+            // Puces : état (doré), transmission (verre), puis la fiche courte
+            bool driving2 = order[shown] == game.Local.CarIndex;
+            stateText.text = Glass.Spaced(driving2 ? Loc.T("AU VOLANT", "DRIVING") : Loc.T("AU GARAGE", "IN THE GARAGE"), 1);
+            stateText.color = driving2 ? Glass.Ink : Glass.Gold;
+            stateChip.Set(driving2 ? Glass.Gold : Glass.GoldSoft, driving2 ? Color.clear : Glass.Gold, driving2 ? 0f : 1.5f);
+            float sw = stateText.preferredWidth + 54f;
+            stateChip.rectTransform.sizeDelta = new Vector2(sw, 38f);
             string drive = s.drivetrain == Drivetrain.AWD ? Loc.T("Intégrale", "AWD")
                 : s.drivetrain == Drivetrain.FWD ? Loc.T("Traction", "FWD") : Loc.T("Propulsion", "RWD");
+            driveText.text = drive;
+            float dw = driveText.preferredWidth + 54f;
+            var dr = driveChip.rectTransform;
+            dr.anchoredPosition = new Vector2(sw + 15f, dr.anchoredPosition.y);
+            dr.sizeDelta = new Vector2(dw, 38f);
             int gears = s.gearRatios != null ? s.gearRatios.Length : 0;
-            subText.text = Loc.F($"{drive}  ·  {gears} rapports  ·  {s.mass:N0} kg", $"{drive}  ·  {gears} speeds  ·  {s.mass:N0} kg");
-            bool driving2 = order[shown] == game.Local.CarIndex;
-            stateText.text = driving2 ? Loc.T("AU VOLANT", "DRIVING") : Loc.T("AU GARAGE", "IN THE GARAGE");
-            stateText.color = driving2 ? Money : Accent;
-            actionText.text = driving2 ? Loc.T($"{ok} : repartir avec", $"{ok}: drive on") : Loc.T($"{ok} : prendre le volant", $"{ok}: drive it");
+            subText.text = Loc.F($"{gears} rapports  ·  {s.mass:N0} kg", $"{gears} speeds  ·  {s.mass:N0} kg");
+            var sr = subText.rectTransform;
+            sr.anchoredPosition = new Vector2(sw + 15f + dw + 20f, sr.anchoredPosition.y);
+            action.label.text = driving2
+                ? Loc.T($"<color=#FFC233>{ok}</color>   repartir avec", $"<color=#FFC233>{ok}</color>   drive on")
+                : Loc.T($"<color=#FFC233>{ok}</color>   prendre le volant", $"<color=#FFC233>{ok}</color>   drive it");
+            action.rt.sizeDelta = new Vector2(action.label.preferredWidth + 64f, 60f);
 
             float power = Power(s), top = s.TopSpeed * 3.6f, ratio = power / Mathf.Max(s.mass, 1f) * 1000f;
             SetBar(0, power / maxPower, Loc.F($"{power:0} ch", $"{power:0} hp"));
@@ -273,9 +301,12 @@ namespace ChillRoad
             SetBar(2, ratio / maxRatio, Loc.F($"{ratio:0} ch/t", $"{ratio:0} hp/t"));
             SetBar(3, s.tireGrip / maxGrip, Loc.F($"{s.tireGrip:0.00}"));
 
+            const string G = "<color=#FFC233>", E = "</color>";
             hintText.text = pad
-                ? Loc.T("← → choisir  ·  A conduire  ·  B retour  ·  joystick droit : tourner", "← → browse  ·  A drive  ·  B back  ·  right stick: rotate")
-                : Loc.T("← → / molette choisir  ·  Entrée conduire  ·  Échap retour  ·  clic droit : tourner", "← → / wheel browse  ·  Enter drive  ·  Esc back  ·  right click: rotate");
+                ? Loc.T($"{G}← →{E}  choisir     ·     {G}A{E}  conduire     ·     {G}B{E}  retour     ·     {G}joystick droit{E}  tourner",
+                        $"{G}← →{E}  browse     ·     {G}A{E}  drive     ·     {G}B{E}  back     ·     {G}right stick{E}  rotate")
+                : Loc.T($"{G}← →{E} / {G}molette{E}  choisir     ·     {G}Entrée{E}  conduire     ·     {G}Échap{E}  retour     ·     {G}clic droit{E}  tourner",
+                        $"{G}← →{E} / {G}wheel{E}  browse     ·     {G}Enter{E}  drive     ·     {G}Esc{E}  back     ·     {G}right click{E}  rotate");
         }
 
         void SetBar(int i, float v, string value)
@@ -286,6 +317,22 @@ namespace ChillRoad
 
         /// <summary>Puissance estimée (ch) : couple max tenu jusqu'à 80 % du rupteur (comme à la concession).</summary>
         static float Power(VehicleSpec s) => s.maxTorque * s.redline * 0.8f / 9549f * 1.36f;
+
+        /// <summary>Pointeur de la souris au-dessus du rectangle (pas de survol à la manette).</summary>
+        static bool Hover(RectTransform rt)
+        {
+            var mouse = Mouse.current;
+            return mouse != null && !GameInput.UsingGamepad && rt && rt.gameObject.activeInHierarchy
+                && RectTransformUtility.RectangleContainsScreenPoint(rt, mouse.position.ReadValue(), null);
+        }
+
+        static void HoverPill(Pill p)
+        {
+            bool on = Hover(p.rt);
+            if ((on ? 1 : 0) == p.hover) return;
+            p.hover = on ? 1 : 0;
+            p.plate.Set(on ? Glass.GoldSoft : Glass.Pill, on ? Glass.Gold : Glass.Edge, on ? 2f : 1.5f, on ? 6f : 0f);
+        }
 
         // ------------------------------------------------------------------ construction
 
@@ -325,84 +372,80 @@ namespace ChillRoad
             scaler.matchWidthOrHeight = 0.5f;
             screenRt = (RectTransform)root.transform;
 
-            // Bas d'écran assombri : la rangée et les fiches restent lisibles sur le sol clair du hall
-            var shadeShape = Shape(screenRt, "Shade", Vector2.zero, Vector2.zero, Vector2.zero, new Color(0.01f, 0.012f, 0.02f, 1f));
-            shadeShape.Set(0f, 0f, 0f, 0f, 0.85f);
-            var shade = shadeShape.rectTransform;
-            shade.anchorMin = Vector2.zero;
-            shade.anchorMax = new Vector2(1f, 0f);
-            shade.offsetMin = Vector2.zero;
-            shade.offsetMax = new Vector2(0f, PanelY + InfoH + 60f);
+            // En-tête (en haut à gauche, sur la scène) : « GARAGE · n / N », nom en grand, puces, action
+            headRt = Glass.Place(screenRt, "Head", new Vector2(0f, 1f), new Vector2(90f, -66f), new Vector2(1100f, 320f));
+            countText = Glass.Kicker(headRt, "", 17);
+            Pose(countText.rectTransform, new Vector2(0f, 1f), Vector2.zero, new Vector2(900f, 26f));
+            Glass.Soft(countText, 0.35f);
+            nameText = Glass.Label(headRt, "", 102, Glass.Weight.Light, Glass.White, TextAnchor.UpperLeft);
+            Pose(nameText.rectTransform, new Vector2(0f, 1f), new Vector2(-4f, -30f), new Vector2(1100f, 120f));
+            Glass.Soft(nameText);
 
-            // Enseigne (en haut à gauche) : titre, nombre de voitures, aide des touches
-            const float headH = 132f;
-            var head = Panel(screenRt, "Head", new Vector2(0f, 1f), new Vector2(40f, -32f), new Vector2(720f, headH));
-            Edge(head, headH);
-            var icon = Icon(head, HudIcon.Kind.Car, new Vector2(0f, 1f), new Vector2(38f + Lean(headH - 46f, headH), -46f), 64f);
-            icon.SetColors(Accent, PanelPlate);
-            var title = Place(Label(head, "", 50, TextAnchor.MiddleLeft, White, FontStyle.BoldAndItalic), new Vector2(120f, -12f), new Vector2(560f, 64f), headH);
-            Loc.Bind(title, "GARAGE", "GARAGE");
-            countText = Place(Label(head, "", 22, TextAnchor.MiddleLeft, Dim, FontStyle.Bold), new Vector2(122f, -78f), new Vector2(560f, 30f), headH);
+            stateChip = Glass.Make(headRt, "State", 19f, Glass.Gold, 0f);
+            Pose(stateChip.rectTransform, new Vector2(0f, 1f), new Vector2(0f, -176f), new Vector2(180f, 38f));
+            stateText = Glass.Label(stateChip.transform, "", 18, Glass.Weight.Semibold, Glass.Ink, TextAnchor.MiddleCenter);
+            Glass.Stretch(stateText.rectTransform);
+            driveChip = Glass.Make(headRt, "Drive", 19f, Glass.Panel);
+            Pose(driveChip.rectTransform, new Vector2(0f, 1f), new Vector2(195f, -176f), new Vector2(160f, 38f));
+            driveText = Glass.Label(driveChip.transform, "", 21, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleCenter);
+            Glass.Stretch(driveText.rectTransform);
+            subText = Glass.Label(headRt, "", 21, Glass.Weight.Semilight, Glass.Dim, TextAnchor.MiddleLeft);
+            Pose(subText.rectTransform, new Vector2(0f, 1f), new Vector2(380f, -176f), new Vector2(500f, 38f));
+            Glass.Soft(subText);
 
-            // Retour (souris, doigt) : hors de la navigation
-            var back = Plate(screenRt, "Back", new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-40f, -32f), new Vector2(230f, 60f), () => Close(false));
-            var backIcon = Icon(back.rt, HudIcon.Kind.Back, new Vector2(0f, 0.5f), new Vector2(46f, 0f), 30f);
-            backIcon.SetColors(White, Color.clear);
+            action = MakePill(headRt, "Action", new Vector2(0f, 1f), new Vector2(0f, -240f), new Vector2(340f, 60f), () => Choose(shown));
+            action.label.fontSize = 22;
+
+            // Retour (souris, doigt), en haut à droite, hors de la navigation
+            back = MakePill(screenRt, "Back", new Vector2(1f, 1f), new Vector2(-90f, -66f), new Vector2(190f, 60f), () => Close(false));
+            var backIcon = Icon(back.rt, HudIcon.Kind.Back, new Vector2(0f, 0.5f), new Vector2(42f, 0f), 26f);
+            backIcon.SetColors(Glass.White, Color.clear);
             back.label.alignment = TextAnchor.MiddleLeft;
-            back.label.rectTransform.offsetMin = new Vector2(78f, 0f);
+            back.label.rectTransform.offsetMin = new Vector2(70f, 0f);
             Loc.Bind(back.label, "Retour", "Back");
-            hintText = Label(screenRt, "", 19, TextAnchor.MiddleRight, Dim, FontStyle.Bold);
-            var hr = hintText.rectTransform;
-            hr.anchorMin = hr.anchorMax = hr.pivot = new Vector2(1f, 1f);
-            hr.sizeDelta = new Vector2(900f, 30f);
-            hr.anchoredPosition = new Vector2(-44f, -104f);
 
-            // Flèches de la rangée (souris, doigt), de part et d'autre de la voiture
-            var prev = Plate(screenRt, "Previous", new Vector2(0f, 0.62f), new Vector2(0f, 0.5f), new Vector2(34f, 0f), new Vector2(64f, 96f), () => Step(-1));
-            prev.label.text = "‹";
-            prev.label.fontSize = 64;
-            var next = Plate(screenRt, "Next", new Vector2(1f, 0.62f), new Vector2(1f, 0.5f), new Vector2(-34f, 0f), new Vector2(64f, 96f), () => Step(1));
-            next.label.text = "›";
-            next.label.fontSize = 64;
-
-            // Voiture regardée (à gauche, au-dessus de la rangée) : nom, fiche courte, état, action
-            infoRt = Panel(screenRt, "Car", new Vector2(0f, 0f), new Vector2(40f, PanelY), new Vector2(720f, InfoH));
-            Edge(infoRt, InfoH);
-            nameText = Low(Label(infoRt, "", 48, TextAnchor.MiddleLeft, White, FontStyle.BoldAndItalic), 36f, 164f, 660f, 62f, InfoH);
-            subText = Low(Label(infoRt, "", 22, TextAnchor.MiddleLeft, Dim, FontStyle.Bold), 38f, 116f, 660f, 30f, InfoH);
-            stateText = Low(Label(infoRt, "", 22, TextAnchor.MiddleLeft, Money, FontStyle.BoldAndItalic), 38f, 46f, 200f, 30f, InfoH);
-            var action = Plate(infoRt, "Action", Vector2.zero, new Vector2(0f, 0.5f), new Vector2(238f + Lean(46f, InfoH), 46f), new Vector2(440f, 58f), () => Choose(shown));
-            actionText = action.label;
-            actionText.fontSize = 24;
-
-            // Fiche technique (à droite, au-dessus de la rangée)
-            cardRt = Panel(screenRt, "Card", new Vector2(1f, 0f), new Vector2(-40f, PanelY), new Vector2(620f, CardH));
-            Edge(cardRt, CardH);
-            var cardTitle = Place(Label(cardRt, "", 22, TextAnchor.MiddleLeft, Info, FontStyle.BoldAndItalic), new Vector2(34f, -14f), new Vector2(540f, 30f), CardH);
-            Loc.Bind(cardTitle, "FICHE TECHNIQUE", "SPECS");
+            // Fiche technique (en haut à droite, sous Retour)
+            cardRt = Glass.Place(screenRt, "Card", new Vector2(1f, 1f), new Vector2(-90f, -150f), new Vector2(600f, 228f));
+            Glass.Backdrop(cardRt, 30f);
+            var cardTitle = Glass.Kicker(cardRt, "", 16);
+            Pose(cardTitle.rectTransform, new Vector2(0f, 1f), new Vector2(30f, -24f), new Vector2(500f, 24f));
+            Loc.Bind(cardTitle, Glass.Spaced("FICHE TECHNIQUE", 2), Glass.Spaced("SPECS", 2));
             string[,] labels = { { "Puissance", "Power" }, { "Vitesse max", "Top speed" }, { "Rapport poids/puissance", "Power to weight" }, { "Adhérence", "Grip" } };
             for (int i = 0; i < 4; i++)
             {
-                float y = -64f - i * 38f;
-                var label = Place(Label(cardRt, "", 20, TextAnchor.MiddleLeft, White, FontStyle.Normal), new Vector2(34f, y), new Vector2(250f, 28f), CardH);
+                float y = -80f - i * 38f;
+                var label = Glass.Label(cardRt, "", 19, Glass.Weight.Semilight, Glass.Dim, TextAnchor.MiddleLeft);
+                Pose(label.rectTransform, new Vector2(0f, 1f), new Vector2(30f, y + 15f), new Vector2(262f, 30f));
+                label.horizontalOverflow = HorizontalWrapMode.Wrap;
+                label.verticalOverflow = VerticalWrapMode.Truncate;   // sinon la taille auto ne réduit pas « Rapport poids/puissance »
+                label.resizeTextForBestFit = true;
+                label.resizeTextMinSize = 14;
+                label.resizeTextMaxSize = 19;
                 Loc.Bind(label, labels[i, 0], labels[i, 1]);
-                float lean = Lean(CardH + y - 14f, CardH);
-                var bg = Rect(cardRt, "Bar", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(286f + lean, y - 18f), new Vector2(462f + lean, y - 10f));
-                bg.gameObject.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.12f);
-                var fill = Rect(bg, "Fill", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+                var track = Glass.Bar(cardRt, "Bar", Glass.Track);
+                Pose(track.rectTransform, new Vector2(0f, 1f), new Vector2(306f, y + 1.5f), new Vector2(124f, 3f));
+                var fill = Glass.Bar(track.transform, "Fill", Glass.White).rectTransform;
+                Glass.Stretch(fill);
                 fill.pivot = new Vector2(0f, 0.5f);
-                fill.gameObject.AddComponent<Image>().color = Info;
-                var value = Place(Label(cardRt, "", 20, TextAnchor.MiddleRight, Accent, FontStyle.Bold), new Vector2(466f, y), new Vector2(124f, 28f), CardH);
+                var value = Glass.Label(cardRt, "", 19, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleRight);
+                Pose(value.rectTransform, new Vector2(1f, 1f), new Vector2(-30f, y + 15f), new Vector2(130f, 30f));
                 bars.Add((fill, value));
             }
 
-            // Rangée des voitures (en bas, sur toute la largeur), qui défile
-            viewRt = Rect(screenRt, "Strip", Vector2.zero, new Vector2(1f, 0f), new Vector2(0f, StripY - 16f), new Vector2(0f, StripY + TileH + 22f));
+            // Plateau de verre en bas : flèches et vignettes des voitures, qui défilent
+            var tray = Glass.Rect(screenRt, "Tray", Vector2.zero, new Vector2(1f, 0f), new Vector2(111f, TrayY), new Vector2(-111f, TrayY + TrayH));
+            Glass.Backdrop(tray, 45f);
+            var prev = MakeArrow(tray, "Previous", "‹", new Vector2(0f, 0.5f), new Vector2(27f, 14f), () => Step(-1));
+            prevRt = prev.rt; prevText = prev.label;
+            var next = MakeArrow(tray, "Next", "›", new Vector2(1f, 0.5f), new Vector2(-27f, 14f), () => Step(1));
+            nextRt = next.rt; nextText = next.label;
+            // Fenêtre de défilement un peu plus haute que les tuiles : le halo doré n'est pas rogné
+            viewRt = Glass.Rect(tray, "Strip", Vector2.zero, Vector2.one, new Vector2(ViewInset, ViewPad), new Vector2(-ViewInset, -ViewPad));
             viewRt.gameObject.AddComponent<RectMask2D>();
-            contentRt = Rect(viewRt, "Row", Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
+            contentRt = Glass.Rect(viewRt, "Row", Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
             contentRt.pivot = Vector2.zero;
             contentRt.sizeDelta = new Vector2(owned.Length * (TileW + TileGap), TileH);
-            contentRt.anchoredPosition = new Vector2(0f, 16f);
+            contentRt.anchoredPosition = new Vector2(0f, TrayPadBottom - ViewPad);
             for (int k = 0; k < owned.Length; k++) tiles.Add(BuildTile(k, cars[owned[k]]));
             for (int k = 0; k < tiles.Count; k++)
                 tiles[k].button.navigation = new Navigation
@@ -411,24 +454,45 @@ namespace ChillRoad
                     selectOnLeft = tiles[(k - 1 + tiles.Count) % tiles.Count].button,
                     selectOnRight = tiles[(k + 1) % tiles.Count].button,
                 };
+
+            // Aide des touches, centrée tout en bas (touches en or)
+            hintText = Glass.Label(screenRt, "", 21, Glass.Weight.Light, Glass.White, TextAnchor.MiddleCenter,
+                new Vector2(0.5f, 0f), new Vector2(0f, 24f), new Vector2(1800f, 32f));
+            Glass.Soft(hintText, 0.8f);
             root.SetActive(false);
         }
 
         Tile BuildTile(int k, VehicleSpec spec)
         {
             var t = new Tile();
-            var go = new GameObject("Tile " + spec.id, typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape), typeof(Button));
+            var go = new GameObject("Tile " + spec.id, typeof(RectTransform), typeof(Button));
             go.transform.SetParent(contentRt, false);
             t.rt = (RectTransform)go.transform;
             t.rt.anchorMin = t.rt.anchorMax = Vector2.zero;
             t.rt.pivot = new Vector2(0.5f, 0f);
             t.rt.sizeDelta = new Vector2(TileW, TileH);
             t.rt.anchoredPosition = new Vector2(k * (TileW + TileGap) + TileW * 0.5f, 0f);
-            t.plate = go.GetComponent<HudShape>();
-            t.plate.Set(TileH * Slope * 0.5f, 0f, 0f);
-            t.plate.color = TilePlate;
+
+            // Vignette arrondie : un masque de verre (invisible) découpe l'image rendue
+            var holder = Glass.Make(go.transform, "Thumb", 24f, Color.white, 0f);
+            Pose(holder.rectTransform, new Vector2(0.5f, 1f), Vector2.zero, new Vector2(ThumbW, ThumbH));
+            holder.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+            t.texture = new RenderTexture(472, 232, 24, RenderTextureFormat.DefaultHDR) { name = "CarThumb " + spec.id };
+            t.texture.Create();
+            var img = new GameObject("Image", typeof(RectTransform), typeof(CanvasRenderer), typeof(RawImage));
+            img.transform.SetParent(holder.transform, false);
+            Glass.Stretch((RectTransform)img.transform);
+            t.thumb = img.GetComponent<RawImage>();
+            t.thumb.texture = t.texture;
+            t.thumb.color = new Color(0f, 0f, 0f, 0.4f);
+            t.thumb.raycastTarget = false;
+
+            // Liseré par-dessus la vignette (doré + halo sur la voiture regardée) ; c'est lui qui reçoit les clics
+            t.frame = Glass.Make(go.transform, "Frame", 24f, Color.clear);
+            Pose(t.frame.rectTransform, new Vector2(0.5f, 1f), Vector2.zero, new Vector2(ThumbW, ThumbH));
+            t.frame.raycastTarget = true;
             t.button = go.GetComponent<Button>();
-            t.button.targetGraphic = t.plate;
+            t.button.targetGraphic = t.frame;
             t.button.transition = Selectable.Transition.None;
             int index = k;
             t.button.onClick.AddListener(() => Clicked(index));
@@ -438,78 +502,67 @@ namespace ChillRoad
             down.callback.AddListener(_ => { pointerPending = true; pointerArmed = shown == index; });
             trigger.triggers.Add(down);
 
-            // Vignette (rendue à l'ouverture), nom dessous
-            t.texture = new RenderTexture(472, 232, 24, RenderTextureFormat.DefaultHDR) { name = "CarThumb " + spec.id };
-            t.texture.Create();
-            var img = new GameObject("Thumb", typeof(RectTransform), typeof(CanvasRenderer), typeof(RawImage));
-            img.transform.SetParent(go.transform, false);
-            var ir = (RectTransform)img.transform;
-            ir.anchorMin = new Vector2(0f, 1f);
-            ir.anchorMax = new Vector2(1f, 1f);
-            ir.pivot = new Vector2(0.5f, 1f);
-            ir.offsetMin = new Vector2(14f, -8f - ThumbH);
-            ir.offsetMax = new Vector2(-14f, -8f);
-            t.thumb = img.GetComponent<RawImage>();
-            t.thumb.texture = t.texture;
-            t.thumb.color = new Color(0f, 0f, 0f, 0.4f);
-            t.thumb.raycastTarget = false;
-            t.name = Label(go.transform, spec.displayName, 19, TextAnchor.MiddleCenter, White, FontStyle.BoldAndItalic);
+            t.name = Glass.Label(go.transform, spec.displayName, 21, Glass.Weight.Light, Glass.Dim, TextAnchor.MiddleCenter);
             var nr = t.name.rectTransform;
             nr.anchorMin = Vector2.zero;
             nr.anchorMax = new Vector2(1f, 0f);
             nr.pivot = new Vector2(0.5f, 0f);
-            nr.offsetMin = new Vector2(10f, 4f);
-            nr.offsetMax = new Vector2(-10f, 32f);
+            nr.offsetMin = new Vector2(4f, 0f);
+            nr.offsetMax = new Vector2(-4f, NameH);
             t.name.horizontalOverflow = HorizontalWrapMode.Wrap;
             t.name.verticalOverflow = VerticalWrapMode.Truncate;
             t.name.resizeTextForBestFit = true;
-            t.name.resizeTextMinSize = 13;
-            t.name.resizeTextMaxSize = 19;
-            t.name.GetComponent<Shadow>().enabled = false;
-            // Liseré vert sous la voiture au volant, et son badge sur la vignette
-            t.bar = Shape(go.transform, "Driving", new Vector2(0.5f, 0f), new Vector2(0f, -8f), new Vector2(TileW * 0.6f, 4f), Money);
-            t.bar.Set(2f, 0f, 0f);
-            t.badgeGo = new GameObject("Badge", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape));
-            t.badgeGo.transform.SetParent(go.transform, false);
-            var br = (RectTransform)t.badgeGo.transform;
-            br.anchorMin = br.anchorMax = br.pivot = new Vector2(0f, 1f);
-            br.sizeDelta = new Vector2(112f, 26f);
-            br.anchoredPosition = new Vector2(20f, -14f);
-            var bs = t.badgeGo.GetComponent<HudShape>();
-            bs.Set(26f * Slope, 0f, 0f);
-            bs.color = Money;
-            bs.raycastTarget = false;
-            t.badge = Label(t.badgeGo.transform, "", 15, TextAnchor.MiddleCenter, Ink, FontStyle.BoldAndItalic);
-            Stretch(t.badge.rectTransform, 4f, 4f);
-            t.badge.GetComponent<Shadow>().enabled = false;
-            Loc.Bind(t.badge, "AU VOLANT", "DRIVING");
+            t.name.resizeTextMinSize = 14;
+            t.name.resizeTextMaxSize = 21;
+
+            // Pastille « au volant » sur la vignette de la voiture conduite
+            var badge = Glass.Make(go.transform, "Badge", 13f, Glass.Gold, 0f);
+            Pose(badge.rectTransform, new Vector2(0f, 1f), new Vector2(10f, -10f), new Vector2(116f, 26f));
+            t.badgeGo = badge.gameObject;
+            var bt = Glass.Label(badge.transform, "", 13, Glass.Weight.Semibold, Glass.Ink, TextAnchor.MiddleCenter);
+            Glass.Stretch(bt.rectTransform);
+            Loc.Bind(bt, Glass.Spaced("AU VOLANT", 1), Glass.Spaced("DRIVING", 1));
             return t;
         }
 
         // ------------------------------------------------------------------ helpers
 
-        static RectTransform Panel(Transform parent, string name, Vector2 corner, Vector2 pos, Vector2 size)
+        /// <summary>Bouton pilule de verre (souris, doigt), hors de la navigation au clavier et à la manette.</summary>
+        Pill MakePill(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size, UnityEngine.Events.UnityAction onClick)
         {
-            var rt = Rect(parent, name, corner, corner, Vector2.zero, Vector2.zero);
-            rt.pivot = corner;
-            rt.sizeDelta = size;
-            rt.anchoredPosition = pos;
-            var s = Shape(rt, "Plate", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, PanelPlate);
-            s.Set(size.y * Slope, 0f, 0f);
-            var pr = s.rectTransform;
-            pr.anchorMin = Vector2.zero;
-            pr.anchorMax = Vector2.one;
-            pr.offsetMin = pr.offsetMax = Vector2.zero;
-            pr.SetAsFirstSibling();
-            return rt;
+            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(GlassRect), typeof(Button));
+            go.transform.SetParent(parent, false);
+            var p = new Pill { rt = (RectTransform)go.transform, plate = go.GetComponent<GlassRect>() };
+            Pose(p.rt, anchor, pos, size);
+            p.plate.radius = size.y * 0.5f;
+            p.plate.color = Glass.Pill;
+            var b = go.GetComponent<Button>();
+            b.targetGraphic = p.plate;
+            b.transition = Selectable.Transition.None;
+            b.navigation = new Navigation { mode = Navigation.Mode.None };
+            b.onClick.AddListener(onClick);
+            p.label = Glass.Label(go.transform, "", 23, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleCenter);
+            Glass.Stretch(p.label.rectTransform);
+            return p;
         }
 
-        /// <summary>Décalage horizontal du bord penché d'un panneau à la hauteur y (depuis le bas) : 0 au milieu.</summary>
-        static float Lean(float y, float panelHeight) => Slope * (y - panelHeight * 0.5f);
-
-        static void Edge(RectTransform panel, float height)
+        /// <summary>Flèche du plateau (souris, doigt) : simple chevron fin, zone de clic plus large que le trait.</summary>
+        (RectTransform rt, Text label) MakeArrow(Transform parent, string name, string glyph, Vector2 anchor, Vector2 pos, UnityEngine.Events.UnityAction onClick)
         {
-            Shape(panel, "Stripe", Vector2.zero, Vector2.zero, new Vector2(4f, height), new Color(Info.r, Info.g, Info.b, 0.7f)).Set(height * Slope, 0f, 0f);
+            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            go.transform.SetParent(parent, false);
+            var rt = (RectTransform)go.transform;
+            Pose(rt, anchor, pos, new Vector2(52f, 140f));
+            var hit = go.GetComponent<Image>();
+            hit.color = Color.clear;
+            var b = go.GetComponent<Button>();
+            b.targetGraphic = hit;
+            b.transition = Selectable.Transition.None;
+            b.navigation = new Navigation { mode = Navigation.Mode.None };
+            b.onClick.AddListener(onClick);
+            var label = Glass.Label(go.transform, glyph, 54, Glass.Weight.Light, Glass.Gold, TextAnchor.MiddleCenter);
+            Glass.Stretch(label.rectTransform);
+            return (rt, label);
         }
 
         static HudIcon Icon(Transform parent, HudIcon.Kind kind, Vector2 anchor, Vector2 pos, float size)
@@ -527,102 +580,12 @@ namespace ChillRoad
             return icon;
         }
 
-        /// <summary>Bouton à plaque inclinée (souris, doigt), hors de la navigation au clavier et à la manette.</summary>
-        (RectTransform rt, Text label) Plate(Transform parent, string name, Vector2 corner, Vector2 pivot, Vector2 pos, Vector2 size, UnityEngine.Events.UnityAction onClick)
+        /// <summary>Ancre et pivot au même point, position et taille.</summary>
+        static void Pose(RectTransform rt, Vector2 anchor, Vector2 pos, Vector2 size)
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape), typeof(Button));
-            go.transform.SetParent(parent, false);
-            var rt = (RectTransform)go.transform;
-            rt.anchorMin = rt.anchorMax = corner;
-            rt.pivot = pivot;
-            rt.sizeDelta = size;
-            rt.anchoredPosition = pos;
-            var shape = go.GetComponent<HudShape>();
-            shape.Set(size.y * Slope, 0f, 0f);
-            shape.color = Color.white;
-            var b = go.GetComponent<Button>();
-            b.targetGraphic = shape;
-            var colors = b.colors;
-            colors.normalColor = new Color(0.14f, 0.16f, 0.2f, 0.92f);
-            colors.highlightedColor = new Color(0.2f, 0.42f, 0.55f, 1f);
-            colors.selectedColor = new Color(0.14f, 0.16f, 0.2f, 0.92f);
-            colors.pressedColor = Info;
-            b.colors = colors;
-            b.navigation = new Navigation { mode = Navigation.Mode.None };
-            b.onClick.AddListener(onClick);
-            var label = Label(go.transform, "", 26, TextAnchor.MiddleCenter, White, FontStyle.BoldAndItalic);
-            Stretch(label.rectTransform, 16f, 16f);
-            return (rt, label);
-        }
-
-        static RectTransform Rect(Transform parent, string name, Vector2 aMin, Vector2 aMax, Vector2 oMin, Vector2 oMax)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var rt = (RectTransform)go.transform;
-            rt.anchorMin = aMin; rt.anchorMax = aMax; rt.offsetMin = oMin; rt.offsetMax = oMax;
-            return rt;
-        }
-
-        static void Stretch(RectTransform rt, float left, float right)
-        {
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
-            rt.offsetMin = new Vector2(left, 0f);
-            rt.offsetMax = new Vector2(-right, 0f);
-        }
-
-        /// <summary>Texte posé depuis le haut à gauche d'un panneau de hauteur panelHeight : sa marge suit le bord penché.</summary>
-        static Text Place(Text t, Vector2 pos, Vector2 size, float panelHeight)
-        {
-            var rt = t.rectTransform;
-            rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
-            rt.pivot = new Vector2(0f, 0.5f);
-            rt.sizeDelta = size;
-            float lean = Lean(panelHeight + pos.y - size.y * 0.5f, panelHeight);
-            rt.anchoredPosition = pos + new Vector2(lean, -size.y * 0.5f);
-            return t;
-        }
-
-        /// <summary>Texte posé depuis le bas à gauche d'un panneau (y : milieu de la ligne) ; sa marge suit le bord penché.</summary>
-        static Text Low(Text t, float x, float y, float width, float height, float panelHeight)
-        {
-            var rt = t.rectTransform;
-            rt.anchorMin = rt.anchorMax = Vector2.zero;
-            rt.pivot = new Vector2(0f, 0.5f);
-            rt.sizeDelta = new Vector2(width, height);
-            rt.anchoredPosition = new Vector2(x + Lean(y, panelHeight), y);
-            return t;
-        }
-
-        static HudShape Shape(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size, Color color)
-        {
-            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape));
-            go.transform.SetParent(parent, false);
-            var rt = (RectTransform)go.transform;
             rt.anchorMin = rt.anchorMax = rt.pivot = anchor;
             rt.anchoredPosition = pos;
             rt.sizeDelta = size;
-            var s = go.GetComponent<HudShape>();
-            s.color = color;
-            s.raycastTarget = false;
-            return s;
-        }
-
-        Text Label(Transform parent, string text, int size, TextAnchor align, Color color, FontStyle style)
-        {
-            var go = new GameObject("Text", typeof(RectTransform), typeof(Text), typeof(Shadow));
-            go.transform.SetParent(parent, false);
-            var t = go.GetComponent<Text>();
-            t.font = font; t.fontSize = size; t.alignment = align; t.color = color; t.text = text;
-            t.fontStyle = style;
-            t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
-            t.raycastTarget = false;
-            var sh = go.GetComponent<Shadow>();
-            sh.effectColor = new Color(0, 0, 0, 0.55f);
-            sh.effectDistance = new Vector2(2, -2);
-            return t;
         }
     }
 }
