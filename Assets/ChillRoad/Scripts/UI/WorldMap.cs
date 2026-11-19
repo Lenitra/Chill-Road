@@ -89,8 +89,9 @@ namespace ChillRoad
         float raceZoom = -1f;
         /// <summary>Distance au départ (unités d'écran) sous laquelle le curseur ou le viseur le survole.</summary>
         const float RaceHoverRadius = 18f;
-        // Radars et tremplins : repère et étiquette de chacun (couleur et texte selon qu'il est déjà réussi)
-        readonly List<Image> radarDots = new List<Image>(), stuntDots = new List<Image>();
+        // Radars et tremplins : coche « réussi » de la pastille et étiquette de chacun (texte selon qu'il est déjà réussi)
+        const float GoalBadge = 26f;
+        readonly List<GameObject> radarChecks = new List<GameObject>(), stuntChecks = new List<GameObject>();
         readonly List<Text> radarLabels = new List<Text>(), stuntLabels = new List<Text>();
         bool pressed;
         float pressMoved;
@@ -154,9 +155,9 @@ namespace ChillRoad
                 raceLabels.Clear();
                 raceStarts.Clear();
                 raceFinishes.Clear();
-                radarDots.Clear();
+                radarChecks.Clear();
                 radarLabels.Clear();
-                stuntDots.Clear();
+                stuntChecks.Clear();
                 stuntLabels.Clear();
                 raceHover = -1;
                 raceZoom = -1f;
@@ -762,7 +763,7 @@ namespace ChillRoad
                 (new Color32(238, 234, 224, 255), new Color32(92, 92, 98, 255), 4.5f, "Chemin", "Lane"),
                 (new Color32(212, 176, 128, 255), new Color32(104, 76, 48, 255), 3.5f, "Chemin de terre", "Dirt track"),
             };
-            int rows = roads.Length + 2;
+            int rows = roads.Length + 3;
             float legendHeight = 62f + rows * rowStep + 14f;
             float legendTop = -Margin - headHeight - 14f;
             var legend = Panel(shade, "Legend", new Vector2(0f, 1f), new Vector2(x, legendTop - legendHeight * 0.5f), new Vector2(width, legendHeight));
@@ -803,8 +804,9 @@ namespace ChillRoad
             // Courses : une ligne par genre (le nom est écrit au départ en zoomant, le détail et le record au survol)
             RaceSwatch(LegendRow(legend, col1, top - 3f * rowStep, colW, "Course : sprint", "Race: sprint"), Races.SprintTint);
             RaceSwatch(LegendRow(legend, col1, top - 4f * rowStep, colW, "Course : tours", "Race: laps"), Races.LapsTint);
-            RadarSwatch(LegendRow(legend, col1, top - 5f * rowStep, colW, "Radar", "Speed camera"));
-            StuntSwatch(LegendRow(legend, col1, top - 6f * rowStep, colW, "Tremplin", "Stunt jump"));
+            GoalSwatch(LegendRow(legend, col1, top - 5f * rowStep, colW, "Radar", "Speed camera"), HudIcon.Kind.RadarPin, SpeedCameras.Tint, false);
+            GoalSwatch(LegendRow(legend, col1, top - 6f * rowStep, colW, "Tremplin", "Stunt jump"), HudIcon.Kind.RampPin, StuntJumps.Tint, true);
+            DoneSwatch(LegendRow(legend, col1, top - 7f * rowStep, colW, "Réussi", "Completed"));
             {
                 var row = LegendRow(legend, col0, top - (roads.Length + 1) * rowStep, colW, "Votre voiture", "Your car");
                 var arrow = Box(row, "Arrow", new Vector2(0f, 0.5f), new Vector2(17f, 0f), new Vector2(17f, 19f)).gameObject.AddComponent<HudArrow>();
@@ -1113,42 +1115,40 @@ namespace ChillRoad
                 foreach (var r in game.Radars.All)
                 {
                     var mark = Box(content, "Radar_" + r.data.id, new Vector2(0.5f, 0.5f), Local(r.center.x, r.center.z), new Vector2(10f, 10f));
-                    Disc(mark, 18f, Ink);
-                    radarDots.Add(Disc(mark, 13f, SpeedCameras.Tint));
-                    Disc(mark, 5f, Ink);
-                    radarLabels.Add(GoalLabel(mark));
+                    radarChecks.Add(HudIcon.Badge(mark, Vector2.zero, GoalBadge, HudIcon.Kind.RadarPin, SpeedCameras.Tint, false));
+                    radarLabels.Add(GoalLabel(mark, SpeedCameras.Tint));
                 }
             if (game.Stunts)
                 foreach (var s in game.Stunts.All)
                 {
                     var mark = Box(content, "Stunt_" + s.data.id, new Vector2(0.5f, 0.5f), Local(s.lip.x, s.lip.z), new Vector2(10f, 10f));
-                    Diamond(mark, 14f, Ink);
-                    stuntDots.Add(Diamond(mark, 9.5f, StuntJumps.Tint));
-                    stuntLabels.Add(GoalLabel(mark));
+                    stuntChecks.Add(HudIcon.Badge(mark, Vector2.zero, GoalBadge, HudIcon.Kind.RampPin, StuntJumps.Tint, true));
+                    stuntLabels.Add(GoalLabel(mark, StuntJumps.Tint));
                 }
         }
 
-        Text GoalLabel(RectTransform mark)
+        Text GoalLabel(RectTransform mark, Color tint)
         {
-            var label = MapLabel(mark, 17, TextAnchor.MiddleLeft, Color.white, new Vector2(14f, 0f), FontStyle.BoldAndItalic);
+            var label = MapLabel(mark, 17, TextAnchor.MiddleLeft, tint, new Vector2(GoalBadge * 0.5f + 9f, 0f), FontStyle.BoldAndItalic);
             label.rectTransform.pivot = new Vector2(0f, 0.5f);
             fixedSize.Add(mark);
-            AddName(label, mark, 5, RaceNameZoom, 18f, true);
+            AddName(label, mark, 5, RaceNameZoom, GoalBadge + 4f, true);
             return label;
         }
 
-        /// <summary>État des objectifs : leur couleur avec ce qu'il faut atteindre, vert avec le record une fois réussis.</summary>
+        /// <summary>
+        /// État des objectifs : la pastille garde sa couleur ; une coche verte s'y ajoute une fois réussi, et l'étiquette
+        /// passe de ce qu'il faut atteindre au record.
+        /// </summary>
         void RefreshGoals()
         {
             if (game.Radars)
             {
                 var all = game.Radars.All;
-                for (int i = 0; i < radarDots.Count && i < all.Count; i++)
+                for (int i = 0; i < radarChecks.Count && i < all.Count; i++)
                 {
                     var r = all[i];
-                    Color tint = r.done ? SpeedCameras.DoneTint : SpeedCameras.Tint;
-                    radarDots[i].color = tint;
-                    radarLabels[i].color = tint;
+                    if (radarChecks[i].activeSelf != r.done) radarChecks[i].SetActive(r.done);
                     radarLabels[i].text = r.done
                         ? Loc.F($"{r.Name}  ·  record {r.best:0} km/h", $"{r.Name}  ·  best {r.best:0} km/h")
                         : Loc.F($"{r.Name}  ·  {r.Target:0} km/h");
@@ -1157,12 +1157,10 @@ namespace ChillRoad
             if (game.Stunts)
             {
                 var all = game.Stunts.All;
-                for (int i = 0; i < stuntDots.Count && i < all.Count; i++)
+                for (int i = 0; i < stuntChecks.Count && i < all.Count; i++)
                 {
                     var s = all[i];
-                    Color tint = s.done ? StuntJumps.DoneTint : StuntJumps.Tint;
-                    stuntDots[i].color = tint;
-                    stuntLabels[i].color = tint;
+                    if (stuntChecks[i].activeSelf != s.done) stuntChecks[i].SetActive(s.done);
                     stuntLabels[i].text = !s.done ? Loc.F($"{s.Name}  ·  {s.Target:0} m")
                         : s.best > 0f ? Loc.F($"{s.Name}  ·  record {s.best:0} m", $"{s.Name}  ·  best {s.best:0} m")
                         : s.Name;
@@ -1246,29 +1244,11 @@ namespace ChillRoad
             Disc(row, 5f, Color.white, at);
         }
 
-        static void RadarSwatch(RectTransform row)
-        {
-            var at = new Vector2(17f - row.sizeDelta.x * 0.5f, 0f);
-            Disc(row, 18f, Ink, at);
-            Disc(row, 13f, SpeedCameras.Tint, at);
-            Disc(row, 5f, Ink, at);
-        }
+        static void GoalSwatch(RectTransform row, HudIcon.Kind kind, Color tint, bool diamond)
+            => HudIcon.Badge(row, new Vector2(17f - row.sizeDelta.x * 0.5f, 0f), GoalBadge, kind, tint, diamond);
 
-        static void StuntSwatch(RectTransform row)
-        {
-            var at = new Vector2(17f - row.sizeDelta.x * 0.5f, 0f);
-            Diamond(row, 14f, Ink, at);
-            Diamond(row, 9.5f, StuntJumps.Tint, at);
-        }
-
-        static Image Diamond(RectTransform parent, float size, Color color, Vector2? pos = null)
-        {
-            var img = Box(parent, "Diamond", new Vector2(0.5f, 0.5f), pos ?? Vector2.zero, new Vector2(size, size)).gameObject.AddComponent<Image>();
-            img.color = color;
-            img.raycastTarget = false;
-            img.rectTransform.localEulerAngles = new Vector3(0f, 0f, 45f);
-            return img;
-        }
+        static void DoneSwatch(RectTransform row)
+            => HudIcon.Check(row, new Vector2(17f - row.sizeDelta.x * 0.5f, 0f), GoalBadge * 0.7f);
 
         static Image Disc(RectTransform parent, float size, Color color, Vector2? pos = null)
         {

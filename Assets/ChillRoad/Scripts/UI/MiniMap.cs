@@ -11,7 +11,7 @@ namespace ChillRoad
     /// dessinée par Tools/Map/map_minimap.py) et tourné avec la voiture (l'avant toujours en haut). La voiture, flèche noire cerclée de
     /// blanc, est un peu sous le centre pour voir plus loin devant ; le champ s'élargit avec la vitesse. Pas de
     /// circulation affichée ; autres joueurs en flèches grises (posées sur le bord quand ils sont hors champ), nord sur le
-    /// bord du disque. Tremplins (losanges) et radars (pastilles) à leur place, verts une fois réussis, sauf en course.
+    /// bord du disque. Tremplins (losanges) et radars (pastilles) à pictogramme à leur place, coche verte une fois réussis, sauf en course.
     /// </summary>
     public class MiniMap : MonoBehaviour
     {
@@ -55,8 +55,9 @@ namespace ChillRoad
         MiniMapDisc disc;
         RectTransform north, carMark;
         readonly List<(RectTransform rt, HudArrow fill)> others = new List<(RectTransform, HudArrow)>();
-        readonly List<(RectTransform rt, Image fill)> stuntMarks = new List<(RectTransform, Image)>();
-        readonly List<(RectTransform rt, Image fill)> radarMarks = new List<(RectTransform, Image)>();
+        const float GoalSize = 21f;   // pastille d'un radar ou d'un tremplin
+        readonly List<(RectTransform rt, GameObject check)> stuntMarks = new List<(RectTransform, GameObject)>();
+        readonly List<(RectTransform rt, GameObject check)> radarMarks = new List<(RectTransform, GameObject)>();
         float heading, range = NearRange;
         bool hasHeading;
 
@@ -159,8 +160,8 @@ namespace ChillRoad
                 var all = game.Stunts.All;
                 for (int i = 0; i < all.Count; i++)
                 {
-                    if (i == stuntMarks.Count) stuntMarks.Add(MakeGoal(true));
-                    ShowGoal(stuntMarks[i], goals, ToUi(all[i].lip), all[i].done ? StuntJumps.DoneTint : StuntJumps.Tint);
+                    if (i == stuntMarks.Count) stuntMarks.Add(MakeGoal(HudIcon.Kind.RampPin, StuntJumps.Tint, true));
+                    ShowGoal(stuntMarks[i], goals, ToUi(all[i].lip), all[i].done);
                 }
             }
             if (game.Radars)
@@ -168,8 +169,8 @@ namespace ChillRoad
                 var all = game.Radars.All;
                 for (int i = 0; i < all.Count; i++)
                 {
-                    if (i == radarMarks.Count) radarMarks.Add(MakeGoal(false));
-                    ShowGoal(radarMarks[i], goals, ToUi(all[i].center), all[i].done ? SpeedCameras.DoneTint : SpeedCameras.Tint);
+                    if (i == radarMarks.Count) radarMarks.Add(MakeGoal(HudIcon.Kind.RadarPin, SpeedCameras.Tint, false));
+                    ShowGoal(radarMarks[i], goals, ToUi(all[i].center), all[i].done);
                 }
             }
 
@@ -207,44 +208,25 @@ namespace ChillRoad
             return (rt, fill);
         }
 
-        static void ShowGoal((RectTransform rt, Image fill) mark, bool allowed, Vector2 p, Color color)
+        static void ShowGoal((RectTransform rt, GameObject check) mark, bool allowed, Vector2 p, bool done)
         {
-            float edge = Radius - 9f;
+            float edge = Radius - 12f;
             bool show = allowed && p.sqrMagnitude < edge * edge;
             if (mark.rt.gameObject.activeSelf != show) mark.rt.gameObject.SetActive(show);
             if (!show) return;
             mark.rt.anchoredPosition = p;
-            mark.fill.color = color;
+            if (mark.check.activeSelf != done) mark.check.SetActive(done);
         }
 
-        /// <summary>Repère d'objectif, juste au-dessus de la carte : losange (tremplin) ou pastille à centre noir (radar).</summary>
-        (RectTransform, Image) MakeGoal(bool diamond)
+        /// <summary>
+        /// Repère d'objectif, juste au-dessus de la carte : pastille à pictogramme, ronde (radar) ou en losange (tremplin),
+        /// qui garde sa couleur ; une coche verte s'y ajoute une fois réussi.
+        /// </summary>
+        (RectTransform, GameObject) MakeGoal(HudIcon.Kind kind, Color tint, bool diamond)
         {
-            var rt = Box((RectTransform)transform, "Goal", Vector2.zero, new Vector2(14f, 14f));
+            var rt = Box((RectTransform)transform, "Goal", Vector2.zero, new Vector2(GoalSize, GoalSize));
             rt.SetSiblingIndex(disc.transform.GetSiblingIndex() + 1);
-            Image fill;
-            if (diamond)
-            {
-                GoalLayer(rt, 12f, Black, true);
-                fill = GoalLayer(rt, 8f, White, true);
-            }
-            else
-            {
-                GoalLayer(rt, 14f, Black, false);
-                fill = GoalLayer(rt, 10f, White, false);
-                GoalLayer(rt, 3.5f, Black, false);
-            }
-            return (rt, fill);
-        }
-
-        static Image GoalLayer(RectTransform parent, float size, Color color, bool diamond)
-        {
-            var img = Box(parent, "Layer", Vector2.zero, new Vector2(size, size)).gameObject.AddComponent<Image>();
-            img.color = color;
-            img.raycastTarget = false;
-            if (diamond) img.rectTransform.localEulerAngles = new Vector3(0f, 0f, 45f);
-            else img.sprite = HudArt.Disc;
-            return img;
+            return (rt, HudIcon.Badge(rt, Vector2.zero, GoalSize, kind, tint, diamond));
         }
 
         // ------------------------------------------------------------------ helpers

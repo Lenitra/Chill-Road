@@ -12,7 +12,7 @@ namespace ChillRoad
     /// </summary>
     public class HudIcon : MaskableGraphic
     {
-        public enum Kind { Play, Car, Clock, Gear, Home, Power, Invite, Back, Map, Trophy, Road, Gauge, Ramp, Flag, Coin, Lock, Radar }
+        public enum Kind { Play, Car, Clock, Gear, Home, Power, Invite, Back, Map, Trophy, Road, Gauge, Ramp, Flag, Coin, Lock, Radar, Check, RadarPin, RampPin }
 
         Kind kind;
         Color cut = Color.black;
@@ -201,7 +201,108 @@ namespace ChillRoad
                     Line(fg, new Vector2(0.66f, 0.78f), new Vector2(0.88f, 0.92f), 0.065f);
                     Line(fg, new Vector2(0.66f, 0.5f), new Vector2(0.88f, 0.36f), 0.065f);
                     break;
+
+                case Kind.Check:
+                    // Coche : deux traits épais qui se recouvrent au coude
+                    {
+                        Vector2 a = new Vector2(0.14f, 0.5f), k = new Vector2(0.4f, 0.22f), b = new Vector2(0.88f, 0.76f);
+                        const float w = 0.2f;
+                        Line(fg, a, k + (k - a).normalized * w * 0.5f, w);
+                        Line(fg, k - (b - k).normalized * w * 0.5f, b, w);
+                    }
+                    break;
+
+                case Kind.RadarPin:
+                    // Radar des cartes (petite taille) : boîtier sur un mât court, objectif évidé, trois éclairs du flash
+                    Line(fg, new Vector2(0.38f, 0.08f), new Vector2(0.38f, 0.34f), 0.15f);
+                    Poly(fg, new Vector2(0.08f, 0.3f), new Vector2(0.68f, 0.3f), new Vector2(0.68f, 0.76f), new Vector2(0.08f, 0.76f));
+                    Disc(bg, new Vector2(0.38f, 0.53f), 0.14f, 24);
+                    Disc(fg, new Vector2(0.38f, 0.53f), 0.055f, 16);
+                    Line(fg, new Vector2(0.77f, 0.53f), new Vector2(0.98f, 0.53f), 0.11f);
+                    Line(fg, new Vector2(0.76f, 0.73f), new Vector2(0.94f, 0.88f), 0.11f);
+                    Line(fg, new Vector2(0.76f, 0.33f), new Vector2(0.94f, 0.18f), 0.11f);
+                    break;
+
+                case Kind.RampPin:
+                    // Tremplin des cartes (petite taille) : rampe pleine et trajectoire du saut en trait épais fléché
+                    Poly(fg, new Vector2(0.03f, 0.18f), new Vector2(0.55f, 0.18f), new Vector2(0.55f, 0.56f));
+                    Arc(fg, new Vector2(0.76f, 0.5f), 0.2f, 0.15f, -80f, 95f);
+                    Poly(fg, new Vector2(0.85f, 0.5f), new Vector2(1.07f, 0.5f), new Vector2(0.96f, 0.22f));
+                    break;
             }
+        }
+
+        // ------------------------------------------------------------------ pastilles d'objectifs (carte, minicarte)
+
+        static readonly Color BadgeInk = new Color(0.02f, 0.03f, 0.05f, 0.94f);
+        static readonly Color PictoInk = new Color(0.07f, 0.075f, 0.09f, 1f);
+        /// <summary>Vert de la coche « réussi » : assez soutenu pour porter une coche blanche.</summary>
+        public static readonly Color CheckGreen = new Color(0.16f, 0.7f, 0.3f, 1f);
+
+        /// <summary>
+        /// Pastille d'objectif centrée sur <paramref name="pos"/> : cerne d'encre, disque (ou losange) de sa couleur et
+        /// pictogramme sombre. Sa couleur ne change jamais : la coche verte rendue (masquée) se pose en haut à droite
+        /// une fois l'objectif réussi.
+        /// </summary>
+        public static GameObject Badge(RectTransform parent, Vector2 pos, float size, Kind kind, Color tint, bool diamond)
+        {
+            var root = Node(parent, "Badge", pos, new Vector2(size, size));
+            float border = Mathf.Max(1.6f, size * 0.09f);
+            if (diamond)
+            {
+                float side = size * 0.84f;
+                Layer(root, Vector2.zero, side, BadgeInk, null).rectTransform.localEulerAngles = new Vector3(0f, 0f, 45f);
+                Layer(root, Vector2.zero, side - border * 2f, tint, null).rectTransform.localEulerAngles = new Vector3(0f, 0f, 45f);
+                Picto(root, Vector2.zero, size * 0.6f, kind, tint);
+            }
+            else
+            {
+                Layer(root, Vector2.zero, size, BadgeInk, HudArt.Disc);
+                Layer(root, Vector2.zero, size - border * 2f, tint, HudArt.Disc);
+                Picto(root, Vector2.zero, size * 0.6f, kind, tint);
+            }
+            var check = Check(root, new Vector2(size * 0.4f, size * 0.4f), size * 0.56f);
+            check.SetActive(false);
+            return check;
+        }
+
+        /// <summary>Coche « réussi » : disque vert cerné d'encre, coche blanche.</summary>
+        public static GameObject Check(RectTransform parent, Vector2 pos, float size)
+        {
+            var root = Node(parent, "Done", pos, new Vector2(size, size));
+            Layer(root, Vector2.zero, size, BadgeInk, HudArt.Disc);
+            Layer(root, Vector2.zero, size - Mathf.Max(1.4f, size * 0.14f) * 2f, CheckGreen, HudArt.Disc);
+            Picto(root, new Vector2(0f, -size * 0.02f), size * 0.56f, Kind.Check, CheckGreen).color = Color.white;
+            return root.gameObject;
+        }
+
+        static RectTransform Node(RectTransform parent, string name, Vector2 pos, Vector2 size)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var rt = (RectTransform)go.transform;
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = pos;
+            rt.sizeDelta = size;
+            return rt;
+        }
+
+        static Image Layer(RectTransform parent, Vector2 pos, float size, Color color, Sprite sprite)
+        {
+            var img = Node(parent, "Layer", pos, new Vector2(size, size)).gameObject.AddComponent<Image>();
+            img.sprite = sprite;
+            img.color = color;
+            img.raycastTarget = false;
+            return img;
+        }
+
+        static HudIcon Picto(RectTransform parent, Vector2 pos, float size, Kind kind, Color bg)
+        {
+            var icon = Node(parent, "Icon", pos, new Vector2(size, size)).gameObject.AddComponent<HudIcon>();
+            icon.raycastTarget = false;
+            icon.Shape = kind;
+            icon.SetColors(PictoInk, bg);
+            return icon;
         }
 
         /// <summary>Étoile à cinq branches : pentagone central et cinq pointes (chaque morceau convexe).</summary>
