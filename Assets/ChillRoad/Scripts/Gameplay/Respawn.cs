@@ -6,7 +6,8 @@ namespace ChillRoad
     /// <summary>
     /// Replacement de la voiture sur la route (bouton Y / R, voiture retournée, tombée à l'eau, sous la carte ou
     /// sortie des limites). Rien à payer, mais le combo en cours est perdu (comme après un accident) et l'on perd du
-    /// temps : commandes coupées près de trois secondes, et l'on repart arrêté. En course, retour juste après la dernière porte franchie, chrono en marche.
+    /// temps : commandes coupées près de trois secondes, et l'on repart arrêté (en course, chrono en marche). Aucun
+    /// message : le fondu suffit.
     /// Transition : la voiture freine pendant un fondu au noir, elle est reposée dans le noir (le trafic s'écarte),
     /// puis l'image revient pendant que la caméra descend de haut derrière elle ; on reprend la main un instant après.
     /// Sens de la voiture reposée : celui du parcours en course, celui de l'itinéraire si le GPS en affiche un,
@@ -19,14 +20,12 @@ namespace ChillRoad
         /// <summary>Itinéraire du GPS plus loin que ceci (m) : on se replace sur la route la plus proche, sans lui.</summary>
         const float RouteReach = 400f;
         static readonly Color Night = new Color(0.015f, 0.02f, 0.04f);
-        static readonly Color Tint = new Color(1f, 0.45f, 0.18f);
 
         enum Step { Idle, Out, Dark, In }
 
         GameManager game;
         Step step;
         float t;
-        bool racing;
         CanvasGroup veil;
 
         /// <summary>Replacement en cours (de l'appui jusqu'au retour des commandes).</summary>
@@ -63,7 +62,6 @@ namespace ChillRoad
             if (Busy || !game || game.State != GameManager.Phase.Playing) return;
             var races = game.Races;
             if (races && races.Counting) return;
-            racing = races && races.Running;
             step = Step.Out;
             t = 0f;
             game.SetInputEnabled(false);
@@ -105,7 +103,6 @@ namespace ChillRoad
                         step = Step.In;
                         t = 0f;
                         game.Camera.Respawn(FadeIn + Hold * 0.8f);
-                        Announce();
                     }
                     break;
                 default:
@@ -126,15 +123,9 @@ namespace ChillRoad
             if (game.Local.Audio) game.Local.Audio.RespawnIn();
         }
 
-        void Announce()
-        {
-            if (!game.Hud) return;
-            game.Hud.Announce(Loc.T("REPLACEMENT", "RESPAWN"),
-                racing ? Loc.T("Retour à la dernière porte", "Back to the last gate") : Loc.T("Retour sur la route", "Back on the road"), Tint);
-        }
-
         /// <summary>
-        /// Repose la voiture : en course après la dernière porte franchie ; à l'aéroport (hors du réseau routier),
+        /// Repose la voiture : en course sur le parcours, là où elle en est (entre la dernière porte franchie et la
+        /// suivante) ; à l'aéroport (hors du réseau routier),
         /// redressée sur place ; ailleurs sur la route la plus proche (de l'itinéraire du GPS s'il y en a un), dans sa
         /// voie, dans le sens du parcours, de l'itinéraire ou de la voiture.
         /// </summary>
@@ -142,9 +133,9 @@ namespace ChillRoad
         {
             var car = game.Player;
             Vector3 from = car.transform.position;
-            if (game.Races && game.Races.RespawnPoint(out var gatePos, out var gateDir))
+            if (game.Races && game.Races.RespawnPoint(from, out var coursePos, out var courseDir))
             {
-                Put(gatePos, gateDir, 18f);
+                Put(coursePos, courseDir, 18f);
                 return;
             }
             if (Airfield.Inside(from))

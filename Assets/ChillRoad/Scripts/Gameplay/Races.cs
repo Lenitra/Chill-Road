@@ -625,26 +625,62 @@ namespace ChillRoad
         public bool Counting => mode == Mode.Countdown;
 
         /// <summary>
-        /// Course en cours : point de replacement, sur le parcours (dans la voie) juste après la dernière porte
-        /// franchie, ou au départ si aucune ne l'est encore, et cap du parcours à cet endroit. Le chrono tourne pendant
-        /// le replacement : la distance refaite depuis la porte et le temps perdu sont la pénalité.
+        /// Course en cours : point de replacement sur le parcours (dans la voie), le plus proche de <paramref name="from"/>
+        /// entre la dernière porte franchie et la suivante (jamais au-delà de celle-ci : elle reste à franchir), et cap
+        /// du parcours à cet endroit.
         /// </summary>
-        public bool RespawnPoint(out Vector3 pos, out Vector3 forward)
+        public bool RespawnPoint(Vector3 from, out Vector3 pos, out Vector3 forward)
         {
             pos = forward = Vector3.zero;
-            if (mode != Mode.Running || Active == null || Active.path.Count < 2) return false;
-            var g = next > 0 ? GateOf(next - 1) : Active.start;
+            if (mode != Mode.Running || Active == null || Active.path.Count < 2 || alongPath == null) return false;
             var path = Active.path;
-            // Ligne de la porte ramenée sur le parcours (la porte d'une route de campagne est sur l'axe de la chaussée)
+            int gate = next % Active.gates.Length;
+            float min = gate > 0 ? AlongAt(Active.gates[gate - 1]) : 0f;
+            float max = Mathf.Max(min, AlongAt(Active.gates[gate]) - 3f);
+            int lo = Mathf.Clamp(gate > 0 ? Active.gates[gate - 1].index - 1 : 0, 0, path.Count - 2);
+            int hi = Mathf.Clamp(Active.gates[gate].index, lo, path.Count - 2);
+            float best = float.MaxValue, along = min;
+            for (int i = lo; i <= hi; i++)
+            {
+                Vector3 a = path[i], ab = path[i + 1] - a;
+                float len2 = ab.x * ab.x + ab.z * ab.z;
+                float k = len2 > 1e-4f ? Mathf.Clamp01(((from.x - a.x) * ab.x + (from.z - a.z) * ab.z) / len2) : 0f;
+                Vector3 p = a + ab * k;
+                // Un peu de poids à la hauteur : le bon étage sous un pont
+                float dx = from.x - p.x, dz = from.z - p.z, dy = (from.y - p.y) * 0.5f;
+                float d = dx * dx + dz * dz + dy * dy;
+                if (d < best) { best = d; along = alongPath[i] + (alongPath[i + 1] - alongPath[i]) * k; }
+            }
+            along = Mathf.Clamp(along, min, max);
+            pos = PathPoint(along);
+            forward = PathPoint(along + 4f) - PathPoint(along - 4f);
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 1e-4f) forward = Active.start.forward;
+            forward.Normalize();
+            return true;
+        }
+
+        /// <summary>Distance (m, à plat) du début du parcours à la ligne d'une porte.</summary>
+        float AlongAt(Gate g)
+        {
+            var path = Active.path;
             int i = Mathf.Clamp(g.index, 1, path.Count - 1);
             Vector3 a = path[i - 1], ab = path[i] - a;
             float len2 = ab.x * ab.x + ab.z * ab.z;
             float k = len2 > 1e-4f ? Mathf.Clamp01(((g.pos.x - a.x) * ab.x + (g.pos.z - a.z) * ab.z) / len2) : 0f;
-            forward = g.forward;
-            pos = a + ab * k + forward * 3f;
-            var ground = game.Road.Nearest(pos, 20f);
-            if (ground.Found) pos.y = ground.point.y;
-            return true;
+            return alongPath[i - 1] + (alongPath[i] - alongPath[i - 1]) * k;
+        }
+
+        /// <summary>Point du parcours d'un tour à la distance d (à plat) de son début, bornée au parcours.</summary>
+        Vector3 PathPoint(float d)
+        {
+            var path = Active.path;
+            d = Mathf.Clamp(d, 0f, alongPath[alongPath.Length - 1]);
+            int i = Array.BinarySearch(alongPath, d);
+            if (i < 0) i = ~i;
+            i = Mathf.Clamp(i, 1, path.Count - 1);
+            float seg = alongPath[i] - alongPath[i - 1];
+            return seg > 1e-4f ? Vector3.Lerp(path[i - 1], path[i], (d - alongPath[i - 1]) / seg) : path[i];
         }
 
         void UpdateCountdown(VehicleController car, Vector3 pos, bool menu, float dt)
