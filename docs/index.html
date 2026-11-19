@@ -4,11 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chill Road</title>
-<meta name="description" content="Chill Road : un jeu de conduite low-poly en monde ouvert dans une vallée alpine. Téléchargement gratuit pour Windows.">
+<meta name="description" content="Chill Road : un jeu de conduite low-poly en monde ouvert dans une vallée alpine. Téléchargement gratuit pour Windows." data-en-content="Chill Road: a low-poly open-world driving game in an alpine valley. Free download for Windows.">
 <meta property="og:title" content="Chill Road">
 <meta property="og:description" content="Une vallée alpine, un col, des lacets : roule à ton rythme. Jeu de conduite low-poly gratuit pour Windows.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
+<link rel="alternate" hreflang="fr" href="https://lenitra.github.io/Chill-Road/?lang=fr">
+<link rel="alternate" hreflang="en" href="https://lenitra.github.io/Chill-Road/?lang=en">
 <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="img/logo-192.png">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
@@ -77,6 +79,11 @@
   nav.links a:hover { color: var(--text); background: var(--pill); }
   nav.links a.cta { color: var(--ink); background: var(--gold); font-weight: 600; }
   nav.links a.cta:hover { box-shadow: 0 0 0 5px var(--gold-halo); }
+  .lang { display: inline-flex; margin-left: 4px; padding: 3px; border-radius: 999px; background: var(--pill); }
+  .lang button { border: 0; background: none; color: var(--dim); font: 500 13px/1 "Inter", sans-serif; letter-spacing: .08em;
+    padding: 9px 12px; border-radius: 999px; cursor: pointer; }
+  .lang button:hover { color: var(--text); }
+  .lang button[aria-pressed="true"] { background: rgba(255, 255, 255, .9); color: var(--ink); }
 
   /* ---------- buttons (pilules du jeu) ---------- */
   .btn {
@@ -127,13 +134,14 @@
   .stat span { display: block; margin-top: 8px; color: var(--dim); font-size: 15px; }
 
   /* ---------- tuiles (comme les tuiles du menu pause) ---------- */
-  .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .gallery { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-flow: dense; gap: 14px; }
   .shot {
     position: relative; margin: 0; overflow: hidden; background: #151a21; cursor: zoom-in; padding: 0; text-align: left;
     color: inherit; font: inherit; aspect-ratio: 16 / 9; border-radius: 24px; border: 1px solid var(--edge);
     transition: border-color .15s, box-shadow .15s;
   }
   .shot.feat { grid-column: span 2; grid-row: span 2; aspect-ratio: auto; border-radius: 30px; }
+  .shot.feat-r { grid-column: 2 / span 2; }
   .shot img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s ease; }
   .shot:hover, .shot:focus-visible { border-color: var(--gold); box-shadow: 0 0 0 6px var(--gold-halo); outline: none; }
   .shot:hover img { transform: scale(1.03); }
@@ -144,14 +152,9 @@
     opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s;
   }
   .shot figcaption small { display: block; margin-top: 3px; font-size: 13px; font-weight: 300; color: var(--dim); }
-  .shot:hover figcaption, .shot:focus-visible figcaption, .shot.feat figcaption, .menus .shot figcaption { opacity: 1; transform: none; }
+  .shot:hover figcaption, .shot:focus-visible figcaption, .shot.feat figcaption { opacity: 1; transform: none; }
   .shot.feat figcaption { left: 14px; right: auto; bottom: 14px; padding: 14px 22px; font-size: 22px; }
 
-  /* Menus : même grille que le menu pause, une grande tuile et quatre petites */
-  .menus { display: grid; grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 14px; }
-  .menus .shot.feat { grid-column: 1; grid-row: 1 / span 2; aspect-ratio: 16 / 9; }
-  .menus .shot:not(.feat) figcaption { left: 8px; right: auto; bottom: 8px; padding: 8px 14px; border-radius: 12px; font-size: 14px; }
-  .menus .shot:not(.feat) figcaption small { display: none; }
 
   /* ---------- download ---------- */
   .dl { padding: 40px 48px; border-radius: 34px; display: grid; grid-template-columns: 1fr auto; gap: 16px 40px; align-items: center; }
@@ -182,9 +185,8 @@
     .stats { grid-template-columns: 1fr 1fr; }
     .gallery { grid-template-columns: 1fr 1fr; }
     .shot.feat { grid-row: auto; aspect-ratio: 16 / 9; }
+    .shot.feat-r { grid-column: span 2; }
     .shot figcaption { opacity: 1; transform: none; }
-    .menus { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
-    .menus .shot.feat { grid-column: span 2; grid-row: auto; }
     .head { display: block; }
     .head p { text-align: left; margin-top: 10px; }
     .dl { grid-template-columns: 1fr; padding: 32px 26px; }
@@ -196,12 +198,16 @@
     header.top { inset: 12px 0 auto 0; }
     .brand { font-size: 17px; padding-right: 16px; }
     .brand img { width: 34px; height: 34px; }
-    .gallery, .menus { grid-template-columns: 1fr; }
-    .shot.feat, .menus .shot.feat { grid-column: auto; }
+    .gallery { grid-template-columns: 1fr; }
+    .shot.feat, .shot.feat-r { grid-column: auto; }
     section { padding-top: 64px; }
     .title-card { display: block; border-radius: 28px; padding: 24px 22px 26px; }
     .btn { height: 52px; padding: 0 24px; font-size: 17px; }
     .stat b { font-size: 32px; }
+  }
+  @media (max-width: 480px) {
+    .brand { padding: 5px; }
+    .brand span { display: none; }   /* le nom est juste dessous, dans la carte de titre */
   }
 </style>
 </head>
@@ -212,41 +218,43 @@
     <a class="brand glass" href="#"><img src="img/logo-96.png" srcset="img/logo-96.png 1x, img/logo-192.png 2x" width="40" height="40" alt=""><span>CHILL <b>ROAD</b></span></a>
     <nav class="links glass">
       <a href="#images">Images</a>
-      <a href="#menus">Menus</a>
-      <a class="cta" href="#telecharger">Télécharger</a>
+      <a class="cta" href="#telecharger" data-en="Download">Télécharger</a>
+      <span class="lang" role="group" aria-label="Langue / Language">
+        <button type="button" data-lang="fr" aria-pressed="true">FR</button><button type="button" data-lang="en" aria-pressed="false">EN</button>
+      </span>
     </nav>
   </div>
 </header>
 
 <main>
   <div class="hero">
-    <div class="hero-bg"><img src="img/hero.jpg" alt="Une Twingo jaune traverse un village de montagne aux façades colorées"></div>
+    <div class="hero-bg"><img src="img/hero.jpg" alt="Une Twingo jaune traverse un village de montagne aux façades colorées" data-en-alt="A yellow Twingo drives through a mountain village with colourful façades"></div>
     <div class="wrap">
       <div class="title-card glass">
-        <div class="kicker">Balade alpine · Monde ouvert</div>
+        <div class="kicker" data-en="Alpine driving · Open world">Balade alpine · Monde ouvert</div>
         <h1 class="logo">CHILL <span>ROAD</span></h1>
         <div class="bar"><i></i><i></i></div>
-        <p class="tagline">Une vallée alpine, un col, des lacets&nbsp;: roule à ton rythme.</p>
+        <p class="tagline" data-en="An alpine valley, a mountain pass, hairpins: drive at your own pace.">Une vallée alpine, un col, des lacets&nbsp;: roule à ton rythme.</p>
         <div class="actions">
           <a class="btn btn-gold" href="https://github.com/Lenitra/Chill-Road/releases/latest/download/ChillRoad-Windows.zip">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
-            Télécharger
+            <span data-en="Download">Télécharger</span>
           </a>
           <a class="btn btn-ghost glass" href="#images">Images <span class="chev">›</span></a>
         </div>
-        <div class="meta"><b>Gratuit</b> · Windows 10/11 64 bits · zip de 91 Mo · v0.4.0 · 19 novembre 2026 à 22 h 31 · en développement</div>
+        <div class="meta" data-auto="meta"><b>Gratuit</b> · Windows 10/11 64 bits · zip de 91 Mo · v0.4.0 · 19 novembre 2026 à 22 h 31 · en développement</div>
       </div>
     </div>
   </div>
 
   <section id="jeu">
     <div class="wrap">
-      <p class="pitch">Un jeu de conduite low-poly en monde ouvert&nbsp;: choisis ta voiture et pars explorer une vallée alpine, seul ou entre amis.</p>
+      <p class="pitch" data-en="A low-poly open-world driving game: pick your car and explore an alpine valley, alone or with friends.">Un jeu de conduite low-poly en monde ouvert&nbsp;: choisis ta voiture et pars explorer une vallée alpine, seul ou entre amis.</p>
       <div class="stats">
-        <div class="stat glass"><b>55 km</b><span>de routes</span></div>
-        <div class="stat glass"><b>14</b><span>voitures</span></div>
-        <div class="stat glass"><b>24 h</b><span>jour, nuit, orages</span></div>
-        <div class="stat glass"><b>En ligne</b><span>courses entre amis</span></div>
+        <div class="stat glass"><b>55 km</b><span data-en="of roads">de routes</span></div>
+        <div class="stat glass"><b>14</b><span data-en="cars">voitures</span></div>
+        <div class="stat glass"><b>24 h</b><span data-en="day, night, storms">jour, nuit, orages</span></div>
+        <div class="stat glass"><b data-en="Online">En ligne</b><span data-en="races with friends">courses entre amis</span></div>
       </div>
     </div>
   </section>
@@ -254,100 +262,93 @@
   <section id="images">
     <div class="wrap">
       <div class="head">
-        <div><div class="kicker">La vallée</div><h2>Images</h2></div>
-        <p>Villages, cols, autoroute, lac et station de ski, de jour comme sous l’orage.</p>
+        <div><div class="kicker" data-en="The valley and the game">La vallée et le jeu</div><h2>Images</h2></div>
+        <p data-en="Villages, passes, motorway, lake and ski resort, in sunshine or storm, and the menus that set it all from the road.">Villages, cols, autoroute, lac et station de ski, au soleil ou sous l’orage, et les menus qui règlent tout depuis la route.</p>
       </div>
       <div class="gallery">
-        <button class="shot feat" data-full="img/village.jpg" data-cap="Le village du Plan">
-          <img src="img/village_s.jpg" srcset="img/village_s.jpg 800w, img/village.jpg 1600w" sizes="(max-width: 900px) 100vw, 780px" alt="Twingo jaune dans la rue d'un village alpin" loading="lazy">
-          <figcaption>Le village du Plan</figcaption>
+        <button class="shot feat" data-img="village" data-full="img/village.jpg" data-cap="Le village du Plan" data-en-cap="Le Plan village">
+          <img src="img/village_s.jpg" srcset="img/village_s.jpg 800w, img/village.jpg 1600w" sizes="(max-width: 900px) 100vw, 780px" alt="Twingo jaune dans la rue d&#x27;un village alpin" data-en-alt="Yellow Twingo in the street of an alpine village" loading="lazy">
+          <figcaption data-en="Le Plan village">Le village du Plan</figcaption>
         </button>
-        <button class="shot" data-full="img/tunnel.jpg" data-cap="Les tunnels de l’autoroute">
-          <img src="img/tunnel_s.jpg" srcset="img/tunnel_s.jpg 800w, img/tunnel.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Hypercar verte devant un double tunnel" loading="lazy">
-          <figcaption>Les tunnels de l’autoroute</figcaption>
+        <button class="shot" data-img="tunnel" data-full="img/tunnel.jpg" data-cap="Les tunnels de l’autoroute" data-en-cap="The motorway tunnels">
+          <img src="img/tunnel_s.jpg" srcset="img/tunnel_s.jpg 800w, img/tunnel.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Hypercar verte devant un double tunnel" data-en-alt="Green hypercar in front of twin tunnels" loading="lazy">
+          <figcaption data-en="The motorway tunnels">Les tunnels de l’autoroute</figcaption>
         </button>
-        <button class="shot" data-full="img/lacets.jpg" data-cap="La route du col">
-          <img src="img/lacets_s.jpg" srcset="img/lacets_s.jpg 800w, img/lacets.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Voiture blanche sur une route sinueuse dans les alpages, vue du ciel" loading="lazy">
-          <figcaption>La route du col</figcaption>
+        <button class="shot" data-img="lacets" data-full="img/lacets.jpg" data-cap="La route du col" data-en-cap="The mountain pass road">
+          <img src="img/lacets_s.jpg" srcset="img/lacets_s.jpg 800w, img/lacets.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Voiture blanche sur une route sinueuse dans les alpages, vue du ciel" data-en-alt="White car on a winding road through alpine pastures, seen from the sky" loading="lazy">
+          <figcaption data-en="The mountain pass road">La route du col</figcaption>
         </button>
-        <button class="shot" data-full="img/orage.jpg" data-cap="Orage sur l’autoroute">
-          <img src="img/orage_s.jpg" srcset="img/orage_s.jpg 800w, img/orage.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Hypercar sous la pluie sur l’autoroute, avec le compteur et la minicarte" loading="lazy">
-          <figcaption>Orage sur l’autoroute</figcaption>
+        <button class="shot" data-img="accueil" data-en-img data-full="img/accueil.jpg" data-cap="L’écran d’accueil" data-en-cap="The title screen">
+          <img src="img/accueil_s.jpg" srcset="img/accueil_s.jpg 800w, img/accueil.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Écran d’accueil : titre Chill Road, menu Jouer, Multijoueur, Options, et la voiture choisie" data-en-alt="Title screen: Chill Road title, Play, Multiplayer and Options menu, and the chosen car" loading="lazy">
+          <figcaption data-en="The title screen">L’écran d’accueil</figcaption>
         </button>
-        <button class="shot" data-full="img/alpage.jpg" data-cap="Pistes d’alpage">
-          <img src="img/alpage_s.jpg" srcset="img/alpage_s.jpg 800w, img/alpage.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Petite sportive blanche sur un chemin de terre entre les sapins" loading="lazy">
-          <figcaption>Pistes d’alpage</figcaption>
+        <button class="shot" data-img="orage" data-en-img data-full="img/orage.jpg" data-cap="Orage sur l’autoroute" data-en-cap="Storm on the motorway">
+          <img src="img/orage_s.jpg" srcset="img/orage_s.jpg 800w, img/orage.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Hypercar sous la pluie sur l’autoroute, avec le compteur et la minicarte" data-en-alt="Hypercar in the rain on the motorway, with the speedometer and minimap" loading="lazy">
+          <figcaption data-en="Storm on the motorway">Orage sur l’autoroute</figcaption>
         </button>
-        <button class="shot" data-full="img/station.jpg" data-cap="Station des Combes">
-          <img src="img/station_s.jpg" srcset="img/station_s.jpg 800w, img/station.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Voiture blanche sur une route enneigée devant des chalets" loading="lazy">
-          <figcaption>Station des Combes</figcaption>
+        <button class="shot" data-img="alpage" data-full="img/alpage.jpg" data-cap="Pistes d’alpage" data-en-cap="Alpine tracks">
+          <img src="img/alpage_s.jpg" srcset="img/alpage_s.jpg 800w, img/alpage.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Petite sportive blanche sur un chemin de terre entre les sapins" data-en-alt="Small white sports car on a dirt track between fir trees" loading="lazy">
+          <figcaption data-en="Alpine tracks">Pistes d’alpage</figcaption>
         </button>
-        <button class="shot" data-full="img/couchant.jpg" data-cap="Fin de journée aux Granges">
-          <img src="img/couchant_s.jpg" srcset="img/couchant_s.jpg 800w, img/couchant.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Muscle car noire sur une route de vallée en fin de journée" loading="lazy">
-          <figcaption>Fin de journée aux Granges</figcaption>
+        <button class="shot" data-img="station" data-full="img/station.jpg" data-cap="Station des Combes" data-en-cap="Les Combes ski resort">
+          <img src="img/station_s.jpg" srcset="img/station_s.jpg 800w, img/station.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Voiture blanche sur une route enneigée devant des chalets" data-en-alt="White car on a snowy road in front of chalets" loading="lazy">
+          <figcaption data-en="Les Combes ski resort">Station des Combes</figcaption>
         </button>
-        <button class="shot" data-full="img/peel.jpg" data-cap="Peel P50, 49 cm³">
-          <img src="img/peel_s.jpg" srcset="img/peel_s.jpg 800w, img/peel.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Minuscule voiture bleue à trois roues sur une route de campagne" loading="lazy">
-          <figcaption>Peel P50, 49 cm³</figcaption>
+        <button class="shot" data-img="couchant" data-full="img/couchant.jpg" data-cap="Fin de journée aux Granges" data-en-cap="Evening at Les Granges">
+          <img src="img/couchant_s.jpg" srcset="img/couchant_s.jpg 800w, img/couchant.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Muscle car noire sur une route de vallée en fin de journée" data-en-alt="Black muscle car on a valley road at the end of the day" loading="lazy">
+          <figcaption data-en="Evening at Les Granges">Fin de journée aux Granges</figcaption>
         </button>
-        <button class="shot" data-full="img/col.jpg" data-cap="En montée vers le col">
-          <img src="img/col_s.jpg" srcset="img/col_s.jpg 800w, img/col.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Coupé dans un virage de montagne en fin de journée, avec le compteur et la minicarte" loading="lazy">
-          <figcaption>En montée vers le col</figcaption>
+        <button class="shot feat feat-r" data-img="menu_pause" data-en-img data-full="img/menu_pause.jpg" data-cap="Le menu pause" data-en-cap="The pause menu">
+          <img src="img/menu_pause_s.jpg" srcset="img/menu_pause_s.jpg 800w, img/menu_pause.jpg 1600w" sizes="(max-width: 900px) 100vw, 780px" alt="Menu pause : grande tuile de la carte, tuiles Voiture, Options, Heure et météo et Succès" data-en-alt="Pause menu: big map tile, Car, Options, Time and weather and Achievements tiles" loading="lazy">
+          <figcaption data-en="The pause menu&lt;small&gt;Map, car, options, time and weather, achievements&lt;/small&gt;">Le menu pause<small>Carte, voiture, options, heure et météo, succès</small></figcaption>
         </button>
-        <button class="shot" data-full="img/delorean.jpg" data-cap="Balade en DeLorean">
-          <img src="img/delorean_s.jpg" srcset="img/delorean_s.jpg 800w, img/delorean.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="DeLorean sur une route de montagne" loading="lazy">
-          <figcaption>Balade en DeLorean</figcaption>
+        <button class="shot" data-img="menu_carte" data-en-img data-full="img/menu_carte.jpg" data-cap="La carte et le GPS" data-en-cap="The map and GPS">
+          <img src="img/menu_carte_s.jpg" srcset="img/menu_carte_s.jpg 800w, img/menu_carte.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Carte du massif avec la légende, les courses, les radars et les tremplins" data-en-alt="Map of the massif with the legend, races, speed cameras and ramps" loading="lazy">
+          <figcaption data-en="The map and GPS">La carte et le GPS</figcaption>
         </button>
-        <button class="shot" data-full="img/lac.jpg" data-cap="Le viaduc du lac">
-          <img src="img/lac_s.jpg" srcset="img/lac_s.jpg 800w, img/lac.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Long viaduc d’autoroute au-dessus d’un lac bleu" loading="lazy">
-          <figcaption>Le viaduc du lac</figcaption>
+        <button class="shot" data-img="menu_meteo" data-en-img data-full="img/menu_meteo.jpg" data-cap="Heure et météo, en direct" data-en-cap="Time and weather, live">
+          <img src="img/menu_meteo_s.jpg" srcset="img/menu_meteo_s.jpg 800w, img/menu_meteo.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Réglage de l’heure sur une frise de 24 heures et choix de la météo, la scène derrière en aperçu" data-en-alt="Setting the time on a 24-hour timeline and choosing the weather, with the scene behind as a live preview" loading="lazy">
+          <figcaption data-en="Time and weather, live">Heure et météo, en direct</figcaption>
         </button>
-        <button class="shot" data-full="img/soir.jpg" data-cap="Le village le soir">
-          <img src="img/soir_s.jpg" srcset="img/soir_s.jpg 800w, img/soir.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Twingo dans une rue de village éclairée à la tombée de la nuit" loading="lazy">
-          <figcaption>Le village le soir</figcaption>
+        <button class="shot" data-img="peel" data-full="img/peel.jpg" data-cap="Peel P50, 49 cm³" data-en-cap="Peel P50, 49 cc">
+          <img src="img/peel_s.jpg" srcset="img/peel_s.jpg 800w, img/peel.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Minuscule voiture bleue à trois roues sur une route de campagne" data-en-alt="Tiny blue three-wheeler on a country road" loading="lazy">
+          <figcaption data-en="Peel P50, 49 cc">Peel P50, 49 cm³</figcaption>
         </button>
-        <button class="shot" data-full="img/ami.jpg" data-cap="Citroën Ami">
-          <img src="img/ami_s.jpg" srcset="img/ami_s.jpg 800w, img/ami.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Petite voiture électrique bleu clair devant la concession" loading="lazy">
-          <figcaption>Citroën Ami</figcaption>
+        <button class="shot" data-img="col" data-en-img data-full="img/col.jpg" data-cap="En montée vers le col" data-en-cap="Climbing to the pass">
+          <img src="img/col_s.jpg" srcset="img/col_s.jpg 800w, img/col.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Coupé dans un virage de montagne en fin de journée, avec le compteur et la minicarte" data-en-alt="Coupe in a mountain bend at the end of the day, with the speedometer and minimap" loading="lazy">
+          <figcaption data-en="Climbing to the pass">En montée vers le col</figcaption>
         </button>
-        <button class="shot" data-full="img/echangeur.jpg" data-cap="Un échangeur vu du ciel">
-          <img src="img/echangeur_s.jpg" srcset="img/echangeur_s.jpg 800w, img/echangeur.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Échangeur d’autoroute vu du dessus" loading="lazy">
-          <figcaption>Un échangeur vu du ciel</figcaption>
+        <button class="shot" data-img="delorean" data-full="img/delorean.jpg" data-cap="Balade en DeLorean" data-en-cap="A ride in the DeLorean">
+          <img src="img/delorean_s.jpg" srcset="img/delorean_s.jpg 800w, img/delorean.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="DeLorean sur une route de montagne" data-en-alt="DeLorean on a mountain road" loading="lazy">
+          <figcaption data-en="A ride in the DeLorean">Balade en DeLorean</figcaption>
         </button>
-        <button class="shot" data-full="img/carte.jpg" data-cap="La carte du massif">
-          <img src="img/carte_s.jpg" srcset="img/carte_s.jpg 800w, img/carte.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Carte de la vallée avec l’autoroute en boucle, le lac et les cols" loading="lazy">
-          <figcaption>La carte du massif</figcaption>
+        <button class="shot" data-img="menu_garage" data-en-img data-full="img/menu_garage.jpg" data-cap="Le garage" data-en-cap="The garage">
+          <img src="img/menu_garage_s.jpg" srcset="img/menu_garage_s.jpg 800w, img/menu_garage.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Garage du chalet : voiture sur son plateau, fiche technique et vignettes des voitures" data-en-alt="Chalet garage: car on its turntable, specs card and car thumbnails" loading="lazy">
+          <figcaption data-en="The garage">Le garage</figcaption>
         </button>
-      </div>
-    </div>
-  </section>
-
-  <section id="menus">
-    <div class="wrap">
-      <div class="head">
-        <div><div class="kicker">L’interface</div><h2>Menus</h2></div>
-        <p>Carte, garage, tuning, heure et météo&nbsp;: tout se règle depuis le menu pause, sans quitter la route.</p>
-      </div>
-      <div class="menus">
-        <button class="shot feat" data-full="img/menu_pause.jpg" data-cap="Le menu pause">
-          <img src="img/menu_pause_s.jpg" srcset="img/menu_pause_s.jpg 800w, img/menu_pause.jpg 1600w" sizes="(max-width: 900px) 100vw, 600px" alt="Menu pause : grande tuile de la carte, tuiles Voiture, Options, Heure et météo et Succès" loading="lazy">
-          <figcaption>Le menu pause<small>Carte, voiture, options, heure et météo, succès</small></figcaption>
+        <button class="shot" data-img="lac" data-full="img/lac.jpg" data-cap="Le viaduc du lac" data-en-cap="The lake viaduct">
+          <img src="img/lac_s.jpg" srcset="img/lac_s.jpg 800w, img/lac.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Long viaduc d’autoroute au-dessus d’un lac bleu" data-en-alt="Long motorway viaduct over a blue lake" loading="lazy">
+          <figcaption data-en="The lake viaduct">Le viaduc du lac</figcaption>
         </button>
-        <button class="shot" data-full="img/menu_carte.jpg" data-cap="La carte et le GPS">
-          <img src="img/menu_carte_s.jpg" srcset="img/menu_carte_s.jpg 800w, img/menu_carte.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 290px" alt="Carte du massif avec la légende, les courses, les radars et les tremplins" loading="lazy">
-          <figcaption>Carte<small>Courses, radars, tremplins, GPS</small></figcaption>
+        <button class="shot" data-img="soir" data-full="img/soir.jpg" data-cap="Le village le soir" data-en-cap="The village at night">
+          <img src="img/soir_s.jpg" srcset="img/soir_s.jpg 800w, img/soir.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Twingo dans une rue de village éclairée à la tombée de la nuit" data-en-alt="Twingo in a lit village street at nightfall" loading="lazy">
+          <figcaption data-en="The village at night">Le village le soir</figcaption>
         </button>
-        <button class="shot" data-full="img/menu_meteo.jpg" data-cap="Heure et météo">
-          <img src="img/menu_meteo_s.jpg" srcset="img/menu_meteo_s.jpg 800w, img/menu_meteo.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 290px" alt="Réglage de l’heure sur une frise de 24 heures et choix de la météo, la scène derrière en aperçu" loading="lazy">
-          <figcaption>Heure et météo<small>Aperçu en direct</small></figcaption>
+        <button class="shot" data-img="menu_tuning" data-en-img data-full="img/menu_tuning.jpg" data-cap="Le tuning" data-en-cap="Tuning">
+          <img src="img/menu_tuning_s.jpg" srcset="img/menu_tuning_s.jpg 800w, img/menu_tuning.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Atelier de tuning : liste des pièces et fiche des performances" data-en-alt="Tuning shop: parts list and performance card" loading="lazy">
+          <figcaption data-en="Tuning">Le tuning</figcaption>
         </button>
-        <button class="shot" data-full="img/menu_garage.jpg" data-cap="Le garage">
-          <img src="img/menu_garage_s.jpg" srcset="img/menu_garage_s.jpg 800w, img/menu_garage.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 290px" alt="Garage du chalet : voiture sur son plateau, fiche technique et vignettes des voitures" loading="lazy">
-          <figcaption>Garage<small>Change de voiture</small></figcaption>
+        <button class="shot" data-img="ami" data-full="img/ami.jpg" data-cap="Citroën Ami" data-en-cap="Citroën Ami">
+          <img src="img/ami_s.jpg" srcset="img/ami_s.jpg 800w, img/ami.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Petite voiture électrique bleu clair devant la concession" data-en-alt="Small light-blue electric car in front of the dealership" loading="lazy">
+          <figcaption data-en="Citroën Ami">Citroën Ami</figcaption>
         </button>
-        <button class="shot" data-full="img/menu_tuning.jpg" data-cap="Le tuning">
-          <img src="img/menu_tuning_s.jpg" srcset="img/menu_tuning_s.jpg 800w, img/menu_tuning.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 290px" alt="Atelier de tuning : liste des pièces et fiche des performances" loading="lazy">
-          <figcaption>Tuning<small>Pièces, peinture, cosmétique</small></figcaption>
+        <button class="shot" data-img="echangeur" data-full="img/echangeur.jpg" data-cap="Un échangeur vu du ciel" data-en-cap="An interchange from the sky">
+          <img src="img/echangeur_s.jpg" srcset="img/echangeur_s.jpg 800w, img/echangeur.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Échangeur d’autoroute vu du dessus" data-en-alt="Motorway interchange seen from above" loading="lazy">
+          <figcaption data-en="An interchange from the sky">Un échangeur vu du ciel</figcaption>
+        </button>
+        <button class="shot" data-img="carte" data-full="img/carte.jpg" data-cap="La carte du massif" data-en-cap="The map of the massif">
+          <img src="img/carte_s.jpg" srcset="img/carte_s.jpg 800w, img/carte.jpg 1600w" sizes="(max-width: 560px) 100vw, (max-width: 900px) 50vw, 380px" alt="Carte de la vallée avec l’autoroute en boucle, le lac et les cols" data-en-alt="Map of the valley with the motorway loop, the lake and the passes" loading="lazy">
+          <figcaption data-en="The map of the massif">La carte du massif</figcaption>
         </button>
       </div>
     </div>
@@ -359,15 +360,15 @@
         <img src="img/couchant_s.jpg" alt="" loading="lazy">
         <div class="dl glass">
           <div>
-            <div class="kicker">Télécharger</div>
-            <h2>Gratuit, pour Windows</h2>
-            <p class="dl-meta">Version 0.4.0 · 91 Mo · Windows 10/11 64 bits</p>
+            <div class="kicker" data-en="Download">Télécharger</div>
+            <h2 data-en="Free, for Windows">Gratuit, pour Windows</h2>
+            <p class="dl-meta" data-auto="dl">Version 0.4.0 · 91 Mo · Windows 10/11 64 bits</p>
           </div>
           <a class="btn btn-gold" href="https://github.com/Lenitra/Chill-Road/releases/latest/download/ChillRoad-Windows.zip">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></svg>
-            Télécharger
+            <span data-en="Download">Télécharger</span>
           </a>
-          <p class="note">Décompresse le zip et lance <kbd>Chill Road.exe</kbd>. Si Windows bloque le lancement&nbsp;: <b>Informations complémentaires</b> → <b>Exécuter quand même</b>.</p>
+          <p class="note" data-en="Unzip the archive and run &lt;kbd&gt;Chill Road.exe&lt;/kbd&gt;. If Windows blocks it: &lt;b&gt;More info&lt;/b&gt; → &lt;b&gt;Run anyway&lt;/b&gt;.">Décompresse le zip et lance <kbd>Chill Road.exe</kbd>. Si Windows bloque le lancement&nbsp;: <b>Informations complémentaires</b> → <b>Exécuter quand même</b>.</p>
         </div>
       </div>
     </div>
@@ -376,22 +377,83 @@
 
 <footer>
   <div class="wrap">
-    <span>Chill Road · un projet de TauMah, réalisé avec l’IA (Claude, via Claude Code).</span>
-    <span>v0.4.0 · 19 novembre 2026 à 22 h 31</span>
+    <span data-en="Chill Road · a project by TauMah, made with AI (Claude, via Claude Code).">Chill Road · un projet de TauMah, réalisé avec l’IA (Claude, via Claude Code).</span>
+    <span data-auto="foot">v0.4.0 · 19 novembre 2026 à 22 h 31</span>
   </div>
 </footer>
 
-<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Image agrandie">
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Image agrandie" data-en-label="Enlarged image">
   <img alt="">
   <p></p>
 </div>
 
 <script>
-  const box = document.getElementById('lightbox');
+  // Langue : ?lang=, sinon le dernier choix, sinon la langue du navigateur. Le français est dans la page ; l'anglais
+  // vient des attributs data-en*. Version, taille et date (mises à jour par le script de publication en français) sont
+  // traduites à la volée.
+  const MONTHS = { janvier: 'January', 'février': 'February', mars: 'March', avril: 'April', mai: 'May', juin: 'June', juillet: 'July',
+    'août': 'August', septembre: 'September', octobre: 'October', novembre: 'November', 'décembre': 'December' };
+  function enDate(fr) {
+    const m = fr.match(/(\d{1,2}) ([^\s]+) (\d{4})(?: à (\d{1,2}) h (\d{2}))?/);
+    return m ? `${MONTHS[m[2]] || m[2]} ${m[1]}, ${m[3]}` : fr;
+  }
+  const AUTO = {
+    meta: fr => {
+      const size = (fr.match(/zip de (\d+) Mo/) || [])[1], ver = (fr.match(/v(\d+\.\d+\.\d+)/) || [])[1];
+      const date = (fr.match(/v\d+\.\d+\.\d+ · ([^·]+)/) || [])[1] || '';
+      return `<b>Free</b> · Windows 10/11 64-bit · ${size} MB zip · v${ver} · ${enDate(date.trim())} · in development`;
+    },
+    dl: fr => {
+      const m = fr.match(/Version (\d+\.\d+\.\d+) · (\d+) Mo/);
+      return m ? `Version ${m[1]} · ${m[2]} MB · Windows 10/11 64-bit` : fr;
+    },
+    foot: fr => {
+      const m = fr.match(/v(\d+\.\d+\.\d+) · (.*)/);
+      return m ? `v${m[1]} · ${enDate(m[2])}` : fr;
+    },
+  };
+  const texts = [...document.querySelectorAll('[data-en], [data-auto]')].map(el => ({ el, fr: el.innerHTML }));
+  const alts = [...document.querySelectorAll('[data-en-alt]')].map(el => ({ el, fr: el.alt }));
+  const shots = [...document.querySelectorAll('.shot')];
+  shots.forEach(b => b.dataset.frCap = b.dataset.cap);
+  const desc = document.querySelector('meta[name=description]'), descFr = desc.content;
+  const box = document.getElementById('lightbox'), boxLabelFr = box.getAttribute('aria-label');
+
+  function setLang(lang) {
+    const en = lang === 'en';
+    document.documentElement.lang = lang;
+    desc.content = en ? desc.dataset.enContent : descFr;
+    box.setAttribute('aria-label', en ? box.dataset.enLabel : boxLabelFr);
+    texts.forEach(({ el, fr }) => {
+      el.innerHTML = !en ? fr : el.dataset.auto ? AUTO[el.dataset.auto](fr) : el.dataset.en;
+    });
+    alts.forEach(({ el, fr }) => { el.alt = en ? el.dataset.enAlt : fr; });
+    shots.forEach(b => {
+      b.dataset.cap = en ? b.dataset.enCap : b.dataset.frCap;
+      // Captures de l'interface : version anglaise du jeu
+      if (b.hasAttribute('data-en-img')) {
+        const n = b.dataset.img, s = en ? '_en' : '';
+        const img = b.querySelector('img');
+        img.srcset = `img/${n}${s}_s.jpg 800w, img/${n}${s}.jpg 1600w`;
+        img.src = `img/${n}${s}_s.jpg`;
+        b.dataset.full = `img/${n}${s}.jpg`;
+      }
+    });
+    document.querySelectorAll('.lang button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.lang === lang)));
+    try { localStorage.setItem('chillroad_site_lang', lang); } catch (e) {}
+  }
+  let start = new URLSearchParams(location.search).get('lang');
+  if (start !== 'fr' && start !== 'en') {
+    try { start = localStorage.getItem('chillroad_site_lang'); } catch (e) { start = null; }
+  }
+  if (start !== 'fr' && start !== 'en') start = (navigator.languages || [navigator.language || 'fr']).some(l => /^fr/i.test(l)) ? 'fr' : 'en';
+  if (start === 'en') setLang('en');
+  document.querySelectorAll('.lang button').forEach(x => x.addEventListener('click', () => setLang(x.dataset.lang)));
+
   const boxImg = box.querySelector('img');
   const boxCap = box.querySelector('p');
   let opener = null;
-  document.querySelectorAll('.shot').forEach(b => b.addEventListener('click', () => {
+  shots.forEach(b => b.addEventListener('click', () => {
     opener = b;
     boxImg.src = b.dataset.full;
     boxImg.alt = b.querySelector('img').alt;
