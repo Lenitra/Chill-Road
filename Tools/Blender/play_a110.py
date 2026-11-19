@@ -4,7 +4,7 @@ pas validée, pour qu'aucun export groupé ne la pose dans le jeu.
 
 Repères de la vraie voiture : 3,85 m de long, 1,13 m de haut, 2,10 m d'empattement, nez plongeant, quatre phares ronds,
 pare-chocs chromés en deux lames, deux longue-portée, grande lunette enveloppante, ouïes de custode, moteur en porte-à-
-faux arrière (propulsion). Livrée bleu Alpine, ronds de course blancs sans numéro (pas de texte dans la DA).
+faux arrière (propulsion). Livrée bleu Alpine unie (sans ronds de course ni texte).
 """
 import math
 from mathutils import Vector
@@ -73,16 +73,12 @@ def a110_details(c):
         limb(c, (xs - 0.05, y, 0.348), (xs + 0.045, y, 0.348), 0.083, 'chrome', n=18, name="RallyLampPot")
         limb(c, (xs + 0.045, y, 0.348), (xs + 0.052, y, 0.348), 0.072, 'yellow', n=18, name="RallyLamp")
         limb(c, (xs + 0.052, y, 0.348), (xs + 0.056, y, 0.348), 0.036, 'led', n=12, name="RallyLampCore")
-    # ---- capot : joint du capot, deux sangles de rallye, rond de course
+    # ---- capot : joint du capot, deux sangles de rallye
     c.decal(band([(0.55, 0.44), (1.05, 0.475), (1.40, 0.43), (1.60, 0.31), (1.70, 0.15), (1.725, 0.0)], -0.004, 0.004),
             'top', 'trim', offset=0.004, name="HoodSeam", min_facing=0.25)
     c.decal(band([(1.56, 0.20), (1.70, 0.155)], -0.013, 0.013), 'top', 'black', offset=0.008, name="HoodStrap",
             min_facing=0.2)
-    c.decal(ellipse(1.13, 0.0, 0.25, 0.20, n=24), 'top', 'white', mirror=False, offset=0.005, name="HoodRoundel",
-            min_facing=0.3)
-    # ---- flancs : rond de course sur la porte, bandeau jaune sur l'aile, rétroviseurs, élargisseurs d'ailes
-    c.decal(ellipse(0.14, 0.50, 0.165, 0.165, n=24), 'side', 'white', offset=0.005, name="DoorRoundel",
-            min_facing=0.15)
+    # ---- flancs : bandeau jaune sur l'aile, rétroviseurs, élargisseurs d'ailes
     c.decal(rect(0.66, 0.625, 0.84, 0.66), 'side', 'yellow', offset=0.005, name="FenderStripe", min_facing=0.15)
     for sy in (1, -1):                                               # petits rétroviseurs ronds sur la porte
         xm, zm = 0.50, 0.835
