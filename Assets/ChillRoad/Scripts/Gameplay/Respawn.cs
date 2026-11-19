@@ -5,8 +5,8 @@ namespace ChillRoad
 {
     /// <summary>
     /// Replacement de la voiture sur la route (bouton Y / R, voiture retournée, tombée à l'eau, sous la carte ou
-    /// sortie des limites). La seule pénalité est le temps (rien à payer, combo gardé) : commandes coupées près de
-    /// trois secondes, et l'on repart arrêté. En course, retour juste après la dernière porte franchie, chrono en marche.
+    /// sortie des limites). Rien à payer, mais le combo en cours est perdu (comme après un accident) et l'on perd du
+    /// temps : commandes coupées près de trois secondes, et l'on repart arrêté. En course, retour juste après la dernière porte franchie, chrono en marche.
     /// Transition : la voiture freine pendant un fondu au noir, elle est reposée dans le noir (le trafic s'écarte),
     /// puis l'image revient pendant que la caméra descend de haut derrière elle ; on reprend la main un instant après.
     /// Sens de la voiture reposée : celui du parcours en course, celui de l'itinéraire si le GPS en affiche un,
@@ -67,6 +67,8 @@ namespace ChillRoad
             step = Step.Out;
             t = 0f;
             game.SetInputEnabled(false);
+            // Le combo en jeu (cagnotte, drift, vitesse) est perdu
+            game.Score.Forfeit(Loc.T("REPLACEMENT", "RESPAWN"));
             if (game.Local.Audio) game.Local.Audio.RespawnOut();
             GamepadRumble.Kick(0.25f, 0.1f, 0.25f);
             if (veil) veil.gameObject.SetActive(true);

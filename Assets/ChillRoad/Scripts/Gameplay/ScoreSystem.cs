@@ -393,6 +393,19 @@ namespace ChillRoad
             Protect(1.5f);
         }
 
+        /// <summary>
+        /// Voiture replacée sur la route : tout ce qui est en jeu (cagnotte, drift, vitesse) est perdu, comme après
+        /// un accident.
+        /// </summary>
+        public void Forfeit(string reason)
+        {
+            float lost = AtStake;
+            ResetCombo();
+            passes.Clear();
+            if (lost >= 1f) Lost?.Invoke(lost, reason);
+            Protect(2f);
+        }
+
         /// <summary>Fin de partie (retour au menu, quitter) : ce qui est en jeu est encaissé, sans annonce.</summary>
         public void SaveBest()
         {
