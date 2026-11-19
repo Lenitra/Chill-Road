@@ -114,6 +114,9 @@ namespace ChillRoad
             var traffic = AddSlider(play, "Densité du trafic", "Traffic density", 0.2f, 2f, 18, () => GameSettings.TrafficDensity, v => GameSettings.TrafficDensity = v, Percent);
             var rain = AddSlider(play, "Probabilité de pluie", "Rain probability", 0f, 1f, 20, () => GameSettings.RainChance, v => GameSettings.RainChance = v, v => v < 0.01f ? Loc.T("Jamais", "Never") : v > 0.99f ? Loc.T("Toujours", "Always") : Percent(v));
             var shake = AddToggle(play, "Secousses de caméra", "Camera shake", () => GameSettings.CameraShake, v => GameSettings.CameraShake = v);
+            // Vibrations de la manette : une courte vibration de test à chaque cran
+            var rumble = AddSlider(play, "Vibrations de la manette", "Controller vibration", 0f, 1f, 10, () => GameSettings.Rumble,
+                v => { GameSettings.Rumble = v; GamepadRumble.Preview(); }, v => v < 0.01f ? Loc.T("Désactivées", "Off") : Percent(v));
             // Commandes tactiles (téléphone, tablette) : façon de diriger, ou désactivées. Absentes sur un PC sans
             // écran tactile, où elles ne s'affichent jamais.
             Selectable touch = null;
@@ -212,7 +215,7 @@ namespace ChillRoad
                            "LB RB / Tab  category   ·   ↑ ↓  select   ·   ← →  adjust   ·   B / Esc  back");
 
             // Navigation explicite par page (voir ShowTab) : gauche/droite restent aux curseurs (réglage)
-            var gameItems = new List<Selectable> { language, traffic, rain, shake };
+            var gameItems = new List<Selectable> { language, traffic, rain, shake, rumble };
             if (touch) gameItems.Add(touch);
             gameItems.Add(apply.button);
             var audioItems = new List<Selectable> { master, music, engine, effects, ambience, ui, trackNames };
