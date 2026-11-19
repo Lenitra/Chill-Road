@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace ChillRoad
 {
@@ -28,6 +29,7 @@ namespace ChillRoad
             public float drive = 5f;       // secondes de route avant la prise
             public float traffic = 1.3f;
             public bool hud;               // vraie caméra de poursuite + HUD
+            public string menu = "";       // pause, meteo, garage, tuning, carte : menu ouvert pour la prise (caméra de poursuite)
             public Vector3 cam = new Vector3(4f, 1.4f, 7f);   // droite, haut, avant (repère voiture)
             public Vector3 look = new Vector3(0f, 0.7f, 0f);
             public float fov = 40f;
@@ -82,6 +84,11 @@ namespace ChillRoad
             yield return new WaitForSeconds(2f);
             var cars = game.assets.playerCars;
             for (int i = 0; i < cars.Length; i++) Debug.Log($"[SiteShots] car {i} {cars[i].displayName}");
+            // Sauvegarde de la copie de capture seulement : tout le garage et une cagnotte crédible pour les menus
+            Wallet.Add(100000000f);
+            foreach (var c in cars) Wallet.Buy(c);
+            yield return new WaitForSeconds(1f);   // primes des succès débloqués par ces achats, puis cagnotte fixée
+            Wallet.Spend(Wallet.Cash - 186450);
 
             foreach (var shot in plan.shots)
             {
@@ -108,20 +115,77 @@ namespace ChillRoad
                 game.Player.Parked = v < 0.1f;
                 game.Player.Autopilot = v > 0.1f;
                 current = shot;
-                game.Hud.SetVisible(shot.hud);
-                game.Camera.Directed = !shot.hud;
-                if (shot.hud) game.Camera.SetView(0);
+                bool chase = shot.hud || !string.IsNullOrEmpty(shot.menu);
+                game.Hud.SetVisible(chase);
+                game.Camera.Directed = !chase;
+                if (chase) game.Camera.SetView(0);
                 yield return new WaitForSeconds(Mathf.Max(shot.drive, 2.5f));
                 if (shot.world) { anchor = game.Player.transform.position; place = true; }
-                yield return new WaitForSeconds(0.15f);
+                if (!string.IsNullOrEmpty(shot.menu))
+                {
+                    // Voiture arrêtée, menu ouvert ; le jeu est en pause (temps figé) : attentes en temps réel
+                    game.Player.Autopilot = false;
+                    game.Player.Parked = true;
+                    yield return OpenMenu(shot.menu);
+                }
+                yield return new WaitForSecondsRealtime(0.15f);
                 yield return new WaitForEndOfFrame();
                 string file = Path.Combine(outDir, shot.name + ".png");
                 ScreenCapture.CaptureScreenshot(file, 2);
                 Debug.Log("[SiteShots] " + file + " car=" + game.Player.Spec.displayName + " kmh=" + game.Player.SpeedKmh.ToString("F0"));
-                yield return new WaitForSeconds(0.6f);
+                yield return new WaitForSecondsRealtime(0.6f);
+                if (!string.IsNullOrEmpty(shot.menu)) yield return CloseMenu(shot.menu);
             }
             game.Player.Autopilot = false;
             Application.Quit();
+        }
+
+        /// <summary>Bouton dont le libellé (espaces de mise en forme retirés) vaut <paramref name="label"/>.</summary>
+        static bool Click(string label)
+        {
+            foreach (var t in FindObjectsByType<Text>(FindObjectsSortMode.None))
+            {
+                if (!t.isActiveAndEnabled) continue;
+                string flat = t.text.Replace(" ", "").Replace("\u2009", "").Replace("\u200A", "");
+                if (t.text.Trim() != label && flat != label) continue;
+                var b = t.GetComponentInParent<Button>();
+                if (b && b.isActiveAndEnabled && b.interactable) { b.onClick.Invoke(); return true; }
+            }
+            Debug.LogWarning("[SiteShots] no button " + label);
+            return false;
+        }
+
+        IEnumerator OpenMenu(string menu)
+        {
+            switch (menu)
+            {
+                case "tuning":
+                    FindFirstObjectByType<TuningGarage>().Open();
+                    yield return new WaitForSecondsRealtime(3f);
+                    yield break;
+                case "carte":
+                    game.Hud.SetPaused(true);
+                    yield return new WaitForSecondsRealtime(1f);
+                    Click("Carte");
+                    yield return new WaitForSecondsRealtime(2.5f);
+                    yield break;
+            }
+            game.Hud.SetPaused(true);
+            yield return new WaitForSecondsRealtime(1.5f);
+            if (menu == "meteo") Click("Heure et météo");
+            else if (menu == "garage") Click("Voiture");
+            else if (menu == "options") Click("Options");
+            yield return new WaitForSecondsRealtime(menu == "garage" ? 4f : 2f);
+        }
+
+        IEnumerator CloseMenu(string menu)
+        {
+            if (menu == "tuning") { FindFirstObjectByType<TuningGarage>().Close(); yield return new WaitForSecondsRealtime(2f); yield break; }
+            if (menu == "carte") { foreach (var w in FindObjectsByType<WorldMap>(FindObjectsSortMode.None)) w.SetOpen(false); }
+            else if (menu != "pause") Click("Retour");
+            yield return new WaitForSecondsRealtime(1.5f);
+            game.Hud.SetPaused(false);
+            yield return new WaitForSecondsRealtime(1f);
         }
 
         bool Find(Shot shot)
@@ -184,7 +248,10 @@ namespace ChillRoad
 
         void LateUpdate()
         {
-            if (current == null || current.hud || !game) return;
+            // Pas de toast de succès sur les images (l'achat du garage au départ en débloque plusieurs)
+            var toast = GameObject.Find("AchievementToast");
+            if (toast && toast.GetComponent<Canvas>().enabled) toast.GetComponent<Canvas>().enabled = false;
+            if (current == null || current.hud || !string.IsNullOrEmpty(current.menu) || !game) return;
             var cam = game.Camera.GetComponent<Camera>();
             var t = game.Player.transform;
             Vector3 eye, at;
