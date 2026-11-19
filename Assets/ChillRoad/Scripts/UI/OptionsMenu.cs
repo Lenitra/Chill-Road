@@ -56,7 +56,7 @@ namespace ChillRoad
         // Mise en page (repère 1920 × 1080, maquette U-Options × 1,5) : cadre centré, barre du haut, plaque, bas
         const float FrameWidth = 1350f, FrameHeight = 1080f;
         const float BarTop = 48f, BarBottom = 124f, PanelTop = 183f;
-        const float RowHeight = 72f, KeyRowHeight = 46f, Pad = 30f;
+        const float RowHeight = 72f, KeyRowHeight = 38f, Pad = 30f;
 
         // Mode d'affichage et définition : appliqués à cet instant (0 = rien en attente), pour ne pas changer de mode
         // d'écran à chaque cran quand on fait défiler les choix
@@ -439,31 +439,32 @@ namespace ChillRoad
 
         // ------------------------------------------------------------------ touches
 
-        /// <summary>Onglet Touches : en-tête (commande, clavier, manette) puis une ligne par commande, quatre emplacements.</summary>
+        /// <summary>Rubriques de l'onglet Touches : première commande de chaque groupe et son titre.</summary>
+        static readonly (GameInput.Bind first, string fr, string en)[] KeyGroups =
+        {
+            (GameInput.Bind.Throttle, "CONDUITE", "DRIVING"), (GameInput.Bind.LookBack, "CAMÉRA", "CAMERA"),
+            (GameInput.Bind.Reset, "VOITURE", "CAR"), (GameInput.Bind.Music, "JEU", "GAME"),
+        };
+
+        /// <summary>
+        /// Onglet Touches : commandes groupées en rubriques (titres cyan ; la première porte aussi les en-têtes Clavier et
+        /// Manette), une ligne par commande, deux touches et deux boutons. Touches du clavier en touches carrées, boutons de
+        /// la manette en pastilles rondes ; un emplacement libre n'est qu'un « + » discret.
+        /// </summary>
         void BuildKeys(RectTransform page)
         {
-            var head = Glass.Rect(page, "Head", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            Fixed(head, 44);
-            HeadLabel(head, "COMMANDE", "ACTION", 0f, 0.35f, TextAnchor.LowerLeft);
-            HeadLabel(head, "CLAVIER", "KEYBOARD", SlotColumns[0].min, SlotColumns[1].max, TextAnchor.LowerCenter);
-            HeadLabel(head, "MANETTE", "GAMEPAD", SlotColumns[2].min, SlotColumns[3].max, TextAnchor.LowerCenter);
-            var line = Glass.Bar(head, "Line", Glass.Line);
-            var lrt = line.rectTransform;
-            lrt.anchorMin = Vector2.zero;
-            lrt.anchorMax = new Vector2(1f, 0f);
-            lrt.offsetMin = Vector2.zero;
-            lrt.offsetMax = new Vector2(0f, 1.5f);
-
             keyGrid = new Button[GameInput.BindCount, 4];
             for (int b = 0; b < GameInput.BindCount; b++)
             {
                 var bind = (GameInput.Bind)b;
+                foreach (var g in KeyGroups)
+                    if (g.first == bind) KeySection(page, g.fr, g.en, b == 0);
                 var row = Glass.Rect(page, bind.ToString(), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
                 Fixed(row, KeyRowHeight);
                 var plate = SelectionPlate(row, 23f);
                 var rowLine = RowLine(row);
                 lastLine[page] = rowLine;
-                var name = Glass.Label(row, "", 24, Glass.Weight.Semilight, Glass.White, TextAnchor.MiddleLeft);
+                var name = Glass.Label(row, "", 22, Glass.Weight.Semilight, Glass.White, TextAnchor.MiddleLeft);
                 Stretch(name.rectTransform, 0f, SlotColumns[0].min, Pad, 8f);
                 refreshers.Add(() => name.text = GameInput.BindName(bind));
                 for (int c = 0; c < 4; c++)
@@ -473,6 +474,18 @@ namespace ChillRoad
                     rows.Add((slot.gameObject, plate, rowLine, name));
                 }
             }
+        }
+
+        /// <summary>Titre de rubrique de l'onglet Touches (plus bas que Section, pour que les 14 commandes tiennent).</summary>
+        void KeySection(RectTransform page, string fr, string en, bool first)
+        {
+            if (lastLine.TryGetValue(page, out var prev)) trimmed.Add(prev);
+            var row = Glass.Rect(page, "Section", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Fixed(row, first ? 34f : 38f);
+            HeadLabel(row, fr, en, 0f, 0.35f, TextAnchor.LowerLeft);
+            if (!first) return;
+            HeadLabel(row, "CLAVIER", "KEYBOARD", SlotColumns[0].min, SlotColumns[1].max, TextAnchor.LowerCenter);
+            HeadLabel(row, "MANETTE", "GAMEPAD", SlotColumns[2].min, SlotColumns[3].max, TextAnchor.LowerCenter);
         }
 
         void HeadLabel(RectTransform parent, string fr, string en, float xMin, float xMax, TextAnchor align)
@@ -488,18 +501,20 @@ namespace ChillRoad
         {
             bool pad = column >= 2;
             int slot = column % 2;
-            var (button, plate, text) = PillButton(row, "Slot", 21, Glass.Weight.Regular, null, TextAnchor.MiddleCenter, () => StartCapture(bind, slot, pad));
-            plate.radius = 19f;
+            var (button, plate, text) = PillButton(row, "Slot", 20, Glass.Weight.Regular, null, TextAnchor.MiddleCenter, () => StartCapture(bind, slot, pad));
+            plate.radius = pad ? 16f : 8f;   // clavier : touche carrée ; manette : bouton rond
             var hit = button.GetComponent<OptionHit>();
             var rt = (RectTransform)button.transform;
             rt.anchorMin = new Vector2(SlotColumns[column].min, 0.5f);
             rt.anchorMax = new Vector2(SlotColumns[column].max, 0.5f);
-            rt.offsetMin = new Vector2(0f, -19f);
-            rt.offsetMax = new Vector2(0f, 19f);
+            rt.offsetMin = new Vector2(0f, -16f);
+            rt.offsetMax = new Vector2(0f, 16f);
             bool Waiting() => capturing && captureBind == bind && captureSlot == slot && capturePad == pad;
+            bool Empty() => pad ? string.IsNullOrEmpty(GameInput.GetPad(bind, slot)) : GameInput.GetKey(bind, slot) == Key.None;
             refreshers.Add(() =>
             {
-                text.text = Waiting() ? "…" : pad ? GameInput.PadName(GameInput.GetPad(bind, slot)) : GameInput.KeyName(GameInput.GetKey(bind, slot));
+                text.text = Waiting() ? Loc.T("Appuie…", "Press…") : Empty() ? "+"
+                    : pad ? GameInput.PadName(GameInput.GetPad(bind, slot)) : GameInput.KeyName(GameInput.GetKey(bind, slot));
             });
             animators.Add(_ =>
             {
@@ -514,9 +529,15 @@ namespace ChillRoad
                     Look(plate, Glass.Gold, Color.clear, 0f);
                     Ink(text, Glass.Ink, Glass.Weight.Semibold);
                 }
+                else if (Empty())
+                {
+                    // Libre : pas de fond, liseré à peine visible, « + » estompé
+                    Look(plate, hit.Hover ? Glass.Pill : Color.clear, hit.Hover ? Glass.Edge : Glass.Line, 0f);
+                    Ink(text, Glass.Faint, Glass.Weight.Light);
+                }
                 else
                 {
-                    Look(plate, hit.Hover ? Glass.A(Color.white, 0.18f) : Glass.Pill, Glass.Edge, 0f);
+                    Look(plate, hit.Hover ? Glass.A(Color.white, 0.16f) : Glass.Pill, Glass.Edge, 0f);
                     Ink(text, Glass.White, Glass.Weight.Regular);
                 }
             });
