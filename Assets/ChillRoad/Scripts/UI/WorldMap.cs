@@ -92,6 +92,9 @@ namespace ChillRoad
         // Radars et tremplins : coche « réussi » de la pastille et étiquette de chacun (texte selon qu'il est déjà réussi)
         const float GoalBadge = 26f;
         readonly List<GameObject> radarChecks = new List<GameObject>(), stuntChecks = new List<GameObject>();
+        /// <summary>Repères des objectifs : les radars, puis les tremplins (index de <see cref="goalHover"/>).</summary>
+        readonly List<RectTransform> goalMarks = new List<RectTransform>();
+        int goalHover = -1;
         readonly List<Text> radarLabels = new List<Text>(), stuntLabels = new List<Text>();
         bool pressed;
         float pressMoved;
@@ -159,6 +162,8 @@ namespace ChillRoad
                 radarLabels.Clear();
                 stuntChecks.Clear();
                 stuntLabels.Clear();
+                goalMarks.Clear();
+                goalHover = -1;
                 raceHover = -1;
                 raceZoom = -1f;
             }
@@ -528,7 +533,7 @@ namespace ChillRoad
                 }
             }
             RefreshRoute();
-            UpdateRaceHover();
+            UpdateHover();
             Declutter();
             RefreshScale();
             if (GameInput.UsingGamepad != hintsForPad) BuildHints(GameInput.UsingGamepad);
@@ -922,16 +927,17 @@ namespace ChillRoad
         }
 
         /// <summary>
-        /// Départ survolé par le curseur (ou par le viseur, à la manette et aux flèches) : son tracé et l'arrivée d'un
-        /// sprint s'affichent, le repère grossit et son étiquette se détaille. Les autres tracés restent masqués, et
-        /// leurs noms ne s'écrivent qu'en zoomant.
+        /// Repère survolé par le curseur (ou par le viseur, à la manette et aux flèches), le plus proche l'emporte.
+        /// Départ de course : son tracé et l'arrivée d'un sprint s'affichent, le repère grossit et son étiquette se
+        /// détaille (les autres tracés restent masqués, leurs noms ne s'écrivent qu'en zoomant). Radar ou tremplin : le
+        /// repère grossit et son étiquette se détaille de même.
         /// </summary>
-        void UpdateRaceHover()
+        void UpdateHover()
         {
-            if (raceStarts.Count == 0) return;
-            // Un joueur désigné passe avant le départ sur lequel il se trouve (c'est lui que la validation choisit)
+            if (raceStarts.Count == 0 && goalMarks.Count == 0) return;
+            // Un joueur désigné passe avant le repère sur lequel il se trouve (c'est lui que la validation choisit)
             bool has = Pointed(out var local) && !hoveredPlayer;
-            int hover = -1;
+            int hover = -1, goal = -1;
             if (has)
             {
                 float best = RaceHoverRadius;
@@ -940,7 +946,19 @@ namespace ChillRoad
                     float d = (local - raceStarts[i].anchoredPosition).magnitude * zoom;
                     if (d < best) { best = d; hover = i; }
                 }
+                for (int i = 0; i < goalMarks.Count; i++)
+                {
+                    float d = (local - goalMarks[i].anchoredPosition).magnitude * zoom;
+                    if (d < best) { best = d; goal = i; hover = -1; }
+                }
             }
+            if (goal != goalHover)
+            {
+                goalHover = goal;
+                if (goal >= 0) goalMarks[goal].SetAsLastSibling();
+                RefreshGoals();
+            }
+            if (goal >= 0) goalMarks[goal].localScale = Vector3.one * (1.3f / zoom);
             if (hover != raceHover)
             {
                 raceHover = hover;
@@ -962,7 +980,7 @@ namespace ChillRoad
         {
             public Text text;
             public RectTransform mark;
-            public int priority, race = -1;
+            public int priority, race = -1, goal = -1;
             public float minZoom, dot;
             public bool movable;
             public Vector2 basePos;
@@ -970,10 +988,10 @@ namespace ChillRoad
             public TextAnchor baseAlign;
         }
 
-        void AddName(Text text, RectTransform mark, int priority, float minZoom, float dot, bool movable, int race = -1)
+        void AddName(Text text, RectTransform mark, int priority, float minZoom, float dot, bool movable, int race = -1, int goal = -1)
         {
             var rt = text.rectTransform;
-            var name = new MapName { text = text, mark = mark, priority = priority, minZoom = minZoom, dot = dot, movable = movable, race = race,
+            var name = new MapName { text = text, mark = mark, priority = priority, minZoom = minZoom, dot = dot, movable = movable, race = race, goal = goal,
                                      basePos = rt.anchoredPosition, basePivot = rt.pivot.x, baseAlign = text.alignment };
             // ordre de placement : priorité, puis ordre de construction
             int at = names.Count;
@@ -1009,7 +1027,7 @@ namespace ChillRoad
                 }
             int first = -1;
             for (int i = 0; i < names.Count; i++)
-                if (names[i].race >= 0 && names[i].race == raceHover) first = i;
+                if (names[i].race >= 0 && names[i].race == raceHover || names[i].goal >= 0 && names[i].goal == goalHover) first = i;
             if (first >= 0) Place(first, true);
             for (int i = 0; i < names.Count; i++)
                 if (i != first) Place(i, false);
@@ -1132,26 +1150,37 @@ namespace ChillRoad
             var label = MapLabel(mark, 17, TextAnchor.MiddleLeft, tint, new Vector2(GoalBadge * 0.5f + 9f, 0f), FontStyle.BoldAndItalic);
             label.rectTransform.pivot = new Vector2(0f, 0.5f);
             fixedSize.Add(mark);
-            AddName(label, mark, 5, RaceNameZoom, GoalBadge + 4f, true);
+            AddName(label, mark, 5, RaceNameZoom, GoalBadge + 4f, true, -1, goalMarks.Count);
+            goalMarks.Add(mark);
             return label;
         }
 
         /// <summary>
         /// État des objectifs : la pastille garde sa couleur ; une coche verte s'y ajoute une fois réussi, et l'étiquette
-        /// passe de ce qu'il faut atteindre au record.
+        /// passe de ce qu'il faut atteindre au record. Au survol, l'étiquette se détaille : genre, objectif, prime, puis
+        /// réussi (avec le record) ou pas encore.
         /// </summary>
         void RefreshGoals()
         {
+            int radarCount = 0;
             if (game.Radars)
             {
                 var all = game.Radars.All;
+                radarCount = radarChecks.Count;
                 for (int i = 0; i < radarChecks.Count && i < all.Count; i++)
                 {
                     var r = all[i];
                     if (radarChecks[i].activeSelf != r.done) radarChecks[i].SetActive(r.done);
-                    radarLabels[i].text = r.done
-                        ? Loc.F($"{r.Name}  ·  record {r.best:0} km/h", $"{r.Name}  ·  best {r.best:0} km/h")
-                        : Loc.F($"{r.Name}  ·  {r.Target:0} km/h");
+                    if (i == goalHover)
+                        radarLabels[i].text = GoalDetail(r.Name,
+                            Loc.F($"Radar  ·  {r.Target:0} km/h minimum  ·  prime {Wallet.Format(r.data.reward)}",
+                                  $"Speed camera  ·  {r.Target:0} km/h minimum  ·  reward {Wallet.Format(r.data.reward)}"),
+                            r.done, r.done ? Loc.F($"record {r.best:0} km/h", $"best {r.best:0} km/h") : null,
+                            Loc.T("pas encore flashé", "not flashed yet"));
+                    else
+                        radarLabels[i].text = r.done
+                            ? Loc.F($"{r.Name}  ·  record {r.best:0} km/h", $"{r.Name}  ·  best {r.best:0} km/h")
+                            : Loc.F($"{r.Name}  ·  {r.Target:0} km/h");
                 }
             }
             if (game.Stunts)
@@ -1161,11 +1190,28 @@ namespace ChillRoad
                 {
                     var s = all[i];
                     if (stuntChecks[i].activeSelf != s.done) stuntChecks[i].SetActive(s.done);
-                    stuntLabels[i].text = !s.done ? Loc.F($"{s.Name}  ·  {s.Target:0} m")
-                        : s.best > 0f ? Loc.F($"{s.Name}  ·  record {s.best:0} m", $"{s.Name}  ·  best {s.best:0} m")
-                        : s.Name;
+                    if (radarCount + i == goalHover)
+                        stuntLabels[i].text = GoalDetail(s.Name,
+                            Loc.F($"Tremplin  ·  {s.Target:0} m en l'air  ·  prime {Wallet.Format(s.data.reward)}",
+                                  $"Stunt jump  ·  {s.Target:0} m airborne  ·  reward {Wallet.Format(s.data.reward)}"),
+                            s.done, s.done && s.best > 0f ? Loc.F($"record {s.best:0} m", $"best {s.best:0} m") : null,
+                            Loc.T("pas encore réussi", "not completed yet"));
+                    else
+                        stuntLabels[i].text = !s.done ? Loc.F($"{s.Name}  ·  {s.Target:0} m")
+                            : s.best > 0f ? Loc.F($"{s.Name}  ·  record {s.best:0} m", $"{s.Name}  ·  best {s.best:0} m")
+                            : s.Name;
                 }
             }
+        }
+
+        /// <summary>Étiquette détaillée d'un objectif survolé : nom, puis en petit sa fiche et son état (réussi en vert).</summary>
+        static string GoalDetail(string name, string info, bool done, string best, string todo)
+        {
+            string state = done
+                ? "<color=#" + ColorUtility.ToHtmlStringRGB(HudIcon.CheckGreen * 1.25f) + ">" + Loc.T("Réussi", "Completed") + "</color>"
+                  + (best != null ? "  ·  " + best : "")
+                : todo;
+            return name + "\n<size=16><color=#FFFFFFD8>" + info + "\n" + state + "</color></size>";
         }
 
         /// <summary>Repère d'un joueur : flèche orientée cerclée de blanc sur un disque d'encre (or : soi ; couleur et pseudo : les autres).</summary>
