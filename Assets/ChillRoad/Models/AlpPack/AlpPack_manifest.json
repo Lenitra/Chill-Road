@@ -5560,6 +5560,449 @@
    "radius": 0.06
   },
   {
+   "id": "airport_terminal",
+   "file": "Airport_Terminal",
+   "category": "landmark",
+   "tags": [
+    "airport",
+    "service"
+   ],
+   "size": [
+    42.32,
+    8.5,
+    21.39
+   ],
+   "ymin": -1.4,
+   "footprint": [
+    42.0,
+    16.0
+   ],
+   "lods": 3,
+   "tris": [
+    5537,
+    941,
+    126
+   ],
+   "collider": "box",
+   "note": "hall x -12..12 (entrée côté ville x = 0 en y = -7,9, auvent x -7..7 jusqu'à y = -12 ; porte d'embarquement côté piste x = +6 en y = +7,9), ailes x 12..21, toit monopente qui monte vers la piste"
+  },
+  {
+   "id": "airport_tower",
+   "file": "Airport_Tower",
+   "category": "landmark",
+   "tags": [
+    "airport",
+    "service"
+   ],
+   "size": [
+    8.0,
+    23.3,
+    8.0
+   ],
+   "ymin": -1.4,
+   "footprint": [
+    8.0,
+    8.0
+   ],
+   "lods": 3,
+   "tris": [
+    2276,
+    614,
+    216
+   ],
+   "collider": "box",
+   "note": "socle 7,6 m, fût octogonal, vigie de 17,6 à 20,2 m, feu rouge à 21,4 m, antenne à 23,3 m"
+  },
+  {
+   "id": "airport_hangar",
+   "file": "Airport_Hangar",
+   "category": "landmark",
+   "tags": [
+    "airport",
+    "service"
+   ],
+   "size": [
+    26.34,
+    9.1,
+    24.26
+   ],
+   "ymin": -0.04,
+   "footprint": [
+    26.0,
+    24.0
+   ],
+   "lods": 3,
+   "tris": [
+    2163,
+    499,
+    36
+   ],
+   "collider": "box",
+   "note": "voûte de 26 m, faîte à 9 m ; portes coulissantes côté -Y (x -9,5..9,5, hautes de 6 m), entrouvertes de 1,7 m au centre ; porte de service au pignon arrière, x = -9,5"
+  },
+  {
+   "id": "plane_tourer",
+   "file": "Plane_Tourer",
+   "category": "street",
+   "tags": [
+    "airport",
+    "aircraft"
+   ],
+   "size": [
+    8.75,
+    2.23,
+    7.08
+   ],
+   "ymin": 0.0,
+   "footprint": [
+    8.7,
+    7.0
+   ],
+   "lods": 3,
+   "tris": [
+    1168,
+    502,
+    260
+   ],
+   "collider": "mesh_low"
+  },
+  {
+   "id": "plane_trainer",
+   "file": "Plane_Trainer",
+   "category": "street",
+   "tags": [
+    "airport",
+    "aircraft"
+   ],
+   "size": [
+    11.05,
+    2.8,
+    8.33
+   ],
+   "ymin": 0.0,
+   "footprint": [
+    11.0,
+    8.3
+   ],
+   "lods": 3,
+   "tris": [
+    850,
+    466,
+    260
+   ],
+   "collider": "mesh_low"
+  },
+  {
+   "id": "plane_jet",
+   "file": "Plane_Jet",
+   "category": "street",
+   "tags": [
+    "airport",
+    "aircraft"
+   ],
+   "size": [
+    14.05,
+    4.71,
+    14.52
+   ],
+   "ymin": 0.0,
+   "footprint": [
+    14.0,
+    14.5
+   ],
+   "lods": 3,
+   "tris": [
+    1230,
+    730,
+    342
+   ],
+   "collider": "mesh_low"
+  },
+  {
+   "id": "plane_glider",
+   "file": "Plane_Glider",
+   "category": "street",
+   "tags": [
+    "airport",
+    "aircraft"
+   ],
+   "size": [
+    15.0,
+    1.44,
+    6.75
+   ],
+   "ymin": -0.0,
+   "footprint": [
+    15.0,
+    6.6
+   ],
+   "lods": 3,
+   "tris": [
+    626,
+    384,
+    174
+   ],
+   "collider": "mesh_low"
+  },
+  {
+   "id": "helicopter",
+   "file": "Helicopter",
+   "category": "street",
+   "tags": [
+    "airport",
+    "aircraft"
+   ],
+   "size": [
+    7.75,
+    3.4,
+    10.89
+   ],
+   "ymin": 0.03,
+   "footprint": [
+    7.6,
+    10.5
+   ],
+   "lods": 3,
+   "tris": [
+    988,
+    582,
+    306
+   ],
+   "collider": "mesh_low"
+  },
+  {
+   "id": "airport_windsock",
+   "file": "Airport_Windsock",
+   "category": "street",
+   "tags": [
+    "airport"
+   ],
+   "size": [
+    3.04,
+    6.5,
+    0.71
+   ],
+   "ymin": 0.0,
+   "footprint": [
+    0.5,
+    0.5
+   ],
+   "lods": 3,
+   "tris": [
+    441,
+    247,
+    132
+   ],
+   "collider": "capsule",
+   "radius": 0.12
+  },
+  {
+   "id": "airfield_light_white",
+   "file": "Airfield_LightWhite",
+   "category": "street",
+   "tags": [
+    "airport",
+    "light"
+   ],
+   "size": [
+    0.26,
+    0.4,
+    0.23
+   ],
+   "ymin": 0.0,
+   "footprint": [
+    0.3,
+    0.3
+   ],
+   "lods": 3,
+   "tris": [
+    46,
+    37,
+    10
+   ],
+   "collider": "none"
+  },
+  {
+   "id": "airfield_light_blue",
+   "file": "Airfield_LightBlue",
+   "category": "street",
+   "tags": [
+    "airport",
+    "light"
+   ],
+   "size": [
+    0.26,
+    0.4,
+    0.23
+   ],
+   "ymin": 0.0,
+   "footprint": [
+    0.3,
+    0.3
+   ],
+   "lods": 3,
+   "tris": [
+    46,
+    37,
+    10
+   ],
+   "collider": "none"
+  },
+  {
+   "id": "airfield_light_green",
+   "file": "Airfield_LightGreen",
+   "category": "street",
+   "tags": [
+    "airport",
+    "light"
+   ],
+   "size": [
+    0.26,
+    0.4,
+    0.23
+   ],
+   "ymin": 0.0,
+   "footprint": [
+    0.3,
+    0.3
+   ],
+   "lods": 3,
+   "tris": [
+    46,
+    37,
+    10
+   ],
+   "collider": "none"
+  },
+  {
+   "id": "airfield_light_red",
+   "file": "Airfield_LightRed",
+   "category": "street",
+   "tags": [
+    "airport",
+    "light"
+   ],
+   "size": [
+    0.26,
+    0.4,
+    0.23
+   ],
+   "ymin": 0.0,
+   "footprint": [
+    0.3,
+    0.3
+   ],
+   "lods": 3,
+   "tris": [
+    46,
+    37,
+    10
+   ],
+   "collider": "none"
+  },
+  {
+   "id": "airport_papi",
+   "file": "Airport_Papi",
+   "category": "street",
+   "tags": [
+    "airport",
+    "light"
+   ],
+   "size": [
+    8.7,
+    0.8,
+    0.84
+   ],
+   "ymin": 0.0,
+   "footprint": [
+    9.0,
+    1.0
+   ],
+   "lods": 3,
+   "tris": [
+    336,
+    288,
+    56
+   ],
+   "collider": "none"
+  },
+  {
+   "id": "airport_fence",
+   "file": "Airport_Fence",
+   "category": "street",
+   "tags": [
+    "airport"
+   ],
+   "size": [
+    4.04,
+    2.44,
+    0.33
+   ],
+   "ymin": 0.0,
+   "footprint": [
+    4.0,
+    0.12
+   ],
+   "lods": 3,
+   "tris": [
+    156,
+    64,
+    48
+   ],
+   "collider": "box"
+  },
+  {
+   "id": "airport_sign",
+   "file": "Airport_Sign",
+   "category": "street",
+   "tags": [
+    "airport",
+    "sign"
+   ],
+   "size": [
+    3.2,
+    6.05,
+    0.9
+   ],
+   "ymin": -0.4,
+   "footprint": [
+    3.2,
+    0.9
+   ],
+   "lods": 3,
+   "tris": [
+    142,
+    122,
+    60
+   ],
+   "collider": "box"
+  },
+  {
+   "id": "airport_fuel",
+   "file": "Airport_Fuel",
+   "category": "street",
+   "tags": [
+    "airport"
+   ],
+   "size": [
+    6.04,
+    2.48,
+    3.04
+   ],
+   "ymin": 0.0,
+   "footprint": [
+    6.0,
+    3.0
+   ],
+   "lods": 3,
+   "tris": [
+    607,
+    216,
+    88
+   ],
+   "collider": "box"
+  },
+  {
    "id": "reeds",
    "file": "Reeds",
    "category": "lake",

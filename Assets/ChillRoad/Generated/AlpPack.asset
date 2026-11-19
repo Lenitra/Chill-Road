@@ -2670,6 +2670,224 @@ MonoBehaviour:
     module: 0
     ymin: -0.5
     lights: []
+  - id: airport_terminal
+    category: landmark
+    tags:
+    - airport
+    - service
+    prefab: {fileID: 919132149155446097, guid: 2cfda1c1be4391343993491f64686b23, type: 3}
+    size: {x: 42.32, y: 8.5, z: 21.39}
+    footprint: {x: 42, y: 16}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: -1.4
+    lights: []
+  - id: airport_tower
+    category: landmark
+    tags:
+    - airport
+    - service
+    prefab: {fileID: 919132149155446097, guid: 915b485261616364e9c550c2a344fa7a, type: 3}
+    size: {x: 8, y: 23.3, z: 8}
+    footprint: {x: 8, y: 8}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: -1.4
+    lights: []
+  - id: airport_hangar
+    category: landmark
+    tags:
+    - airport
+    - service
+    prefab: {fileID: 919132149155446097, guid: bf493b044a613f142bfec543d5eb68dc, type: 3}
+    size: {x: 26.34, y: 9.1, z: 24.26}
+    footprint: {x: 26, y: 24}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: -0.04
+    lights: []
+  - id: plane_tourer
+    category: street
+    tags:
+    - airport
+    - aircraft
+    prefab: {fileID: 919132149155446097, guid: 8cccc71e76531844ab660118c9670861, type: 3}
+    size: {x: 8.75, y: 2.23, z: 7.08}
+    footprint: {x: 8.7, y: 7}
+    collider: mesh_low
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
+  - id: plane_trainer
+    category: street
+    tags:
+    - airport
+    - aircraft
+    prefab: {fileID: 919132149155446097, guid: a56830f2397de25409bc4ed750363eb4, type: 3}
+    size: {x: 11.05, y: 2.8, z: 8.33}
+    footprint: {x: 11, y: 8.3}
+    collider: mesh_low
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
+  - id: plane_jet
+    category: street
+    tags:
+    - airport
+    - aircraft
+    prefab: {fileID: 919132149155446097, guid: 627b3ed29a0b7c345a6dd2136e69b41e, type: 3}
+    size: {x: 14.05, y: 4.71, z: 14.52}
+    footprint: {x: 14, y: 14.5}
+    collider: mesh_low
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
+  - id: plane_glider
+    category: street
+    tags:
+    - airport
+    - aircraft
+    prefab: {fileID: 919132149155446097, guid: 938f1f377b50bab46b3ee9baa84e987d, type: 3}
+    size: {x: 15, y: 1.44, z: 6.75}
+    footprint: {x: 15, y: 6.6}
+    collider: mesh_low
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
+  - id: helicopter
+    category: street
+    tags:
+    - airport
+    - aircraft
+    prefab: {fileID: 919132149155446097, guid: 4a0367cd9be969643af1f1eef3ca6e16, type: 3}
+    size: {x: 7.75, y: 3.4, z: 10.89}
+    footprint: {x: 7.6, y: 10.5}
+    collider: mesh_low
+    radius: 0
+    module: 0
+    ymin: 0.03
+    lights: []
+  - id: airport_windsock
+    category: street
+    tags:
+    - airport
+    prefab: {fileID: 919132149155446097, guid: 1c86456518308b94aa673d9d9892b985, type: 3}
+    size: {x: 3.04, y: 6.5, z: 0.71}
+    footprint: {x: 0.5, y: 0.5}
+    collider: capsule
+    radius: 0.12
+    module: 0
+    ymin: 0
+    lights: []
+  - id: airfield_light_white
+    category: street
+    tags:
+    - airport
+    - light
+    prefab: {fileID: 919132149155446097, guid: 0e5d76579ced90944a2da1f6f4e07ff6, type: 3}
+    size: {x: 0.26, y: 0.4, z: 0.23}
+    footprint: {x: 0.3, y: 0.3}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
+  - id: airfield_light_blue
+    category: street
+    tags:
+    - airport
+    - light
+    prefab: {fileID: 919132149155446097, guid: 1ee51a313415cb845af45a29b14759ee, type: 3}
+    size: {x: 0.26, y: 0.4, z: 0.23}
+    footprint: {x: 0.3, y: 0.3}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
+  - id: airfield_light_green
+    category: street
+    tags:
+    - airport
+    - light
+    prefab: {fileID: 919132149155446097, guid: 722ed6422fb31c84f940fd01b45e78c3, type: 3}
+    size: {x: 0.26, y: 0.4, z: 0.23}
+    footprint: {x: 0.3, y: 0.3}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
+  - id: airfield_light_red
+    category: street
+    tags:
+    - airport
+    - light
+    prefab: {fileID: 919132149155446097, guid: 9e42213f9d727c3428df1bf729bc4bb2, type: 3}
+    size: {x: 0.26, y: 0.4, z: 0.23}
+    footprint: {x: 0.3, y: 0.3}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
+  - id: airport_papi
+    category: street
+    tags:
+    - airport
+    - light
+    prefab: {fileID: 919132149155446097, guid: 564f5d961c77d1f4191c9cddf27690a2, type: 3}
+    size: {x: 8.7, y: 0.8, z: 0.84}
+    footprint: {x: 9, y: 1}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
+  - id: airport_fence
+    category: street
+    tags:
+    - airport
+    prefab: {fileID: 919132149155446097, guid: e6469d76a452d6a45959cc07fb9e6ca0, type: 3}
+    size: {x: 4.04, y: 2.44, z: 0.33}
+    footprint: {x: 4, y: 0.12}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
+  - id: airport_sign
+    category: street
+    tags:
+    - airport
+    - sign
+    prefab: {fileID: 919132149155446097, guid: 9216dd6d8b961224c88ef4255844487f, type: 3}
+    size: {x: 3.2, y: 6.05, z: 0.9}
+    footprint: {x: 3.2, y: 0.9}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: -0.4
+    lights: []
+  - id: airport_fuel
+    category: street
+    tags:
+    - airport
+    prefab: {fileID: 919132149155446097, guid: 28f1fe1dad38d3c4b84f2bd27747ce12, type: 3}
+    size: {x: 6.04, y: 2.48, z: 3.04}
+    footprint: {x: 6, y: 3}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
   - id: reeds
     category: lake
     tags:

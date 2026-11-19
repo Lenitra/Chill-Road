@@ -4153,6 +4153,343 @@
    "material": ""
   },
   {
+   "id": "airport_terminal",
+   "file": "Airport_Terminal",
+   "category": "landmark",
+   "tags": [
+    "airport",
+    "service"
+   ],
+   "sx": 42.32,
+   "sy": 8.5,
+   "sz": 21.39,
+   "fw": 42.0,
+   "fd": 16.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -1.4,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "airport_tower",
+   "file": "Airport_Tower",
+   "category": "landmark",
+   "tags": [
+    "airport",
+    "service"
+   ],
+   "sx": 8.0,
+   "sy": 23.3,
+   "sz": 8.0,
+   "fw": 8.0,
+   "fd": 8.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -1.4,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "airport_hangar",
+   "file": "Airport_Hangar",
+   "category": "landmark",
+   "tags": [
+    "airport",
+    "service"
+   ],
+   "sx": 26.34,
+   "sy": 9.1,
+   "sz": 24.26,
+   "fw": 26.0,
+   "fd": 24.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.04,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "plane_tourer",
+   "file": "Plane_Tourer",
+   "category": "street",
+   "tags": [
+    "airport",
+    "aircraft"
+   ],
+   "sx": 8.75,
+   "sy": 2.23,
+   "sz": 7.08,
+   "fw": 8.7,
+   "fd": 7.0,
+   "collider": "mesh_low",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "plane_trainer",
+   "file": "Plane_Trainer",
+   "category": "street",
+   "tags": [
+    "airport",
+    "aircraft"
+   ],
+   "sx": 11.05,
+   "sy": 2.8,
+   "sz": 8.33,
+   "fw": 11.0,
+   "fd": 8.3,
+   "collider": "mesh_low",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "plane_jet",
+   "file": "Plane_Jet",
+   "category": "street",
+   "tags": [
+    "airport",
+    "aircraft"
+   ],
+   "sx": 14.05,
+   "sy": 4.71,
+   "sz": 14.52,
+   "fw": 14.0,
+   "fd": 14.5,
+   "collider": "mesh_low",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "plane_glider",
+   "file": "Plane_Glider",
+   "category": "street",
+   "tags": [
+    "airport",
+    "aircraft"
+   ],
+   "sx": 15.0,
+   "sy": 1.44,
+   "sz": 6.75,
+   "fw": 15.0,
+   "fd": 6.6,
+   "collider": "mesh_low",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "helicopter",
+   "file": "Helicopter",
+   "category": "street",
+   "tags": [
+    "airport",
+    "aircraft"
+   ],
+   "sx": 7.75,
+   "sy": 3.4,
+   "sz": 10.89,
+   "fw": 7.6,
+   "fd": 10.5,
+   "collider": "mesh_low",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.03,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "airport_windsock",
+   "file": "Airport_Windsock",
+   "category": "street",
+   "tags": [
+    "airport"
+   ],
+   "sx": 3.04,
+   "sy": 6.5,
+   "sz": 0.71,
+   "fw": 0.5,
+   "fd": 0.5,
+   "collider": "capsule",
+   "radius": 0.12,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "airfield_light_white",
+   "file": "Airfield_LightWhite",
+   "category": "street",
+   "tags": [
+    "airport",
+    "light"
+   ],
+   "sx": 0.26,
+   "sy": 0.4,
+   "sz": 0.23,
+   "fw": 0.3,
+   "fd": 0.3,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "airfield_light_blue",
+   "file": "Airfield_LightBlue",
+   "category": "street",
+   "tags": [
+    "airport",
+    "light"
+   ],
+   "sx": 0.26,
+   "sy": 0.4,
+   "sz": 0.23,
+   "fw": 0.3,
+   "fd": 0.3,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "airfield_light_green",
+   "file": "Airfield_LightGreen",
+   "category": "street",
+   "tags": [
+    "airport",
+    "light"
+   ],
+   "sx": 0.26,
+   "sy": 0.4,
+   "sz": 0.23,
+   "fw": 0.3,
+   "fd": 0.3,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "airfield_light_red",
+   "file": "Airfield_LightRed",
+   "category": "street",
+   "tags": [
+    "airport",
+    "light"
+   ],
+   "sx": 0.26,
+   "sy": 0.4,
+   "sz": 0.23,
+   "fw": 0.3,
+   "fd": 0.3,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "airport_papi",
+   "file": "Airport_Papi",
+   "category": "street",
+   "tags": [
+    "airport",
+    "light"
+   ],
+   "sx": 8.7,
+   "sy": 0.8,
+   "sz": 0.84,
+   "fw": 9.0,
+   "fd": 1.0,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "airport_fence",
+   "file": "Airport_Fence",
+   "category": "street",
+   "tags": [
+    "airport"
+   ],
+   "sx": 4.04,
+   "sy": 2.44,
+   "sz": 0.33,
+   "fw": 4.0,
+   "fd": 0.12,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "airport_sign",
+   "file": "Airport_Sign",
+   "category": "street",
+   "tags": [
+    "airport",
+    "sign"
+   ],
+   "sx": 3.2,
+   "sy": 6.05,
+   "sz": 0.9,
+   "fw": 3.2,
+   "fd": 0.9,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": -0.4,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "airport_fuel",
+   "file": "Airport_Fuel",
+   "category": "street",
+   "tags": [
+    "airport"
+   ],
+   "sx": 6.04,
+   "sy": 2.48,
+   "sz": 3.04,
+   "fw": 6.0,
+   "fd": 3.0,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
    "id": "reeds",
    "file": "Reeds",
    "category": "lake",
