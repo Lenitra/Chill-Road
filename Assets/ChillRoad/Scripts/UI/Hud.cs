@@ -781,7 +781,7 @@ namespace ChillRoad
             pillsRoot = Glass.Rect(root, "Pills", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(0f, PillH));
             float px = 0f;
             var resume = Pill(pillsRoot, ref px, HudIcon.Kind.Play, "Reprendre", "Resume", () => SetPaused(false));
-            firstButton = resume.button;
+            firstButton = mapTile.button;   // à l'ouverture du menu, la grande tuile de la carte est choisie
             // Plus de pilule Commandes (les touches se voient et se changent dans Options › Touches) ; en réseau seulement,
             // « Joueurs » ouvre le tableau des joueurs à la place des tuiles
             controlsPill = Pill(pillsRoot, ref px, HudIcon.Kind.Invite, "Joueurs", "Players", () => { ShowControlsPage(true); ShowControlsView(ViewPlayers); });
