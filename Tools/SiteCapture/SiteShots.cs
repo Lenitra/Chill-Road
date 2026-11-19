@@ -29,7 +29,8 @@ namespace ChillRoad
             public float drive = 5f;       // secondes de route avant la prise
             public float traffic = 1.3f;
             public bool hud;               // vraie caméra de poursuite + HUD
-            public string menu = "";       // pause, meteo, garage, tuning, carte : menu ouvert pour la prise (caméra de poursuite)
+            public string menu = "";       // pause, meteo, garage, tuning, carte : menu ouvert pour la prise (caméra de poursuite) ;
+                                           // accueil : écran d'accueil, pris avant de lancer la partie
             public Vector3 cam = new Vector3(4f, 1.4f, 7f);   // droite, haut, avant (repère voiture)
             public Vector3 look = new Vector3(0f, 0.7f, 0f);
             public float fov = 40f;
@@ -51,7 +52,8 @@ namespace ChillRoad
         static void French()
         {
             if (Arg("-siteshots") == null) return;
-            PlayerPrefs.SetInt("chillroad_opt_lang", 1);
+            // Interface en français, ou en anglais avec « -lang en » (images de la version anglaise du site)
+            PlayerPrefs.SetInt("chillroad_opt_lang", Arg("-lang") == "en" ? 0 : 1);
             PlayerPrefs.Save();
         }
 
@@ -79,6 +81,16 @@ namespace ChillRoad
             while (!(game = FindFirstObjectByType<GameManager>())) yield return null;
             while (game.State != GameManager.Phase.Title && game.State != GameManager.Phase.Playing) yield return null;
             VegetationRenderer.NoFrustumCull = true;
+            foreach (var shot in plan.shots)
+            {
+                if (shot.menu != "accueil" || game.State != GameManager.Phase.Title) continue;
+                yield return new WaitForSecondsRealtime(Mathf.Max(shot.drive, 4f));   // décor de la vallée chargé, menu entré
+                yield return new WaitForEndOfFrame();
+                string file = Path.Combine(outDir, shot.name + ".png");
+                ScreenCapture.CaptureScreenshot(file, 2);
+                Debug.Log("[SiteShots] " + file + " (accueil)");
+                yield return new WaitForSecondsRealtime(0.6f);
+            }
             if (game.State == GameManager.Phase.Title) game.StartCountdown();
             while (game.State != GameManager.Phase.Playing) yield return null;
             yield return new WaitForSeconds(2f);
@@ -92,6 +104,7 @@ namespace ChillRoad
 
             foreach (var shot in plan.shots)
             {
+                if (shot.menu == "accueil") continue;
                 current = null;
                 place = false;
                 int ci = -1;
@@ -141,13 +154,13 @@ namespace ChillRoad
         }
 
         /// <summary>Bouton dont le libellé (espaces de mise en forme retirés) vaut <paramref name="label"/>.</summary>
-        static bool Click(string label)
+        static bool Click(string label, string english)
         {
             foreach (var t in FindObjectsByType<Text>(FindObjectsSortMode.None))
             {
                 if (!t.isActiveAndEnabled) continue;
                 string flat = t.text.Replace(" ", "").Replace("\u2009", "").Replace("\u200A", "");
-                if (t.text.Trim() != label && flat != label) continue;
+                if (t.text.Trim() != label && flat != label && t.text.Trim() != english && flat != english.ToUpperInvariant()) continue;
                 var b = t.GetComponentInParent<Button>();
                 if (b && b.isActiveAndEnabled && b.interactable) { b.onClick.Invoke(); return true; }
             }
@@ -166,15 +179,15 @@ namespace ChillRoad
                 case "carte":
                     game.Hud.SetPaused(true);
                     yield return new WaitForSecondsRealtime(1f);
-                    Click("Carte");
+                    Click("Carte", "Map");
                     yield return new WaitForSecondsRealtime(2.5f);
                     yield break;
             }
             game.Hud.SetPaused(true);
             yield return new WaitForSecondsRealtime(1.5f);
-            if (menu == "meteo") Click("Heure et météo");
-            else if (menu == "garage") Click("Voiture");
-            else if (menu == "options") Click("Options");
+            if (menu == "meteo") Click("Heure et météo", "Time and weather");
+            else if (menu == "garage") Click("Voiture", "Car");
+            else if (menu == "options") Click("Options", "Options");
             yield return new WaitForSecondsRealtime(menu == "garage" ? 4f : 2f);
         }
 
@@ -182,7 +195,7 @@ namespace ChillRoad
         {
             if (menu == "tuning") { FindFirstObjectByType<TuningGarage>().Close(); yield return new WaitForSecondsRealtime(2f); yield break; }
             if (menu == "carte") { foreach (var w in FindObjectsByType<WorldMap>(FindObjectsSortMode.None)) w.SetOpen(false); }
-            else if (menu != "pause") Click("Retour");
+            else if (menu != "pause") Click("Retour", "Back");
             yield return new WaitForSecondsRealtime(1.5f);
             game.Hud.SetPaused(false);
             yield return new WaitForSecondsRealtime(1f);

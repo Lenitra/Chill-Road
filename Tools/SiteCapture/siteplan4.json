@@ -1,4 +1,5 @@
 {"shots": [
+  {"name": "accueil", "menu": "accueil", "drive": 6},
   {"name": "col", "car": "supra", "kind": "Mountain", "x": -200, "z": -300, "hour": 18.2, "speed": 60, "drive": 5, "hud": true},
   {"name": "orage", "car": "jesko", "kind": "Highway", "x": 2135, "z": -150, "hour": 17, "storm": true, "speed": 140, "drive": 6, "traffic": 1.8, "hud": true},
   {"name": "menu_pause", "car": "twingo", "x": 250, "z": -1780, "hour": 16.2, "speed": 30, "drive": 4, "menu": "pause"},
