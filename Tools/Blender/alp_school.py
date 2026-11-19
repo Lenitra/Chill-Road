@@ -79,4 +79,17 @@ def school_kiosk(g):
 reg(dict(id="school_kiosk", file="School_Kiosk", cat="street", tags=["school"], seed=614, fp=(7.5, 5.8),
          collider="box", build=school_kiosk))
 
-IDS = ["school_board", "school_cone", "school_tires", "school_arch", "school_kiosk"]
+def school_pylon(g):
+    """Poteau du 8 de drift : socle, mât rayé rouge et blanc, boule en tête (repère lisible de loin)."""
+    n = lv(g, 16, 10, 8)
+    g.frustum((0, 0, 0), 0.45, 0.4, 0.2, n, "concrete", auto=False)
+    for k in range(6):
+        g.frustum((0, 0, 0.2 + k * 0.5), 0.16, 0.16, 0.5, n, "sign_red" if k % 2 == 0 else "white", cap0=False,
+                  cap1=k == 5, auto=False)
+    g.frustum((0, 0, 3.2), 0.28, 0.28, 0.4, n, "yellow", auto=False)
+
+
+reg(dict(id="school_pylon", file="School_Pylon", cat="street", tags=["school"], seed=615, fp=(0.9, 0.9),
+         collider="capsule", radius=0.4, build=school_pylon))
+
+IDS = ["school_board", "school_cone", "school_tires", "school_arch", "school_kiosk", "school_pylon"]

@@ -137,6 +137,12 @@ namespace ChillRoad
                 id = "chalets", fr = "Chemin des Chalets", en = "Chalets Track", spacing = 450f, heading = new Vector2(0.88f, 0.48f), side = 1, fr2 = "Chalets, retour", en2 = "Chalets Track Return", side2 = 0,
                 points = new[] { new Vector2(347.6f, 2353.4f), new Vector2(-37.8f, 2509.7f), new Vector2(-435.8f, 2490.1f) },
             },
+            // Tours : le circuit de l'auto-école, dans la vallée est (Tools/Map/map_school.py, ≈ 1 km le tour)
+            new Def
+            {
+                id = "ecole", fr = "Circuit de l'école", en = "Driving School Circuit", laps = 2, spacing = 250f, heading = new Vector2(0f, 1f), side = 1,
+                points = new[] { new Vector2(1738f, -830f), new Vector2(1930f, -830f), new Vector2(1830f, -1008f) },
+            },
             // Tours : route du lac jusqu'aux Rives, retour par le chemin des Bois (terre) et l'échangeur sud (≈ 3,7 km)
             new Def
             {

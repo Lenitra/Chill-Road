@@ -2326,6 +2326,18 @@ MonoBehaviour:
     module: 0
     ymin: 0
     lights: []
+  - id: school_pylon
+    category: street
+    tags:
+    - school
+    prefab: {fileID: 919132149155446097, guid: ea9e0744c7a09624ba8a2ed1957c802d, type: 3}
+    size: {x: 0.9, y: 3.6, z: 0.9}
+    footprint: {x: 0.9, y: 0.9}
+    collider: capsule
+    radius: 0.4
+    module: 0
+    ymin: 0
+    lights: []
   - id: snow_groomer
     category: ski
     tags:

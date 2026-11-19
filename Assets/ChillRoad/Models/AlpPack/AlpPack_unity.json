@@ -3620,6 +3620,25 @@
    "material": ""
   },
   {
+   "id": "school_pylon",
+   "file": "School_Pylon",
+   "category": "street",
+   "tags": [
+    "school"
+   ],
+   "sx": 0.9,
+   "sy": 3.6,
+   "sz": 0.9,
+   "fw": 0.9,
+   "fd": 0.9,
+   "collider": "capsule",
+   "radius": 0.4,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
    "id": "snow_groomer",
    "file": "Snow_Groomer",
    "category": "ski",

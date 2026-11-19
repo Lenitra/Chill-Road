@@ -569,7 +569,8 @@ def build_edges(net, rivers, lakes_level, verbose=True):
                    if a <= min(ia, ib) and max(ia, ib) <= b]
             eid = ch.id if len(cuts) == 2 else "%s_%d" % (ch.id, k + 1)
             edges.append(dict(id=eid, chain=ch.id, kind=ch.kind, a=na, b=nb, pts=pts, s=L.arclen(pts), spans=spans,
-                              underpass=under, aux=aux, opts=ch.opts, **{k2: v for k2, v in KINDS[ch.kind].items()}))
+                              underpass=under, aux=aux, opts=ch.opts,
+                              **dict(KINDS[ch.kind], **ch.opts.get("kind_over", {}))))
 
     # Ponts automatiques : franchissement des rivières
     for e in edges:
