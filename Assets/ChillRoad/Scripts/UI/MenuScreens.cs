@@ -6,25 +6,22 @@ using UnityEngine.UI;
 namespace ChillRoad
 {
     /// <summary>
-    /// Écrans hors partie (construits en code), dans la DA du HUD (plaques inclinées anthracite, Bahnschrift, or et cyan) :
+    /// Écrans hors partie (construits en code), dans le style verre de l'interface (<see cref="Glass"/> : panneaux
+    /// sombres translucides arrondis, texte fin, or pour la sélection et l'argent, cyan pour les petits titres) :
     /// - fond des deux écrans : une vallée alpine en 3D (<see cref="LoadingStage"/>) avec la voiture choisie, filmée en
     ///   plans de bande-annonce pendant le chargement, puis en orbite lente (voiture dans le tiers droit) sous l'accueil ;
     ///   au départ, il s'efface pendant le flash et laisse place au monde ;
-    /// - chargement : logo, astuce, étape, pourcentage et barre de progression ;
-    /// - accueil : logo, menu en plaques inclinées (Jouer / Multijoueur / Options / Langue / Quitter) qui entre en cascade,
-    ///   voiture et cagnotte en pied de page, touches en bas à droite ;
+    /// - chargement : pilule « CHILL ROAD » en haut à gauche, bandeau de verre en bas (astuce, étape, pourcentage) et
+    ///   fin trait de progression doré le long de son bord inférieur ;
+    /// - accueil : carte du logo en haut à gauche, menu en pilules (Jouer / Multijoueur / Options / Langue / Quitter) qui
+    ///   entre en cascade en bas à gauche, voiture et cagnotte sur une pilule en bas à droite, touches et version dessous ;
     /// - mise en scène du départ : l'accueil s'éjecte, bandes or et cyan, flash, bandes cinéma, compte à rebours, « GO ! ».
     /// </summary>
     public class MenuScreens : MonoBehaviour
     {
-        static readonly Color Accent = new Color(1f, 0.76f, 0.2f);
-        static readonly Color White = new Color(0.97f, 0.97f, 0.97f);
-        static readonly Color Dim = new Color(1f, 1f, 1f, 0.62f);
-        static readonly Color Info = new Color(0.35f, 0.85f, 1f);
-        static readonly Color Ink = new Color(0.04f, 0.045f, 0.06f);
-        static readonly Color PlateColor = new Color(0.03f, 0.04f, 0.06f, 0.86f);
-        static readonly Color ButtonIdle = new Color(0.1f, 0.115f, 0.15f, 0.82f);
-        static readonly Color ButtonSelected = new Color(0.95f, 0.66f, 0.14f, 1f);
+        static readonly Color Accent = Glass.Gold;
+        static readonly Color White = Glass.White;
+        static readonly Color Info = Glass.Cyan;
 
         static readonly (string fr, string en)[] Tips =
         {
@@ -62,15 +59,16 @@ namespace ChillRoad
              "With friends, get noticed: D-pad ↓ (or F) flashes your headlights, R3 (or H) sounds the horn."),
         };
 
-        /// <summary>Bouton du menu d'accueil : plaque inclinée, liseré or, libellé ; l'état « choisi » est animé.</summary>
+        /// <summary>Bouton du menu d'accueil : pilule de verre, libellé, valeur facultative (langue) ; l'état « choisi » est animé.</summary>
         class MenuItem
         {
             public Button button;
             public RectTransform body;
-            public HudShape plate, mark;
-            public Text label, chevron;
+            public GlassRect plate;
+            public Text label, value, chevron;
             public CanvasGroup group;
-            public float sel;
+            public float sel, drawn = -1f;
+            public bool strong;
         }
 
         GameManager game;
@@ -85,18 +83,18 @@ namespace ChillRoad
         CanvasGroup backdrop;
         LoadingStage stage;
         RawImage stageView;
-        // Écran de chargement : logo, astuce, pourcentage, reflet de la barre, roue d'attente
-        RectTransform loadingLogo, progressSheen, spinner;
+        // Écran de chargement : pilule du logo, astuce, étape, pourcentage, roue d'attente
+        RectTransform loadingLogo, spinner;
         CanvasGroup loadingLogoGroup;
-        Text percentText, tipText;
-        HudShape sheenShape;
+        Text percentText, tipText, loadKicker;
         float loadingT, tipTimer = 6f;
         int tipIndex;
         // Accueil : entrée en cascade, pied de page, touches
         readonly List<MenuItem> items = new List<MenuItem>();
-        RectTransform titleLogo, chipRow;
+        RectTransform titleLogo;
+        Vector2 titleLogoPos;
         CanvasGroup titleLogoGroup, footerGroup;
-        Text carText, cashText;
+        Text carText, cashText, keysText;
         float titleT = -1f;
         bool chipsForPad, chipsFrench;
         Button playButton;
@@ -121,7 +119,7 @@ namespace ChillRoad
             BuildTitle(root);
             BuildLoading(root);
             BuildLaunch(root);
-            countdownText = Label(root, 240, TextAnchor.MiddleCenter, White, FontStyle.BoldAndItalic, new Vector2(0.5f, 0.58f), Vector2.zero, new Vector2(1200, 320));
+            countdownText = Glass.Label(root, "", 240, Glass.Weight.Semilight, White, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.58f), Vector2.zero, new Vector2(1200, 320));
             countdownGlow = countdownText.gameObject.AddComponent<Outline>();
             countdownGlow.effectDistance = new Vector2(6, -6);
             lobby = gameObject.AddComponent<NetLobby>();
@@ -131,104 +129,122 @@ namespace ChillRoad
 
         // ------------------------------------------------------------------ logo
 
-        /// <summary>
-        /// Logo du jeu : surtitre cyan espacé, « CHILL » blanc et « ROAD » or en gras italique, souligné d'un trait or
-        /// incliné prolongé d'un tiret cyan. Pivot à gauche (accueil) ou au centre (chargement).
-        /// </summary>
-        RectTransform Logo(RectTransform parent, Vector2 anchor, int size, bool centred, out CanvasGroup group)
+        /// <summary>« CHILL » fin blanc et « ROAD » or plus appuyé, côte à côte (deux textes : deux graisses).</summary>
+        static RectTransform Wordmark(Transform parent, int size, float rowHeight)
         {
-            float w = size * 4.6f, h = size * 1.75f;
-            var rt = Rect(parent, "Logo", anchor, anchor, Vector2.zero, Vector2.zero);
-            rt.sizeDelta = new Vector2(w, h);
-            rt.pivot = new Vector2(centred ? 0.5f : 0f, 0.5f);
-            group = rt.gameObject.AddComponent<CanvasGroup>();
-            group.blocksRaycasts = false;
-            var align = centred ? TextAnchor.MiddleCenter : TextAnchor.MiddleLeft;
-            float px = centred ? 0.5f : 0f;
-
-            var kicker = Label(rt, Mathf.RoundToInt(size * 0.16f), align, Info, FontStyle.Bold, new Vector2(px, 1f), new Vector2(centred ? 0f : size * 0.06f, -size * 0.1f), new Vector2(w, size * 0.25f));
-            kicker.rectTransform.pivot = new Vector2(px, 1f);
-            Loc.Bind(kicker, Spaced("BALADE ALPINE") + "   ·   " + Spaced("MONDE OUVERT"), Spaced("ALPINE DRIVING") + "   ·   " + Spaced("OPEN WORLD"));
-
-            var word = Label(rt, size, align, White, FontStyle.BoldAndItalic, new Vector2(px, 0.5f), new Vector2(0f, size * 0.04f), new Vector2(w, size * 1.15f));
-            word.rectTransform.pivot = new Vector2(px, 0.5f);
-            word.supportRichText = true;
-            word.text = $"CHILL <color=#{ColorUtility.ToHtmlStringRGB(Accent)}>ROAD</color>";
-            var sh = word.GetComponent<Shadow>();
-            sh.effectColor = new Color(0f, 0f, 0f, 0.5f);
-            sh.effectDistance = new Vector2(size * 0.035f, -size * 0.035f);
-
-            // Trait or + tiret cyan sous le mot
-            float barW = size * 2.1f, dash = size * 0.42f, bh = Mathf.Max(5f, size * 0.05f), y = -size * 0.62f;
-            float x0 = centred ? -(barW + dash + 14f) * 0.5f : size * 0.04f;
-            var bar = Rect(rt, "Bar", new Vector2(px, 0.5f), new Vector2(px, 0.5f), new Vector2(x0, y - bh), new Vector2(x0 + barW, y));
-            Plate(bar, Accent).Set(bh * 1.4f, 0f, 0f);
-            var tick = Rect(rt, "Dash", new Vector2(px, 0.5f), new Vector2(px, 0.5f), new Vector2(x0 + barW + 14f, y - bh), new Vector2(x0 + barW + 14f + dash, y));
-            Plate(tick, Info).Set(bh * 1.4f, 0f, 0f);
-            return rt;
+            var row = Rect(parent, "Word", Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
+            var h = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+            h.spacing = size * 0.28f;
+            h.childAlignment = TextAnchor.MiddleLeft;
+            h.childControlWidth = h.childControlHeight = true;
+            h.childForceExpandWidth = h.childForceExpandHeight = false;
+            row.gameObject.AddComponent<LayoutElement>().preferredHeight = rowHeight;
+            Glass.Label(row, "CHILL", size, Glass.Weight.Light, Glass.White);
+            Glass.Label(row, "ROAD", size, Glass.Weight.Regular, Glass.Gold);
+            return row;
         }
 
-        /// <summary>Lettres espacées (le Text de uGUI n'a pas d'interlettrage).</summary>
-        static string Spaced(string s) => string.Join(" ", s.ToCharArray());
+        /// <summary>Panneau de verre qui prend la taille de son contenu (mise en page verticale ou horizontale).</summary>
+        static GlassRect FitPanel(Transform parent, string name, float radius, bool vertical, RectOffset padding, float spacing, Vector2 anchor, Vector2 pos)
+        {
+            var g = Glass.Make(parent, name, radius, Glass.Panel, 1.5f);
+            var rt = g.rectTransform;
+            rt.anchorMin = rt.anchorMax = rt.pivot = anchor;
+            rt.anchoredPosition = pos;
+            HorizontalOrVerticalLayoutGroup l = vertical
+                ? g.gameObject.AddComponent<VerticalLayoutGroup>()
+                : (HorizontalOrVerticalLayoutGroup)g.gameObject.AddComponent<HorizontalLayoutGroup>();
+            l.padding = padding;
+            l.spacing = spacing;
+            l.childAlignment = vertical ? TextAnchor.UpperLeft : TextAnchor.MiddleLeft;
+            l.childControlWidth = l.childControlHeight = true;
+            l.childForceExpandWidth = l.childForceExpandHeight = false;
+            var fit = g.gameObject.AddComponent<ContentSizeFitter>();
+            fit.horizontalFit = fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            return g;
+        }
 
         // ------------------------------------------------------------------ chargement
 
         /// <summary>
         /// Écran de chargement (le premier que l'on voit) : décor 3D fait des assets du jeu (<see cref="LoadingStage"/> :
-        /// la voiture choisie sur une nationale, filmée en plans enchaînés), logo, puis en bas l'astuce du moment sur sa
-        /// plaque, l'étape en cours avec une roue d'attente, le pourcentage et une barre crantée. En fin de chargement,
-        /// l'écran s'efface en fondu sur l'accueil.
+        /// la voiture choisie sur une nationale, filmée en plans enchaînés), petite pilule « CHILL ROAD » en haut à gauche,
+        /// puis en bas un bandeau de verre pleine largeur (coins hauts arrondis) : l'astuce du moment à gauche, l'étape en
+        /// cours avec sa roue d'attente et le grand pourcentage à droite, un fin trait doré de progression le long du bord
+        /// inférieur. En fin de chargement, l'écran s'efface en fondu sur l'accueil.
         /// </summary>
         void BuildLoading(RectTransform root)
         {
             var panel = Rect(root, "Loading", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             loading = panel.gameObject.AddComponent<CanvasGroup>();
-            // Voile en haut et en bas : le logo et la plaque restent lisibles sur le décor
+            // Voile léger en haut et en bas : la pilule et le bandeau restent lisibles sur le décor
             var veil = Rect(panel, "Veil", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject.AddComponent<RawImage>();
             veil.texture = VerticalVeil();
             veil.raycastTarget = false;
 
-            loadingLogo = Logo(panel, new Vector2(0.5f, 0.8f), 128, true, out loadingLogoGroup);
+            // Pilule du logo
+            var pill = FitPanel(panel, "Logo", 45f, false, new RectOffset(36, 36, 9, 9), 14f, new Vector2(0f, 1f), new Vector2(60f, -51f));
+            Glass.Label(pill.transform, "CHILL", 42, Glass.Weight.Light, Glass.White);
+            Glass.Label(pill.transform, "ROAD", 42, Glass.Weight.Regular, Glass.Gold);
+            loadingLogo = pill.rectTransform;
+            loadingLogoGroup = pill.gameObject.AddComponent<CanvasGroup>();
+            loadingLogoGroup.blocksRaycasts = false;
 
-            // Bas de l'écran : astuce sur sa plaque, puis étape, pourcentage et barre
-            var box = Rect(panel, "Progress", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(-660f, 56f), new Vector2(660f, 236f));
-            var tipPlate = Rect(box, "TipPlate", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -60f), Vector2.zero);
-            Plate(tipPlate, PlateColor).Set(22f, 180f, 180f);
-            tipText = Label(tipPlate, 24, TextAnchor.MiddleCenter, White, FontStyle.Normal, new Vector2(0.5f, 0.5f), new Vector2(0f, 1f), new Vector2(1240, 34));
-            tipText.supportRichText = true;
+            // Bandeau du bas : il déborde sous et sur les côtés de l'écran, seuls ses coins hauts arrondis se voient
+            var band = Glass.Make(panel, "Band", 45f, Glass.Panel, 1.5f).rectTransform;
+            band.anchorMin = Vector2.zero; band.anchorMax = new Vector2(1f, 0f);
+            band.offsetMin = new Vector2(-4f, -60f); band.offsetMax = new Vector2(4f, 210f);
+            var content = Rect(band, "Content", Vector2.zero, Vector2.one, new Vector2(94f, 96f), new Vector2(-94f, -36f));
+
+            // Astuce : petit titre cyan, texte fin sur deux lignes au plus
+            var tipKicker = Glass.Kicker(content, "", 16);
+            Pose(tipKicker, new Vector2(0f, 1f), Vector2.zero, new Vector2(400f, 24f));
+            Loc.Bind(tipKicker, Glass.Spaced("ASTUCE", 2), Glass.Spaced("TIP", 2));
+            tipText = Glass.Label(content, "", 34, Glass.Weight.Light, Glass.White, TextAnchor.UpperLeft);
+            var tr = tipText.rectTransform;
+            tr.anchorMin = new Vector2(0f, 1f); tr.anchorMax = Vector2.one; tr.pivot = new Vector2(0f, 1f);
+            tr.offsetMin = new Vector2(0f, -132f); tr.offsetMax = new Vector2(-560f, -34f);
+            tipText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            tipText.lineSpacing = 1.05f;
             tipIndex = Random.Range(0, Tips.Length);
             SetTip();
 
-            // Roue d'attente (arc qui tourne) et étape en cours, à gauche ; pourcentage à droite
-            spinner = Rect(box, "Spinner", new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(18f, 50f), new Vector2(50f, 82f));
-            spinner.gameObject.AddComponent<CanvasRenderer>();
+            // À droite : « CHARGEMENT » précédé de l'étape en cours et de la roue d'attente, puis le pourcentage
+            loadKicker = Glass.Kicker(content, "", 16);
+            loadKicker.alignment = TextAnchor.MiddleRight;
+            Pose(loadKicker, Vector2.one, Vector2.zero, new Vector2(400f, 24f));
+            Loc.Bind(loadKicker, Glass.Spaced("CHARGEMENT", 2), Glass.Spaced("LOADING", 2));
+            stepText = Glass.Label(content, "", 20, Glass.Weight.Light, Glass.Dim, TextAnchor.MiddleRight, Vector2.one, new Vector2(-220f, 0f), new Vector2(700f, 24f));
+            spinner = Glass.Place(content, "Spinner", Vector2.one, new Vector2(-460f, -2f), new Vector2(20f, 20f));
             var arc = spinner.gameObject.AddComponent<Image>();
-            arc.sprite = HudArt.Ring;
+            arc.sprite = Glass.Ring(0.2f);
             arc.type = Image.Type.Filled;
             arc.fillMethod = Image.FillMethod.Radial360;
             arc.fillAmount = 0.3f;
             arc.color = Accent;
             arc.raycastTarget = false;
-            stepText = Label(box, 24, TextAnchor.MiddleLeft, new Color(1f, 1f, 1f, 0.82f), FontStyle.BoldAndItalic, new Vector2(0f, 0f), new Vector2(66f, 66f), new Vector2(900, 34));
-            stepText.rectTransform.pivot = new Vector2(0f, 0.5f);
-            percentText = Label(box, 44, TextAnchor.MiddleRight, Accent, FontStyle.BoldAndItalic, new Vector2(1f, 0f), new Vector2(-14f, 68f), new Vector2(260, 52));
-            percentText.rectTransform.pivot = new Vector2(1f, 0.5f);
+            spinner.pivot = new Vector2(0.5f, 0.5f);
+            percentText = Glass.Label(content, "", 90, Glass.Weight.Light, Accent, TextAnchor.MiddleRight, Vector2.one, new Vector2(0f, -26f), new Vector2(520f, 100f));
 
-            // Barre : piste sombre crantée tous les 10 %, remplissage or, reflet qui la parcourt
-            var bar = Rect(box, "Bar", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(14f, 18f), new Vector2(-14f, 30f));
-            Plate(bar, new Color(1f, 1f, 1f, 0.12f)).Set(10f, 0f, 0f);
-            progressFill = Rect(bar, "Fill", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            // Trait de progression : piste claire et remplissage or, au ras du bas de l'écran
+            var track = Rect(band, "Track", Vector2.zero, new Vector2(1f, 0f), new Vector2(4f, 60f), new Vector2(-4f, 64.5f));
+            track.gameObject.AddComponent<Image>().color = Glass.A(Color.white, 0.18f);
+            track.GetComponent<Image>().raycastTarget = false;
+            progressFill = Rect(track, "Fill", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             progressFill.pivot = new Vector2(0f, 0.5f);
-            Plate(progressFill, Accent).Set(10f, 0f, 0f);
+            var fill = progressFill.gameObject.AddComponent<Image>();
+            fill.color = Accent;
+            fill.raycastTarget = false;
             progressFill.localScale = new Vector3(0f, 1f, 1f);
-            for (int i = 1; i < 10; i++)
-            {
-                var notch = Rect(bar, "Notch", new Vector2(i / 10f, 0f), new Vector2(i / 10f, 1f), new Vector2(-2f, -1f), new Vector2(2f, 1f));
-                Plate(notch, new Color(0.01f, 0.012f, 0.02f, 0.85f)).Set(10f, 0f, 0f);
-            }
-            progressSheen = Rect(bar, "Sheen", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(-50f, -6f), new Vector2(50f, 6f));
-            sheenShape = Plate(progressSheen, new Color(1f, 1f, 0.92f, 0f));
-            sheenShape.Set(10f, 40f, 40f);
+        }
+
+        /// <summary>Texte posé : ancre = pivot, position et boîte.</summary>
+        static void Pose(Text t, Vector2 anchor, Vector2 pos, Vector2 box)
+        {
+            var rt = t.rectTransform;
+            rt.anchorMin = rt.anchorMax = rt.pivot = anchor;
+            rt.anchoredPosition = pos;
+            rt.sizeDelta = box;
         }
 
         /// <summary>
@@ -273,38 +289,27 @@ namespace ChillRoad
             }
         }
 
-        /// <summary>Dégradé vertical : sombre en haut et surtout en bas, transparent au milieu (sur la voiture).</summary>
+        /// <summary>Dégradé vertical : assombrit le bas (sous le bandeau) et un peu le haut, transparent au milieu (sur la voiture).</summary>
         static Texture2D VerticalVeil()
         {
             var tex = new Texture2D(1, 128, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
             for (int y = 0; y < 128; y++)
             {
                 float v = y / 127f;
-                float a = Mathf.Max(Mathf.Pow(1f - Mathf.Clamp01(v / 0.36f), 1.5f) * 0.88f, Mathf.Pow(Mathf.Clamp01((v - 0.6f) / 0.4f), 1.7f) * 0.62f);
+                float a = Mathf.Max(Mathf.Pow(1f - Mathf.Clamp01(v / 0.34f), 1.5f) * 0.6f, Mathf.Pow(Mathf.Clamp01((v - 0.72f) / 0.28f), 1.7f) * 0.4f);
                 tex.SetPixel(0, y, new Color(0.01f, 0.012f, 0.02f, a));
             }
             tex.Apply();
             return tex;
         }
 
-        /// <summary>Plaque inclinée du HUD sur tout le rectangle (le composant CanvasRenderer n'est pas ajouté seul).</summary>
-        static HudShape Plate(RectTransform rt, Color color)
-        {
-            rt.gameObject.AddComponent<CanvasRenderer>();
-            var s = rt.gameObject.AddComponent<HudShape>();
-            s.color = color;
-            s.raycastTarget = false;
-            return s;
-        }
-
         void SetTip()
         {
             var tip = Tips[tipIndex];
-            string hex = ColorUtility.ToHtmlStringRGB(Info);
-            tipText.text = $"<color=#{hex}><b>{Loc.T("ASTUCE", "TIP")}</b></color>    {Loc.T(tip.fr, tip.en)}";
+            tipText.text = Loc.T(tip.fr, tip.en);
         }
 
-        /// <summary>Animation de l'écran de chargement : fondus du décor, logo, roue, pourcentage, reflet, astuces.</summary>
+        /// <summary>Animation de l'écran de chargement : logo, roue, étape, pourcentage, astuces.</summary>
         void UpdateLoading(float dt)
         {
             loadingT += dt;
@@ -312,18 +317,16 @@ namespace ChillRoad
             int pct = Mathf.RoundToInt(progress * 100f);
             percentText.text = Loc.T($"{pct} %", $"{pct}%");
             spinner.localRotation = Quaternion.Euler(0f, 0f, -loadingT * 300f);
+            // L'étape et sa roue se rangent à gauche de « CHARGEMENT » (largeurs variables selon la langue et l'étape)
+            float x = -(loadKicker.preferredWidth + 22f);
+            stepText.rectTransform.anchoredPosition = new Vector2(x, 0f);
+            spinner.anchoredPosition = new Vector2(x - stepText.preferredWidth - 22f, -12f);
+            spinner.gameObject.SetActive(stepText.text.Length > 0);
 
-            // Reflet qui parcourt la partie remplie de la barre
-            float fill = ((RectTransform)progressFill.parent).rect.width * progress;
-            float k = Mathf.Repeat(loadingT * 0.75f, 1.35f);
-            progressSheen.anchoredPosition = new Vector2(Mathf.Min(k, 1f) * fill, 0f);
-            float sheenA = k < 1f && fill > 80f ? Mathf.Sin(k * Mathf.PI) * 0.75f : 0f;
-            sheenShape.color = new Color(1f, 1f, 0.92f, sheenA);
-
-            // Logo : arrivée (léger zoom et fondu), puis respiration lente
+            // Logo : arrivée (léger glissement et fondu)
             float intro = Mathf.Clamp01((loadingT - 0.15f) / 0.9f);
             float ease = 1f - (1f - intro) * (1f - intro) * (1f - intro);
-            loadingLogo.localScale = Vector3.one * (Mathf.Lerp(1.08f, 1f, ease) + Mathf.Sin(loadingT * 1.4f) * 0.006f);
+            loadingLogo.anchoredPosition = new Vector2(60f - (1f - ease) * 40f, -51f);
             loadingLogoGroup.alpha = ease;
 
             // Astuces : une nouvelle toutes les 6 s, en fondu
@@ -346,64 +349,81 @@ namespace ChillRoad
             var panel = Rect(root, "Title", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             titlePanel = panel;
             title = panel.gameObject.AddComponent<CanvasGroup>();
-            // Ombres : dégradé sombre à gauche (le menu) et en bas (le pied de page), la voiture reste dégagée à droite
-            var shade = Rect(panel, "Shade", Vector2.zero, new Vector2(0.62f, 1f), Vector2.zero, Vector2.zero).gameObject.AddComponent<RawImage>();
-            shade.texture = Ramp(true, 1.3f, 0.86f);
+            // Ombres légères : à gauche (le menu) et en bas (le pied de page), la voiture reste dégagée à droite ; les
+            // panneaux de verre font le reste pour la lisibilité
+            var shade = Rect(panel, "Shade", Vector2.zero, new Vector2(0.55f, 1f), Vector2.zero, Vector2.zero).gameObject.AddComponent<RawImage>();
+            shade.texture = Ramp(true, 1.4f, 0.5f);
             shade.raycastTarget = false;
             var floor = Rect(panel, "Floor", Vector2.zero, new Vector2(1f, 0.24f), Vector2.zero, Vector2.zero).gameObject.AddComponent<RawImage>();
-            floor.texture = Ramp(false, 1.6f, 0.6f);
+            floor.texture = Ramp(false, 1.6f, 0.42f);
             floor.raycastTarget = false;
 
-            titleLogo = Logo(panel, new Vector2(0.065f, 0.765f), 150, false, out titleLogoGroup);
-            var tagline = Label(titleLogo, 28, TextAnchor.MiddleLeft, Dim, FontStyle.Italic, new Vector2(0f, 0f), new Vector2(8f, -18f), new Vector2(1100, 40));
-            tagline.rectTransform.pivot = new Vector2(0f, 0.5f);
+            // Carte du logo en haut à gauche : surtitre cyan, « CHILL ROAD », trait or + tiret cyan, accroche
+            titleLogoPos = new Vector2(90f, -66f);
+            var card = FitPanel(panel, "Logo", 45f, true, new RectOffset(48, 48, 33, 36), 9f, new Vector2(0f, 1f), titleLogoPos);
+            titleLogo = card.rectTransform;
+            titleLogoGroup = card.gameObject.AddComponent<CanvasGroup>();
+            titleLogoGroup.blocksRaycasts = false;
+            var kicker = Glass.Kicker(card.transform, "", 18);
+            Loc.Bind(kicker, Glass.Spaced("BALADE ALPINE", 2) + "   ·   " + Glass.Spaced("MONDE OUVERT", 2), Glass.Spaced("ALPINE DRIVING", 2) + "   ·   " + Glass.Spaced("OPEN WORLD", 2));
+            Wordmark(card.transform, 123, 128f);
+            var rule = Rect(card.transform, "Rule", Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
+            var rle = rule.gameObject.AddComponent<LayoutElement>();
+            rle.preferredWidth = 330f; rle.preferredHeight = 4.5f;
+            var goldRule = Glass.Make(rule, "Gold", 3f, Accent, 0f).rectTransform;
+            goldRule.anchorMin = Vector2.zero; goldRule.anchorMax = new Vector2(0f, 1f);
+            goldRule.offsetMin = Vector2.zero; goldRule.offsetMax = new Vector2(255f, 0f);
+            var cyanRule = Glass.Make(rule, "Cyan", 3f, Info, 0f).rectTransform;
+            cyanRule.anchorMin = Vector2.zero; cyanRule.anchorMax = new Vector2(0f, 1f);
+            cyanRule.offsetMin = new Vector2(264f, 0f); cyanRule.offsetMax = new Vector2(330f, 0f);
+            Rect(card.transform, "Gap", Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero).gameObject.AddComponent<LayoutElement>().preferredHeight = 3f;
+            var tagline = Glass.Label(card.transform, "", 26, Glass.Weight.Light, Glass.White);
             Loc.Bind(tagline, "Une vallée alpine, un col, des lacets : roule à ton rythme.", "An alpine valley, a mountain pass, hairpins: drive at your own pace.");
 
-            // Menu : plaques inclinées en colonne, la première plus haute
-            var box = Rect(panel, "Buttons", new Vector2(0.065f, 0.4f), new Vector2(0.065f, 0.4f), new Vector2(0, -190), new Vector2(540, 160));
-            box.pivot = new Vector2(0f, 0.5f);
+            // Menu : pilules en colonne, calées en bas à gauche, la première plus haute
+            var box = Glass.Place(panel, "Buttons", Vector2.zero, new Vector2(90f, 72f), new Vector2(570f, 460f));
             var layout = box.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 10;
-            layout.childControlHeight = true; layout.childControlWidth = true; layout.childForceExpandHeight = false;
-            playButton = Item(box, "JOUER", "PLAY", () => game.StartCountdown(), 78, 40).button;
-            Item(box, "MULTIJOUEUR", "MULTIPLAYER", OpenLobby, 60, 32);
-            Item(box, "OPTIONS", "OPTIONS", OpenOptions, 60, 32);
+            layout.spacing = 12;
+            layout.childAlignment = TextAnchor.LowerLeft;
+            layout.childControlHeight = true; layout.childControlWidth = true;
+            layout.childForceExpandHeight = false; layout.childForceExpandWidth = true;
+            playButton = Item(box, "JOUER", "PLAY", () => game.StartCountdown(), 90, 32).button;
+            Item(box, "MULTIJOUEUR", "MULTIPLAYER", OpenLobby, 75, 26);
+            Item(box, "OPTIONS", "OPTIONS", OpenOptions, 75, 26);
             // Langue : affiche celle en cours, un clic passe à l'autre
-            Item(box, "LANGUE : FRANÇAIS", "LANGUAGE: ENGLISH", Loc.Toggle, 50, 24);
-            Item(box, "QUITTER", "QUIT", () => game.Quit(), 60, 32);
+            Item(box, "LANGUE", "LANGUAGE", Loc.Toggle, 75, 26, "Français", "English");
+            Item(box, "QUITTER", "QUIT", () => game.Quit(), 75, 26);
 
-            // Pied de page : la voiture du moment et la cagnotte
-            var footer = Rect(panel, "Footer", new Vector2(0.065f, 0f), new Vector2(0.065f, 0f), new Vector2(-10f, 56f), new Vector2(630f, 134f));
+            // Bas à droite : pilule voiture du moment | cagnotte, puis touches utiles et version du jeu
+            var footer = FitPanel(panel, "Footer", 45f, false, new RectOffset(36, 36, 15, 15), 27f, new Vector2(1f, 0f), new Vector2(-60f, 122f));
             footerGroup = footer.gameObject.AddComponent<CanvasGroup>();
             footerGroup.blocksRaycasts = false;
-            Plate(footer, PlateColor).Set(22f, 0f, 120f);
-            var stripe = Rect(footer, "Stripe", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(10f, 10f), new Vector2(17f, -10f));
-            Plate(stripe, Info).Set(7f, 0f, 0f);
-            var carTitle = Label(footer, 18, TextAnchor.MiddleLeft, Info, FontStyle.Bold, new Vector2(0f, 1f), new Vector2(36f, -22f), new Vector2(300, 24));
-            carTitle.rectTransform.pivot = new Vector2(0f, 0.5f);
-            Loc.Bind(carTitle, Spaced("TA VOITURE"), Spaced("YOUR CAR"));
-            carText = Label(footer, 32, TextAnchor.MiddleLeft, White, FontStyle.BoldAndItalic, new Vector2(0f, 0f), new Vector2(36f, 28f), new Vector2(310, 40));
-            carText.rectTransform.pivot = new Vector2(0f, 0.5f);
-            carText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            carText.resizeTextForBestFit = true;
-            carText.resizeTextMinSize = 20;
-            carText.resizeTextMaxSize = 32;
-            var cashTitle = Label(footer, 18, TextAnchor.MiddleRight, Info, FontStyle.Bold, new Vector2(1f, 1f), new Vector2(-130f, -22f), new Vector2(200, 24));
-            cashTitle.rectTransform.pivot = new Vector2(1f, 0.5f);
-            Loc.Bind(cashTitle, Spaced("CAGNOTTE"), Spaced("CASH"));
-            cashText = Label(footer, 32, TextAnchor.MiddleRight, Accent, FontStyle.BoldAndItalic, new Vector2(1f, 0f), new Vector2(-130f, 28f), new Vector2(220, 40));
-            cashText.rectTransform.pivot = new Vector2(1f, 0.5f);
+            carText = FooterColumn(footer.transform, "TA VOITURE", "YOUR CAR", Glass.White);
+            var divider = Glass.Bar(footer.transform, "Divider", Glass.A(Color.white, 0.4f));
+            var dle = divider.gameObject.AddComponent<LayoutElement>();
+            dle.preferredWidth = 1.5f; dle.preferredHeight = 45f;
+            cashText = FooterColumn(footer.transform, "CAGNOTTE", "CASH", Accent);
 
-            // Bas à droite : touches utiles, et version du jeu
-            chipRow = Rect(panel, "Keys", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-900f, 70f), new Vector2(-60f, 110f));
+            keysText = Glass.Label(panel, "", 21, Glass.Weight.Light, Glass.White, TextAnchor.MiddleRight, new Vector2(1f, 0f), new Vector2(-60f, 72f), new Vector2(1400f, 32f));
+            Glass.Soft(keysText, 0.8f);
             BuildChips(GameInput.UsingGamepad);
-            var version = Label(panel, 18, TextAnchor.MiddleRight, new Color(1f, 1f, 1f, 0.35f), FontStyle.Normal, new Vector2(1f, 0f), new Vector2(-60f, 40f), new Vector2(400, 24));
-            version.rectTransform.pivot = new Vector2(1f, 0.5f);
-            version.text = "v" + Application.version;
         }
 
-        /// <summary>Bouton du menu : plaque inclinée qui s'estompe à droite, liseré or à gauche, flèche quand il est choisi.</summary>
-        MenuItem Item(Transform parent, string fr, string en, UnityEngine.Events.UnityAction onClick, float height, int size)
+        /// <summary>Colonne de la pilule du pied de page : petit titre cyan, valeur dessous.</summary>
+        static Text FooterColumn(Transform parent, string fr, string en, Color valueColor)
+        {
+            var col = Rect(parent, "Column", Vector2.zero, Vector2.zero, Vector2.zero, Vector2.zero);
+            var v = col.gameObject.AddComponent<VerticalLayoutGroup>();
+            v.childAlignment = TextAnchor.MiddleLeft;
+            v.childControlWidth = v.childControlHeight = true;
+            v.childForceExpandWidth = v.childForceExpandHeight = false;
+            var k = Glass.Kicker(col, "", 16);
+            Loc.Bind(k, Glass.Spaced(fr, 2), Glass.Spaced(en, 2));
+            return Glass.Label(col, "", 30, Glass.Weight.Regular, valueColor);
+        }
+
+        /// <summary>Bouton du menu : pilule de verre ; choisi, elle se remplit d'or (texte à l'encre, halo, chevron).</summary>
+        MenuItem Item(Transform parent, string fr, string en, UnityEngine.Events.UnityAction onClick, float height, int size, string valueFr = null, string valueEn = null)
         {
             var go = new GameObject("Button", typeof(RectTransform), typeof(LayoutElement), typeof(CanvasGroup));
             go.transform.SetParent(parent, false);
@@ -412,18 +432,17 @@ namespace ChillRoad
             le.flexibleHeight = 0f;
             var item = new MenuItem { group = go.GetComponent<CanvasGroup>() };
             item.body = Rect(go.transform, "Body", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            item.plate = Plate(item.body, ButtonIdle).Set(18f, 0f, 110f);
+            item.plate = Glass.Make(item.body, "Pill", height * 0.5f, Glass.Panel, 1.5f);
+            Glass.Stretch(item.plate.rectTransform);
             item.plate.raycastTarget = true;
-            var mark = Rect(item.body, "Mark", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(2f, 0f), new Vector2(9f, 0f));
-            item.mark = Plate(mark, Accent).Set(18f, 0f, 0f);
-            item.label = Label(item.body, size, TextAnchor.MiddleLeft, White, FontStyle.BoldAndItalic, new Vector2(0f, 0.5f), new Vector2(34f, 0f), new Vector2(460, height));
-            item.label.rectTransform.pivot = new Vector2(0f, 0.5f);
-            Loc.Bind(item.label, fr, en);
-            item.chevron = Label(item.body, size, TextAnchor.MiddleRight, Ink, FontStyle.Bold, new Vector2(1f, 0.5f), new Vector2(-150f, 0f), new Vector2(60, height));
-            item.chevron.rectTransform.pivot = new Vector2(1f, 0.5f);
-            item.chevron.text = "›";
-            var sh = item.chevron.GetComponent<Shadow>();
-            sh.enabled = false;
+            item.label = Glass.Label(item.body, "", size, Glass.Weight.Regular, White, TextAnchor.MiddleLeft, new Vector2(0f, 0.5f), new Vector2(36f, 0f), new Vector2(440f, height));
+            Loc.Bind(item.label, Glass.Spaced(fr, 1), Glass.Spaced(en, 1));
+            if (valueFr != null)
+            {
+                item.value = Glass.Label(item.body, "", 22, Glass.Weight.Regular, Info, TextAnchor.MiddleRight, new Vector2(1f, 0.5f), new Vector2(-36f, 0f), new Vector2(260f, height));
+                Loc.Bind(item.value, valueFr, valueEn);
+            }
+            item.chevron = Glass.Label(item.body, "›", size + 12, Glass.Weight.Semibold, Glass.Ink, TextAnchor.MiddleRight, new Vector2(1f, 0.5f), new Vector2(-30f, 3f), new Vector2(40f, height));
 
             var b = go.AddComponent<Button>();
             b.transition = Selectable.Transition.None;
@@ -435,36 +454,22 @@ namespace ChillRoad
             return item;
         }
 
-        /// <summary>Touches du bas de l'accueil : petites plaques claires avec la touche, puis l'action (reconstruites si la manette change).</summary>
+        /// <summary>Touches du bas de l'accueil : ligne fine, touche en or puis l'action, et la version (refaite si la manette change).</summary>
         void BuildChips(bool pad)
         {
             chipsForPad = pad;
             chipsFrench = Loc.French;
-            for (int i = chipRow.childCount - 1; i >= 0; i--) Destroy(chipRow.GetChild(i).gameObject);
-            if (Application.isMobilePlatform) return;
+            string version = "v" + Application.version;
+            if (Application.isMobilePlatform) { keysText.text = version; return; }
+            string gold = ColorUtility.ToHtmlStringRGB(Accent);
             var keys = pad
-                ? new[] { ("A", "Valider", "Select"), ("↑ ↓", "Choisir", "Navigate") }
-                : new[] { (Loc.T("ENTRÉE", "ENTER"), "Valider", "Select"), ("↑ ↓", "Choisir", "Navigate") };
-            float x = 0f;
+                ? new[] { ("↑ ↓", "Choisir", "Navigate"), ("A", "Valider", "Select") }
+                : new[] { ("↑ ↓", "Choisir", "Navigate"), (Loc.T("ENTRÉE", "ENTER"), "Valider", "Select") };
+            var sb = new System.Text.StringBuilder();
             foreach (var (key, fr, en) in keys)
-            {
-                // De droite à gauche : l'action, puis la touche
-                var action = Label(chipRow, 22, TextAnchor.MiddleRight, Dim, FontStyle.Normal, new Vector2(1f, 0.5f), new Vector2(x, 0f), new Vector2(200, 30));
-                action.rectTransform.pivot = new Vector2(1f, 0.5f);
-                action.text = Loc.T(fr, en);
-                x -= action.preferredWidth + 12f;
-                var chip = Rect(chipRow, "Key", new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), Vector2.zero, Vector2.zero);
-                var keyText = Label(chip, 20, TextAnchor.MiddleCenter, Ink, FontStyle.Bold, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(120, 30));
-                keyText.text = key;
-                keyText.GetComponent<Shadow>().enabled = false;
-                float w = Mathf.Max(38f, keyText.preferredWidth + 22f);
-                chip.pivot = new Vector2(1f, 0.5f);
-                chip.sizeDelta = new Vector2(w, 34f);
-                chip.anchoredPosition = new Vector2(x, 0f);
-                Plate(chip, new Color(0.92f, 0.93f, 0.95f, 0.92f)).Set(8f, 0f, 0f);
-                keyText.transform.SetAsLastSibling();
-                x -= w + 34f;
-            }
+                sb.Append($"<color=#{gold}>{key}</color>  {Loc.T(fr, en)}   ·   ");
+            sb.Append($"<color=#{ColorUtility.ToHtmlStringRGBA(Glass.Dim)}>{version}</color>");
+            keysText.text = sb.ToString();
         }
 
         /// <summary>Animation de l'accueil : entrée en cascade, état des boutons, pied de page, touches.</summary>
@@ -475,7 +480,7 @@ namespace ChillRoad
 
             float logo = T(0.05f, 0.7f);
             titleLogoGroup.alpha = logo;
-            titleLogo.anchoredPosition = new Vector2(-(1f - logo) * 90f, 0f);
+            titleLogo.anchoredPosition = titleLogoPos + new Vector2(-(1f - logo) * 90f, 0f);
             footerGroup.alpha = T(0.55f, 0.6f);
 
             var selected = EventSystem.current ? EventSystem.current.currentSelectedGameObject : null;
@@ -487,14 +492,33 @@ namespace ChillRoad
                 bool on = selected == it.button.gameObject && title.interactable;
                 it.sel = Mathf.MoveTowards(it.sel, on ? 1f : 0f, dt * 7f);
                 float s = Mathf.SmoothStep(0f, 1f, it.sel);
-                float x = s * 22f - (1f - e) * 120f;
+                float x = s * 12f - (1f - e) * 120f;
                 it.body.offsetMin = new Vector2(x, 0f);
                 it.body.offsetMax = new Vector2(x, 0f);
-                it.plate.color = Color.Lerp(ButtonIdle, ButtonSelected, s);
-                it.label.color = Color.Lerp(White, Ink, s);
-                it.mark.color = Color.Lerp(new Color(Accent.r, Accent.g, Accent.b, 0.85f), Ink, s);
-                it.chevron.color = new Color(Ink.r, Ink.g, Ink.b, s);
-                it.chevron.rectTransform.anchoredPosition = new Vector2(-150f + s * 10f, 0f);
+                // Pilule : verre → or plein avec halo (maillage refait seulement quand l'état bouge)
+                if (Mathf.Abs(s - it.drawn) > 0.001f)
+                {
+                    it.drawn = s;
+                    it.plate.color = Color.Lerp(Glass.Panel, Accent, s);
+                    it.plate.borderColor = Color.Lerp(Glass.Edge, Glass.A(Accent, 0f), s);
+                    it.plate.halo = 10.5f * s;
+                    it.plate.haloColor = Glass.A(Accent, 0.25f * s);
+                    it.plate.SetVerticesDirty();
+                }
+                it.label.color = Color.Lerp(White, Glass.Ink, s);
+                bool strong = s > 0.5f;
+                if (strong != it.strong)
+                {
+                    it.strong = strong;
+                    it.label.font = Glass.FontOf(strong ? Glass.Weight.Semibold : Glass.Weight.Regular);
+                }
+                if (it.value)
+                {
+                    it.value.color = Color.Lerp(Info, Glass.Ink, s);
+                    it.value.rectTransform.anchoredPosition = new Vector2(-36f - s * 34f, 0f);
+                }
+                it.chevron.color = Glass.A(Glass.Ink, s);
+                it.chevron.rectTransform.anchoredPosition = new Vector2(-30f - (1f - s) * 10f, 3f);
             }
 
             // Pied de page : voiture et cagnotte du moment (changent au retour d'une partie)
@@ -698,27 +722,6 @@ namespace ChillRoad
             var rt = (RectTransform)go.transform;
             rt.anchorMin = aMin; rt.anchorMax = aMax; rt.offsetMin = oMin; rt.offsetMax = oMax;
             return rt;
-        }
-
-        /// <summary>Texte dans la police du HUD, avec une ombre portée discrète.</summary>
-        static Text Label(Transform parent, int size, TextAnchor align, Color color, FontStyle style, Vector2 anchor, Vector2 pos, Vector2 box)
-        {
-            var go = new GameObject("Text", typeof(RectTransform), typeof(Text), typeof(Shadow));
-            go.transform.SetParent(parent, false);
-            var rt = (RectTransform)go.transform;
-            rt.anchorMin = rt.anchorMax = anchor;
-            rt.anchoredPosition = pos;
-            rt.sizeDelta = box;
-            var t = go.GetComponent<Text>();
-            t.font = HudArt.Font; t.fontSize = size; t.alignment = align; t.color = color;
-            t.fontStyle = style;
-            t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
-            t.raycastTarget = false;
-            var sh = go.GetComponent<Shadow>();
-            sh.effectColor = new Color(0, 0, 0, 0.6f);
-            sh.effectDistance = new Vector2(2, -2);
-            return t;
         }
     }
 }
