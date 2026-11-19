@@ -2338,6 +2338,66 @@ MonoBehaviour:
     module: 0
     ymin: 0
     lights: []
+  - id: school_tirewall
+    category: street
+    tags:
+    - school
+    prefab: {fileID: 919132149155446097, guid: ace23a0dbfd829e4694579a58898fc77, type: 3}
+    size: {x: 4.01, y: 0.78, z: 1.32}
+    footprint: {x: 4, y: 1.3}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
+  - id: school_gantry
+    category: street
+    tags:
+    - school
+    prefab: {fileID: 919132149155446097, guid: 2b8f9c7d8903e0b4abb8e5ca3bd4922b, type: 3}
+    size: {x: 17.1, y: 6.8, z: 1.1}
+    footprint: {x: 16.6, y: 1.1}
+    collider: none
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
+  - id: school_grandstand
+    category: street
+    tags:
+    - school
+    prefab: {fileID: 919132149155446097, guid: b8d52d9c5d92d3446a8288c39d41927d, type: 3}
+    size: {x: 25, y: 7.3, z: 8.4}
+    footprint: {x: 24.6, y: 8.2}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: 0
+    lights: []
+  - id: school_banner
+    category: street
+    tags:
+    - school
+    prefab: {fileID: 919132149155446097, guid: 9e52ed490288f774d9a7c556af48ecaa, type: 3}
+    size: {x: 6.02, y: 1.22, z: 0.14}
+    footprint: {x: 6, y: 0.3}
+    collider: box
+    radius: 0
+    module: 0
+    ymin: 0.02
+    lights: []
+  - id: school_flag
+    category: street
+    tags:
+    - school
+    prefab: {fileID: 919132149155446097, guid: 7b1485333ed348644af0921005f8a67a, type: 3}
+    size: {x: 1.71, y: 7, z: 0.12}
+    footprint: {x: 0.4, y: 0.4}
+    collider: capsule
+    radius: 0.1
+    module: 0
+    ymin: 0
+    lights: []
   - id: snow_groomer
     category: ski
     tags:

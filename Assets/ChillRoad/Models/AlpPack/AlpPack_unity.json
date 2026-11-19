@@ -3639,6 +3639,101 @@
    "material": ""
   },
   {
+   "id": "school_tirewall",
+   "file": "School_TireWall",
+   "category": "street",
+   "tags": [
+    "school"
+   ],
+   "sx": 4.01,
+   "sy": 0.78,
+   "sz": 1.32,
+   "fw": 4.0,
+   "fd": 1.3,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "school_gantry",
+   "file": "School_Gantry",
+   "category": "street",
+   "tags": [
+    "school"
+   ],
+   "sx": 17.1,
+   "sy": 6.8,
+   "sz": 1.1,
+   "fw": 16.6,
+   "fd": 1.1,
+   "collider": "none",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "school_grandstand",
+   "file": "School_Grandstand",
+   "category": "street",
+   "tags": [
+    "school"
+   ],
+   "sx": 25.0,
+   "sy": 7.3,
+   "sz": 8.4,
+   "fw": 24.6,
+   "fd": 8.2,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "school_banner",
+   "file": "School_Banner",
+   "category": "street",
+   "tags": [
+    "school"
+   ],
+   "sx": 6.02,
+   "sy": 1.22,
+   "sz": 0.14,
+   "fw": 6.0,
+   "fd": 0.3,
+   "collider": "box",
+   "radius": 0.0,
+   "module": 0.0,
+   "ymin": 0.02,
+   "lights": [],
+   "material": ""
+  },
+  {
+   "id": "school_flag",
+   "file": "School_Flag",
+   "category": "street",
+   "tags": [
+    "school"
+   ],
+   "sx": 1.71,
+   "sy": 7.0,
+   "sz": 0.12,
+   "fw": 0.4,
+   "fd": 0.4,
+   "collider": "capsule",
+   "radius": 0.1,
+   "module": 0.0,
+   "ymin": 0.0,
+   "lights": [],
+   "material": ""
+  },
+  {
    "id": "snow_groomer",
    "file": "Snow_Groomer",
    "category": "ski",

@@ -703,7 +703,7 @@ namespace ChillRoad
                     Color tint = school ? new Color(1f, 0.76f, 0.2f) : dealer ? Info : Tuning;
                     Disc(mark, 32f, Ink);
                     Disc(mark, 26f, tint);
-                    var glyph = Label(mark, school ? "A" : dealer ? "€" : "⚙", dealer || school ? 19 : 21, TextAnchor.MiddleCenter, Ink, new Vector2(0f, 0.5f), new Vector2(30f, 30f), FontStyle.Bold);
+                    var glyph = Label(mark, school ? "⚑" : dealer ? "€" : "⚙", dealer || school ? 19 : 21, TextAnchor.MiddleCenter, Ink, new Vector2(0f, 0.5f), new Vector2(30f, 30f), FontStyle.Bold);
                     glyph.raycastTarget = false;
                     var tag = MapLabel(mark, 21, left ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft, tint, new Vector2(left ? -24f : 24f, 0f), FontStyle.BoldAndItalic);
                     tag.rectTransform.pivot = new Vector2(left ? 1f : 0f, 0.5f);
