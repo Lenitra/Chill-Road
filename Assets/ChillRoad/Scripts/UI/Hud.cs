@@ -83,30 +83,31 @@ namespace ChillRoad
         RectTransform announceRt;
         CanvasGroup announceGroup;
         Text announceTitle, announceDetail;
-        HudShape announcePlate, announceStripe;
+        GlassRect announcePlate;
+        Image announceStripe;
         float announceTimer, announceTime, announcePunch;
         int walletSlide = -1;
-        static readonly Vector2 WalletHome = new Vector2(26f, -84f);        // sous l'heure
+        static readonly Vector2 WalletHome = new Vector2(36f, -30f);        // pilule heure | argent, en haut à gauche
         static readonly Vector2 WalletTouchHome = new Vector2(338f, -30f);  // à droite du bouton pause tactile
 
-        // Heure
+        // Heure (dans la pilule de l'argent)
         Text clockText;
+        GlassRect statusPill;
+        Image statusDivider;
 
         // Compteur
         Text speedText, gearText, distText, lightsText, assistLamp;
         float assistLampT;
-        Image rpmArc, gearDisc;
+        Image rpmArc;
 
         // Bas centre : drift, invite d'entrée
         CanvasGroup driftGroup;
         Text driftText, driftChain, driftTitle;
-        Outline driftOutline;
         Image driftBarImage;
         RectTransform driftBar;
         float driftAlpha;
         CanvasGroup dealerGroup;
         Text dealerText;
-        HudShape dealerStripe;
 
         // Bas gauche
         CanvasGroup hintGroup, musicGroup;
@@ -147,37 +148,40 @@ namespace ChillRoad
         readonly List<(Button button, HudShape plate, Text text, int view)> viewChips = new List<(Button, HudShape, Text, int)>();
         Button firstButton;
         int openedFrame;
-        // Partie en réseau : plaque du menu (elle grandit avec ses lignes), ligne d'état, bouton du code d'invitation
-        RectTransform pauseBox;
-        LayoutElement netLayout;
         // Tuiles du menu (pictogramme, nom, détail) ; la voiture ouvre le garage (CarPicker)
-        class PauseTile { public Button button; public HudShape plate; public HudIcon icon; public Text label, sub; public float on; }
+        // Tuiles (verre, pictogramme, bande de légende) et pilules du bas (pictogramme et nom)
+        class PauseTile
+        {
+            public Button button; public GlassRect plate, caption; public RectTransform content; public HudIcon icon;
+            public Text label, sub; public float on, x; public bool pill; public Vector2 size;
+        }
         readonly List<PauseTile> pauseTiles = new List<PauseTile>();
-        PauseTile carTile, timeTile, inviteTile, trophyTile;
+        readonly List<PauseTile> pausePills = new List<PauseTile>();
+        PauseTile carTile, timeTile, inviteTile, trophyTile, mapTile, controlsPill;
+        Text trophyBadge, timeBadge, pauseKicker, pauseStatus, pauseHint;
+        readonly Dictionary<Text, GlassRect> badgePlates = new Dictionary<Text, GlassRect>();
+        RawImage mapPreview;
+        RectTransform mapDot, pauseRoot, tilesRoot, pillsRoot;
+        MenuBackdrop pauseBackdrop;
+        bool controlsPage;
         CarPicker picker;
         AchievementsMenu achievementsMenu;
+        TimeWeatherMenu timeWeather;
+        static readonly Color TileFill = new Color(0.063f, 0.078f, 0.102f, 0.5f);
         static readonly Color TileNormal = new Color(0.13f, 0.15f, 0.19f, 0.96f);
-        static readonly Color TileOff = new Color(0.09f, 0.1f, 0.12f, 0.9f);
         static readonly Color TileGold = new Color(0.95f, 0.62f, 0.12f, 1f);
         static readonly Color Ink = new Color(0.06f, 0.07f, 0.09f);
-        static readonly Color InkDim = new Color(0.06f, 0.07f, 0.09f, 0.72f);
-        static readonly Color Muted = new Color(0.46f, 0.48f, 0.52f);
-        const float HeroH = 132f, MidH = 214f, SetH = 104f, ExitH = 80f, RowGap = 14f;
-        // Disposition du menu pause : deux plaques de même hauteur, centrées ensemble (tuiles à gauche, contrôles ou
-        // joueurs à droite), toutes penchées du même angle (décalage horizontal par pixel de hauteur) ; les tuiles
-        // ont ce même angle et leurs rangées suivent la pente, d'où des bords droits et parallèles à ceux des plaques
-        public const float MenuLean = 0.1f;
-        const float PauseW = 720f, ControlsW = 740f, MenuGap = 36f;
-        const float MenuLeft = -(PauseW + MenuGap + ControlsW) * 0.5f, ControlsLeft = MenuLeft + PauseW + MenuGap;
-        /// <summary>Centre horizontal de la plaque de droite (contrôles, tableau des joueurs en réseau).</summary>
-        public const float ControlsCenterX = ControlsLeft + ControlsW * 0.5f;
-        /// <summary>Hauteur commune des plaques du menu pause (elle grandit en réseau avec la ligne d'état).</summary>
-        public static float MenuHeight { get; private set; } = 60f + 90f + HeroH + MidH + SetH + ExitH + RowGap * 4f;
-        HudShape pausePlate, controlsPlate;
+        // Menu pause (canevas 1920 × 1080) : en tête, grille de tuiles 4 × 2, rangée de pilules
+        const float PauseW = 1560f, PauseH = 900f, GridTop = 140f, GridH = 660f, GridGap = 24f, PillH = 70f;
+        /// <summary>Pente des plaques du menu (style verre : aucune).</summary>
+        public const float MenuLean = 0f;
+        const float ControlsW = 740f, ControlsLeft = -ControlsW * 0.5f;
+        /// <summary>Centre horizontal du panneau des contrôles et du tableau des joueurs en réseau (au centre de l'écran).</summary>
+        public const float ControlsCenterX = 0f;
+        /// <summary>Hauteur du panneau des contrôles (et du tableau des joueurs dans le menu).</summary>
+        public static float MenuHeight { get; private set; } = 736f;
+        GlassRect controlsPlate;
         RectTransform controlsPanelRt;
-        GameObject netRow;
-        // Rangées du menu dans l'ordre (titre, état réseau, tuiles) : chacune décalée selon sa hauteur (voir ApplyLean)
-        readonly List<HorizontalLayoutGroup> leanRows = new List<HorizontalLayoutGroup>();
         float netRefresh, inviteCopied = -10f, inviteClock;
         string inviteAnnounced;
         /// <summary>
@@ -187,12 +191,14 @@ namespace ChillRoad
         /// <summary>Photo du radar, en haut à droite.</summary>
         public RadarPolaroid Polaroid { get; private set; }
         public bool Paused => WorldMap.IsOpen || inPause || Dealership.IsOpen || TuningGarage.IsOpen || RaceSetup.IsOpen;
+        /// <summary>Menu pause ouvert sur ses tuiles (pas sur un sous-écran).</summary>
+        public bool PauseTilesShown => inPause && pausePanel && pausePanel.activeSelf && !controlsPage;
 
         // Partie en réseau : à droite du menu, le tableau des joueurs (PlayerList) prend la place des contrôles
         GameObject controlsPanel;
         bool playersPage = true;
         /// <summary>Menu d'une partie en réseau ouvert sur le tableau des joueurs (à la place des contrôles).</summary>
-        public bool PlayersInMenu => inPause && pausePanel && pausePanel.activeSelf && game.Online && playersPage;
+        public bool PlayersInMenu => inPause && controlsPage && pausePanel && pausePanel.activeSelf && game.Online && playersPage;
         /// <summary>Menu d'une partie en réseau : montre à droite le tableau des joueurs, ou les contrôles.</summary>
         public void ShowPlayersInMenu(bool players) => playersPage = players;
 
@@ -232,7 +238,6 @@ namespace ChillRoad
             flash.raycastTarget = false;
 
             BuildScore();
-            BuildClock();
             BuildGauge();
             BuildMiniMap();
             BuildCenter();
@@ -262,49 +267,51 @@ namespace ChillRoad
                 Feed(Loc.F($"{label} · {air:0.0} s · {dist:0} m"), pts);
             };
             slot.Score.Lost += (pts, why) => Flash(new Color(1f, 0.1f, 0.05f), 0.35f);
-            if (game.Music) game.Music.TrackChanged += name => { if (!GameSettings.TrackNames) return; musicText.text = "♪  " + name; musicTimer = 5f; };
+            if (game.Music) game.Music.TrackChanged += name => { if (!GameSettings.TrackNames) return; musicText.text = "<color=#6FDCFF>♪</color>   " + name; musicTimer = 5f; };
         }
 
         // ------------------------------------------------------------------ construction
 
         /// <summary>
-        /// Haut gauche, sous l'heure : argent du joueur, sur une petite plaque. Haut centre, seulement pendant un combo :
-        /// badge du multiplicateur, cagnotte en jeu (perdue en cas d'accident) et fine jauge du combo, sans plaque.
+        /// Haut gauche : heure et argent dans une pilule de verre (à droite du bouton pause quand les commandes tactiles
+        /// sont affichées). Haut centre, seulement pendant un combo : cagnotte en jeu (perdue en cas d'accident) et fine
+        /// jauge dorée du combo, sans plaque ; dessous, les derniers gains puis les annonces sur une plaque de verre.
         /// </summary>
         void BuildScore()
         {
-            // Argent : à côté du bouton pause quand les commandes tactiles sont affichées (voir UpdateTouchLayout)
-            var wallet = Rect(canvas, "Wallet", new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, Vector2.zero);
-            wallet.pivot = new Vector2(0f, 1f);
-            wallet.sizeDelta = new Vector2(230f, 40f);
-            wallet.anchoredPosition = WalletHome;
-            Shape(wallet, "Plate", new Vector2(0f, 0.5f), Vector2.zero, new Vector2(230f, 40f), Plate).Set(12f, 0f, 70f);
-            scoreText = Label(wallet, "", 26, TextAnchor.MiddleLeft, White, new Vector2(0f, 0.5f), new Vector2(18f, 0f), new Vector2(206f, 38f), FontStyle.Bold);
+            var status = Glass.Place(canvas, "Status", new Vector2(0f, 1f), WalletHome, new Vector2(320f, 60f));
+            statusPill = Glass.Backdrop(status, 30f);
+            clockText = Glass.Label(status, "", 30, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleLeft, new Vector2(0f, 0.5f), new Vector2(30f, 0f), new Vector2(220f, 54f));
+            statusDivider = Glass.Bar(status, "Divider", Glass.A(Color.white, 0.4f));
+            var dr = statusDivider.rectTransform;
+            dr.anchorMin = dr.anchorMax = dr.pivot = new Vector2(0f, 0.5f);
+            dr.sizeDelta = new Vector2(1.5f, 26f);
+            scoreText = Glass.Label(status, "", 30, Glass.Weight.Regular, Glass.Gold, TextAnchor.MiddleLeft, new Vector2(0f, 0.5f), new Vector2(150f, 0f), new Vector2(300f, 54f));
             walletSlide = slides.Count;
-            AddSlide(wallet, new Vector2(-300f, 0f));
+            AddSlide(status, new Vector2(-420f, 0f));
 
             // Combo : n'apparaît que pendant un combo
-            var combo = Rect(canvas, "Combo", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-220f, -96f), new Vector2(220f, -24f));
+            var combo = Rect(canvas, "Combo", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-260f, -100f), new Vector2(260f, -24f));
             comboGroup = combo.gameObject.AddComponent<CanvasGroup>();
             comboGroup.alpha = 0f;
             comboGroup.blocksRaycasts = false;
-            // Cagnotte en jeu, centrée
-            bestText = Label(combo, "", 26, TextAnchor.MiddleCenter, Accent, new Vector2(0.5f, 1f), new Vector2(0f, -20f), new Vector2(400f, 34f), FontStyle.BoldAndItalic);
+            bestText = Glass.Label(combo, "", 34, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0f, -24f), new Vector2(520f, 44f));
             bestText.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            Outline(bestText, new Color(0f, 0f, 0f, 0.35f), 1.5f);
+            Glass.Soft(bestText);
 
-            // Jauge du combo : fine ligne qui se vide
-            var comboBar = Rect(combo, "Timer", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-120f, -45f), new Vector2(120f, -42f));
-            comboBar.gameObject.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.12f);
+            // Jauge du combo : fine ligne dorée qui se vide
+            var comboBar = Rect(combo, "Timer", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-135f, -55f), new Vector2(135f, -52f));
+            comboBar.gameObject.AddComponent<Image>().color = Glass.A(Color.white, 0.3f);
             comboFill = Rect(comboBar, "Fill", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            comboFill.gameObject.AddComponent<Image>().color = Accent;
+            comboFill.pivot = new Vector2(0f, 0.5f);
+            comboFill.gameObject.AddComponent<Image>().color = Glass.Gold;
             AddSlide(combo, new Vector2(0f, 220f));
 
             // Derniers gains, sous le combo (indépendants de son fondu : le texte reste lisible si le combo s'arrête)
             feedRt = Rect(canvas, "Feed", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
             feedRt.pivot = new Vector2(0.5f, 1f);
             feedRt.sizeDelta = new Vector2(700f, FeedStep * FeedLines);
-            feedRt.anchoredPosition = new Vector2(0f, -76f);
+            feedRt.anchoredPosition = new Vector2(0f, -86f);
             for (int i = 0; i < FeedLines; i++)
             {
                 var rt = Rect(feedRt, "Line", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
@@ -313,71 +320,70 @@ namespace ChillRoad
                 var group = rt.gameObject.AddComponent<CanvasGroup>();
                 group.alpha = 0f;
                 group.blocksRaycasts = false;
-                var t = Label(rt, "", 18, TextAnchor.UpperCenter, new Color(1f, 1f, 1f, 0.8f), new Vector2(0.5f, 1f), Vector2.zero, new Vector2(700f, FeedStep), FontStyle.Italic);
-                t.supportRichText = true;
+                var t = Glass.Label(rt, "", 22, Glass.Weight.Semilight, Glass.A(Color.white, 0.92f), TextAnchor.UpperCenter, new Vector2(0.5f, 1f), Vector2.zero, new Vector2(700f, FeedStep));
+                Glass.Soft(t);
                 feed.Add(new FeedLine { rt = rt, group = group, text = t });
             }
 
-            // Annonces : sous le combo et ses lignes de gains
+            // Annonces : sous le combo et ses lignes de gains, sur une plaque de verre taillée sur le texte
             announceRt = Rect(canvas, "Announce", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), Vector2.zero, Vector2.zero);
             announceRt.pivot = new Vector2(0.5f, 1f);
             announceRt.sizeDelta = new Vector2(1000f, 72f);
-            announceRt.anchoredPosition = new Vector2(0f, -192f);
+            announceRt.anchoredPosition = new Vector2(0f, -200f);
             announceGroup = announceRt.gameObject.AddComponent<CanvasGroup>();
             announceGroup.alpha = 0f;
             announceGroup.blocksRaycasts = false;
-            // Plaque sombre inclinée (taillée sur le texte à chaque annonce) et liseré de la couleur du titre
-            announcePlate = Shape(announceRt, "Plate", new Vector2(0.5f, 1f), new Vector2(0f, 8f), new Vector2(400f, 80f), new Color(0.02f, 0.03f, 0.05f, 0.72f));
-            announcePlate.Set(22f, 90f, 90f);
-            announceStripe = Shape(announceRt, "Stripe", new Vector2(0.5f, 1f), new Vector2(0f, 8f), new Vector2(240f, 4f), Accent);
-            announceStripe.Set(0f, 80f, 80f);
-            announceTitle = Label(announceRt, "", 36, TextAnchor.UpperCenter, White, new Vector2(0.5f, 1f), Vector2.zero, new Vector2(1000f, 44f), FontStyle.BoldAndItalic);
-            Outline(announceTitle, new Color(0f, 0f, 0f, 0.45f), 2f);
-            announceDetail = Label(announceRt, "", 19, TextAnchor.UpperCenter, new Color(1f, 1f, 1f, 0.85f), new Vector2(0.5f, 1f), new Vector2(0f, -44f), new Vector2(1000f, 26f), FontStyle.Bold);
+            announcePlate = Glass.Make(announceRt, "Plate", 32f);
+            var pr = announcePlate.rectTransform;
+            pr.anchorMin = pr.anchorMax = pr.pivot = new Vector2(0.5f, 1f);
+            pr.anchoredPosition = new Vector2(0f, 14f);
+            announceStripe = Glass.Bar(announceRt, "Line", Glass.Gold);
+            var sr = announceStripe.rectTransform;
+            sr.anchorMin = sr.anchorMax = sr.pivot = new Vector2(0.5f, 1f);
+            announceTitle = Glass.Label(announceRt, "", 38, Glass.Weight.Light, Glass.White, TextAnchor.UpperCenter, new Vector2(0.5f, 1f), Vector2.zero, new Vector2(1000f, 48f));
+            announceDetail = Glass.Label(announceRt, "", 23, Glass.Weight.Semilight, Glass.Dim, TextAnchor.UpperCenter, new Vector2(0.5f, 1f), new Vector2(0f, -48f), new Vector2(1000f, 30f));
         }
 
-        void BuildClock()
+        /// <summary>Pilule du haut à gauche : heure, séparateur, argent ; sa largeur suit les textes.</summary>
+        void LayoutStatus()
         {
-            // Heure (haut gauche)
-            var clock = Rect(canvas, "Clock", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(26f, -72f), new Vector2(226f, -28f));
-            Shape(clock, "Plate", new Vector2(0f, 0.5f), new Vector2(0f, 0f), new Vector2(200f, 44f), Plate).Set(12f, 0f, 70f);
-            clockText = Label(clock, "", 26, TextAnchor.MiddleLeft, White, new Vector2(0f, 0.5f), new Vector2(18f, 0f), new Vector2(190f, 40f), FontStyle.Bold);
-            AddSlide(clock, new Vector2(-300f, 0f));
+            float cw = Mathf.Ceil(clockText.preferredWidth);
+            float x = 30f + cw + 22f;
+            statusDivider.rectTransform.anchoredPosition = new Vector2(x, 0f);
+            scoreText.rectTransform.anchoredPosition = new Vector2(x + 22f, 0f);
+            float w = x + 22f + Mathf.Ceil(scoreText.preferredWidth) + 32f;
+            var rt = (RectTransform)statusPill.transform.parent;
+            rt.sizeDelta = new Vector2(Mathf.Max(200f, w), 60f);
         }
 
-        /// <summary>Bas droite : compte-tours circulaire (arc de 270°), vitesse au centre, rapport en pastille.</summary>
+        /// <summary>
+        /// Bas droite : compte-tours en anneau fin (arc de 270°, zone rouge en fin d'arc), vitesse en chiffres fins au
+        /// centre ; dessous, phares, rapport (doré) et distance.
+        /// </summary>
         void BuildGauge()
         {
-            var root = Rect(canvas, "Gauge", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-326f, 26f), new Vector2(-26f, 326f));
-            Img(root, "Back", HudArt.SoftDisc, new Vector2(300f, 300f), Vector2.zero, new Color(0.02f, 0.03f, 0.05f, 0.62f));
-            var arcBack = Img(root, "ArcBack", HudArt.Ring, new Vector2(244f, 244f), Vector2.zero, new Color(1f, 1f, 1f, 0.12f));
+            var root = Rect(canvas, "Gauge", new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-361f, 31f), new Vector2(-41f, 351f));
+            Img(root, "Back", HudArt.SoftDisc, new Vector2(330f, 330f), Vector2.zero, new Color(0.03f, 0.04f, 0.06f, 0.32f));
+            var arcBack = Img(root, "ArcBack", Glass.Ring(0.022f), new Vector2(290f, 290f), Vector2.zero, Glass.A(Color.white, 0.3f));
             Arc(arcBack, 0f, 0.75f);
-            var red = Img(root, "Redline", HudArt.Ring, new Vector2(244f, 244f), Vector2.zero, new Color(1f, 0.25f, 0.2f, 0.45f));
+            var red = Img(root, "Redline", Glass.Ring(0.022f), new Vector2(290f, 290f), Vector2.zero, Glass.Bad);
             Arc(red, 0.9f * 0.75f, 0.1f * 0.75f);
-            rpmArc = Img(root, "Rpm", HudArt.Ring, new Vector2(244f, 244f), Vector2.zero, White);
+            rpmArc = Img(root, "Rpm", Glass.Ring(0.052f), new Vector2(290f, 290f), Vector2.zero, Glass.White);
             Arc(rpmArc, 0f, 0f);
-            // Graduations
-            for (int i = 0; i <= 10; i++)
-            {
-                float deg = 225f - i * 27f;
-                var tick = Rect(root, "Tick", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
-                tick.sizeDelta = new Vector2(3f, i % 5 == 0 ? 16f : 10f);
-                tick.anchoredPosition = new Vector2(Mathf.Cos(deg * Mathf.Deg2Rad), Mathf.Sin(deg * Mathf.Deg2Rad)) * 104f;
-                tick.localRotation = Quaternion.Euler(0f, 0f, deg - 90f);
-                tick.gameObject.AddComponent<Image>().color = i >= 9 ? new Color(1f, 0.35f, 0.3f, 0.8f) : new Color(1f, 1f, 1f, 0.45f);
-            }
-            speedText = Label(root, "0", 86, TextAnchor.MiddleCenter, White, new Vector2(0.5f, 0.5f), new Vector2(0f, 10f), new Vector2(240f, 100f), FontStyle.BoldAndItalic);
-            Label(root, "km/h", 20, TextAnchor.MiddleCenter, Dim, new Vector2(0.5f, 0.5f), new Vector2(0f, -40f), new Vector2(120f, 26f), FontStyle.Bold);
-            // Rapport : pastille dans l'ouverture de l'arc
-            gearDisc = Img(root, "Gear", HudArt.Disc, new Vector2(56f, 56f), new Vector2(0f, -104f), Accent);
-            gearText = Label(gearDisc.rectTransform, "1", 32, TextAnchor.MiddleCenter, new Color(0.06f, 0.06f, 0.08f), new Vector2(0.5f, 0.5f), new Vector2(0f, 1f), new Vector2(56f, 56f), FontStyle.BoldAndItalic);
-            gearText.GetComponent<Shadow>().enabled = false;
-            lightsText = Label(root, "", 17, TextAnchor.MiddleRight, Dim, new Vector2(0.5f, 0.5f), new Vector2(-46f, -106f), new Vector2(120f, 24f), FontStyle.Bold);
+            speedText = Glass.Label(root, "0", 124, Glass.Weight.Light, Glass.White, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0f, 14f), new Vector2(300f, 130f));
+            Glass.Soft(speedText, 0.4f);
+            var unit = Glass.Label(root, Glass.Spaced("KM/H", 2), 21, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0f, -50f), new Vector2(160f, 28f));
+            Glass.Soft(unit, 0.4f);
+            // Dessous : phares, rapport, distance
+            gearText = Glass.Label(root, "1", 46, Glass.Weight.Light, Glass.Gold, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0f, -124f), new Vector2(70f, 56f));
+            Glass.Soft(gearText, 0.4f);
+            lightsText = Glass.Label(root, "", 19, Glass.Weight.Regular, Glass.Faint, TextAnchor.MiddleRight, new Vector2(0.5f, 0.5f), new Vector2(-40f, -122f), new Vector2(130f, 26f));
             lightsText.rectTransform.pivot = new Vector2(1f, 0.5f);
-            distText = Label(root, "", 17, TextAnchor.MiddleLeft, Dim, new Vector2(0.5f, 0.5f), new Vector2(46f, -106f), new Vector2(120f, 24f), FontStyle.Bold);
-            // Témoin d'ESP / d'antipatinage : clignote quand l'assistance intervient, invisible sinon
-            assistLamp = Label(root, "", 17, TextAnchor.MiddleCenter, Accent, new Vector2(0.5f, 0.5f), new Vector2(0f, 74f), new Vector2(80f, 24f), FontStyle.Bold);
+            distText = Glass.Label(root, "", 19, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleLeft, new Vector2(0.5f, 0.5f), new Vector2(40f, -122f), new Vector2(130f, 26f));
             distText.rectTransform.pivot = new Vector2(0f, 0.5f);
+            Glass.Soft(distText, 0.4f);
+            // Témoin d'ESP / d'antipatinage : clignote quand l'assistance intervient, invisible sinon
+            assistLamp = Glass.Label(root, "", 19, Glass.Weight.Semibold, Glass.Gold, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0f, 88f), new Vector2(90f, 26f));
             gaugeSlide = slides.Count;
             AddSlide(root, new Vector2(420f, 0f));
         }
@@ -395,54 +401,49 @@ namespace ChillRoad
 
         void BuildCenter()
         {
-            // Drift en cours : points en attente (encaissés à la sortie du drift) et jauge d'angle
-            var drift = Rect(canvas, "Drift", new Vector2(0.5f, 0.27f), new Vector2(0.5f, 0.27f), new Vector2(-300f, -50f), new Vector2(300f, 50f));
+            // Drift en cours (ou saut) : petit titre en couleur, points en attente en chiffres fins, jauge d'angle fine
+            var drift = Rect(canvas, "Drift", new Vector2(0.5f, 0.27f), new Vector2(0.5f, 0.27f), new Vector2(-280f, -60f), new Vector2(280f, 60f));
             driftGroup = drift.gameObject.AddComponent<CanvasGroup>();
             driftGroup.alpha = 0f;
-            Shape(drift, "Plate", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600f, 100f), new Color(0.02f, 0.03f, 0.05f, 0.45f)).Set(20f, 160f, 160f);
-            driftTitle = Label(drift, "DRIFT", 20, TextAnchor.MiddleCenter, DriftColor, new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(200f, 24f), FontStyle.BoldAndItalic);
-            driftText = Label(drift, "", 50, TextAnchor.MiddleCenter, White, new Vector2(0.5f, 0.5f), new Vector2(0f, -4f), new Vector2(500f, 60f), FontStyle.BoldAndItalic);
-            Outline(driftText, new Color(DriftColor.r, DriftColor.g, DriftColor.b, 0.45f), 2f);
-            driftOutline = driftText.GetComponent<Outline>();
-            driftChain = Label(drift, "", 24, TextAnchor.MiddleLeft, DriftColor, new Vector2(0.5f, 0.5f), new Vector2(150f, -4f), new Vector2(120f, 30f), FontStyle.BoldAndItalic);
+            Glass.Backdrop(drift, 34f, Glass.A(Glass.Panel, 0.42f));
+            driftTitle = Glass.Label(drift, "DRIFT", 17, Glass.Weight.Semibold, DriftColor, TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(260f, 24f));
+            driftText = Glass.Label(drift, "", 54, Glass.Weight.Light, Glass.White, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0f, -2f), new Vector2(500f, 64f));
+            driftChain = Glass.Label(drift, "", 24, Glass.Weight.Regular, DriftColor, TextAnchor.MiddleLeft, new Vector2(0.5f, 0.5f), new Vector2(150f, -4f), new Vector2(160f, 30f));
             driftChain.rectTransform.pivot = new Vector2(0f, 0.5f);
-            var barBg = Rect(drift, "AngleBg", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(-120f, 10f), new Vector2(120f, 14f));
-            barBg.gameObject.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.12f);
+            var barBg = Rect(drift, "AngleBg", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(-120f, 14f), new Vector2(120f, 17f));
+            barBg.gameObject.AddComponent<Image>().color = Glass.A(Color.white, 0.2f);
             driftBar = Rect(barBg, "Angle", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            driftBar.pivot = new Vector2(0f, 0.5f);
             driftBarImage = driftBar.gameObject.AddComponent<Image>();
             driftBarImage.color = DriftColor;
 
             // Concession et garage de tuning : aux abords, rappel d'entrer en voiture par la porte
-            var dealer = Rect(canvas, "DealerPrompt", new Vector2(0.5f, 0.24f), new Vector2(0.5f, 0.24f), new Vector2(-330f, -32f), new Vector2(330f, 32f));
+            var dealer = Rect(canvas, "DealerPrompt", new Vector2(0.5f, 0.24f), new Vector2(0.5f, 0.24f), new Vector2(-360f, -35f), new Vector2(360f, 35f));
             dealerGroup = dealer.gameObject.AddComponent<CanvasGroup>();
             dealerGroup.alpha = 0f;
             dealerGroup.blocksRaycasts = dealerGroup.interactable = false;
-            var plate = Shape(dealer, "Plate", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(660f, 64f), new Color(0.02f, 0.03f, 0.05f, 0.75f));
-            plate.Set(18f, 0f, 0f);
-            dealerStripe = Shape(dealer, "Stripe", new Vector2(0.5f, 1f), Vector2.zero, new Vector2(420f, 3f), Info);
-            dealerStripe.Set(0f, 120f, 120f);
-            dealerText = Label(dealer, "", 28, TextAnchor.MiddleCenter, White, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(640f, 56f), FontStyle.BoldAndItalic);
-            dealerText.supportRichText = true;
+            Glass.Backdrop(dealer, 35f);
+            dealerText = Glass.Label(dealer, "", 26, Glass.Weight.Semilight, Glass.White, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(700f, 60f));
         }
 
         void BuildBottomLeft()
         {
-            // Morceau en cours : entre en glissant, puis s'efface
-            musicRt = Rect(canvas, "Music", new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(BottomLeftX, 76f), new Vector2(BottomLeftX + 500f, 116f));
+            // Morceau en cours : entre en glissant, puis s'efface (sans plaque, note cyan)
+            musicRt = Rect(canvas, "Music", new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(BottomLeftX, 76f), new Vector2(BottomLeftX + 600f, 116f));
             musicHome = musicRt.anchoredPosition;
             musicGroup = musicRt.gameObject.AddComponent<CanvasGroup>();
             musicGroup.alpha = 0f;
-            Shape(musicRt, "Plate", new Vector2(0f, 0.5f), Vector2.zero, new Vector2(500f, 40f), Plate).Set(12f, 0f, 160f);
-            Shape(musicRt, "Stripe", new Vector2(0f, 0.5f), Vector2.zero, new Vector2(5f, 40f), MusicColor).Set(12f, 0f, 0f);
-            musicText = Label(musicRt, "", 22, TextAnchor.MiddleLeft, MusicColor, new Vector2(0f, 0.5f), new Vector2(20f, 0f), new Vector2(470f, 34f), FontStyle.BoldAndItalic);
+            musicText = Glass.Label(musicRt, "", 24, Glass.Weight.Semilight, Glass.White, TextAnchor.MiddleLeft, new Vector2(0f, 0.5f), new Vector2(6f, 0f), new Vector2(590f, 34f));
+            Glass.Soft(musicText);
 
             // Aide des commandes : affichée au départ puis quand on change d'appareil, puis s'efface
             // (entre la minicarte et le compte-tours : la police rétrécit si la ligne est trop longue)
-            var hint = Rect(canvas, "Hint", new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(BottomLeftX, 26f), new Vector2(BottomLeftX + 1200f, 60f));
+            var hint = Rect(canvas, "Hint", new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(BottomLeftX, 24f), new Vector2(BottomLeftX + 1180f, 64f));
             hintGroup = hint.gameObject.AddComponent<CanvasGroup>();
             hintGroup.alpha = 0f;
-            Shape(hint, "Plate", new Vector2(0f, 0.5f), Vector2.zero, new Vector2(1200f, 34f), new Color(0.02f, 0.03f, 0.05f, 0.45f)).Set(10f, 0f, 260f);
-            hintText = Label(hint, "", 18, TextAnchor.MiddleLeft, new Color(1f, 1f, 1f, 0.8f), new Vector2(0f, 0.5f), new Vector2(16f, 0f), new Vector2(1150f, 30f), FontStyle.Normal);
+            Glass.Backdrop(hint, 20f, Glass.A(Glass.Panel, 0.4f), 1f);
+            hintText = Glass.Label(hint, "", 18, Glass.Weight.Semilight, Glass.Dim, TextAnchor.MiddleLeft);
+            Fit(hintText.rectTransform, Vector2.zero, Vector2.one, new Vector2(22f, 2f), new Vector2(-22f, -2f));
             hintText.horizontalOverflow = HorizontalWrapMode.Wrap;
             hintText.verticalOverflow = VerticalWrapMode.Truncate;
             hintText.resizeTextForBestFit = true;
@@ -464,20 +465,20 @@ namespace ChillRoad
             gearText.text = car.Gear < 0 ? "R" : car.Gear.ToString();
             float rpm = car.Rpm01;
             rpmArc.fillAmount = Mathf.Clamp01(rpm) * 0.75f;
-            rpmArc.color = rpm > 0.9f ? Danger : rpm > 0.72f ? Color.Lerp(White, Accent, (rpm - 0.72f) / 0.18f) : White;
-            // Témoin de passage de rapport : la pastille clignote au rupteur
+            rpmArc.color = rpm > 0.9f ? Glass.Bad : rpm > 0.72f ? Color.Lerp(Glass.White, Glass.Gold, (rpm - 0.72f) / 0.18f) : Glass.White;
+            // Témoin de passage de rapport : le rapport clignote au rupteur
             bool shift = rpm > 0.93f && car.Gear > 0;
-            gearDisc.color = shift && Mathf.Repeat(Time.unscaledTime * 8f, 1f) < 0.5f ? Danger : Accent;
+            gearText.color = shift && Mathf.Repeat(Time.unscaledTime * 8f, 1f) < 0.5f ? Glass.Bad : Glass.Gold;
             distText.text = Loc.F($"{score.RunDistance / 1000f:0.0} km");
             // Témoin des phares : allumé aussi le temps d'un appel de phares
             bool lightsOn = slot.Lights && (slot.Lights.On || slot.Lights.Flashing);
             lightsText.text = Loc.T("PHARES", "LIGHTS");
-            lightsText.color = lightsOn ? Info : new Color(1f, 1f, 1f, 0.28f);
+            lightsText.color = lightsOn ? Glass.Cyan : Glass.A(Color.white, 0.4f);
             bool esp = car.EspIntervention > 0.05f, tcs = car.TcsIntervention > 0.05f;
             if (esp || tcs) { assistLampT = 0.45f; assistLamp.text = esp ? "ESP" : "TCS"; }
             assistLampT -= dt;
             float lampOn = assistLampT > 0f && Mathf.Repeat(Time.unscaledTime * 6f, 1f) < 0.6f ? 1f : 0f;
-            assistLamp.color = new Color(Accent.r, Accent.g, Accent.b, lampOn * 0.95f);
+            assistLamp.color = Glass.A(Glass.Gold, lampOn * 0.95f);
 
             // Argent : le compteur monte jusqu'à la somme encaissée
             float cash = Wallet.Cash;
@@ -485,7 +486,7 @@ namespace ChillRoad
             displayedScore = Mathf.Lerp(displayedScore, cash, 1f - Mathf.Exp(-dt * 6f));
             if (Mathf.Abs(displayedScore - cash) < 1f) displayedScore = cash;
             scoreText.text = Wallet.Format(displayedScore);
-            scoreText.color = Mathf.Abs(displayedScore - cash) > 0.5f ? Money : White;
+            scoreText.color = Mathf.Abs(displayedScore - cash) > 0.5f ? Glass.Good : Glass.Gold;
             // Combo : multiplicateur, temps restant, cagnotte en jeu
             bool combo = score.ComboActive;
             comboAlpha = Mathf.MoveTowards(comboAlpha, combo ? 1f : 0f, dt * (combo ? 6f : 2.5f));
@@ -495,7 +496,7 @@ namespace ChillRoad
             {
                 bool kept = score.Drifting || score.Speeding || score.Jumping;
                 comboFill.localScale = new Vector3(kept ? 1f : Mathf.Clamp01(score.ComboTimer / score.comboWindow), 1f, 1f);
-                bestText.text = "+" + Wallet.Format(score.AtStake) + Loc.T("  en jeu", "  at stake");
+                bestText.text = "<color=#FFC233>+" + Wallet.Format(score.AtStake) + "</color>" + Loc.T("  en jeu", "  at stake");
             }
             bestText.rectTransform.localScale = Vector3.one * (1f + stakePunch);
             // Derniers gains : chaque ligne apparaît vite, reste, puis s'efface ; les anciennes descendent d'un cran
@@ -526,7 +527,8 @@ namespace ChillRoad
 
             // Heure (icône soleil ou lune)
             if (clockText && game.DayNight)
-                clockText.text = (game.Weather && game.Weather.Storm > 0.5f ? "☂  " : game.DayNight.Night > 0.5f ? "☾  " : "☀  ") + game.DayNight.Clock;
+                clockText.text = "<color=#FFFFFFB8>" + (game.Weather && game.Weather.Storm > 0.5f ? "☂" : game.DayNight.Night > 0.5f ? "☾" : "☀") + "</color>  " + game.DayNight.Clock;
+            LayoutStatus();
 
             // Drift : ce que rapportera le drift (multiplicateur compris) ; le compteur grossit avec l'angle
             // En l'air, le même cadre suit le saut : gain à la réception, distance, temps en l'air
@@ -535,9 +537,8 @@ namespace ChillRoad
             if (showJump || showDrift)   // pendant le fondu de sortie, le cadre garde l'allure du dernier affiché
             {
                 Color tint = showJump ? JumpColor : DriftColor;
-                driftTitle.text = showJump ? Loc.T("SAUT", "JUMP") : "DRIFT";
+                driftTitle.text = Glass.Spaced(showJump ? Loc.T("SAUT", "JUMP") : "DRIFT", 2);
                 driftTitle.color = driftChain.color = driftBarImage.color = tint;
-                driftOutline.effectColor = new Color(tint.r, tint.g, tint.b, 0.45f);
             }
             if (showJump)
             {
@@ -551,9 +552,8 @@ namespace ChillRoad
                 {
                     float reach = Mathf.Clamp01(score.JumpDistance / stunt.Target);
                     Color tint = reach >= 1f ? StuntJumps.DoneTint : StuntJumps.Tint;
-                    driftTitle.text = stunt.done ? Loc.T("TREMPLIN", "RAMP") : Loc.T("CASCADE", "STUNT");
+                    driftTitle.text = Glass.Spaced(stunt.done ? Loc.T("TREMPLIN", "RAMP") : Loc.T("CASCADE", "STUNT"), 2);
                     driftTitle.color = driftChain.color = driftBarImage.color = tint;
-                    driftOutline.effectColor = new Color(tint.r, tint.g, tint.b, 0.45f);
                     driftChain.text = Loc.F($"{Mathf.Floor(score.JumpDistance):0} / {stunt.Target:0} m");
                     driftBar.localScale = new Vector3(reach, 1f, 1f);
                 }
@@ -574,12 +574,10 @@ namespace ChillRoad
             bool dealer = tuning || (game.Dealer && game.Dealer.Near && !Paused);
             if (dealer)
             {
-                Color tint = tuning ? new Color(1f, 0.42f, 0.82f) : Info;
-                dealerStripe.color = tint;
-                string hex = ColorUtility.ToHtmlStringRGB(tint);
+                string hex = ColorUtility.ToHtmlStringRGB(tuning ? Glass.Gold : Glass.Cyan);
                 dealerText.text = tuning
-                    ? Loc.T($"<color=#{hex}>GARAGE DE TUNING</color>   ·   roulez jusqu'à la porte", $"<color=#{hex}>TUNING GARAGE</color>   ·   drive up to the door")
-                    : Loc.T($"<color=#{hex}>CONCESSION</color>   ·   roulez jusqu'à la porte", $"<color=#{hex}>CAR DEALER</color>   ·   drive up to the door");
+                    ? Loc.T($"<color=#{hex}>GARAGE DE TUNING</color>    roulez jusqu'à la porte", $"<color=#{hex}>TUNING GARAGE</color>    drive up to the door")
+                    : Loc.T($"<color=#{hex}>CONCESSION</color>    roulez jusqu'à la porte", $"<color=#{hex}>CAR DEALER</color>    drive up to the door");
             }
             dealerGroup.alpha = Mathf.MoveTowards(dealerGroup.alpha, dealer ? 1f : 0f, dt * 5f);
 
@@ -675,7 +673,7 @@ namespace ChillRoad
             if (touch == gaugeTouch || gaugeSlide < 0) return;
             gaugeTouch = touch;
             var s = slides[gaugeSlide];
-            s.home = touch ? GaugeTouchHome : new Vector2(-176f, 176f);
+            s.home = touch ? GaugeTouchHome : new Vector2(-201f, 191f);
             slides[gaugeSlide] = s;
             s.rt.localScale = Vector3.one * (touch ? GaugeTouchScale : 1f);
             if (slideT < 0f) s.rt.anchoredPosition = s.home;
@@ -724,7 +722,7 @@ namespace ChillRoad
         }
 
         /// <summary>Gain sous le combo : libellé discret, montant en couleur.</summary>
-        void Feed(string label, float pts) => Feed(label, "+" + Wallet.Format(pts), Accent);
+        void Feed(string label, float pts) => Feed(label, "+" + Wallet.Format(pts), Glass.Gold);
 
         /// <summary>
         /// Ligne discrète sous le combo : libellé, puis une valeur en couleur (facultative).
@@ -749,21 +747,24 @@ namespace ChillRoad
         public void Announce(string title, string detail, Color color, float time = 2.6f, bool big = false)
         {
             detail ??= "";
-            float titleH = big ? 70f : 44f;
-            announceTitle.fontSize = big ? 66 : 36;
-            announceTitle.rectTransform.sizeDelta = new Vector2(1000f, titleH);
+            float titleH = big ? 76f : 48f;
+            announceTitle.fontSize = big ? 68 : 38;
+            announceTitle.rectTransform.sizeDelta = new Vector2(1200f, titleH);
             announceTitle.text = title;
-            announceTitle.color = color;
-            announceDetail.fontSize = big ? 21 : 19;
-            announceDetail.rectTransform.anchoredPosition = new Vector2(0f, -titleH);
+            // Titre en blanc sur le verre ; la couleur de l'annonce passe dans le filet sous le titre et dans le détail
+            bool neutral = color.r > 0.9f && color.g > 0.9f && color.b > 0.9f;
+            announceTitle.color = Glass.White;
+            announceDetail.fontSize = big ? 25 : 23;
+            announceDetail.rectTransform.anchoredPosition = new Vector2(0f, -titleH - 4f);
             announceDetail.text = detail;
+            announceDetail.color = neutral ? Glass.Dim : Color.Lerp(color, Color.white, 0.35f);
             // Plaque taillée sur le plus large des deux textes
-            float w = Mathf.Max(announceTitle.preferredWidth, detail.Length > 0 ? announceDetail.preferredWidth : 0f) + (big ? 200f : 170f);
-            float h = titleH + (detail.Length > 0 ? 30f : 0f) + 14f;
+            float w = Mathf.Max(announceTitle.preferredWidth, detail.Length > 0 ? announceDetail.preferredWidth : 0f) + (big ? 110f : 90f);
+            float h = titleH + (detail.Length > 0 ? 36f : 0f) + 34f;
             announcePlate.rectTransform.sizeDelta = new Vector2(w, h);
-            announceStripe.rectTransform.sizeDelta = new Vector2(w * 0.55f, 4f);
-            announceStripe.rectTransform.anchoredPosition = new Vector2(0f, 8f - h);
-            announceStripe.color = color;
+            announceStripe.rectTransform.sizeDelta = new Vector2(Mathf.Min(140f, w * 0.3f), 2f);
+            announceStripe.rectTransform.anchoredPosition = new Vector2(0f, -titleH + 2f);
+            announceStripe.color = neutral ? Glass.Gold : color;
             announcePunch = big ? 0.3f : 0.12f;
             announceTimer = announceTime = time;
         }
@@ -778,194 +779,285 @@ namespace ChillRoad
         // ------------------------------------------------------------------ pause
 
         /// <summary>
-        /// Menu pause en tuiles (pictogramme + nom + détail), par groupes : Reprendre (et Inviter, hôte d'une partie en
-        /// réseau) ; Voiture (ouvre le garage), Carte, Succès ; Options, Heure ; Menu principal, Quitter. Contrôles à droite.
+        /// Menu pause du style verre, sur l'image du jeu floutée : en tête le titre (et la voiture), l'heure et l'argent ;
+        /// une grande tuile Carte (la carte autour de la voiture) et quatre tuiles Voiture, Options, Heure et météo,
+        /// Succès ; en bas, des pilules : Reprendre (choisie à l'ouverture), Commandes, Inviter (hôte en réseau), Menu
+        /// principal, Quitter. Commandes ouvre le panneau des contrôles (liste, manette, clavier ; en réseau, les
+        /// joueurs) à la place des tuiles ; B / Échap y revient.
         /// </summary>
         void BuildPause()
         {
             pausePanel = Rect(screen, "Pause", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero).gameObject;
-            pausePanel.AddComponent<Image>().color = new Color(0.01f, 0.01f, 0.03f, 0.62f);
-            // Menu à gauche, contrôles à droite
-            var box = Rect(pausePanel.transform, "Box", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(MenuLeft, -MenuHeight * 0.5f), new Vector2(MenuLeft + PauseW, MenuHeight * 0.5f));
-            pausePlate = Backdrop(box);
-            pauseBox = box;
-            var layout = box.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(46, 46, 30, 30);
-            layout.spacing = RowGap;
-            layout.childControlHeight = true; layout.childControlWidth = true; layout.childForceExpandHeight = false;
-            var titleRow = TileRow(box, 90f);
-            var title = Label(titleRow, "PAUSE", 64, TextAnchor.MiddleLeft, Accent, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600, 90), FontStyle.BoldAndItalic);
-            pauseTitle = title;
-            // Partie en réseau : nombre de joueurs, adresse et code d'invitation à donner aux autres (hôte) ; dessous,
-            // l'option de collisions
-            var netRt = TileRow(box, 56f);
-            netRow = netRt.gameObject;
-            netLabel = Label(netRt, "", 22, TextAnchor.MiddleLeft, Info, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600, 56), FontStyle.Bold);
-            netLayout = netRt.GetComponent<LayoutElement>();
-            netRow.SetActive(false);
+            pauseBackdrop = MenuBackdrop.Attach((RectTransform)pausePanel.transform);
+            var root = Glass.Place(pausePanel.transform, "Menu", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(PauseW, PauseH));
+            pauseRoot = root;
+            root.pivot = new Vector2(0.5f, 0.5f);
 
-            var hero = TileRow(box, HeroH);
-            var resume = Tile(hero, HeroH, HudIcon.Kind.Play, "Reprendre", "Resume", true, 1.45f, () => SetPaused(false));
-            Loc.Bind(resume.sub, "Retour sur la route", "Back on the road");
-            resume.label.fontSize = 34;
+            // En tête : petit titre (voiture, état en réseau), PAUSE en lettres fines ; à droite l'heure et l'argent
+            pauseKicker = Glass.Kicker(root, "", 17);
+            Place(pauseKicker.rectTransform, new Vector2(0f, 1f), new Vector2(4f, -4f), new Vector2(900f, 26f));
+            pauseTitle = Glass.Label(root, "", 66, Glass.Weight.Light, Glass.White, TextAnchor.UpperLeft);
+            Place(pauseTitle.rectTransform, new Vector2(0f, 1f), new Vector2(0f, -28f), new Vector2(900f, 84f));
+            var status = Glass.Place(root, "Status", new Vector2(1f, 1f), new Vector2(0f, -22f), new Vector2(300f, 60f));
+            Glass.Backdrop(status, 30f);
+            pauseStatus = Glass.Label(status, "", 27, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleCenter);
+            Glass.Stretch(pauseStatus.rectTransform);
+            // Partie en réseau : joueurs, adresse ou code d'invitation, collisions (sous l'heure, à droite)
+            netLabel = Glass.Label(root, "", 19, Glass.Weight.Semilight, Glass.Dim, TextAnchor.UpperRight);
+            Place(netLabel.rectTransform, new Vector2(1f, 1f), new Vector2(-6f, -92f), new Vector2(900f, 80f));
+            netLabel.lineSpacing = 1.05f;
+
+            // Tuiles : grille de 4 colonnes sur 2 rangées, la carte prend 2 × 2
+            tilesRoot = Glass.Rect(root, "Tiles", new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -GridTop - GridH), new Vector2(0f, -GridTop));
+            float colW = (PauseW - 3f * GridGap) / 4f, rowH = (GridH - GridGap) * 0.5f;
+            mapTile = Tile(tilesRoot, new Vector2(0f, 0f), new Vector2(colW * 2f + GridGap, GridH), HudIcon.Kind.Map, "Carte", "Map", OpenMap, true);
+            Loc.Bind(mapTile.sub, "Lieux, courses, radars, tremplins · GPS", "Places, races, cameras, ramps · GPS");
+            float x2 = (colW + GridGap) * 2f, x3 = x2 + colW + GridGap;
+            carTile = Tile(tilesRoot, new Vector2(x2, 0f), new Vector2(colW, rowH), HudIcon.Kind.Car, "Voiture", "Car", OpenPicker, false);
+            var options = Tile(tilesRoot, new Vector2(x3, 0f), new Vector2(colW, rowH), HudIcon.Kind.Gear, "Options", "Options", OpenOptions, false);
+            Loc.Bind(options.sub, "Jeu, graphismes, audio, touches", "Game, graphics, audio, keys");
+            timeTile = Tile(tilesRoot, new Vector2(x2, -(rowH + GridGap)), new Vector2(colW, rowH), HudIcon.Kind.Clock, "Heure et météo", "Time and weather", OpenTimeWeather, false);
+            trophyTile = Tile(tilesRoot, new Vector2(x3, -(rowH + GridGap)), new Vector2(colW, rowH), HudIcon.Kind.Trophy, "Succès", "Achievements", OpenAchievements, false);
+            BuildMapPreview(mapTile);
+            trophyBadge = Badge(trophyTile, true);
+            timeBadge = Badge(timeTile, false);
+
+            // Pilules du bas
+            pillsRoot = Glass.Rect(root, "Pills", new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(0f, PillH));
+            float px = 0f;
+            var resume = Pill(pillsRoot, ref px, HudIcon.Kind.Play, "Reprendre", "Resume", () => SetPaused(false));
             firstButton = resume.button;
-            // Hôte : copie le code d'invitation dans le presse-papiers (ou en demande un s'il n'y en a pas)
-            inviteTile = Tile(hero, HeroH, HudIcon.Kind.Invite, "Inviter", "Invite", true, 1f, InviteAction);
+            controlsPill = Pill(pillsRoot, ref px, HudIcon.Kind.Gear, "Commandes", "Controls", () => ShowControlsPage(true));
+            inviteTile = Pill(pillsRoot, ref px, HudIcon.Kind.Invite, "Inviter", "Invite", InviteAction);
+            Pill(pillsRoot, ref px, HudIcon.Kind.Home, "Menu principal", "Main menu", game.ReturnToTitle);
+            Pill(pillsRoot, ref px, HudIcon.Kind.Power, "Quitter", "Quit", game.Quit);
+            pauseHint = Glass.Label(pillsRoot, "", 21, Glass.Weight.Semilight, Glass.Dim, TextAnchor.MiddleRight);
+            Place(pauseHint.rectTransform, new Vector2(1f, 0.5f), new Vector2(-4f, 0f), new Vector2(560f, PillH));
 
-            // Garage, monde et progression
-            var mid = TileRow(box, MidH);
-            carTile = Tile(mid, MidH, HudIcon.Kind.Car, "Voiture", "Car", false, 1f, OpenPicker);
-            var map = Tile(mid, MidH, HudIcon.Kind.Map, "Carte", "Map", false, 1f, OpenMap);
-            Loc.Bind(map.sub, "Lieux, courses, GPS", "Places, races, GPS");
-            trophyTile = Tile(mid, MidH, HudIcon.Kind.Trophy, "Succès", "Achievements", false, 1f, OpenAchievements);
-
-            // Réglages : options, heure (celle d'une partie rejointe est celle du serveur)
-            var settings = TileRow(box, SetH);
-            var options = Tile(settings, SetH, HudIcon.Kind.Gear, "Options", "Options", true, 1f, OpenOptions);
-            Loc.Bind(options.sub, "Son, jeu, graphismes", "Sound, game, graphics");
-            timeTile = Tile(settings, SetH, HudIcon.Kind.Clock, "Heure", "Time", true, 1f,
-                () => { if (!(game.Net && game.Net.IsClient)) game.DayNight.Advance(3f); RefreshPause(); });
-
-            var exits = TileRow(box, ExitH);
-            var home = Tile(exits, ExitH, HudIcon.Kind.Home, "Menu principal", "Main menu", true, 1f, game.ReturnToTitle);
-            Loc.Bind(home.sub, "Écran d'accueil", "Title screen");
-            var quit = Tile(exits, ExitH, HudIcon.Kind.Power, "Quitter", "Quit", true, 1f, game.Quit);
-            Loc.Bind(quit.sub, "Fermer le jeu", "Close the game");
             BuildControls(pausePanel.transform);
             ApplyLean(MenuHeight);
+            controlsPanel.SetActive(false);
             pausePanel.SetActive(false);
         }
 
-        /// <summary>
-        /// Plaques du menu à la hauteur donnée : même hauteur et même pente pour les deux ; chaque rangée de tuiles (et
-        /// chaque ligne de la liste des contrôles) glisse selon sa hauteur, le titre et les onglets des contrôles aussi.
-        /// </summary>
+        static void Place(RectTransform rt, Vector2 anchor, Vector2 pos, Vector2 size)
+        {
+            rt.anchorMin = rt.anchorMax = rt.pivot = anchor;
+            rt.anchoredPosition = pos;
+            rt.sizeDelta = size;
+        }
+
+        /// <summary>Panneau des contrôles fixé au centre : hauteur fixe, sans pente (style verre).</summary>
         void ApplyLean(float height)
         {
             MenuHeight = height;
-            float skew = MenuLean * height;
-            foreach (var rt in new[] { pauseBox, controlsPanelRt })
-            {
-                rt.offsetMin = new Vector2(rt.offsetMin.x, -height * 0.5f);
-                rt.offsetMax = new Vector2(rt.offsetMax.x, height * 0.5f);
-            }
-            pausePlate.Set(skew, 0f, 0f);
-            controlsPlate.Set(skew, 0f, 0f);
-            // Tuiles : du haut (marge de 30) vers le bas, les rangées affichées et leur espacement
-            float y = 30f;
-            foreach (var row in leanRows)
-            {
-                if (!row.gameObject.activeSelf) continue;
-                float h = row.GetComponent<LayoutElement>().preferredHeight;
-                int off = Mathf.RoundToInt(MenuLean * (height * 0.5f - (y + h * 0.5f)));
-                row.padding = new RectOffset(off, -off, 0, 0);
-                y += h + RowGap;
-            }
-            // Contrôles : titre (centre 52 px sous le haut), lignes de la liste (sous les 100 px du haut, 43 px chacune)
-            controlsTitle.rectTransform.anchoredPosition = new Vector2(50f + MenuLean * (height * 0.5f - 52f), -22f);
-            for (int i = 0; i < controlRows.Count; i++)
-            {
-                var h = controlRows[i].action.transform.parent.GetComponent<HorizontalLayoutGroup>();
-                int off = Mathf.RoundToInt(MenuLean * (height * 0.5f - 100f - i * 43f - 20f));
-                h.padding = new RectOffset(off, -off, 0, 0);
-            }
-        }
-
-        /// <summary>Rangée de tuiles de hauteur fixe (elle n'absorbe pas la place libre de la plaque), penchée avec la plaque.</summary>
-        RectTransform TileRow(Transform parent, float height)
-        {
-            var row = Rect(parent, "Row", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            var le = row.gameObject.AddComponent<LayoutElement>();
-            le.preferredHeight = le.minHeight = height;
-            le.flexibleHeight = 0f;
-            var h = row.gameObject.AddComponent<HorizontalLayoutGroup>();
-            h.spacing = RowGap;
-            h.childControlWidth = h.childControlHeight = true;
-            h.childForceExpandWidth = h.childForceExpandHeight = true;
-            leanRows.Add(h);
-            return row;
+            controlsPanelRt.offsetMin = new Vector2(controlsPanelRt.offsetMin.x, -height * 0.5f);
+            controlsPanelRt.offsetMax = new Vector2(controlsPanelRt.offsetMax.x, height * 0.5f);
+            controlsTitle.rectTransform.anchoredPosition = new Vector2(50f, -22f);
+            foreach (var row in controlRows)
+                row.action.transform.parent.GetComponent<HorizontalLayoutGroup>().padding = new RectOffset(0, 0, 0, 0);
         }
 
         /// <summary>
-        /// Tuile du menu : plaque inclinée, pictogramme et nom (dessous : un détail). wide : pictogramme à gauche et
-        /// textes à sa droite ; sinon pictogramme en haut, textes centrés dessous. Survol = sélection ; la tuile
-        /// sélectionnée passe à l'or (animée dans <see cref="AnimateTiles"/>).
+        /// Tuile du menu : verre, pictogramme (au centre, ou dans la bande du bas pour la grande tuile), bande de légende
+        /// en bas (nom et détail). La tuile sélectionnée prend un liseré doré et un halo (animés dans <see cref="AnimateTiles"/>).
         /// </summary>
-        PauseTile Tile(Transform row, float height, HudIcon.Kind kind, string fr, string en, bool wide, float flex, UnityEngine.Events.UnityAction onClick)
+        PauseTile Tile(RectTransform parent, Vector2 pos, Vector2 size, HudIcon.Kind kind, string fr, string en, UnityEngine.Events.UnityAction onClick, bool hero)
         {
-            var go = new GameObject("Tile", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape), typeof(Button), typeof(LayoutElement), typeof(HoverSelect));
-            go.transform.SetParent(row, false);
-            go.GetComponent<LayoutElement>().flexibleWidth = flex;
-            var t = new PauseTile();
-            t.plate = go.GetComponent<HudShape>();
-            t.plate.Set(height * MenuLean, 0f, 0f);
-            t.plate.color = TileNormal;
+            var go = new GameObject("Tile", typeof(RectTransform), typeof(CanvasRenderer), typeof(GlassRect), typeof(Button), typeof(HoverSelect));
+            go.transform.SetParent(parent, false);
+            var rt = (RectTransform)go.transform;
+            Place(rt, new Vector2(0f, 1f), pos, size);
+            var t = new PauseTile { size = size };
+            t.plate = go.GetComponent<GlassRect>();
+            t.plate.radius = hero ? 30f : 26f;
+            t.plate.color = TileFill;
+            t.plate.borderColor = Glass.Edge;
+            t.plate.border = 1.5f;
             t.button = go.GetComponent<Button>();
             t.button.targetGraphic = t.plate;
             t.button.transition = Selectable.Transition.None;
             t.button.onClick.AddListener(onClick);
 
+            float band = hero ? 120f : 96f;
+            // Contenu (aperçu de la carte) sous la bande, découpé par un masque arrondi
+            t.content = Glass.Rect(rt, "Content", Vector2.zero, Vector2.one, new Vector2(3f, 3f), new Vector2(-3f, -3f));
+            t.caption = Glass.Make(rt, "Caption", hero ? 27f : 23f, new Color(0.063f, 0.078f, 0.102f, 0.62f), 0f);
+            var cr = t.caption.rectTransform;
+            cr.anchorMin = Vector2.zero; cr.anchorMax = new Vector2(1f, 0f);
+            cr.offsetMin = new Vector2(3f, 3f); cr.offsetMax = new Vector2(-3f, band);
             var ig = new GameObject("Icon", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudIcon));
-            ig.transform.SetParent(go.transform, false);
+            ig.transform.SetParent(hero ? (Transform)cr : rt, false);
             var ir = (RectTransform)ig.transform;
             t.icon = ig.GetComponent<HudIcon>();
             t.icon.Shape = kind;
             t.icon.raycastTarget = false;
-            t.label = Label(go.transform, "", 30, wide ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, White, Vector2.zero, Vector2.zero, Vector2.zero, FontStyle.BoldAndItalic);
-            t.sub = Label(go.transform, "", 19, wide ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter, Dim, Vector2.zero, Vector2.zero, Vector2.zero, FontStyle.Bold);
-            t.sub.horizontalOverflow = HorizontalWrapMode.Wrap;
-            t.sub.verticalOverflow = VerticalWrapMode.Truncate;
-            t.sub.resizeTextForBestFit = true;
-            t.sub.resizeTextMinSize = 13;
-            t.sub.resizeTextMaxSize = 19;
-            Loc.Bind(t.label, fr, en);
-            if (wide)
+            float tx = 28f;
+            if (hero)
             {
-                float size = Mathf.Min(height * 0.48f, 60f), x = 30f + size * 0.5f, tx = 30f + size + 24f;
-                ir.anchorMin = ir.anchorMax = new Vector2(0f, 0.5f);
-                ir.sizeDelta = new Vector2(size, size);
-                ir.anchoredPosition = new Vector2(x, 0f);
-                Fit(t.label.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(tx, -8f), new Vector2(-14f, 34f));
-                Fit(t.sub.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(tx + 2f, -34f), new Vector2(-14f, -8f));
+                ir.anchorMin = ir.anchorMax = ir.pivot = new Vector2(0f, 0.5f);
+                ir.anchoredPosition = new Vector2(28f, 0f);
+                ir.sizeDelta = new Vector2(58f, 58f);
+                tx = 110f;
             }
             else
             {
-                const float textTop = 76f;
-                float size = Mathf.Min(height * 0.34f, (height - textTop) * 0.7f);
-                ir.anchorMin = ir.anchorMax = new Vector2(0.5f, 0f);
-                ir.sizeDelta = new Vector2(size, size);
-                ir.anchoredPosition = new Vector2(0f, textTop + (height - textTop) * 0.5f);
-                Fit(t.label.rectTransform, Vector2.zero, new Vector2(1f, 0f), new Vector2(10f, 42f), new Vector2(-10f, 78f));
-                Fit(t.sub.rectTransform, Vector2.zero, new Vector2(1f, 0f), new Vector2(14f, 12f), new Vector2(-14f, 42f));
+                ir.anchorMin = ir.anchorMax = ir.pivot = new Vector2(0.5f, 0.5f);
+                ir.anchoredPosition = new Vector2(0f, band * 0.5f);
+                ir.sizeDelta = new Vector2(96f, 96f);
             }
+            t.label = Glass.Label(cr, "", hero ? 40 : 28, Glass.Weight.Light, Glass.White, TextAnchor.LowerLeft);
+            Fit(t.label.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(tx, -2f), new Vector2(-20f, hero ? 46f : 38f));
+            t.sub = Glass.Label(cr, "", hero ? 21 : 18, Glass.Weight.Semilight, Glass.Dim, TextAnchor.UpperLeft);
+            Fit(t.sub.rectTransform, new Vector2(0f, 0.5f), new Vector2(1f, 0.5f), new Vector2(tx + 1f, hero ? -36f : -32f), new Vector2(-20f, -4f));
+            t.sub.horizontalOverflow = HorizontalWrapMode.Wrap;
+            t.sub.verticalOverflow = VerticalWrapMode.Truncate;
+            Loc.Bind(t.label, fr, en);
             pauseTiles.Add(t);
             return t;
         }
 
-        static void Fit(RectTransform rt, Vector2 aMin, Vector2 aMax, Vector2 oMin, Vector2 oMax)
+        /// <summary>Pilule du bas du menu (pictogramme et nom), posée à la suite des précédentes.</summary>
+        PauseTile Pill(RectTransform parent, ref float x, HudIcon.Kind kind, string fr, string en, UnityEngine.Events.UnityAction onClick)
         {
-            rt.anchorMin = aMin; rt.anchorMax = aMax;
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.offsetMin = oMin; rt.offsetMax = oMax;
+            var go = new GameObject("Pill", typeof(RectTransform), typeof(CanvasRenderer), typeof(GlassRect), typeof(Button), typeof(HoverSelect));
+            go.transform.SetParent(parent, false);
+            var rt = (RectTransform)go.transform;
+            var t = new PauseTile { pill = true };
+            t.plate = go.GetComponent<GlassRect>();
+            t.plate.radius = PillH * 0.5f;
+            t.plate.color = Glass.Pill;
+            t.plate.borderColor = Glass.Edge;
+            t.plate.border = 1.5f;
+            t.button = go.GetComponent<Button>();
+            t.button.targetGraphic = t.plate;
+            t.button.transition = Selectable.Transition.None;
+            t.button.onClick.AddListener(onClick);
+            var ig = new GameObject("Icon", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudIcon));
+            ig.transform.SetParent(rt, false);
+            var ir = (RectTransform)ig.transform;
+            Place(ir, new Vector2(0f, 0.5f), new Vector2(30f, 0f), new Vector2(30f, 30f));
+            t.icon = ig.GetComponent<HudIcon>();
+            t.icon.Shape = kind;
+            t.icon.raycastTarget = false;
+            t.label = Glass.Label(rt, "", 24, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleLeft);
+            Fit(t.label.rectTransform, Vector2.zero, Vector2.one, new Vector2(74f, 0f), new Vector2(-24f, 0f));
+            t.sub = t.label;
+            Loc.Bind(t.label, fr, en);
+            t.x = x;
+            Place(rt, new Vector2(0f, 0.5f), new Vector2(x, 0f), new Vector2(PillWidth(t), PillH));
+            x += PillWidth(t) + 16f;
+            pauseTiles.Add(t);
+            pausePills.Add(t);
+            return t;
         }
 
-        /// <summary>État des tuiles : la sélectionnée passe à l'or (textes à l'encre) et grossit un peu ; grisées si indisponibles.</summary>
+        float PillWidth(PauseTile t) => Mathf.Ceil(t.label.preferredWidth) + 74f + 30f;
+
+        /// <summary>Pilules rangées de gauche à droite (largeur selon la langue ; Inviter : hôte en réseau seulement).</summary>
+        void LayoutPills()
+        {
+            float x = 0f;
+            foreach (var p in pausePills)
+            {
+                if (!p.button.gameObject.activeSelf) continue;
+                var rt = (RectTransform)p.button.transform;
+                float w = PillWidth(p);
+                rt.anchoredPosition = new Vector2(x, 0f);
+                rt.sizeDelta = new Vector2(w, PillH);
+                x += w + 16f;
+            }
+        }
+
+        /// <summary>Pastille en haut à droite d'une tuile (dorée : succès ; verre : heure et météo).</summary>
+        Text Badge(PauseTile t, bool gold)
+        {
+            var rt = Glass.Place(t.button.transform, "Badge", new Vector2(1f, 1f), new Vector2(-16f, -16f), new Vector2(120f, 38f));
+            var plate = Glass.Backdrop(rt, 19f, gold ? Glass.Gold : Glass.PanelStrong, gold ? 0f : 1.5f);
+            var text = Glass.Label(rt, "", 19, gold ? Glass.Weight.Semibold : Glass.Weight.Regular, gold ? Glass.Ink : Glass.White, TextAnchor.MiddleCenter);
+            Glass.Stretch(text.rectTransform);
+            badgePlates[text] = plate;
+            return text;
+        }
+
+        /// <summary>Largeur d'une pastille d'après son texte.</summary>
+        void FitBadge(Text badge)
+        {
+            var rt = (RectTransform)badge.transform.parent;
+            rt.sizeDelta = new Vector2(Mathf.Ceil(badge.preferredWidth) + 34f, 38f);
+        }
+
+        /// <summary>Aperçu de la carte dans la grande tuile : la carte du massif autour de la voiture, point doré au centre.</summary>
+        void BuildMapPreview(PauseTile t)
+        {
+            var mask = t.content.gameObject.AddComponent<RectMask2D>();
+            mask.softness = new Vector2Int(2, 2);
+            var raw = new GameObject("Map", typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
+            raw.transform.SetParent(t.content, false);
+            Glass.Stretch(raw.rectTransform);
+            raw.texture = Resources.Load<Texture2D>("Map/map_overview");
+            raw.raycastTarget = false;
+            raw.color = raw.texture ? Color.white : new Color(0.1f, 0.12f, 0.15f, 1f);
+            mapPreview = raw;
+            var dot = Img(t.content, "Car", HudArt.Disc, new Vector2(22f, 22f), new Vector2(0f, 60f), Glass.Gold);
+            var halo = Img(dot.rectTransform, "Halo", HudArt.SoftDisc, new Vector2(64f, 64f), Vector2.zero, Glass.A(Glass.Gold, 0.45f));
+            halo.rectTransform.SetAsFirstSibling();
+            Img(dot.rectTransform, "Core", HudArt.Disc, new Vector2(10f, 10f), Vector2.zero, Glass.Ink);
+            mapDot = dot.rectTransform;
+        }
+
+        /// <summary>Carte de la tuile recentrée sur la voiture (un rectangle d'environ 2,4 km de large).</summary>
+        void RefreshMapPreview()
+        {
+            if (!mapPreview || !mapPreview.texture || game.Map == null || !slot.Car) return;
+            float half = game.Map.Half;
+            var p = slot.Car.transform.position;
+            var r = mapPreview.rectTransform.rect;
+            float w = Mathf.Clamp(2400f / (half * 2f), 0.05f, 1f), h = w * (r.height / Mathf.Max(1f, r.width));
+            // La voiture un peu au-dessus de la bande de légende
+            float bandShare = 120f / Mathf.Max(1f, r.height);
+            float u = (p.x + half) / (half * 2f), v = (p.z + half) / (half * 2f);
+            float vc = v - (bandShare * 0.5f) * h;
+            mapPreview.uvRect = new Rect(u - w * 0.5f, vc - h * 0.5f, w, h);
+            mapDot.anchoredPosition = new Vector2(0f, r.height * bandShare * 0.5f);
+        }
+
+        /// <summary>
+        /// État des tuiles et des pilules : la sélectionnée prend l'or (liseré et halo pour une tuile ; fond doré et
+        /// texte à l'encre pour une pilule) ; grisées si indisponibles.
+        /// </summary>
         void AnimateTiles(float dt)
         {
             var sel = EventSystem.current ? EventSystem.current.currentSelectedGameObject : null;
             foreach (var t in pauseTiles)
             {
+                if (!t.button.gameObject.activeInHierarchy) continue;
                 bool usable = t.button.interactable;
                 t.on = dt > 0f ? Mathf.MoveTowards(t.on, usable && sel == t.button.gameObject ? 1f : 0f, dt * 9f) : 0f;
                 float e = t.on * t.on * (3f - 2f * t.on);
-                Color plate = usable ? Color.Lerp(TileNormal, TileGold, e) : TileOff;
-                t.plate.color = plate;
-                plate.a = 1f;
-                t.icon.SetColors(usable ? Color.Lerp(Accent, Ink, e) : Muted, plate);
-                t.label.color = usable ? Color.Lerp(White, Ink, e) : Muted;
-                t.sub.color = usable ? Color.Lerp(Dim, InkDim, e) : Muted;
-                t.button.transform.localScale = Vector3.one * (1f + 0.035f * e);
+                if (t.pill)
+                {
+                    t.plate.color = usable ? Color.Lerp(Glass.Pill, Glass.Gold, e) : Glass.A(Color.white, 0.05f);
+                    t.plate.borderColor = Color.Lerp(Glass.Edge, Glass.A(Glass.Gold, 0f), e);
+                    t.plate.halo = 9f * e;
+                    t.plate.haloColor = Glass.A(Glass.Gold, 0.3f * e);
+                    Color fg = usable ? Color.Lerp(Glass.White, Glass.Ink, e) : Glass.Faint;
+                    t.label.color = fg;
+                    t.icon.SetColors(fg, Color.Lerp(new Color(0.18f, 0.2f, 0.24f), Glass.Gold, e));
+                }
+                else
+                {
+                    t.plate.color = usable ? TileFill : Glass.A(TileFill, 0.3f);
+                    t.plate.borderColor = Color.Lerp(Glass.Edge, Glass.Gold, e);
+                    t.plate.border = 1.5f + 1f * e;
+                    t.plate.halo = 12f * e;
+                    t.plate.haloColor = Glass.A(Glass.Gold, 0.3f * e);
+                    t.label.color = usable ? Color.Lerp(Glass.White, Glass.Gold, e) : Glass.Faint;
+                    t.sub.color = usable ? Glass.Dim : Glass.Faint;
+                    t.icon.SetColors(usable ? Color.Lerp(Glass.White, Glass.Gold, e) : Glass.Faint, new Color(0.1f, 0.12f, 0.15f));
+                }
+                t.plate.SetVerticesDirty();
+                t.button.transform.localScale = Vector3.one * (1f + (t.pill ? 0.02f : 0.012f) * e);
             }
         }
 
@@ -997,15 +1089,53 @@ namespace ChillRoad
             });
         }
 
+        /// <summary>Heure et météo (tuile) : réglage de l'heure, du temps qui passe et du temps qu'il fait.</summary>
+        void OpenTimeWeather()
+        {
+            if (game.Net && game.Net.IsClient) return;
+            if (!timeWeather)
+            {
+                timeWeather = gameObject.AddComponent<TimeWeatherMenu>();
+                timeWeather.Init(game);
+            }
+            pausePanel.SetActive(false);
+            timeWeather.Open(() =>
+            {
+                pausePanel.SetActive(true);
+                openedFrame = Time.frameCount;
+                RefreshPause();
+                EventSystem.current?.SetSelectedGameObject(timeTile.button.gameObject);
+            });
+        }
+
+        /// <summary>Panneau des contrôles (pilule Commandes) à la place des tuiles ; false : retour aux tuiles.</summary>
+        void ShowControlsPage(bool show)
+        {
+            controlsPage = show;
+            if (game.Online && show) playersPage = false;
+            pauseRoot.gameObject.SetActive(!show);
+            controlsPanel.SetActive(show && !PlayersInMenu);
+            openedFrame = Time.frameCount;
+            if (show) { controlsShown = -1; RefreshControls(); EventSystem.current?.SetSelectedGameObject(null); }
+            else EventSystem.current?.SetSelectedGameObject(controlsPill.button.gameObject);
+        }
+
+        static void Fit(RectTransform rt, Vector2 aMin, Vector2 aMax, Vector2 oMin, Vector2 oMax)
+        {
+            rt.anchorMin = aMin; rt.anchorMax = aMax;
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.offsetMin = oMin; rt.offsetMax = oMax;
+        }
+
         /// <summary>Panneau des contrôles, à droite du menu pause.</summary>
         void BuildControls(Transform parent)
         {
             var panel = Rect(parent, "Controls", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                 new Vector2(ControlsLeft, -MenuHeight * 0.5f), new Vector2(ControlsLeft + ControlsW, MenuHeight * 0.5f));
-            controlsPlate = Backdrop(panel);
+            controlsPlate = Glass.Backdrop(panel, 30f);
             controlsPanel = panel.gameObject;
             controlsPanelRt = panel;
-            controlsTitle = Label(panel, "", 30, TextAnchor.MiddleLeft, Info, new Vector2(0f, 1f), new Vector2(50f, -22f), new Vector2(300, 60), FontStyle.BoldAndItalic);
+            controlsTitle = Glass.Label(panel, "", 32, Glass.Weight.Light, Glass.White, TextAnchor.MiddleLeft, new Vector2(0f, 1f), new Vector2(50f, -22f), new Vector2(300, 60));
             // Onglets : liste, manette, clavier (en réseau, d'abord le tableau des joueurs, qui prend la place du panneau)
             foreach (var (view, fr, en) in new[] { (ViewPlayers, "JOUEURS", "PLAYERS"), (ViewList, "LISTE", "LIST"), (ViewPad, "MANETTE", "GAMEPAD"), (ViewKeys, "CLAVIER", "KEYBOARD") })
             {
@@ -1040,9 +1170,9 @@ namespace ChillRoad
                 row.gameObject.AddComponent<LayoutElement>().preferredHeight = 40;
                 var h = row.gameObject.AddComponent<HorizontalLayoutGroup>();
                 h.childControlWidth = true; h.childControlHeight = true; h.childForceExpandWidth = false;
-                var action = Label(row, "", 23, TextAnchor.MiddleLeft, White, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300, 40), FontStyle.Normal);
+                var action = Glass.Label(row, "", 22, Glass.Weight.Semilight, Glass.White, TextAnchor.MiddleLeft, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300, 40));
                 action.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-                var key = Label(row, "", 23, TextAnchor.MiddleRight, Accent, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(240, 40), FontStyle.Bold);
+                var key = Glass.Label(row, "", 22, Glass.Weight.Regular, Glass.Gold, TextAnchor.MiddleRight, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(240, 40));
                 key.gameObject.AddComponent<LayoutElement>().preferredWidth = 240f;
                 controlRows.Add((action, key));
             }
@@ -1061,7 +1191,7 @@ namespace ChillRoad
                 + (online ? 1 : 0)) * 7919 + GameInput.BindingsVersion) * 31 + layoutHash);
             if (shown == controlsShown) return;
             controlsShown = shown;
-            controlsTitle.text = Loc.T("CONTRÔLES", "CONTROLS");
+            controlsTitle.text = Glass.Spaced(Loc.T("COMMANDES", "CONTROLS"), 2);
             LayoutViewChips(view, online);
             controlsList.gameObject.SetActive(view == ViewList);
             for (int i = controlsArt.childCount - 1; i >= 0; i--)
@@ -1102,7 +1232,7 @@ namespace ChillRoad
         /// <summary>Onglets des vues, alignés à droite du titre ; l'onglet affiché passe à l'or. « Joueurs » : en réseau seulement.</summary>
         void LayoutViewChips(int view, bool online)
         {
-            float x = -50f + MenuLean * (MenuHeight * 0.5f - 33f);
+            float x = -50f;
             for (int i = viewChips.Count - 1; i >= 0; i--)
             {
                 var (button, plate, text, v) = viewChips[i];
@@ -1123,7 +1253,7 @@ namespace ChillRoad
         /// <summary>Onglet choisi (clic) : une vue des contrôles, ou le tableau des joueurs en réseau.</summary>
         void ShowControlsView(int view)
         {
-            if (view == ViewPlayers) { if (game.Online) playersPage = true; return; }
+            if (view == ViewPlayers) { if (game.Online) { playersPage = true; controlsPanel.SetActive(false); } return; }
             controlsView = view;
             if (game.Online) playersPage = false;
             controlsShown = -1;
@@ -1147,19 +1277,32 @@ namespace ChillRoad
             // Une seule voiture achetée, ou course en cours : tuile grisée
             bool locked = game.Races && game.Races.CarLocked;
             carTile.button.interactable = game.OwnedCars > 1 && !locked;
-            carTile.sub.text = locked ? Loc.T("Verrouillée pendant la course", "Locked during the race") : game.Player.Spec.displayName;
+            carTile.sub.text = locked ? Loc.T("Verrouillée pendant la course", "Locked during the race")
+                : game.OwnedCars <= 1 ? Loc.T("Une seule voiture au garage", "Only one car in the garage") : Loc.T("Changer de voiture", "Change car");
             var net = game.Net;
             bool online = game.Online;
             bool client = online && net.IsClient;
             timeTile.button.interactable = !client;
-            timeTile.sub.text = client
-                ? Loc.T($"{game.DayNight.Clock}  ·  réglée par l'hôte", $"{game.DayNight.Clock}  ·  set by the host")
-                : Loc.F($"{game.DayNight.Clock}  ·  +3 h");
+            timeTile.sub.text = client ? Loc.T("Réglées par l'hôte", "Set by the host") : Loc.T("Moment de la journée, ciel", "Time of day, sky");
+            bool storm = game.Weather && game.Weather.Stormy;
+            timeBadge.text = game.DayNight.Clock + "   " + (storm ? Loc.T("Orage", "Storm") : Loc.T("Beau temps", "Clear"));
+            FitBadge(timeBadge);
             int got = Achievements.UnlockedCount, total = Achievements.All.Length;
-            trophyTile.sub.text = Loc.F($"{got} / {total} obtenus", $"{got} / {total} unlocked");
+            trophyBadge.text = Loc.F($"{got} / {total}");
+            FitBadge(trophyBadge);
+            trophyTile.sub.text = Loc.T("Défis de la route", "Road challenges");
             // En réseau, rien ne s'arrête : c'est un menu, pas une pause
-            pauseTitle.text = online ? "MENU" : "PAUSE";
+            pauseTitle.text = Glass.Spaced(online ? "MENU" : "PAUSE", 3);
+            pauseKicker.text = Glass.Spaced(game.Player.Spec.displayName.ToUpperInvariant(), 2);
+            pauseStatus.text = game.DayNight.Clock + "    <color=#FFFFFF66>|</color>    <color=#FFC233>" + Wallet.Format(Wallet.Cash) + "</color>";
+            var sr = (RectTransform)pauseStatus.transform.parent;
+            sr.sizeDelta = new Vector2(Mathf.Ceil(pauseStatus.preferredWidth) + 64f, 60f);
+            pauseHint.text = GameInput.UsingGamepad
+                ? Loc.T("<color=#FFC233>A</color>  valider     <color=#FFC233>B</color>  reprendre", "<color=#FFC233>A</color>  select     <color=#FFC233>B</color>  resume")
+                : Loc.T("<color=#FFC233>Entrée</color>  valider     <color=#FFC233>Échap</color>  reprendre", "<color=#FFC233>Enter</color>  select     <color=#FFC233>Esc</color>  resume");
+            RefreshMapPreview();
             RefreshNet();
+            LayoutPills();
         }
 
         /// <summary>
@@ -1172,9 +1315,8 @@ namespace ChillRoad
             var net = game.Net;
             bool online = game.Online, host = online && net.IsHost;
             netRefresh = 0.5f;
-            int lines = 0;
-            netRow.SetActive(online);
-            inviteTile.button.gameObject.SetActive(host);
+            netLabel.gameObject.SetActive(online);
+            if (inviteTile.button.gameObject.activeSelf != host) { inviteTile.button.gameObject.SetActive(host); LayoutPills(); }
             if (online)
             {
                 // Option fixée par le serveur à l'ouverture de la partie : rappelée, pas modifiable ici
@@ -1190,9 +1332,10 @@ namespace ChillRoad
                         : step == NetRelay.Step.Pending ? Loc.T("Code d'invitation : demande en cours", "Invite code: requesting")
                         : step == NetRelay.Step.Failed ? Loc.T($"Pas de code : {net.InviteError}", $"No code: {net.InviteError}") : "";
                     bool copied = Time.unscaledTime - inviteCopied < 2.5f;
-                    inviteTile.sub.text = step == NetRelay.Step.Ready ? (copied ? Loc.T("Code copié !", "Code copied!") : Loc.T("Copier le code", "Copy the code"))
+                    string pill = step == NetRelay.Step.Ready ? (copied ? Loc.T("Code copié !", "Code copied!") : Loc.T("Copier le code", "Copy the code"))
                         : step == NetRelay.Step.Pending ? Loc.T("Demande en cours…", "Requesting…")
                         : Loc.T("Demander un code", "Request a code");
+                    if (inviteTile.label.text != pill) { inviteTile.label.text = pill; LayoutPills(); }
                 }
                 else
                 {
@@ -1201,13 +1344,8 @@ namespace ChillRoad
                         : Loc.T("  ·  par code d'invitation", "  ·  by invite code");
                     first = Loc.T($"EN LIGNE  ·  {net.ServerName}  ·  joueurs : {net.PlayerCount}{relay}", $"ONLINE  ·  {net.ServerName}  ·  players: {net.PlayerCount}{relay}");
                 }
-                lines = invite.Length > 0 ? 3 : 2;
                 netLabel.text = first + "\n" + (invite.Length > 0 ? invite + "\n" : "") + collisions;
-                netLayout.preferredHeight = netLayout.minHeight = lines * 28f;
             }
-            // Hauteur de la plaque : marges, titre, ligne d'état (en réseau), quatre rangées de tuiles et leurs espaces
-            float height = 60f + 90f + HeroH + MidH + SetH + ExitH + RowGap * 4f + (online ? lines * 28f + RowGap : 0f);
-            ApplyLean(height);
         }
 
         /// <summary>Bouton du code d'invitation (hôte) : le copie dans le presse-papiers ; sans code (panne, expiré), en demande un.</summary>
@@ -1226,16 +1364,20 @@ namespace ChillRoad
 
         public void SetPaused(bool paused)
         {
+            if (paused) MenuBackdrop.Capture(true);   // image du jeu avant que le menu ne la couvre
             pausePanel.SetActive(paused);
             canvas.gameObject.SetActive(!paused);
             inPause = paused;
+            pauseBackdrop.live = game.Online;
+            controlsPage = false;
+            pauseRoot.gameObject.SetActive(true);
             // En réseau, le monde continue pour tous : seule notre voiture n'est plus conduite
             Time.timeScale = paused && !game.Online ? 0f : 1f;
             game.SetInputEnabled(!paused);
             openedFrame = Time.frameCount;
             if (paused)
             {
-                controlsPanel.SetActive(!PlayersInMenu);
+                controlsPanel.SetActive(false);
                 RefreshPause();
                 AnimateTiles(0f);
                 EventSystem.current?.SetSelectedGameObject(firstButton.gameObject);
@@ -1283,15 +1425,18 @@ namespace ChillRoad
         void UpdatePause()
         {
             if (OptionsMenu.IsOpen || Dealership.IsOpen || TuningGarage.IsOpen || RaceSetup.IsOpen || CarPicker.IsOpen || AchievementsMenu.IsOpen
-                || game.Demo || GameManager.DedicatedServer) return;
+                || TimeWeatherMenu.IsOpen || game.Demo || GameManager.DedicatedServer) return;
             // Carte globale ouverte (ou tout juste fermée par Échap) : la pause attend
             if (WorldMap.IsOpen || Time.frameCount == WorldMap.ChangedFrame || Time.frameCount == Dealership.ChangedFrame
                 || Time.frameCount == TuningGarage.ChangedFrame || Time.frameCount == RaceSetup.ChangedFrame
-                || Time.frameCount == CarPicker.ChangedFrame || Time.frameCount == AchievementsMenu.ChangedFrame) return;
+                || Time.frameCount == CarPicker.ChangedFrame || Time.frameCount == AchievementsMenu.ChangedFrame
+                || Time.frameCount == TimeWeatherMenu.ChangedFrame) return;
             if (Time.frameCount == openedFrame || game.State != GameManager.Phase.Playing) return;
+            // Sous-écran des commandes : B / Échap revient aux tuiles
+            if (inPause && controlsPage && GameInput.CancelPressed) { ShowControlsPage(false); return; }
             if (!Paused && GameInput.PausePressed) SetPaused(true);
             else if (Paused && (GameInput.PausePressed || GameInput.CancelPressed)) SetPaused(false);
-            if (Paused && EventSystem.current && EventSystem.current.currentSelectedGameObject == null && GameInput.UsingGamepad)
+            if (Paused && !controlsPage && EventSystem.current && EventSystem.current.currentSelectedGameObject == null && GameInput.UsingGamepad)
                 EventSystem.current.SetSelectedGameObject(firstButton.gameObject);
             // Les contrôles suivent l'appareil touché en dernier, même menu ouvert
             if (Paused) RefreshControls();
@@ -1299,10 +1444,14 @@ namespace ChillRoad
             if (inPause && pausePanel.activeSelf)
             {
                 AnimateTiles(Time.unscaledDeltaTime);
-                int dir = GameInput.TabNextPressed ? 1 : GameInput.TabPrevPressed ? -1 : 0;
-                if (dir != 0) CycleControlsView(dir);
-                bool controls = !PlayersInMenu;
-                if (controlsPanel.activeSelf != controls) controlsPanel.SetActive(controls);
+                if (controlsPage)
+                {
+                    int dir = GameInput.TabNextPressed ? 1 : GameInput.TabPrevPressed ? -1 : 0;
+                    if (dir != 0) CycleControlsView(dir);
+                    bool controls = !PlayersInMenu;
+                    if (controlsPanel.activeSelf != controls) controlsPanel.SetActive(controls);
+                }
+                else RefreshMapPreview();
             }
             // En réseau, l'état de la partie change menu ouvert (joueurs, code d'invitation obtenu, latence)
             if (inPause && pausePanel.activeSelf && game.Online)
