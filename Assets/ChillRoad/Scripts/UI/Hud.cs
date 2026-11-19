@@ -110,12 +110,10 @@ namespace ChillRoad
         Text dealerText;
 
         // Bas gauche
-        CanvasGroup hintGroup, musicGroup;
-        Text hintText, musicText;
+        CanvasGroup musicGroup;
+        Text musicText;
         RectTransform musicRt;
-        float hintTimer = 12f, musicTimer;
-        bool hintPad, hintTouch;
-        int hintBuilt = -1;   // appareil + langue + version des commandes de l'aide affichée
+        float musicTimer;
         int gaugeSlide = -1;
         bool gaugeTouch;
         static readonly Vector2 GaugeTouchHome = new Vector2(-140f, 478f);
@@ -206,7 +204,6 @@ namespace ChillRoad
         public void SetVisible(bool visible)
         {
             if (screen) screen.gameObject.SetActive(visible);
-            if (visible) hintTimer = 12f;
         }
 
         /// <summary>HUD du joueur de cette machine.</summary>
@@ -401,16 +398,17 @@ namespace ChillRoad
 
         void BuildCenter()
         {
-            // Drift en cours (ou saut) : petit titre en couleur, points en attente en chiffres fins, jauge d'angle fine
-            var drift = Rect(canvas, "Drift", new Vector2(0.5f, 0.27f), new Vector2(0.5f, 0.27f), new Vector2(-280f, -60f), new Vector2(280f, 60f));
+            // Drift en cours (ou saut) : petite plaque fixe en bas au centre, entre la minicarte et le compte-tours
+            // (hors de la vue de la route) : titre en couleur, points en attente en chiffres fins, jauge d'angle fine
+            var drift = Rect(canvas, "Drift", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(-170f, 28f), new Vector2(170f, 114f));
             driftGroup = drift.gameObject.AddComponent<CanvasGroup>();
             driftGroup.alpha = 0f;
-            Glass.Backdrop(drift, 34f, Glass.A(Glass.Panel, 0.42f));
-            driftTitle = Glass.Label(drift, "DRIFT", 17, Glass.Weight.Semibold, DriftColor, TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0f, -12f), new Vector2(260f, 24f));
-            driftText = Glass.Label(drift, "", 54, Glass.Weight.Light, Glass.White, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0f, -2f), new Vector2(500f, 64f));
-            driftChain = Glass.Label(drift, "", 24, Glass.Weight.Regular, DriftColor, TextAnchor.MiddleLeft, new Vector2(0.5f, 0.5f), new Vector2(150f, -4f), new Vector2(160f, 30f));
+            Glass.Backdrop(drift, 26f, Glass.A(Glass.Panel, 0.5f));
+            driftTitle = Glass.Label(drift, "DRIFT", 13, Glass.Weight.Semibold, DriftColor, TextAnchor.MiddleCenter, new Vector2(0.5f, 1f), new Vector2(0f, -9f), new Vector2(200f, 18f));
+            driftText = Glass.Label(drift, "", 36, Glass.Weight.Light, Glass.White, TextAnchor.MiddleCenter, new Vector2(0.5f, 0.5f), new Vector2(0f, -4f), new Vector2(300f, 44f));
+            driftChain = Glass.Label(drift, "", 18, Glass.Weight.Regular, DriftColor, TextAnchor.MiddleLeft, new Vector2(0.5f, 0.5f), new Vector2(92f, -6f), new Vector2(90f, 24f));
             driftChain.rectTransform.pivot = new Vector2(0f, 0.5f);
-            var barBg = Rect(drift, "AngleBg", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(-120f, 14f), new Vector2(120f, 17f));
+            var barBg = Rect(drift, "AngleBg", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(-80f, 10f), new Vector2(80f, 12.5f));
             barBg.gameObject.AddComponent<Image>().color = Glass.A(Color.white, 0.2f);
             driftBar = Rect(barBg, "Angle", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             driftBar.pivot = new Vector2(0f, 0.5f);
@@ -429,26 +427,13 @@ namespace ChillRoad
         void BuildBottomLeft()
         {
             // Morceau en cours : entre en glissant, puis s'efface (sans plaque, note cyan)
-            musicRt = Rect(canvas, "Music", new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(BottomLeftX, 76f), new Vector2(BottomLeftX + 600f, 116f));
+            musicRt = Rect(canvas, "Music", new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(BottomLeftX, 30f), new Vector2(BottomLeftX + 420f, 70f));   // s'arrête avant la plaque de drift
             musicHome = musicRt.anchoredPosition;
             musicGroup = musicRt.gameObject.AddComponent<CanvasGroup>();
             musicGroup.alpha = 0f;
-            musicText = Glass.Label(musicRt, "", 24, Glass.Weight.Semilight, Glass.White, TextAnchor.MiddleLeft, new Vector2(0f, 0.5f), new Vector2(6f, 0f), new Vector2(590f, 34f));
+            musicText = Glass.Label(musicRt, "", 22, Glass.Weight.Semilight, Glass.White, TextAnchor.MiddleLeft, new Vector2(0f, 0.5f), new Vector2(6f, 0f), new Vector2(410f, 34f));
             Glass.Soft(musicText);
 
-            // Aide des commandes : affichée au départ puis quand on change d'appareil, puis s'efface
-            // (entre la minicarte et le compte-tours : la police rétrécit si la ligne est trop longue)
-            var hint = Rect(canvas, "Hint", new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(BottomLeftX, 24f), new Vector2(BottomLeftX + 1180f, 64f));
-            hintGroup = hint.gameObject.AddComponent<CanvasGroup>();
-            hintGroup.alpha = 0f;
-            Glass.Backdrop(hint, 20f, Glass.A(Glass.Panel, 0.4f), 1f);
-            hintText = Glass.Label(hint, "", 18, Glass.Weight.Semilight, Glass.Dim, TextAnchor.MiddleLeft);
-            Fit(hintText.rectTransform, Vector2.zero, Vector2.one, new Vector2(22f, 2f), new Vector2(-22f, -2f));
-            hintText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            hintText.verticalOverflow = VerticalWrapMode.Truncate;
-            hintText.resizeTextForBestFit = true;
-            hintText.resizeTextMinSize = 12;
-            hintText.resizeTextMaxSize = 18;
         }
 
         // ------------------------------------------------------------------ mise à jour
@@ -631,36 +616,6 @@ namespace ChillRoad
                 musicGroup.alpha = Mathf.Min(x, Mathf.Clamp01(musicTimer / 0.8f));
             }
             else musicGroup.alpha = 0f;
-
-            // Aide : au départ, puis de nouveau quelques secondes quand on change d'appareil
-            bool pad = GameInput.UsingGamepad, touch = TouchInput.Showing;
-            if (pad != hintPad || touch != hintTouch) { hintPad = pad; hintTouch = touch; hintTimer = Mathf.Max(hintTimer, 6f); }
-            int hintKey = (touch ? 2 : pad ? 1 : 0) + (Loc.French ? 4 : 0) + GameInput.BindingsVersion * 8;
-            if (hintKey != hintBuilt)
-            {
-                hintBuilt = hintKey;
-                hintText.text = touch
-                    ? Loc.T("Gauche : diriger · droite : pédales · glisser sur l'écran : regarder autour · REPLACER : retour sur la route · II : pause",
-                            "Left: steer · right: pedals · drag on screen: look around · RESET: back on the road · II: pause")
-                    : DrivingHint(pad);
-            }
-            bool visible = hintTimer > 0f && !Paused && !game.Demo && game.State == GameManager.Phase.Playing;
-            if (visible) hintTimer -= dt;
-            hintGroup.alpha = Mathf.MoveTowards(hintGroup.alpha, visible ? 1f : 0f, dt * 2f);
-        }
-
-        /// <summary>Aide d'une ligne pendant la conduite, d'après les commandes choisies dans les options (onglet Touches).</summary>
-        static string DrivingHint(bool pad)
-        {
-            string K(GameInput.Bind b) => GameInput.Short(b, pad);
-            string steer = pad ? "" : Loc.T($"{K(GameInput.Bind.Left)} {K(GameInput.Bind.Right)} direction · ", $"{K(GameInput.Bind.Left)} {K(GameInput.Bind.Right)} steer · ");
-            return Loc.T(
-                $"{K(GameInput.Bind.Throttle)} gaz · {K(GameInput.Bind.Brake)} frein · {steer}{K(GameInput.Bind.Handbrake)} frein à main · {K(GameInput.Bind.Lights)} phares · " +
-                $"{K(GameInput.Bind.Horn)} klaxon · {K(GameInput.Bind.Camera)} vue · {K(GameInput.Bind.LookBack)} regarder derrière · {K(GameInput.Bind.Reset)} replacer · " +
-                $"{K(GameInput.Bind.Music)} musique · {(pad ? "Start" : "Échap")} pause",
-                $"{K(GameInput.Bind.Throttle)} throttle · {K(GameInput.Bind.Brake)} brake · {steer}{K(GameInput.Bind.Handbrake)} handbrake · {K(GameInput.Bind.Lights)} lights · " +
-                $"{K(GameInput.Bind.Horn)} horn · {K(GameInput.Bind.Camera)} camera · {K(GameInput.Bind.LookBack)} look back · {K(GameInput.Bind.Reset)} reset · " +
-                $"{K(GameInput.Bind.Music)} music · {(pad ? "Start" : "Esc")} pause");
         }
 
         /// <summary>
@@ -827,10 +782,14 @@ namespace ChillRoad
             float px = 0f;
             var resume = Pill(pillsRoot, ref px, HudIcon.Kind.Play, "Reprendre", "Resume", () => SetPaused(false));
             firstButton = resume.button;
-            controlsPill = Pill(pillsRoot, ref px, HudIcon.Kind.Gear, "Commandes", "Controls", () => ShowControlsPage(true));
+            // Plus de pilule Commandes (les touches se voient et se changent dans Options › Touches) ; en réseau seulement,
+            // « Joueurs » ouvre le tableau des joueurs à la place des tuiles
+            controlsPill = Pill(pillsRoot, ref px, HudIcon.Kind.Invite, "Joueurs", "Players", () => { ShowControlsPage(true); ShowControlsView(ViewPlayers); });
+            controlsPill.button.gameObject.SetActive(false);
             inviteTile = Pill(pillsRoot, ref px, HudIcon.Kind.Invite, "Inviter", "Invite", InviteAction);
             Pill(pillsRoot, ref px, HudIcon.Kind.Home, "Menu principal", "Main menu", game.ReturnToTitle);
             Pill(pillsRoot, ref px, HudIcon.Kind.Power, "Quitter", "Quit", game.Quit);
+            LayoutPills();   // sans le trou de la pilule Joueurs, cachée hors réseau
             pauseHint = Glass.Label(pillsRoot, "", 21, Glass.Weight.Semilight, Glass.Dim, TextAnchor.MiddleRight);
             Place(pauseHint.rectTransform, new Vector2(1f, 0.5f), new Vector2(-4f, 0f), new Vector2(560f, PillH));
 
@@ -990,16 +949,20 @@ namespace ChillRoad
         /// <summary>Aperçu de la carte dans la grande tuile : la carte du massif autour de la voiture, point doré au centre.</summary>
         void BuildMapPreview(PauseTile t)
         {
-            var mask = t.content.gameObject.AddComponent<RectMask2D>();
-            mask.softness = new Vector2Int(2, 2);
+            // Masque aux coins arrondis comme la tuile (rayon de la tuile moins le retrait du contenu)
+            var clip = Glass.Make(t.content, "MapClip", 27f, Color.white, 0f);
+            Glass.Stretch(clip.rectTransform);
+            clip.raycastTarget = false;
+            clip.gameObject.AddComponent<Mask>().showMaskGraphic = false;
+            clip.transform.SetAsFirstSibling();
             var raw = new GameObject("Map", typeof(RectTransform), typeof(RawImage)).GetComponent<RawImage>();
-            raw.transform.SetParent(t.content, false);
+            raw.transform.SetParent(clip.transform, false);
             Glass.Stretch(raw.rectTransform);
             raw.texture = Resources.Load<Texture2D>("Map/map_overview");
             raw.raycastTarget = false;
             raw.color = raw.texture ? Color.white : new Color(0.1f, 0.12f, 0.15f, 1f);
             mapPreview = raw;
-            var dot = Img(t.content, "Car", HudArt.Disc, new Vector2(22f, 22f), new Vector2(0f, 60f), Glass.Gold);
+            var dot = Img(clip.rectTransform, "Car", HudArt.Disc, new Vector2(22f, 22f), new Vector2(0f, 60f), Glass.Gold);
             var halo = Img(dot.rectTransform, "Halo", HudArt.SoftDisc, new Vector2(64f, 64f), Vector2.zero, Glass.A(Glass.Gold, 0.45f));
             halo.rectTransform.SetAsFirstSibling();
             Img(dot.rectTransform, "Core", HudArt.Disc, new Vector2(10f, 10f), Vector2.zero, Glass.Ink);
@@ -1265,7 +1228,8 @@ namespace ChillRoad
         {
             bool touch = TouchInput.InUse && GameSettings.TouchSteer != 0;
             bool online = game.Online;
-            var views = online ? new[] { ViewPlayers, ViewList, ViewPad, ViewKeys } : new[] { ViewList, ViewPad, ViewKeys };
+            if (online) { ShowControlsView(ViewPlayers); return; }   // la page ne sert plus qu'au tableau des joueurs
+            var views = new[] { ViewList, ViewPad, ViewKeys };
             int cur = online && playersPage ? ViewPlayers : ControlsView(touch, !touch && GameInput.UsingGamepad);
             int i = System.Array.IndexOf(views, cur);
             ShowControlsView(views[(i + dir + views.Length) % views.Length]);
@@ -1284,7 +1248,7 @@ namespace ChillRoad
             bool client = online && net.IsClient;
             timeTile.button.interactable = !client;
             timeTile.sub.text = client ? Loc.T("Réglées par l'hôte", "Set by the host") : Loc.T("Moment de la journée, ciel", "Time of day, sky");
-            bool storm = game.Weather && game.Weather.Stormy;
+            bool storm = game.Weather && (game.Weather.Stormy || game.Weather.Rain > 0.05f);
             timeBadge.text = game.DayNight.Clock + "   " + (storm ? Loc.T("Orage", "Storm") : Loc.T("Beau temps", "Clear"));
             FitBadge(timeBadge);
             int got = Achievements.UnlockedCount, total = Achievements.All.Length;
@@ -1317,6 +1281,7 @@ namespace ChillRoad
             netRefresh = 0.5f;
             netLabel.gameObject.SetActive(online);
             if (inviteTile.button.gameObject.activeSelf != host) { inviteTile.button.gameObject.SetActive(host); LayoutPills(); }
+            if (controlsPill.button.gameObject.activeSelf != online) { controlsPill.button.gameObject.SetActive(online); LayoutPills(); }
             if (online)
             {
                 // Option fixée par le serveur à l'ouverture de la partie : rappelée, pas modifiable ici
