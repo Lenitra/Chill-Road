@@ -47,6 +47,8 @@ Shader "ChillRoad/Toon"
         [HideInInspector] _GrimeColor ("Couleur de la boue", Color) = (0.35, 0.27, 0.17, 1)
         [HideInInspector] _GrimeAxis ("Hauteur sur la voiture", Vector) = (0, 1, 0, 0)
         [HideInInspector] _GrimeScale ("Échelle du motif", Float) = 1
+        // Disparition en fondu tramé (débris cassés, BreakableProp, par bloc de propriétés) : 0 visible, 1 effacé
+        [HideInInspector] _Fade ("Fondu", Range(0, 1)) = 0
     }
 
     SubShader
@@ -72,7 +74,20 @@ Shader "ChillRoad/Toon"
             half4 _Grime, _GrimeColor;
             float4 _GrimeAxis;
             float _GrimeScale;
+            half _Fade;
         CBUFFER_END
+
+        // Fondu tramé : motif de Bayer 4x4 à l'écran, les pixels sous le seuil _Fade sont jetés (toutes les passes)
+        static const half kBayer[16] = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
+        void FadeClip(float2 pixel)
+        {
+            UNITY_BRANCH
+            if (_Fade > 0.0)
+            {
+                uint2 q = uint2(pixel) & 3u;
+                clip((kBayer[q.y * 4u + q.x] + 0.5) / 16.0 - _Fade);
+            }
+        }
 
         // Neige (carte de la station de ski) : enneigement du sol lu dans la carte (MapTerrain), 0-1
         TEXTURE2D(_ChillRoadSnowMap);
@@ -299,6 +314,7 @@ Shader "ChillRoad/Toon"
             half4 Frag(Varyings input, bool frontFace : SV_IsFrontFace) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input);
+                FadeClip(input.positionCS.xy);
                 half3 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.uv).rgb * _BaseColor.rgb;
                 #if !defined(_DETAIL_LINES)
                 // Vitres teintées : la teinte garde le dégradé du verre (plus clair en haut)
@@ -442,7 +458,7 @@ Shader "ChillRoad/Toon"
                 return ApplyShadowClamping(positionCS);
             }
 
-            half4 ShadowFrag() : SV_Target { return 0; }
+            half4 ShadowFrag(float4 positionCS : SV_POSITION) : SV_Target { FadeClip(positionCS.xy); return 0; }
             ENDHLSL
         }
 
@@ -474,7 +490,7 @@ Shader "ChillRoad/Toon"
                 return TransformWorldToHClip(TreeWind(TransformObjectToWorld(input.positionOS.xyz), input.wind, input.windPhase));
             }
 
-            half DepthFrag(float4 positionCS : SV_POSITION) : SV_Target { return positionCS.z; }
+            half DepthFrag(float4 positionCS : SV_POSITION) : SV_Target { FadeClip(positionCS.xy); return positionCS.z; }
             ENDHLSL
         }
 
@@ -512,6 +528,7 @@ Shader "ChillRoad/Toon"
 
             half4 NormalsFrag(Varyings input) : SV_Target
             {
+                FadeClip(input.positionCS.xy);
                 return half4(NormalizeNormalPerPixel(input.normalWS), 0.0);
             }
             ENDHLSL

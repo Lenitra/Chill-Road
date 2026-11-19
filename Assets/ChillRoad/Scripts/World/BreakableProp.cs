@@ -12,6 +12,8 @@ namespace ChillRoad
     /// Les piles et murs de pneus du terrain d'essai (<see cref="UseTires"/>) cassent aussi, quand on fonce dedans
     /// (<see cref="TireBreakSpeed"/>) : le modèle disparaît, chaque pneu devient un débris physique, ceux près du choc
     /// sont projetés, les autres restent empilés et se poussent.
+    /// Une fois retombés (<see cref="Linger"/>), les débris perdent leur collision et s'effacent en fondu tramé
+    /// (propriété _Fade du shader Toon), puis disparaissent jusqu'au retour de l'objet.
     /// </summary>
     public class BreakableProp : MonoBehaviour
     {
@@ -58,6 +60,10 @@ namespace ChillRoad
         static Mesh hull;
 
         const float Mass = 18f;
+        /// <summary>Temps laissé aux débris pour voler et retomber, puis durée du fondu.</summary>
+        const float Linger = 3f, FadeTime = 0.8f;
+        static readonly int FadeId = Shader.PropertyToID("_Fade");
+        static MaterialPropertyBlock fadeBlock;
         const float RestoreDelay = 90f, RestoreDistance = 200f;
 
         public bool Broken { get; private set; }
@@ -192,13 +198,44 @@ namespace ChillRoad
                 if (col)
                     foreach (var c in carColliders)
                         if (c) Physics.IgnoreCollision(col, c, false);
-            yield return WaitUntilAway();
+            yield return new WaitForSeconds(Linger - 0.6f);
+            yield return Vanish(pile.GetComponentsInChildren<Renderer>(), pile.GetComponentsInChildren<Collider>());
             Destroy(pile);
             pile = null;
+            yield return WaitUntilAway();
             foreach (var go in hidden) if (go) go.SetActive(true);
             hidden.Clear();
             standing.enabled = true;
             Broken = false;
+        }
+
+        /// <summary>
+        /// Débris qui s'en vont : plus de collision ni de physique (ils restent figés là où ils sont tombés), fondu tramé
+        /// en <see cref="FadeTime"/>, puis rendus invisibles.
+        /// </summary>
+        IEnumerator Vanish(Renderer[] renderers, Collider[] colliders)
+        {
+            foreach (var c in colliders) if (c) c.enabled = false;
+            foreach (var rb in GetComponentsInChildren<Rigidbody>()) Destroy(rb);
+            fadeBlock ??= new MaterialPropertyBlock();
+            for (float t = 0f; t < FadeTime; t += Time.deltaTime)
+            {
+                SetFade(renderers, t / FadeTime);
+                yield return null;
+            }
+            foreach (var r in renderers) if (r) r.enabled = false;
+            body = null;
+        }
+
+        static void SetFade(Renderer[] renderers, float fade)
+        {
+            foreach (var r in renderers)
+            {
+                if (!r) continue;
+                r.GetPropertyBlock(fadeBlock);
+                fadeBlock.SetFloat(FadeId, fade);
+                r.SetPropertyBlock(fadeBlock);
+            }
         }
 
         /// <summary>Attend que la caméra soit loin de l'objet (et de sa place) depuis <see cref="RestoreDelay"/> secondes.</summary>
@@ -255,13 +292,22 @@ namespace ChillRoad
             // Plus de collision avec la voiture le temps qu'il passe par-dessus (sinon second choc contre le pare-brise)
             yield return new WaitForSeconds(0.8f);
             foreach (var c in carColliders) if (c && debris) Physics.IgnoreCollision(debris, c, false);
+            yield return new WaitForSeconds(Linger - 0.8f);
+            var shown = GetComponentsInChildren<Renderer>();
+            yield return Vanish(shown, new Collider[] { debris });
             yield return WaitUntilAway();
+            foreach (var r in shown)
+                if (r)
+                {
+                    r.SetPropertyBlock(null);
+                    r.enabled = true;
+                }
             Restore();
         }
 
         void Restore()
         {
-            Destroy(body);
+            if (body) Destroy(body);
             body = null;
             debris.enabled = false;
             gameObject.layer = homeLayer;
