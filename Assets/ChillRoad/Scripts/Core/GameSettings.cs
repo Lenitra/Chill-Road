@@ -49,6 +49,8 @@ namespace ChillRoad
         public static bool CameraShake = true;
         // Vibrations de la manette (0 = coupées, 1 = pleine force), voir GamepadRumble
         public static float Rumble = 1f;
+        // Déclencheurs des vibrations : glisse et patinage, bourdonnement de la vitesse, chocs et frottements
+        public static bool RumbleDrift = true, RumbleSpeed = true, RumbleCrash = true;
 
         // Écran (ordinateur) : synchro verticale (la limite d'images ne s'applique plus), mode d'affichage
         // (GraphicsQuality.WindowModes : 0 fenêtré, 1 plein écran sans bordure, 2 plein écran exclusif) et définition
@@ -91,6 +93,9 @@ namespace ChillRoad
             MotionBlur = PlayerPrefs.GetInt(Prefix + "motionblur", MotionBlur ? 1 : 0) == 1;
             CameraShake = PlayerPrefs.GetInt(Prefix + "camshake", CameraShake ? 1 : 0) == 1;
             Rumble = Mathf.Clamp01(PlayerPrefs.GetFloat(Prefix + "rumble", Rumble));
+            RumbleDrift = PlayerPrefs.GetInt(Prefix + "rumble_drift", RumbleDrift ? 1 : 0) == 1;
+            RumbleSpeed = PlayerPrefs.GetInt(Prefix + "rumble_speed", RumbleSpeed ? 1 : 0) == 1;
+            RumbleCrash = PlayerPrefs.GetInt(Prefix + "rumble_crash", RumbleCrash ? 1 : 0) == 1;
             VSync = PlayerPrefs.GetInt(Prefix + "vsync", VSync ? 1 : 0) == 1;
             WindowMode = Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "window", WindowMode), 0, GraphicsQuality.WindowModes.Length - 1);
             ScreenWidth = Mathf.Max(0, PlayerPrefs.GetInt(Prefix + "screenw", 0));
@@ -125,6 +130,9 @@ namespace ChillRoad
             PlayerPrefs.SetInt(Prefix + "motionblur", MotionBlur ? 1 : 0);
             PlayerPrefs.SetInt(Prefix + "camshake", CameraShake ? 1 : 0);
             PlayerPrefs.SetFloat(Prefix + "rumble", Rumble);
+            PlayerPrefs.SetInt(Prefix + "rumble_drift", RumbleDrift ? 1 : 0);
+            PlayerPrefs.SetInt(Prefix + "rumble_speed", RumbleSpeed ? 1 : 0);
+            PlayerPrefs.SetInt(Prefix + "rumble_crash", RumbleCrash ? 1 : 0);
             PlayerPrefs.SetInt(Prefix + "vsync", VSync ? 1 : 0);
             PlayerPrefs.SetInt(Prefix + "window", WindowMode);
             PlayerPrefs.SetInt(Prefix + "screenw", ScreenWidth);
@@ -156,6 +164,7 @@ namespace ChillRoad
             MotionBlur = false;
             CameraShake = true;
             Rumble = 1f;
+            RumbleDrift = RumbleSpeed = RumbleCrash = true;
             VSync = false;
             WindowMode = 1;
             ScreenWidth = ScreenHeight = 0;

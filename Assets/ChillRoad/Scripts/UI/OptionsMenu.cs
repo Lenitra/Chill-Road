@@ -114,15 +114,25 @@ namespace ChillRoad
             var traffic = AddSlider(play, "Densité du trafic", "Traffic density", 0.2f, 2f, 18, () => GameSettings.TrafficDensity, v => GameSettings.TrafficDensity = v, Percent);
             var rain = AddSlider(play, "Probabilité de pluie", "Rain probability", 0f, 1f, 20, () => GameSettings.RainChance, v => GameSettings.RainChance = v, v => v < 0.01f ? Loc.T("Jamais", "Never") : v > 0.99f ? Loc.T("Toujours", "Always") : Percent(v));
             var shake = AddToggle(play, "Secousses de caméra", "Camera shake", () => GameSettings.CameraShake, v => GameSettings.CameraShake = v);
-            // Vibrations de la manette : une courte vibration de test à chaque cran
+            // Vibrations de la manette : intensité, puis les déclencheurs sur une ligne (l'onglet est plein), chacun avec
+            // un échantillon quand on l'active
             var rumble = AddSlider(play, "Vibrations de la manette", "Controller vibration", 0f, 1f, 10, () => GameSettings.Rumble,
                 v => { GameSettings.Rumble = v; GamepadRumble.Preview(); }, v => v < 0.01f ? Loc.T("Désactivées", "Off") : Percent(v));
+            var rumbleTriggers = AddFlags(play, "Vibrer pour", "Vibrate on",
+                new[] { ("Drift", "Drift"), ("Vitesse", "Speed"), ("Collisions", "Collisions") },
+                i => i == 0 ? GameSettings.RumbleDrift : i == 1 ? GameSettings.RumbleSpeed : GameSettings.RumbleCrash,
+                (i, v) =>
+                {
+                    if (i == 0) GameSettings.RumbleDrift = v;
+                    else if (i == 1) GameSettings.RumbleSpeed = v;
+                    else GameSettings.RumbleCrash = v;
+                    GamepadRumble.Preview(i == 0 ? GamepadRumble.Trigger.Drift : i == 1 ? GamepadRumble.Trigger.Speed : GamepadRumble.Trigger.Collision);
+                });
             // Commandes tactiles (téléphone, tablette) : façon de diriger, ou désactivées. Absentes sur un PC sans
-            // écran tactile, où elles ne s'affichent jamais.
+            // écran tactile, où elles ne s'affichent jamais. Sans rubrique à elles : l'onglet est plein.
             Selectable touch = null;
             if (TouchScreen)
             {
-                Section(play, "COMMANDES TACTILES", "TOUCH CONTROLS", "", "");
                 touch = AddChoice(play, "Commandes tactiles", "Touch controls", 4, () => GameSettings.TouchSteer, i => GameSettings.TouchSteer = i,
                     i => i == 0 ? Loc.T("Désactivées", "Off") : i == 1 ? Loc.T("Glisser", "Slide") : i == 2 ? Loc.T("Boutons ‹ ›", "‹ › buttons") : Loc.T("Inclinaison", "Tilt"));
             }
@@ -215,7 +225,7 @@ namespace ChillRoad
                            "LB RB / Tab  category   ·   ↑ ↓  select   ·   ← →  adjust   ·   B / Esc  back");
 
             // Navigation explicite par page (voir ShowTab) : gauche/droite restent aux curseurs (réglage)
-            var gameItems = new List<Selectable> { language, traffic, rain, shake, rumble };
+            var gameItems = new List<Selectable> { language, traffic, rain, shake, rumble, rumbleTriggers };
             if (touch) gameItems.Add(touch);
             gameItems.Add(apply.button);
             var audioItems = new List<Selectable> { master, music, engine, effects, ambience, ui, trackNames };
@@ -752,6 +762,53 @@ namespace ChillRoad
                     bool active = i == current;
                     chips[i].shape.color = active ? SegOn : chips[i].hit.Hover ? SegHover : SegOff;
                     chips[i].text.color = active ? Ink : White;
+                }
+            });
+            return selector;
+        }
+
+        /// <summary>
+        /// Cases à cocher en pastilles sur une ligne (plusieurs actives à la fois) : or = activée. Gauche/droite déplacent
+        /// le curseur de pastille (plus claire), A / Entrée ou un clic sur une pastille la bascule.
+        /// </summary>
+        Selectable AddFlags(RectTransform parent, string fr, string en, (string fr, string en)[] names, Func<int, bool> get, Action<int, bool> set)
+        {
+            var selector = SelectorRow(parent, fr, en, out var row);
+            var area = Rect(row, "Flags", new Vector2(ControlLeft, 0f), Vector2.one, new Vector2(0f, 7f), new Vector2(-4f, -7f));
+            var h = area.gameObject.AddComponent<HorizontalLayoutGroup>();
+            h.spacing = 8;
+            h.childControlWidth = true; h.childControlHeight = true;
+            h.childForceExpandWidth = true; h.childForceExpandHeight = true;
+            int count = names.Length, cursor = 0;
+
+            void Flip(int i)
+            {
+                cursor = i;
+                set(i, !get(i));
+                Changed();
+                RefreshAll();
+            }
+            var chips = new (HudShape shape, Text text, OptionHit hit)[count];
+            for (int i = 0; i < count; i++)
+            {
+                int index = i;
+                chips[i] = Chip(area, "Flag", 21);
+                chips[i].hit.Click = () => Flip(index);
+            }
+            selector.Move = d => cursor = Mathf.Clamp(cursor + d, 0, count - 1);
+            selector.Submit = () => Flip(cursor);
+            refreshers.Add(() =>
+            {
+                for (int i = 0; i < count; i++) chips[i].text.text = Loc.T(names[i].fr, names[i].en);
+            });
+            animators.Add(_ =>
+            {
+                bool focused = EventSystem.current && EventSystem.current.currentSelectedGameObject == selector.gameObject;
+                for (int i = 0; i < count; i++)
+                {
+                    bool on = get(i), lit = chips[i].hit.Hover || (focused && i == cursor);
+                    chips[i].shape.color = on ? (lit ? Color.Lerp(SegOn, Color.white, 0.3f) : SegOn) : lit ? SegHover : SegOff;
+                    chips[i].text.color = on ? Ink : White;
                 }
             });
             return selector;
