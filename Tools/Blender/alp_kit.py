@@ -7,7 +7,7 @@ volumes d'origine (mêmes positions, mêmes gabarits : les silhouettes se superp
 import math
 from mathutils import Vector, Matrix
 import alp_lib as A
-from alp_lib import lod
+from alp_lib import lod, lv
 
 _DV = {'+x': Vector((1, 0, 0)), '-x': Vector((-1, 0, 0)), '+y': Vector((0, 1, 0)), '-y': Vector((0, -1, 0))}
 
@@ -935,17 +935,9 @@ def flag(g, x, y, z0, h=5.0, color="red", size=(1.2, 0.8), pole="metal", rotz=0.
     g.frustum((0, 0, z0), 0.05, 0.035, h, lod(g, 5, 4, 3), pole, cap0=False)
     if g.hd:
         g.octa((0, 0, z0 + h + 0.05), 0.07, "brass")
-        n = 5
-        zt, zb = z0 + h - 0.08, z0 + h - 0.08 - size[1]
-        for k in range(n):                            # étoffe ondulée
-            x0, x1 = 0.05 + size[0] * k / n, 0.05 + size[0] * (k + 1) / n
-            y0, y1 = 0.09 * math.sin(k * 1.7), 0.09 * math.sin((k + 1) * 1.7)
-            s0, s1 = 0.05 * k / n, 0.05 * (k + 1) / n
-            p = [(x0, y0, zb - s0 * 3), (x1, y1, zb - s1 * 3), (x1, y1, zt - s1), (x0, y0, zt - s0)]
-            g.face(p, color)
-            g.face([(q[0], q[1] + 0.004, q[2]) for q in reversed(p)], color)
-    else:
-        g.box((size[0] / 2 + 0.05, 0, z0 + h - size[1] / 2 - 0.08), (size[0], 0.03, size[1]), color)
+    # étoffe qui claque au vent (shader Toon, FlagWave)
+    g.cloth((0.05, 0, z0 + h - 0.08), (size[0], 0, 0), (0, 0, -size[1]), lv(g, 8, 5, 2), lv(g, 3, 2, 1), color,
+            amp=0.11 * size[0], sag=0.04 * size[1])
     g.move(g.since(m), (x, y, 0), rotz)
 
 

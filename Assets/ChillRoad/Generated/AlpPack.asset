@@ -275,7 +275,7 @@ MonoBehaviour:
     tags:
     - townhall
     prefab: {fileID: 919132149155446097, guid: 8c6ed9fcae7d564438d46e444ba18763, type: 3}
-    size: {x: 19.52, y: 21.69, z: 16.18}
+    size: {x: 19.52, y: 21.69, z: 16.53}
     footprint: {x: 18, y: 12}
     collider: box
     radius: 0
@@ -441,7 +441,7 @@ MonoBehaviour:
     - refuge
     - summit
     prefab: {fileID: 919132149155446097, guid: b6e007aea052cac49bc2c65f93631f85, type: 3}
-    size: {x: 13.02, y: 8.29, z: 8.81}
+    size: {x: 13.02, y: 8.29, z: 8.79}
     footprint: {x: 9, y: 7}
     collider: box
     radius: 0
@@ -529,7 +529,7 @@ MonoBehaviour:
     tags:
     - summit
     prefab: {fileID: 919132149155446097, guid: 2491723af92fb73419cc181ceff79cff, type: 3}
-    size: {x: 5.25, y: 5.76, z: 2.88}
+    size: {x: 5.25, y: 5.76, z: 2.99}
     footprint: {x: 3, y: 3}
     collider: capsule
     radius: 1
@@ -2193,7 +2193,7 @@ MonoBehaviour:
     - stunt
     - ramp
     prefab: {fileID: 919132149155446097, guid: 5dd71cab5a492de4f86a2b3ecce39afd, type: 3}
-    size: {x: 9.41, y: 3.79, z: 18.78}
+    size: {x: 9.37, y: 3.79, z: 18.71}
     footprint: {x: 5.6, y: 17}
     collider: mesh_low
     radius: 0

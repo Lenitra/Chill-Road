@@ -192,7 +192,7 @@ def townhall(g):
         for s, c in ((-1, "red"), (1, "blue")):
             m = g.mark()
             g.frustum((0, 0, 0), 0.04, 0.03, 3.0, 4, "metal", cap0=False)
-            g.box((0.0, -0.02, 2.35), (0.05, 0.9, 1.3), c)
+            g.cloth((0.0, -0.03, 2.95), (0, -0.9, 0), (0, 0, -1.3), lod(g, 5, 3), lod(g, 2, 1), c, amp=0.09)
             g.transform(g.since(m), Matrix.Translation((s * 1.7, -D / 2 - 0.95, gh + 1.2)) @ Matrix.Rotation(math.radians(35), 4, 'X') @ Matrix.Translation((0, -0.45, 0)))
     # fronton à horloge et clocheton
     g.box((0, -D / 2 + 0.3, H + 1.6), (4.4, 1.0, 3.2), plaster)

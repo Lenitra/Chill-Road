@@ -589,6 +589,5 @@ def summit_cross(g):
     for k in range(6):
         c = p0.lerp(p1, (k + 0.6) / 7) - Vector((0, 0, 0.25 * math.sin(math.pi * (k + 0.6) / 7)))
         col = ("sign_blue", "white", "sign_red", "sign_green", "sign_yellow", "sign_blue")[k]
-        g.face([c + Vector((-0.12, 0, 0)), c + Vector((0.12, 0, 0)), c + Vector((0.1, 0, -0.26)), c + Vector((-0.1, 0, -0.26))], col)
-        g.face([c + Vector((-0.1, 0.004, -0.26)), c + Vector((0.1, 0.004, -0.26)), c + Vector((0.12, 0.004, 0)), c + Vector((-0.12, 0.004, 0))], col)
+        g.cloth(c + Vector((-0.12, 0, 0)), (0, 0, -0.26), (0.24, 0, 0), 2, 1, col, amp=0.08, swing=True, tip=0.83)
     g.tube([p0.lerp(p1, t) - Vector((0, 0, 0.25 * math.sin(math.pi * t))) for t in [k / 6 for k in range(7)]], [0.005] * 7, 3, "white", cap_end=False)

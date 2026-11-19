@@ -113,8 +113,8 @@ def lantern_post(g, x, y, height, wood, cap):
     g.box((x, y, height + 0.04), (0.22, 0.22, 0.08), cap)
     g.box((x, y, height + 0.17), (0.14, 0.14, 0.18), "lamp")
     g.box((x, y, height + 0.31), (0.24, 0.24, 0.06), cap)
-    fy = y + 0.07 + 0.25                               # fanion côté entrée (face à l'arrivée des voitures)
-    g.card((x, fy, height - 0.45), 0.5, 0.32, "orange", rotz=math.pi / 2)
+    # fanion côté entrée (face à l'arrivée des voitures), qui claque au vent (shader Toon, FlagWave)
+    g.cloth((x, y + 0.07, height - 0.29), (0, 0.5, 0), (0, 0, -0.32), lv(g, 4, 3, 1), lv(g, 2, 1, 1), "orange", amp=0.06)
 
 
 def boulder(g, c, r, color="rock", squash=0.6):

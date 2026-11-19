@@ -133,7 +133,7 @@ Shader "ChillRoad/Toon"
         {
             float3 d = float3(0, 0, 0);
             UNITY_BRANCH
-            if (ph.y > 1.5)
+            if (ph.y > 1.5 && ph.y < 2.5)
             {
                 float3 origin = float3(UNITY_MATRIX_M._m03, UNITY_MATRIX_M._m13, UNITY_MATRIX_M._m23);
                 float scale = length(float3(UNITY_MATRIX_M._m01, UNITY_MATRIX_M._m11, UNITY_MATRIX_M._m21));
@@ -159,6 +159,65 @@ Shader "ChillRoad/Toon"
                             sin(a) * dir.y + cos(a * 0.87) * side.y) * f;
             }
             return positionWS + d;
+        }
+
+        // Drapeaux et fanions (2026-11-19). Étoffes planes marquées par l'export Blender (alp_lib.cloth / finish) :
+        // UV1 = (u : distance au bord tenu en m, débattement du point en m × côté ±1 de la face), UV2 = (phase, sorte :
+        // 3 étoffe qui claque, 5 idem bout libre vers le haut, 4 fanion pendu qui se balance), UV3 = direction du bord
+        // tenu vers le bout libre (espace objet, x et z ; y déduit, vers le bas sauf sorte 5). Les deux faces d'une
+        // étoffe bougent ensemble le long de côté × normale ; la normale suit la pente de l'onde (bandes du dégradé
+        // toon qui courent sur l'étoffe). La force du vent (GroundFlora) règle la cadence et l'ampleur.
+        void FlagWave(inout float3 positionWS, inout float3 normalWS, float2 w, float2 ph, float2 fl)
+        {
+            UNITY_BRANCH
+            if (ph.y > 2.5)
+            {
+                float3 origin = float3(UNITY_MATRIX_M._m03, UNITY_MATRIX_M._m13, UNITY_MATRIX_M._m23);
+                float scale = length(float3(UNITY_MATRIX_M._m01, UNITY_MATRIX_M._m11, UNITY_MATRIX_M._m21));
+                float2 dir = _ChillRoadWind.xy;
+                dir = dot(dir, dir) > 1e-4 ? normalize(dir) : float2(0.8, 0.6);
+                float force = _ChillRoadWind.z > 0.0 ? _ChillRoadWind.z : 1.0;
+                float t = _Time.y;
+                float seed = frac(sin(dot(origin.xz, float2(12.9898, 78.233))) * 43758.5453) * 6.2831853;
+                float gust = 0.5 + 0.5 * sin(dot(origin.xz, dir) * 0.045 - t * (0.8 + 0.25 * force))
+                                       * sin(dot(origin.xz, float2(-dir.y, dir.x)) * 0.021 + t * 0.37 + 1.3);
+                float kind = round(ph.y);
+                float s = w.y < 0.0 ? -1.0 : 1.0;
+                float3 n = normalize(normalWS);
+                float3 N = n * s;
+                float ly = sqrt(saturate(1.0 - dot(fl, fl)));
+                float3 L = normalize(TransformObjectToWorldDir(float3(fl.x, kind > 4.5 ? ly : -ly, fl.y)));
+                float u = w.x * scale;
+                float a = abs(w.y) * scale;
+                float phase = ph.x * 6.2831853 + seed;
+                float D, dD;
+                if (kind < 3.5 || kind > 4.5)
+                {
+                    // Étoffe qui claque : deux ondes qui courent du bord tenu vers le bout libre
+                    float om = 4.6 + 2.2 * force;
+                    float k = 6.2831853 / 1.3;
+                    float S = (1.0 + 0.6 * force) * (0.55 + 0.45 * gust);
+                    float th1 = k * u - om * t + phase;
+                    float th2 = 2.3 * k * u - 1.7 * om * t + phase * 1.7;
+                    D = a * S * (sin(th1) + 0.3 * sin(th2));
+                    dD = a * S * k * (cos(th1) + 0.69 * cos(th2));
+                    // le bout libre se rapproche un peu du mât quand l'étoffe se creuse
+                    positionWS -= L * (0.25 * D * dD);
+                }
+                else
+                {
+                    // Fanion pendu : balancement autour de sa ficelle et petit frisson
+                    float om = 1.9 + 0.7 * force;
+                    float S = (0.5 + 0.5 * force) * (0.5 + 0.5 * gust);
+                    float k = 6.2831853 / 0.6;
+                    float th = k * u - 3.2 * om * t + phase;
+                    float sw = 0.8 * sin(om * t + phase) + 0.25 * sin(2.9 * om * t + phase * 2.1);
+                    D = a * S * (sw + 0.25 * sin(th));
+                    dD = D / max(u, 0.05) + a * S * 0.25 * k * cos(th);
+                }
+                positionWS += N * D;
+                normalWS = normalize(n - s * L * dD);
+            }
         }
         ENDHLSL
 
@@ -193,6 +252,7 @@ Shader "ChillRoad/Toon"
                 float2 uv : TEXCOORD0;
                 float2 wind : TEXCOORD1;
                 float2 windPhase : TEXCOORD2;
+                float2 flagDir : TEXCOORD3;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -215,9 +275,12 @@ Shader "ChillRoad/Toon"
                 Varyings o = (Varyings)0;
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_TRANSFER_INSTANCE_ID(input, o);
-                o.positionWS = TreeWind(TransformObjectToWorld(input.positionOS.xyz), input.wind, input.windPhase);
+                float3 positionWS = TreeWind(TransformObjectToWorld(input.positionOS.xyz), input.wind, input.windPhase);
+                float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
+                FlagWave(positionWS, normalWS, input.wind, input.windPhase, input.flagDir);
+                o.positionWS = positionWS;
                 o.positionCS = TransformWorldToHClip(o.positionWS);
-                o.normalWS = TransformObjectToWorldNormal(input.normalOS);
+                o.normalWS = normalWS;
                 o.uv = TRANSFORM_TEX(input.uv, _BaseMap);
                 o.fog = ComputeFogFactor(o.positionCS.z);
                 o.positionOS = input.positionOS.xyz;
@@ -441,6 +504,7 @@ Shader "ChillRoad/Toon"
                 float3 normalOS : NORMAL;
                 float2 wind : TEXCOORD1;
                 float2 windPhase : TEXCOORD2;
+                float2 flagDir : TEXCOORD3;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -449,6 +513,7 @@ Shader "ChillRoad/Toon"
                 UNITY_SETUP_INSTANCE_ID(input);
                 float3 positionWS = TreeWind(TransformObjectToWorld(input.positionOS.xyz), input.wind, input.windPhase);
                 float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
+                FlagWave(positionWS, normalWS, input.wind, input.windPhase, input.flagDir);
                 #if _CASTING_PUNCTUAL_LIGHT_SHADOW
                     float3 lightDirectionWS = normalize(_LightPosition - positionWS);
                 #else
@@ -479,15 +544,20 @@ Shader "ChillRoad/Toon"
             struct Attributes
             {
                 float4 positionOS : POSITION;
+                float3 normalOS : NORMAL;
                 float2 wind : TEXCOORD1;
                 float2 windPhase : TEXCOORD2;
+                float2 flagDir : TEXCOORD3;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             float4 DepthVert(Attributes input) : SV_POSITION
             {
                 UNITY_SETUP_INSTANCE_ID(input);
-                return TransformWorldToHClip(TreeWind(TransformObjectToWorld(input.positionOS.xyz), input.wind, input.windPhase));
+                float3 positionWS = TreeWind(TransformObjectToWorld(input.positionOS.xyz), input.wind, input.windPhase);
+                float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
+                FlagWave(positionWS, normalWS, input.wind, input.windPhase, input.flagDir);
+                return TransformWorldToHClip(positionWS);
             }
 
             half DepthFrag(float4 positionCS : SV_POSITION) : SV_Target { FadeClip(positionCS.xy); return positionCS.z; }
@@ -513,6 +583,7 @@ Shader "ChillRoad/Toon"
                 float3 normalOS : NORMAL;
                 float2 wind : TEXCOORD1;
                 float2 windPhase : TEXCOORD2;
+                float2 flagDir : TEXCOORD3;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
             struct Varyings { float4 positionCS : SV_POSITION; half3 normalWS : TEXCOORD0; };
@@ -521,8 +592,11 @@ Shader "ChillRoad/Toon"
             {
                 UNITY_SETUP_INSTANCE_ID(input);
                 Varyings o;
-                o.positionCS = TransformWorldToHClip(TreeWind(TransformObjectToWorld(input.positionOS.xyz), input.wind, input.windPhase));
-                o.normalWS = TransformObjectToWorldNormal(input.normalOS);
+                float3 positionWS = TreeWind(TransformObjectToWorld(input.positionOS.xyz), input.wind, input.windPhase);
+                float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
+                FlagWave(positionWS, normalWS, input.wind, input.windPhase, input.flagDir);
+                o.positionCS = TransformWorldToHClip(positionWS);
+                o.normalWS = normalWS;
                 return o;
             }
 

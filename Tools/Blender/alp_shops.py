@@ -988,8 +988,8 @@ def pennants(g):
             if prev is not None:
                 g.beam(prev, (x, y, z), 0.012, "black")
             prev = (x, y, z)
-            if 0 < k < n:
-                g.prism([(x - 0.17, z), (x + 0.17, z), (x, z - 0.32)], y - 0.005, y + 0.005, cols[k % 4], axis='y')
+            if 0 < k < n:                                # fanion pendu qui se balance (shader Toon, FlagWave)
+                g.cloth((x - 0.17, y, z), (0, 0, -0.32), (0.34, 0, 0), 2, 1, cols[k % 4], amp=0.035, swing=True, tip=0.06)
 
 
 def crossed_flags(g):
@@ -998,9 +998,8 @@ def crossed_flags(g):
         for s_ in (-1, 1):
             m = g.mark()
             g.box((0, 0, 0.55), (0.03, 0.03, 1.3), "metal_dark")
-            for i in range(6):
-                for j in range(4):
-                    g.box((0.07 + 0.12 * i, 0, 1.12 - 0.12 * j), (0.12, 0.012, 0.12), "white" if (i + j) % 2 else "black")
+            g.cloth((0.025, 0, 1.18), (0.72, 0, 0), (0, 0, -0.48), 6, 4,
+                    lambda i, j: "white" if (i + j) % 2 else "black", amp=0.025)
             rot = Matrix.Rotation(math.radians(-30 * s_), 4, 'Y')
             flip = Matrix.Diagonal((s_, 1, 1, 1))
             g.transform(g.since(m), Matrix.Translation((cx, -HY + 0.08 + 0.02 * (s_ + 1), 4.3)) @ flip @ rot)

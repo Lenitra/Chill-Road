@@ -601,10 +601,15 @@ def flagpole(g, color, cross=None):
     n = lod(g, 6, 4)
     g.frustum((0, 0, -0.5), 0.07, 0.04, 9.5, n, "white", cap0=False)
     g.ico((0, 0, 9.05), 0.08, 1, "brass")
-    g.box((0.85, 0, 8.1), (1.6, 0.03, 1.6), color)
-    if cross:
-        g.box((0.85, 0, 8.1), (1.0, 0.05, 0.3), cross)
-        g.box((0.85, 0, 8.1), (0.3, 0.05, 1.0), cross)
+    # étoffe qui claque au vent (shader Toon, FlagWave) ; croix sur une grille 5 × 5 au niveau moyen
+    nu = 5 if g.lod < 2 else 2
+    nv = 5 if g.lod < 2 else 1
+
+    def cell(i, j):
+        if cross and g.lod < 2 and (i == 2 and 1 <= j <= 3 or j == 2 and 1 <= i <= 3):
+            return cross
+        return color
+    g.cloth((0.05, 0, 8.9), (1.6, 0, 0), (0, 0, -1.6), nu, nv, cell, amp=0.11 * 1.6, sag=0.05)
     if g.lod == 0:
         g.frustum((0, 0, 0), 0.14, 0.1, 0.3, n, "stone")
 

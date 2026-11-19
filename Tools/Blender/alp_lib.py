@@ -297,6 +297,10 @@ class Geo:
         self.bm = bmesh.new()
         self.col = self.bm.faces.layers.int.new("col")
         self.part = self.bm.faces.layers.int.new("part")   # pièce (primitive) d'origine, pour le contrôle de z-fighting
+        # étoffes (Geo.cloth) : créées d'avance, car ajouter une couche en cours de route invalide les mark()
+        self.flag = self.bm.faces.layers.int.new("flag")
+        self.fl = self.bm.loops.layers.float_vector.new("fl")
+        self.nflag = 0
         self.np = 0
         self.lod = lod                    # palier « historique » des fiches (0 complet, 1 réduit, 2 volumes)
         self.hd = hd                      # niveau détaillé v2 (LOD0 exporté) : lod = 0 et hd = True
@@ -578,6 +582,50 @@ class Geo:
         pts = [c - dx - dz, c + dx - dz, c + dx + dz, c - dx + dz]
         return self.face([p - n for p in pts], color) + self.face([p + n for p in reversed(pts)], color)
 
+    def cloth(self, corner, du, dv, nu, nv, color, amp, swing=False, tip=1.0, sag=0.0, profile=None):
+        """Étoffe double face qui ondule au vent (drapeau, fanion ; shader Toon, FlagWave), faite plane : c'est le
+        shader qui la fait onduler. corner = coin du bord tenu ; du = du bord tenu au bout libre (longueur comprise) ;
+        dv = le long du bord tenu ; nu × nv cases, ou listes de coupures 0-1 (cases inégales) ; color = couleur, ou
+        fonction (i, j) -> couleur de la case ; amp = débattement du bout libre en m par vent calme ; swing = fanion
+        pendu à une ficelle (se balance) plutôt qu'étoffe qui claque ; tip = largeur relative au bout libre (fanion
+        en pointe : petite valeur) ; sag = le bout libre retombe de sag m ; profile(u) = facteur de débattement selon
+        u 0-1 (par défaut u : nul au bord tenu ; étoffe tenue des deux côtés : sin(pi u)).
+        Marquage (finish) : couche de boucles « fl » = (u en m, débattement × côté ±1, sorte + phase),
+        couche de faces « flag » = numéro de l'étoffe."""
+        corner, du, dv = Vector(corner), Vector(du), Vector(dv)
+        us = [i / nu for i in range(nu + 1)] if isinstance(nu, int) else list(nu)
+        vs = [j / nv for j in range(nv + 1)] if isinstance(nv, int) else list(nv)
+        fl, fk = self.fl, self.flag
+        self.nflag += 1
+        code = (4.0 if swing else 3.0) + 0.9 * self.h(self.nflag, *corner)
+        n = du.cross(dv)
+        n = n.normalized() * 0.002 if n.length > 1e-9 else Vector((0, 0, 0))
+        L = du.length
+        prof = profile or (lambda u: u)
+
+        def P(u, v):
+            w = 1.0 - (1.0 - tip) * u
+            return corner + du * u + dv * (0.5 + (v - 0.5) * w) - Vector((0, 0, sag * u * u))
+
+        out = []
+        for side in (1, -1):
+            vt = [[self.bm.verts.new(P(u, v) - n * (side < 0)) for v in vs] for u in us]
+            u_of = {vt[i][j]: us[i] for i in range(len(us)) for j in range(len(vs))}
+            for i in range(len(us) - 1):
+                for j in range(len(vs) - 1):
+                    q = (vt[i][j], vt[i + 1][j], vt[i + 1][j + 1], vt[i][j + 1])
+                    f = self.bm.faces.new(q if side > 0 else tuple(reversed(q)))
+                    f[fk] = self.nflag
+                    for lp in f.loops:
+                        u = u_of[lp.vert]
+                        lp[fl] = (u * L, amp * prof(u) * side, code)
+                    out.append((f, i, j))
+        self.paint([f for f, _, _ in out], color if not callable(color) else color(0, 0))
+        if callable(color):
+            for f, i, j in out:
+                f[self.col] = CI[color(i, j)]
+        return [f for f, _, _ in out]
+
 
 # ----------------------------------------------------------------- finition, construction, export
 def _pairs_bm(bm, play, tol=0.01, skip_below=0.0, min_area=1e-4, cell=1.0):
@@ -755,6 +803,54 @@ def finish(geo, name, col, grad_h=None, base=0.0, resolve=None, sharp=SHARP_ANGL
                 w = lp[wd] if wd is not None else (0.0, 0.0, 0.0)
                 lp[uw].uv = (wind * Ht * z * z, w[0] if w[2] > 0.5 else 0.0)
                 lp[up].uv = (w[1] if w[2] > 0.5 else 0.0, 2.0)
+    fl = bm.loops.layers.float_vector.get("fl")
+    fk = bm.faces.layers.int.get("flag")
+    if fl is not None and not any(f[fk] for f in bm.faces):
+        bm.loops.layers.float_vector.remove(fl)
+        bm.faces.layers.int.remove(fk)
+        fl = None
+    if fl is not None:
+        # Drapeaux (2026-11-19) : UV1 = (u en m depuis le bord tenu, débattement en m × côté), UV2 = (phase, sorte :
+        # 3 étoffe qui claque, 5 idem dont le bout libre monte, 4 fanion pendu), UV3 = direction du bord tenu vers le
+        # bout libre dans l'espace objet d'Unity, composantes (x, z) (Unity x = -x Blender, z = -y Blender), y déduit.
+        # La direction se lit sur la géométrie finale (pente de u), après les rotations des fonctions de construction.
+        uw = bm.loops.layers.uv.get("UVWind")
+        up = bm.loops.layers.uv.get("UVPhase")
+        if uw is None:                               # pas de vent dans les arbres : canaux nuls ailleurs
+            uw = bm.loops.layers.uv.new("UVWind")
+            up = bm.loops.layers.uv.new("UVPhase")
+            for f in bm.faces:
+                for lp in f.loops:
+                    lp[uw].uv = (0.0, 0.0)
+                    lp[up].uv = (0.0, 0.0)
+        ud = bm.loops.layers.uv.new("UVFlag")
+        acc = {}
+        for f in bm.faces:
+            if f[fk]:
+                for lp in f.loops:
+                    acc.setdefault(f[fk], []).append((lp.vert.co.copy(), lp[fl][0]))
+        dirs = {}
+        for k, pts in acc.items():
+            pm = sum((p for p, _ in pts), Vector()) / len(pts)
+            um = sum(u for _, u in pts) / len(pts)
+            d = sum(((p - pm) * (u - um) for p, u in pts), Vector())
+            dirs[k] = d.normalized() if d.length > 1e-9 else Vector((1, 0, 0))
+        for f in bm.faces:
+            k = f[fk]
+            for lp in f.loops:
+                if k:
+                    u, a, code = lp[fl]
+                    kind = math.floor(code)
+                    d = dirs[k]
+                    if kind == 3 and d.z > 0.0:
+                        kind = 5
+                    lp[uw].uv = (u, a)
+                    lp[up].uv = (code - math.floor(code), float(kind))
+                    lp[ud].uv = (-d.x, -d.y)
+                else:
+                    lp[ud].uv = (0.0, 0.0)
+        bm.loops.layers.float_vector.remove(fl)
+        bm.faces.layers.int.remove(fk)
     if wd is not None:
         bm.loops.layers.float_vector.remove(wd)
     me = bpy.data.meshes.new(name)

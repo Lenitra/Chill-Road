@@ -316,7 +316,7 @@ def igloo(g):
             r = 2.1 * math.sqrt(max(1.0 - (z / (2.1 * 0.88)) ** 2, 0.01)) + 0.012
             g.frustum((0, 0, z), r, r * 0.995, 0.035, 24, "roof_metal", cap0=False, cap1=False, auto=False)
     g.tube([(0.5, 0.2, 1.75), (0.5, 0.2, 3.0)], [0.025, 0.02], 5, "wood")
-    g.card((0.78, 0.2, 2.82), 0.55, 0.32, "orange")
+    g.cloth((0.52, 0.2, 2.98), (0.55, 0, 0), (0, 0, -0.32), lod(g, 4, 3), lod(g, 2, 1), "orange", amp=0.07)
 
 
 item("igloo", "Igloo", igloo, tags=["snow", "prop"], seed=566, fp=(4.3, 5.2), collider="capsule", radius=2.0)
@@ -527,10 +527,14 @@ item("piste_net", "Piste_Net", piste_net, lods=2, tags=["piste", "net"], seed=57
 def slalom_gate(g, color):
     for sx in (-1, 1):
         g.tube([(sx * 0.32, 0, -0.3), (sx * 0.32, 0, 1.75)], [0.018, 0.014], lod(g, 5, 4), color)
-    g.card((0, 0, 1.25), 0.62, 0.72, color)
+    # toile tenue par les deux piquets : elle ondule au milieu (shader Toon, FlagWave)
     if g.lod == 0:
-        g.card((0, -0.014, 1.25), 0.3, 0.3, "white")
-        g.card((0, 0.014, 1.25), 0.3, 0.3, "white")
+        cuts_u, cuts_v = (0, 0.258, 0.5, 0.742, 1), (0, 0.292, 0.5, 0.708, 1)
+        cell = lambda i, j: "white" if i in (1, 2) and j in (1, 2) else color
+    else:
+        cuts_u, cuts_v, cell = 3, 1, color
+    g.cloth((-0.31, 0, 1.61), (0.62, 0, 0), (0, 0, -0.72), cuts_u, cuts_v, cell, amp=0.035,
+            profile=lambda u: math.sin(math.pi * u))
 
 
 item("slalom_gate_red", "Slalom_Gate_Red", lambda g: slalom_gate(g, "sign_red"), lods=2, tags=["piste", "small"],

@@ -345,20 +345,14 @@ def busstop(g):
 
 # ----------------------------------------------------------------- pavoisement, horloge
 def wavy_flag(g, x0, zt, w, h, color, device=None, n=7, rows=5):
-    """Étoffe ondulée (double face) ; device : couleur d'une croix centrée."""
-    def P(i, j):
-        u = i / n
-        return Vector((x0 + w * u, 0.11 * math.sin(u * 5.2) * (0.3 + u), zt - h * j / rows - 0.06 * u * (1 + 0.5 * math.sin(u * 3))))
-    for i in range(n):
-        for j in range(rows):
-            c = color
-            if device:
-                u, v = (i + 0.5) / n, (j + 0.5) / rows
-                if (abs(v - 0.5) < 0.12 and abs(u - 0.5) < 0.32) or (abs(u - 0.5) < 0.1 and abs(v - 0.5) < 0.34):
-                    c = device
-            p = [P(i, j + 1), P(i + 1, j + 1), P(i + 1, j), P(i, j)]
-            g.face(p, c)
-            g.face([q + Vector((0, 0.004, 0)) for q in reversed(p)], c)
+    """Étoffe qui claque au vent (double face, shader Toon FlagWave) ; device : couleur d'une croix centrée."""
+    def cell(i, j):
+        if device:
+            u, v = (i + 0.5) / n, (j + 0.5) / rows
+            if (abs(v - 0.5) < 0.12 and abs(u - 0.5) < 0.32) or (abs(u - 0.5) < 0.1 and abs(v - 0.5) < 0.34):
+                return device
+        return color
+    g.cloth((x0, 0, zt), (w, 0, 0), (0, 0, -h), n, rows, cell, amp=0.11 * w, sag=0.05)
 
 
 def flagpole(g, color, device):

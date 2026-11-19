@@ -163,9 +163,9 @@ reg(dict(id="school_banner", file="School_Banner", cat="street", tags=["school"]
 def school_flag(g):
     """Mât à drapeau à damier."""
     g.frustum((0, 0, 0), 0.06, 0.04, 7.0, lv(g, 8, 6, 4), "metal", auto=False)
-    for i in range(4):
-        for j in range(3):
-            g.box((0.25 + i * 0.4, 0, 6.6 - j * 0.4), (0.4, 0.03, 0.4), "black" if (i + j) % 2 == 0 else "white")
+    m = lv(g, 2, 1, 1)                                 # damier 4 × 3, étoffe qui claque au vent (shader Toon, FlagWave)
+    g.cloth((0.05, 0, 6.8), (1.6, 0, 0), (0, 0, -1.2), 4 * m, 3 * m,
+            lambda i, j: "black" if (i // m + j // m) % 2 == 0 else "white", amp=0.11 * 1.6, sag=0.04)
 
 
 reg(dict(id="school_flag", file="School_Flag", cat="street", tags=["school"], seed=620, fp=(0.4, 0.4),
