@@ -8,40 +8,42 @@ using UnityEngine.UI;
 namespace ChillRoad
 {
     /// <summary>
-    /// Menu Options (construit en code), ouvert depuis l'accueil ou la pause, dans le langage visuel du HUD et de la
-    /// pause : voile sombre, plaque inclinée anthracite (<see cref="HudShape"/>), police du HUD, titre or, rubriques
-    /// cyan. Chaque réglage a le contrôle qui lui va : curseur or pour les volumes et pourcentages, interrupteur pour
-    /// activé / désactivé, choix segmentés (langue, qualité, mode d'affichage…), carrousel pour la résolution.
-    /// Rangé par onglets : Jeu (langue, trafic, pluie, secousses, commandes tactiles si l'écran est tactile, retour au
-    /// départ), Graphismes (écran : mode d'affichage, résolution et VSync sur ordinateur, limite d'images ; rendu :
-    /// qualité, distance des détails, flou de mouvement), Audio (volume général puis une voie par famille de sons, titre
-    /// des morceaux, son en arrière-plan), Touches (deux touches et deux boutons de manette par commande,
-    /// <see cref="GameInput.Bind"/>). Tout s'applique tout de suite (mode d'affichage et résolution : un instant après le dernier changement).
-    /// Manette : LB/RB (clavier : Tab, Maj+Tab) pour changer d'onglet, haut/bas pour choisir (la ligne choisie
-    /// s'éclaire), gauche/droite pour régler, A / Entrée pour passer au choix suivant.
+    /// Menu Options (construit en code), ouvert depuis l'accueil ou la pause, dans le style verre : plein écran sur
+    /// l'image floutée du jeu (<see cref="MenuBackdrop"/>), titre fin et espacé à gauche d'une barre d'onglets
+    /// (onglet ouvert souligné d'or), une plaque de verre arrondie qui porte les lignes, petits titres cyan espacés.
+    /// La ligne choisie prend un fond or léger et un liseré or. Chaque réglage a le contrôle qui lui va : curseur fin
+    /// pour les volumes et pourcentages, interrupteur pour activé / désactivé, pastilles pour les choix segmentés
+    /// (langue, qualité, mode d'affichage…), carrousel « ‹ valeur › » pour la résolution.
+    /// Rangé par onglets : Jeu (langue, trafic, pluie, secousses, vibrations, commandes tactiles si l'écran est
+    /// tactile, retour au départ), Graphismes (écran : mode d'affichage, résolution et VSync sur ordinateur, limite
+    /// d'images ; rendu : qualité, distance des détails, flou de mouvement), Audio (volume général puis une voie par
+    /// famille de sons, titre des morceaux, son en arrière-plan), Touches (deux touches et deux boutons de manette par
+    /// commande, <see cref="GameInput.Bind"/>). Tout s'applique tout de suite (mode d'affichage et résolution : un
+    /// instant après le dernier changement).
+    /// Manette : LB/RB (clavier : Tab, Maj+Tab) pour changer d'onglet, haut/bas pour choisir, gauche/droite pour
+    /// régler, A / Entrée pour passer au choix suivant.
     /// </summary>
     public class OptionsMenu : MonoBehaviour
     {
-        static readonly Color White = new Color(0.96f, 0.97f, 0.98f);
-        static readonly Color Accent = new Color(1f, 0.76f, 0.2f);
-        static readonly Color Info = new Color(0.35f, 0.85f, 1f);
-        static readonly Color Dim = new Color(1f, 1f, 1f, 0.55f);
-        static readonly Color RowOn = new Color(0.14f, 0.16f, 0.2f, 0.95f);
-
         public static bool IsOpen { get; private set; }
 
         GameManager game;
-        Font font;
         GameObject root;
+        RectTransform screen, frame;
+        MenuBackdrop backdrop;
         Action onClose;
         Selectable first;
-        Text applyText, seedText;
+        Text applyText;
         string roadAtOpen;
         int openedFrame;
         readonly List<Action> refreshers = new List<Action>();
-        // Animations des contrôles (pastille des interrupteurs, survol et choix en or), chaque image tant que c'est ouvert
+        // Animations des contrôles (pastille des interrupteurs, survol, ligne choisie en or), chaque image tant que c'est ouvert
         readonly List<Action<float>> animators = new List<Action<float>>();
-        readonly List<(GameObject target, Graphic plate, Graphic bar)> rows = new List<(GameObject, Graphic, Graphic)>();
+        // Lignes : cible sélectionnable, fond de sélection, filet du bas, libellé (une ligne de Touches a quatre cibles)
+        readonly List<(GameObject target, GlassRect plate, Graphic line, Text label)> rows = new List<(GameObject, GlassRect, Graphic, Text)>();
+        // Filets toujours masqués (dernière ligne d'une rubrique ou d'une page), et dernier filet posé dans chaque page
+        readonly HashSet<Graphic> trimmed = new HashSet<Graphic>();
+        readonly Dictionary<Transform, Graphic> lastLine = new Dictionary<Transform, Graphic>();
 
         // Onglets : pages (une seule visible), lignes réglables de chaque page, boutons d'onglet
         static int lastTab;
@@ -50,6 +52,11 @@ namespace ChillRoad
         Selectable[][] pageItems;
         (Button button, Text text, Graphic mark)[] tabs;
         Button defaultsButton, backButton;
+
+        // Mise en page (repère 1920 × 1080, maquette U-Options × 1,5) : cadre centré, barre du haut, plaque, bas
+        const float FrameWidth = 1350f, FrameHeight = 1080f;
+        const float BarTop = 48f, BarBottom = 124f, PanelTop = 183f;
+        const float RowHeight = 72f, KeyRowHeight = 46f, Pad = 30f;
 
         // Mode d'affichage et définition : appliqués à cet instant (0 = rien en attente), pour ne pas changer de mode
         // d'écran à chaque cran quand on fait défiler les choix
@@ -61,7 +68,7 @@ namespace ChillRoad
         // Pendant l'attente, la navigation des menus est coupée ; elle revient deux images après, pour que la touche
         // choisie (A, Entrée, B…) n'agisse pas aussi sur le menu.
         const int GameTab = 0, GraphicsTab = 1, AudioTab = 2, KeysTab = 3;
-        static readonly (float min, float max)[] SlotColumns = { (0.37f, 0.515f), (0.525f, 0.67f), (0.705f, 0.85f), (0.86f, 1f) };
+        static readonly (float min, float max)[] SlotColumns = { (0.36f, 0.508f), (0.518f, 0.666f), (0.694f, 0.842f), (0.852f, 0.985f) };
         Button[,] keyGrid;
         bool capturing, navBlocked;
         GameInput.Bind captureBind;
@@ -71,7 +78,6 @@ namespace ChillRoad
         public void Init(GameManager gm)
         {
             game = gm;
-            font = HudArt.Font;
             var cgo = new GameObject("Options", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = cgo.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -81,22 +87,47 @@ namespace ChillRoad
             scaler.referenceResolution = new Vector2(1920, 1080);
             scaler.matchWidthOrHeight = 0.5f;
             root = cgo;
+            screen = (RectTransform)cgo.transform;
 
-            // Voile sombre de la pause, puis une plaque : titre, onglets, page de l'onglet, boutons du bas
-            var shade = Rect(cgo.transform, "Shade", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            shade.gameObject.AddComponent<Image>().color = new Color(0.01f, 0.01f, 0.03f, 0.62f);
-            var panel = Panel(shade, "Options", new Vector2(-720, -410), new Vector2(720, 430));
+            // Image du jeu floutée sous un voile, puis un cadre centré de la taille de la maquette (réduit si l'écran
+            // est moins haut, voir FitFrame) : barre du haut, plaque de verre des réglages, boutons et aide en bas
+            backdrop = MenuBackdrop.Attach(screen, 0.5f);
+            frame = Glass.Place(screen, "Frame", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(FrameWidth, FrameHeight));
 
-            var title = Label(panel, "OPTIONS", 64, TextAnchor.MiddleLeft, Accent, FontStyle.BoldAndItalic);
-            title.gameObject.AddComponent<LayoutElement>().preferredHeight = 84;
-            var tabRow = Rect(panel, "Tabs", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            Fixed(tabRow, 58);
+            // Barre du haut : « OPTIONS » fin et espacé à gauche, onglets à droite entre LB et RB, filet dessous
+            var bar = Glass.Rect(frame, "TopBar", new Vector2(0f, 1f), Vector2.one, new Vector2(0f, -BarBottom), new Vector2(0f, -BarTop));
+            var title = Glass.Label(bar, Glass.Spaced("OPTIONS", 1), 63, Glass.Weight.Light, Glass.White, TextAnchor.LowerLeft);
+            Glass.Stretch(title.rectTransform);
+            var sep = Glass.Bar(bar, "Line", Glass.A(Color.white, 0.22f));
+            var srt = sep.rectTransform;
+            srt.anchorMin = Vector2.zero;
+            srt.anchorMax = new Vector2(1f, 0f);
+            srt.offsetMin = new Vector2(0f, -1.5f);
+            srt.offsetMax = Vector2.zero;
+
+            var tabRow = Glass.Rect(bar, "Tabs", new Vector2(1f, 0f), Vector2.one, Vector2.zero, Vector2.zero);
+            tabRow.pivot = new Vector2(1f, 0.5f);
             var th = tabRow.gameObject.AddComponent<HorizontalLayoutGroup>();
-            th.spacing = 14;
+            th.spacing = 39;
+            th.childAlignment = TextAnchor.LowerRight;
             th.childControlWidth = true; th.childControlHeight = true;
             th.childForceExpandWidth = false; th.childForceExpandHeight = true;
+            tabRow.gameObject.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            // Plaque de verre : sa hauteur suit la page ouverte (la plus longue, Touches, tient dans le budget)
+            var panel = Glass.Rect(frame, "Panel", new Vector2(0f, 1f), Vector2.one, Vector2.zero, Vector2.zero);
+            panel.pivot = new Vector2(0.5f, 1f);
+            panel.anchoredPosition = new Vector2(0f, -PanelTop);
+            panel.sizeDelta = new Vector2(0f, 700f);
+            Glass.Backdrop(panel, 42f, Glass.Panel);
+            var pl = panel.gameObject.AddComponent<VerticalLayoutGroup>();
+            pl.padding = new RectOffset(18, 18, 24, 15);
+            pl.childControlHeight = true; pl.childControlWidth = true;
+            pl.childForceExpandHeight = false; pl.childForceExpandWidth = true;
+            panel.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
             var tabNames = new[] { ("JEU", "GAMEPLAY"), ("GRAPHISMES", "GRAPHICS"), ("AUDIO", "AUDIO"), ("TOUCHES", "CONTROLS") };
-            TabGlyph(tabRow, "LB", TextAnchor.MiddleRight);
+            TabGlyph(tabRow, "LB");
             tabs = new (Button, Text, Graphic)[tabNames.Length];
             pages = new RectTransform[tabNames.Length];
             for (int i = 0; i < tabNames.Length; i++)
@@ -104,7 +135,7 @@ namespace ChillRoad
                 tabs[i] = AddTab(tabRow, tabNames[i].Item1, tabNames[i].Item2, i);
                 pages[i] = Page(panel, tabNames[i].Item2);
             }
-            TabGlyph(tabRow, "RB", TextAnchor.MiddleLeft);
+            TabGlyph(tabRow, "RB");
 
             // Jeu : langue, monde (trafic, pluie), caméra, commandes tactiles, puis le retour au départ
             var play = pages[GameTab];
@@ -137,12 +168,9 @@ namespace ChillRoad
                     i => i == 0 ? Loc.T("Désactivées", "Off") : i == 1 ? Loc.T("Glisser", "Slide") : i == 2 ? Loc.T("Boutons ‹ ›", "‹ › buttons") : Loc.T("Inclinaison", "Tilt"));
             }
             Section(play, "CARTE", "MAP", "", "");
-            var gap = Rect(play, "Gap", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            Fixed(gap, 6);
-            var apply = AddButton(play, ApplyRoad);
-            apply.button.GetComponent<LayoutElement>().preferredHeight = 54;
-            applyText = apply.text;
-            Loc.Bind(applyText, "Revenir au départ (route de la vallée)", "Back to the start (valley road)");
+            var apply = AddAction(play, "Revenir au départ (route de la vallée)", "Back to the start (valley road)",
+                "Replacer la voiture", "Reset the car", ApplyRoad);
+            applyText = apply.label;
 
             // Graphismes : l'écran (mode d'affichage, définition et synchro verticale sur ordinateur seulement ; mode et
             // définition appliqués un instant après le dernier changement, voir Update), puis le rendu
@@ -206,23 +234,30 @@ namespace ChillRoad
 
             // Touches
             BuildKeys(pages[KeysTab]);
+            // Pas de filet sous la dernière ligne d'une page
+            foreach (var l in lastLine.Values) trimmed.Add(l);
 
-            var bottom = ButtonRow(panel, 62);
-            var defaults = AddButton(bottom, () => { GameSettings.ResetAll(); GameInput.ResetBindings(); displayAt = Time.unscaledTime + 0.01f; Changed(); RefreshAll(); });
+            // Bas : « Par défaut » et « Retour » en pilules de verre à gauche, aide manette / clavier à droite
+            var bottom = Glass.Rect(frame, "Bottom", Vector2.zero, new Vector2(1f, 0f), new Vector2(0f, 51f), new Vector2(0f, 126f));
+            var bh = bottom.gameObject.AddComponent<HorizontalLayoutGroup>();
+            bh.spacing = 21;
+            bh.childAlignment = TextAnchor.MiddleLeft;
+            bh.childControlWidth = true; bh.childControlHeight = true;
+            bh.childForceExpandWidth = false; bh.childForceExpandHeight = true;
+            var defaults = PillButton(bottom, "Defaults", 24, Glass.Weight.Regular, new RectOffset(42, 42, 0, 0), TextAnchor.MiddleCenter,
+                () => { GameSettings.ResetAll(); GameInput.ResetBindings(); displayAt = Time.unscaledTime + 0.01f; Changed(); RefreshAll(); });
             Loc.Bind(defaults.text, "Par défaut", "Defaults");
-            var back = AddButton(bottom, Close);
+            PillLook(defaults.button, defaults.plate, defaults.text);
+            var back = PillButton(bottom, "Back", 24, Glass.Weight.Regular, new RectOffset(42, 42, 0, 0), TextAnchor.MiddleCenter, Close);
             Loc.Bind(back.text, "Retour", "Back");
+            PillLook(back.button, back.plate, back.text);
             defaultsButton = defaults.button;
             backButton = back.button;
 
-            // Aide manette / clavier sous la plaque
-            var hint = Label(shade, "", 21, TextAnchor.MiddleCenter, Dim, FontStyle.Normal);
-            var hintRt = hint.rectTransform;
-            hintRt.anchorMin = hintRt.anchorMax = new Vector2(0.5f, 0.5f);
-            hintRt.anchoredPosition = new Vector2(0f, -452f);
-            hintRt.sizeDelta = new Vector2(1600f, 40f);
-            Loc.Bind(hint, "LB RB / Tab  catégorie   ·   ↑ ↓  choisir   ·   ← →  régler   ·   B / Échap  retour",
-                           "LB RB / Tab  category   ·   ↑ ↓  select   ·   ← →  adjust   ·   B / Esc  back");
+            var hint = Glass.Label(bottom, "", 21, Glass.Weight.Light, Glass.Dim, TextAnchor.MiddleRight);
+            hint.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            Loc.Bind(hint, Hint("LB RB / Tab", "catégorie") + Dot + Hint("↑ ↓", "choisir") + Dot + Hint("← →", "régler") + Dot + Hint("B / Échap", "retour"),
+                           Hint("LB RB / Tab", "category") + Dot + Hint("↑ ↓", "select") + Dot + Hint("← →", "adjust") + Dot + Hint("B / Esc", "back"));
 
             // Navigation explicite par page (voir ShowTab) : gauche/droite restent aux curseurs (réglage)
             var gameItems = new List<Selectable> { language, traffic, rain, shake, rumble, rumbleTriggers };
@@ -248,6 +283,9 @@ namespace ChillRoad
 
         static string Percent(float v) => Loc.T($"{Mathf.RoundToInt(v * 100f)} %", $"{Mathf.RoundToInt(v * 100f)}%");
 
+        const string Dot = "   ·   ";
+        static string Hint(string keys, string what) => $"<color=#FFC233>{keys}</color>  {what}";
+
         // ------------------------------------------------------------------ ouverture / fermeture
 
         /// <summary>Ouvre le menu ; <paramref name="closed"/> est appelé à la fermeture (retour à l'accueil ou à la pause).</summary>
@@ -255,13 +293,18 @@ namespace ChillRoad
         {
             onClose = closed;
             roadAtOpen = GameSettings.RoadSignature;
+            // En réseau le monde continue : l'image floutée derrière est refaite régulièrement
+            if (backdrop) backdrop.live = game && game.Online;
             ShowTab(lastTab);
             RefreshAll();
             root.SetActive(true);
             IsOpen = true;
             openedFrame = Time.frameCount;
+            FitFrame();
             EventSystem.current?.SetSelectedGameObject(first.gameObject);
             HighlightRows();
+            // Contrôles posés tout de suite à leur état (pas d'image avec les couleurs de construction)
+            foreach (var a in animators) a(10f);
         }
 
         public void Close()
@@ -307,10 +350,21 @@ namespace ChillRoad
             GraphicsQuality.ApplyDisplay();
         }
 
+        /// <summary>Cadre réduit quand l'écran est moins haut ou moins large que la maquette (écran ultra-large, téléphone).</summary>
+        void FitFrame()
+        {
+            if (!screen || !frame) return;
+            var r = screen.rect;
+            if (r.height <= 0f || r.width <= 0f) return;
+            float s = Mathf.Min(1f, r.height / FrameHeight, (r.width - 32f) / FrameWidth);
+            if (Mathf.Abs(frame.localScale.x - s) > 0.001f) frame.localScale = new Vector3(s, s, 1f);
+        }
+
         void Update()
         {
             if (displayAt > 0f && Time.unscaledTime >= displayAt) FlushDisplay();
             if (!IsOpen) return;
+            FitFrame();
             foreach (var a in animators) a(Time.unscaledDeltaTime);
             if (Time.frameCount == openedFrame) return;
             if (capturing) { UpdateCapture(); return; }
@@ -342,10 +396,8 @@ namespace ChillRoad
                 bool on = i == tab;
                 pages[i].gameObject.SetActive(on);
                 tabs[i].mark.enabled = on;
-                tabs[i].text.color = on ? Accent : new Color(White.r, White.g, White.b, 0.7f);
-                var colors = tabs[i].button.colors;
-                colors.normalColor = on ? new Color(0.24f, 0.27f, 0.33f, 1f) : new Color(0.14f, 0.16f, 0.2f, 0.95f);
-                tabs[i].button.colors = colors;
+                tabs[i].text.color = on ? Glass.Gold : Glass.Dim;
+                tabs[i].text.font = Glass.FontOf(on ? Glass.Weight.Regular : Glass.Weight.Semilight);
             }
 
             // Colonne de la page puis « Par défaut », en boucle ; « Retour » à droite de « Par défaut »
@@ -365,14 +417,24 @@ namespace ChillRoad
             HighlightRows();
         }
 
-        /// <summary>Ligne du curseur choisi (manette ou clic) : plaque plus claire et trait or à gauche.</summary>
+        static bool Focused(GameObject g) => EventSystem.current && g && EventSystem.current.currentSelectedGameObject == g;
+
+        /// <summary>Ligne du réglage choisi (manette ou clic) : fond or léger, liseré or, libellé un peu plus appuyé, sans filet.</summary>
         void HighlightRows()
         {
             var selected = EventSystem.current ? EventSystem.current.currentSelectedGameObject : null;
-            // (une ligne de l'onglet Touches a quatre cibles pour la même plaque : éteindre tout, puis allumer)
-            foreach (var r in rows) r.plate.enabled = r.bar.enabled = false;
+            // (une ligne de l'onglet Touches a quatre cibles pour le même fond : on cherche d'abord le fond choisi)
+            GlassRect chosen = null;
             foreach (var r in rows)
-                if (r.target == selected) r.plate.enabled = r.bar.enabled = true;
+                if (r.target == selected) chosen = r.plate;
+            foreach (var r in rows)
+            {
+                bool on = chosen != null && r.plate == chosen;
+                r.plate.enabled = on;
+                r.line.enabled = !on && !trimmed.Contains(r.line);
+                var f = Glass.FontOf(on ? Glass.Weight.Regular : Glass.Weight.Semilight);
+                if (r.label.font != f) r.label.font = f;
+            }
         }
 
         // ------------------------------------------------------------------ touches
@@ -380,72 +442,83 @@ namespace ChillRoad
         /// <summary>Onglet Touches : en-tête (commande, clavier, manette) puis une ligne par commande, quatre emplacements.</summary>
         void BuildKeys(RectTransform page)
         {
-            page.GetComponent<VerticalLayoutGroup>().spacing = 2;
-            var head = Rect(page, "Head", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            Fixed(head, 40);
+            var head = Glass.Rect(page, "Head", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Fixed(head, 44);
             HeadLabel(head, "COMMANDE", "ACTION", 0f, 0.35f, TextAnchor.LowerLeft);
             HeadLabel(head, "CLAVIER", "KEYBOARD", SlotColumns[0].min, SlotColumns[1].max, TextAnchor.LowerCenter);
             HeadLabel(head, "MANETTE", "GAMEPAD", SlotColumns[2].min, SlotColumns[3].max, TextAnchor.LowerCenter);
-            var line = Shape(head, "Line", new Color(Info.r, Info.g, Info.b, 0.4f)).Set(0f, 0f, 260f);
+            var line = Glass.Bar(head, "Line", Glass.Line);
             var lrt = line.rectTransform;
             lrt.anchorMin = Vector2.zero;
             lrt.anchorMax = new Vector2(1f, 0f);
-            lrt.offsetMin = new Vector2(0f, -3f);
-            lrt.offsetMax = new Vector2(0f, -1f);
+            lrt.offsetMin = Vector2.zero;
+            lrt.offsetMax = new Vector2(0f, 1.5f);
 
             keyGrid = new Button[GameInput.BindCount, 4];
             for (int b = 0; b < GameInput.BindCount; b++)
             {
                 var bind = (GameInput.Bind)b;
-                var row = Rect(page, bind.ToString(), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-                Fixed(row, 32);
-                var plate = Shape(row, "Selected", RowOn).Set(12f, 0f, 0f);
-                Fill(plate.rectTransform, new Vector2(-18, 0), new Vector2(14, 0));
-                var bar = Shape(row, "Mark", Accent).Set(6f, 0f, 0f);
-                var barRt = bar.rectTransform;
-                barRt.anchorMin = Vector2.zero;
-                barRt.anchorMax = new Vector2(0f, 1f);
-                barRt.offsetMin = new Vector2(-18, 5);
-                barRt.offsetMax = new Vector2(-13, -5);
-                plate.enabled = bar.enabled = false;
-                var name = Label(row, "", 22, TextAnchor.MiddleLeft, White, FontStyle.Normal);
-                Stretch(name.rectTransform, 0f, 0.36f, 6f, 0f);
+                var row = Glass.Rect(page, bind.ToString(), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+                Fixed(row, KeyRowHeight);
+                var plate = SelectionPlate(row, 23f);
+                var rowLine = RowLine(row);
+                lastLine[page] = rowLine;
+                var name = Glass.Label(row, "", 24, Glass.Weight.Semilight, Glass.White, TextAnchor.MiddleLeft);
+                Stretch(name.rectTransform, 0f, SlotColumns[0].min, Pad, 8f);
                 refreshers.Add(() => name.text = GameInput.BindName(bind));
                 for (int c = 0; c < 4; c++)
                 {
                     var slot = KeySlot(row, bind, c);
                     keyGrid[b, c] = slot;
-                    rows.Add((slot.gameObject, plate, bar));
+                    rows.Add((slot.gameObject, plate, rowLine, name));
                 }
             }
         }
 
         void HeadLabel(RectTransform parent, string fr, string en, float xMin, float xMax, TextAnchor align)
         {
-            var t = Loc.Bind(Label(parent, "", 21, align, Info, FontStyle.BoldAndItalic), fr, en);
-            Stretch(t.rectTransform, xMin, xMax, align == TextAnchor.LowerLeft ? 6f : 0f, 0f);
-            t.rectTransform.offsetMin = new Vector2(t.rectTransform.offsetMin.x, 6f);
+            var t = Loc.Bind(Glass.Kicker(parent, "", 16), Glass.Spaced(fr, 2), Glass.Spaced(en, 2));
+            t.alignment = align;
+            Stretch(t.rectTransform, xMin, xMax, align == TextAnchor.LowerLeft ? Pad : 0f, 0f);
+            t.rectTransform.offsetMin = new Vector2(t.rectTransform.offsetMin.x, 10f);
         }
 
-        /// <summary>Emplacement : petit bouton incliné portant la touche ou le bouton choisi (« … » pendant l'attente).</summary>
+        /// <summary>Emplacement : pastille de verre arrondie portant la touche ou le bouton choisi (« … » en or pendant l'attente).</summary>
         Button KeySlot(RectTransform row, GameInput.Bind bind, int column)
         {
             bool pad = column >= 2;
             int slot = column % 2;
-            var (button, text) = AddButton(row, () => StartCapture(bind, slot, pad));
-            button.GetComponent<HudShape>().Set(10f, 0f, 0f);
+            var (button, plate, text) = PillButton(row, "Slot", 21, Glass.Weight.Regular, null, TextAnchor.MiddleCenter, () => StartCapture(bind, slot, pad));
+            plate.radius = 19f;
+            var hit = button.GetComponent<OptionHit>();
             var rt = (RectTransform)button.transform;
-            rt.anchorMin = new Vector2(SlotColumns[column].min, 0f);
-            rt.anchorMax = new Vector2(SlotColumns[column].max, 1f);
-            rt.offsetMin = new Vector2(0f, 2f);
-            rt.offsetMax = new Vector2(0f, -2f);
-            text.fontSize = 20;
-            text.fontStyle = FontStyle.Bold;
+            rt.anchorMin = new Vector2(SlotColumns[column].min, 0.5f);
+            rt.anchorMax = new Vector2(SlotColumns[column].max, 0.5f);
+            rt.offsetMin = new Vector2(0f, -19f);
+            rt.offsetMax = new Vector2(0f, 19f);
+            bool Waiting() => capturing && captureBind == bind && captureSlot == slot && capturePad == pad;
             refreshers.Add(() =>
             {
-                bool waiting = capturing && captureBind == bind && captureSlot == slot && capturePad == pad;
-                text.text = waiting ? "…" : pad ? GameInput.PadName(GameInput.GetPad(bind, slot)) : GameInput.KeyName(GameInput.GetKey(bind, slot));
-                text.color = waiting ? Accent : White;
+                text.text = Waiting() ? "…" : pad ? GameInput.PadName(GameInput.GetPad(bind, slot)) : GameInput.KeyName(GameInput.GetKey(bind, slot));
+            });
+            animators.Add(_ =>
+            {
+                // Attente : liseré et halo or ; emplacement choisi : or plein, encre ; sinon verre
+                if (Waiting())
+                {
+                    Look(plate, Glass.GoldSoft, Glass.Gold, 8f);
+                    Ink(text, Glass.Gold, Glass.Weight.Semibold);
+                }
+                else if (Focused(button.gameObject))
+                {
+                    Look(plate, Glass.Gold, Color.clear, 0f);
+                    Ink(text, Glass.Ink, Glass.Weight.Semibold);
+                }
+                else
+                {
+                    Look(plate, hit.Hover ? Glass.A(Color.white, 0.18f) : Glass.Pill, Glass.Edge, 0f);
+                    Ink(text, Glass.White, Glass.Weight.Regular);
+                }
             });
             return button;
         }
@@ -517,147 +590,159 @@ namespace ChillRoad
             if (EventSystem.current) EventSystem.current.sendNavigationEvents = true;
         }
 
-        // ------------------------------------------------------------------ lignes
+        // ------------------------------------------------------------------ barre du haut et pages
 
-        /// <summary>Plaque inclinée anthracite (comme la pause) portant une colonne de lignes.</summary>
-        static RectTransform Panel(RectTransform parent, string name, Vector2 min, Vector2 max)
-        {
-            var panel = Rect(parent, name, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), min, max);
-            var plate = Shape(panel, "Plate", new Color(0.03f, 0.04f, 0.06f, 0.92f)).Set(24f, 0f, 0f);
-            plate.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
-            Fill(plate.rectTransform, Vector2.zero, Vector2.zero);
-            var layout = panel.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(58, 52, 30, 34);
-            layout.spacing = 8;
-            layout.childControlHeight = true; layout.childControlWidth = true;
-            layout.childForceExpandHeight = false; layout.childForceExpandWidth = true;
-            return panel;
-        }
-
-        /// <summary>Page d'un onglet : colonne de lignes qui prend la place libre de la plaque.</summary>
+        /// <summary>Page d'un onglet : colonne de lignes, la plaque prend sa hauteur.</summary>
         static RectTransform Page(RectTransform parent, string name)
         {
-            var page = Rect(parent, name, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            page.gameObject.AddComponent<LayoutElement>().flexibleHeight = 1f;
+            var page = Glass.Rect(parent, name, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             var layout = page.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 6;
+            layout.spacing = 0;
             layout.childAlignment = TextAnchor.UpperLeft;
             layout.childControlHeight = true; layout.childControlWidth = true;
             layout.childForceExpandHeight = false; layout.childForceExpandWidth = true;
             return page;
         }
 
-        /// <summary>Onglet : bouton incliné, libellé or et trait or dessous quand il est ouvert (voir ShowTab).</summary>
+        /// <summary>Onglet : texte espacé, or et souligné d'or quand il est ouvert (voir ShowTab) ; toute la hauteur de la barre est cliquable.</summary>
         (Button button, Text text, Graphic mark) AddTab(Transform parent, string fr, string en, int index)
         {
-            var (button, text) = AddButton(parent, () => ShowTab(index));
-            button.GetComponent<LayoutElement>().flexibleWidth = 1f;
+            var (button, plate, text) = PillButton(parent, "Tab", 25, Glass.Weight.Semilight, new RectOffset(6, 6, 0, 18), TextAnchor.LowerCenter, () => ShowTab(index));
+            plate.color = Color.clear;
+            plate.border = 0f;
             button.navigation = new Navigation { mode = Navigation.Mode.None };
-            text.fontSize = 25;
-            Loc.Bind(text, fr, en);
-            var mark = Shape(button.transform, "Active", Accent).Set(4f, 0f, 0f);
+            Loc.Bind(text, Glass.Spaced(fr, 1), Glass.Spaced(en, 1));
+            var mark = Glass.Make(button.transform, "Active", 2f, Glass.Gold, 0f);
+            mark.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
             var rt = mark.rectTransform;
-            rt.anchorMin = new Vector2(0.08f, 0f);
-            rt.anchorMax = new Vector2(0.92f, 0f);
-            rt.offsetMin = new Vector2(0f, 3f);
-            rt.offsetMax = new Vector2(0f, 7f);
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = new Vector2(1f, 0f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = new Vector2(0f, 4.5f);
             return (button, text, mark);
         }
 
-        /// <summary>Repère de bouton manette (LB, RB) au bord de la rangée d'onglets.</summary>
-        void TabGlyph(Transform parent, string glyph, TextAnchor align)
+        /// <summary>Repère de bouton manette (LB, RB) au bord de la rangée d'onglets : petite pastille cernée.</summary>
+        static void TabGlyph(Transform parent, string glyph)
         {
-            var t = Label(parent, glyph, 21, align, Dim, FontStyle.Bold);
-            t.gameObject.AddComponent<LayoutElement>().preferredWidth = 44;
+            var cell = Glass.Rect(parent, glyph, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            cell.gameObject.AddComponent<LayoutElement>().preferredWidth = 50;
+            var chip = Glass.Make(cell, "Chip", 16f, Color.clear, 1.5f);
+            chip.borderColor = Glass.A(Color.white, 0.4f);
+            Put(chip.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 18f), new Vector2(50f, 32f));
+            var t = Glass.Label(chip.transform, glyph, 20, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleCenter);
+            Glass.Stretch(t.rectTransform);
         }
 
-        /// <summary>Rubrique : nom en cyan, précision estompée, filet cyan qui s'efface vers la droite.</summary>
+        /// <summary>Rubrique : petit titre cyan espacé (précision estompée à côté si besoin) ; la ligne d'avant perd son filet.</summary>
         void Section(RectTransform parent, string fr, string en, string noteFr, string noteEn)
         {
-            var row = Rect(parent, "Section", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            Fixed(row, 42);
+            if (lastLine.TryGetValue(parent, out var prev)) trimmed.Add(prev);
+            bool top = parent.childCount == 0;
+            var row = Glass.Rect(parent, "Section", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Fixed(row, top ? 36f : 57f);
             var h = row.gameObject.AddComponent<HorizontalLayoutGroup>();
-            h.spacing = 14;
+            h.spacing = 18;
             h.childAlignment = TextAnchor.LowerLeft;
-            h.padding = new RectOffset(0, 0, 0, 6);
+            h.padding = new RectOffset((int)Pad, (int)Pad, 0, 9);
             h.childControlWidth = true; h.childControlHeight = true;
-            h.childForceExpandWidth = false; h.childForceExpandHeight = true;
-            if (fr.Length > 0) Loc.Bind(Label(row, "", 26, TextAnchor.LowerLeft, Info, FontStyle.BoldAndItalic), fr, en);
+            h.childForceExpandWidth = false; h.childForceExpandHeight = false;
+            if (fr.Length > 0) Loc.Bind(Glass.Kicker(row, "", 17), Glass.Spaced(fr, 2), Glass.Spaced(en, 2));
             if (noteFr.Length > 0)
             {
                 string dot = fr.Length > 0 ? "·  " : "";
-                Loc.Bind(Label(row, "", 20, TextAnchor.LowerLeft, Dim, FontStyle.Italic), dot + noteFr, dot + noteEn);
+                Loc.Bind(Glass.Label(row, "", 20, Glass.Weight.Semilight, Glass.Faint, TextAnchor.LowerLeft), dot + noteFr, dot + noteEn);
             }
-            var line = Shape(row, "Line", new Color(Info.r, Info.g, Info.b, 0.4f)).Set(0f, 0f, 260f);
-            line.gameObject.AddComponent<LayoutElement>().ignoreLayout = true;
+        }
+
+        // ------------------------------------------------------------------ lignes
+
+        // Contrôles de réglage : curseur pour les valeurs continues (volumes, pourcentages), interrupteur pour
+        // activé / désactivé, pastilles quand toutes les valeurs tiennent sur la ligne, carrousel « ‹ valeur › »
+        // pour les longues listes (résolution). Tous occupent la partie droite de la ligne, à partir de ControlLeft.
+        const float ControlLeft = 0.42f;
+        static readonly Color ChipEdge = new Color(1f, 1f, 1f, 0.3f);
+        static readonly Color ChipHover = new Color(1f, 1f, 1f, 0.6f);
+
+        /// <summary>Fond de sélection d'une ligne : or léger et liseré or arrondi (allumé par HighlightRows).</summary>
+        static GlassRect SelectionPlate(RectTransform row, float radius)
+        {
+            var plate = Glass.Make(row, "Selected", radius, Glass.GoldSoft, 1.5f);
+            plate.borderColor = Glass.Gold;
+            Glass.Stretch(plate.rectTransform);
+            plate.enabled = false;
+            return plate;
+        }
+
+        /// <summary>Filet discret sous une ligne.</summary>
+        static Graphic RowLine(RectTransform row)
+        {
+            var line = Glass.Bar(row, "Line", Glass.A(Color.white, 0.1f));
             var lrt = line.rectTransform;
             lrt.anchorMin = Vector2.zero;
             lrt.anchorMax = new Vector2(1f, 0f);
             lrt.offsetMin = Vector2.zero;
-            lrt.offsetMax = new Vector2(0f, 2f);
+            lrt.offsetMax = new Vector2(0f, 1.5f);
+            return line;
         }
 
-        // Contrôles de réglage : curseur pour les valeurs continues (volumes, pourcentages), interrupteur pour
-        // activé / désactivé, choix segmentés quand toutes les valeurs tiennent sur la ligne, carrousel « ‹ valeur › »
-        // pour les longues listes (résolution). Tous occupent la partie droite de la ligne, à partir de ControlLeft.
-        const float ControlLeft = 0.49f;
-        static readonly Color SegOff = new Color(0.14f, 0.16f, 0.2f, 0.95f);
-        static readonly Color SegHover = new Color(0.24f, 0.27f, 0.33f, 1f);
-        static readonly Color SegOn = new Color(0.95f, 0.62f, 0.12f, 1f);
-        static readonly Color Ink = new Color(0.05f, 0.06f, 0.08f, 1f);
-        static readonly Color Faint = new Color(1f, 1f, 1f, 0.16f);
-
-        /// <summary>Ligne de réglage : nom à gauche, plaque et trait or allumés quand elle est choisie (HighlightRows).</summary>
-        RectTransform OptionRow(RectTransform parent, string fr, string en, out Graphic plate, out Graphic bar)
+        /// <summary>Ligne de réglage : nom à gauche, fond et liseré or quand elle est choisie (HighlightRows), filet dessous.</summary>
+        RectTransform OptionRow(RectTransform parent, string fr, string en, out GlassRect plate, out Graphic line, out Text label)
         {
-            var row = Rect(parent, en, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            row.gameObject.AddComponent<LayoutElement>().preferredHeight = 46;
-            plate = Shape(row, "Selected", RowOn).Set(18f, 0f, 0f);
-            Fill(plate.rectTransform, new Vector2(-18, 1), new Vector2(14, -1));
-            bar = Shape(row, "Mark", Accent).Set(8f, 0f, 0f);
-            var barRt = bar.rectTransform;
-            barRt.anchorMin = Vector2.zero;
-            barRt.anchorMax = new Vector2(0f, 1f);
-            barRt.offsetMin = new Vector2(-18, 8);
-            barRt.offsetMax = new Vector2(-12, -8);
-            plate.enabled = bar.enabled = false;
-            var name = Loc.Bind(Label(row, "", 25, TextAnchor.MiddleLeft, White, FontStyle.Normal), fr, en);
-            Stretch(name.rectTransform, 0f, ControlLeft - 0.02f, 6f, 0f);
+            var row = Glass.Rect(parent, en, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            row.gameObject.AddComponent<LayoutElement>().preferredHeight = RowHeight;
+            plate = SelectionPlate(row, 27f);
+            line = RowLine(row);
+            lastLine[parent] = line;
+            label = Loc.Bind(Glass.Label(row, "", 27, Glass.Weight.Semilight, Glass.White, TextAnchor.MiddleLeft), fr, en);
+            Stretch(label.rectTransform, 0f, ControlLeft, Pad, 12f);
             return row;
         }
 
         /// <summary>Ligne à choix (<see cref="OptionSelector"/>) : toute la ligne capte la souris et devient la ligne choisie.</summary>
         OptionSelector SelectorRow(RectTransform parent, string fr, string en, out RectTransform row)
         {
-            row = OptionRow(parent, fr, en, out var plate, out var bar);
-            var hit = Shape(row, "Hit", Color.clear);
+            row = OptionRow(parent, fr, en, out var plate, out var line, out var label);
+            var hit = Glass.Make(row, "Hit", 0f, Color.clear, 0f);
             hit.raycastTarget = true;
             hit.transform.SetAsFirstSibling();
-            Fill(hit.rectTransform, new Vector2(-18, 1), new Vector2(14, -1));
+            Glass.Stretch(hit.rectTransform);
             var selector = row.gameObject.AddComponent<OptionSelector>();
             selector.transition = Selectable.Transition.None;
-            rows.Add((row.gameObject, plate, bar));
+            rows.Add((row.gameObject, plate, line, label));
             return selector;
         }
 
-        /// <summary>Petite plaque inclinée cliquable (choix, flèche) ; libellé sans ombre, encre sur or.</summary>
-        (HudShape shape, Text text, OptionHit hit) Chip(Transform parent, string name, int size)
+        /// <summary>Pastille de choix cliquable : cernée de blanc, or plein et encre quand elle est prise ; largeur au texte.</summary>
+        static (GlassRect plate, Text text, OptionHit hit) Chip(Transform parent, string name, int size)
         {
-            var shape = Shape(parent, name, SegOff).Set(10f, 0f, 0f);
-            shape.raycastTarget = true;
-            var text = Label(shape.transform, "", size, TextAnchor.MiddleCenter, White, FontStyle.Bold);
-            text.GetComponent<Shadow>().enabled = false;
-            text.resizeTextForBestFit = true;
-            text.resizeTextMinSize = 14;
-            text.resizeTextMaxSize = size;
-            text.horizontalOverflow = HorizontalWrapMode.Wrap;
-            Fill(text.rectTransform, new Vector2(8, 0), new Vector2(-6, 0));
-            return (shape, text, shape.gameObject.AddComponent<OptionHit>());
+            var plate = Glass.Make(parent, name, 22f, Color.clear, 1.5f);
+            plate.borderColor = ChipEdge;
+            plate.raycastTarget = true;
+            var h = plate.gameObject.AddComponent<HorizontalLayoutGroup>();
+            h.padding = new RectOffset(24, 24, 0, 0);
+            h.childAlignment = TextAnchor.MiddleCenter;
+            h.childControlWidth = true; h.childControlHeight = true;
+            h.childForceExpandWidth = true; h.childForceExpandHeight = false;
+            var text = Glass.Label(plate.transform, "", size, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleCenter);
+            return (plate, text, plate.gameObject.AddComponent<OptionHit>());
+        }
+
+        /// <summary>Rangée de pastilles calée à droite de la ligne.</summary>
+        static RectTransform ChipArea(RectTransform row, string name)
+        {
+            var area = Glass.Rect(row, name, new Vector2(ControlLeft, 0.5f), new Vector2(1f, 0.5f), new Vector2(0f, -22f), new Vector2(-Pad, 22f));
+            var h = area.gameObject.AddComponent<HorizontalLayoutGroup>();
+            h.spacing = 9;
+            h.childAlignment = TextAnchor.MiddleRight;
+            h.childControlWidth = true; h.childControlHeight = true;
+            h.childForceExpandWidth = false; h.childForceExpandHeight = true;
+            return area;
         }
 
         /// <summary>
-        /// Interrupteur : pastille qui glisse dans un rail (or quand c'est activé), état écrit à sa gauche.
-        /// Gauche = désactivé, droite = activé, A / Entrée ou un clic sur la ligne bascule.
+        /// Interrupteur : pilule (or quand c'est activé, pastille encre ; estompée sinon), état écrit à sa gauche en or
+        /// ou estompé. Gauche = désactivé, droite = activé, A / Entrée ou un clic sur la ligne bascule.
         /// </summary>
         Selectable AddToggle(RectTransform parent, string fr, string en, Func<bool> get, Action<bool> set,
             (string fr, string en)? onName = null, (string fr, string en)? offName = null)
@@ -665,27 +750,22 @@ namespace ChillRoad
             var on = onName ?? ("Activé", "On");
             var off = offName ?? ("Désactivé", "Off");
             var selector = SelectorRow(parent, fr, en, out var row);
-            const float W = 84f, H = 30f, Knob = 36f, Pad = 4f;
-            var track = Shape(row, "Switch", Faint).Set(10f, 0f, 0f);
-            var trt = track.rectTransform;
-            trt.anchorMin = trt.anchorMax = new Vector2(1f, 0.5f);
-            trt.offsetMin = new Vector2(-W - 4f, -H / 2f);
-            trt.offsetMax = new Vector2(-4f, H / 2f);
-            var knob = Shape(track.transform, "Knob", White).Set(8f, 0f, 0f);
+            const float W = 75f, H = 39f, Knob = 30f, Inset = 4.5f;
+            var offTrack = Glass.A(Color.white, 0.18f);
+            var track = Glass.Make(row, "Switch", H / 2f, offTrack, 0f);
+            Put(track.rectTransform, new Vector2(1f, 0.5f), new Vector2(-Pad, 0f), new Vector2(W, H));
+            var knob = Glass.Make(track.transform, "Knob", Knob / 2f, Glass.White, 0f);
             var krt = knob.rectTransform;
-            krt.anchorMin = new Vector2(0f, 0f);
-            krt.anchorMax = new Vector2(0f, 1f);
-            var state = Label(row, "", 23, TextAnchor.MiddleRight, Accent, FontStyle.Bold);
-            Stretch(state.rectTransform, ControlLeft, 1f, 0f, W + 22f);
+            Put(krt, new Vector2(0f, 0.5f), new Vector2(Inset, 0f), new Vector2(Knob, Knob));
+            var state = Glass.Label(row, "", 22, Glass.Weight.Regular, Glass.Gold, TextAnchor.MiddleRight);
+            Stretch(state.rectTransform, ControlLeft, 1f, 0f, Pad + W + 24f);
 
             float t = get() ? 1f : 0f;
             void Place()
             {
-                float x = Pad + t * (W - Knob - 2f * Pad);
-                krt.offsetMin = new Vector2(x, Pad);
-                krt.offsetMax = new Vector2(x + Knob, -Pad);
-                track.color = Color.Lerp(Faint, SegOn, t);
-                knob.color = Color.Lerp(new Color(0.72f, 0.74f, 0.78f), Color.white, t);
+                krt.anchoredPosition = new Vector2(Inset + t * (W - Knob - 2f * Inset), 0f);
+                track.color = Color.Lerp(offTrack, Glass.Gold, t);
+                knob.color = Color.Lerp(Glass.White, Glass.Ink, t);
             }
             void Set(bool v)
             {
@@ -700,7 +780,7 @@ namespace ChillRoad
             {
                 bool v = get();
                 state.text = v ? Loc.T(on.fr, on.en) : Loc.T(off.fr, off.en);
-                state.color = v ? Accent : Dim;
+                state.color = v ? Glass.Gold : Glass.Dim;
                 if (!IsOpen) { t = v ? 1f : 0f; Place(); }
             });
             animators.Add(dt =>
@@ -713,21 +793,17 @@ namespace ChillRoad
         }
 
         /// <summary>
-        /// Choix segmentés : une plaque par valeur, la valeur prise en or. Gauche/droite passe à la voisine (sans
+        /// Choix segmentés : une pastille par valeur, la valeur prise en or plein. Gauche/droite passe à la voisine (sans
         /// boucler), A / Entrée à la suivante (en boucle), un clic choisit. <paramref name="locked"/> rend un texte quand
-        /// le réglage ne s'applique pas (les plaques laissent place à ce texte).
+        /// le réglage ne s'applique pas (les pastilles laissent place à ce texte).
         /// </summary>
         Selectable AddChoice(RectTransform parent, string fr, string en, int count, Func<int> get, Action<int> set,
             Func<int, string> name, Func<string> locked = null)
         {
             var selector = SelectorRow(parent, fr, en, out var row);
-            var area = Rect(row, "Choices", new Vector2(ControlLeft, 0f), Vector2.one, new Vector2(0f, 7f), new Vector2(-4f, -7f));
-            var h = area.gameObject.AddComponent<HorizontalLayoutGroup>();
-            h.spacing = 8;
-            h.childControlWidth = true; h.childControlHeight = true;
-            h.childForceExpandWidth = true; h.childForceExpandHeight = true;
-            var note = Label(row, "", 23, TextAnchor.MiddleCenter, Dim, FontStyle.Italic);
-            Stretch(note.rectTransform, ControlLeft, 1f, 0f, 4f);
+            var area = ChipArea(row, "Choices");
+            var note = Glass.Label(row, "", 22, Glass.Weight.Semilight, Glass.Dim, TextAnchor.MiddleRight);
+            Stretch(note.rectTransform, ControlLeft, 1f, 0f, Pad);
 
             void Pick(int i)
             {
@@ -738,11 +814,11 @@ namespace ChillRoad
                 Changed();
                 RefreshAll();
             }
-            var chips = new (HudShape shape, Text text, OptionHit hit)[count];
+            var chips = new (GlassRect plate, Text text, OptionHit hit)[count];
             for (int i = 0; i < count; i++)
             {
                 int index = i;
-                chips[i] = Chip(area, "Choice", 21);
+                chips[i] = Chip(area, "Choice", 22);
                 chips[i].hit.Click = () => Pick(index);
             }
             selector.Move = d => Pick(get() + d);
@@ -759,26 +835,22 @@ namespace ChillRoad
                 int current = get();
                 for (int i = 0; i < count; i++)
                 {
-                    bool active = i == current;
-                    chips[i].shape.color = active ? SegOn : chips[i].hit.Hover ? SegHover : SegOff;
-                    chips[i].text.color = active ? Ink : White;
+                    bool active = i == current, hover = chips[i].hit.Hover;
+                    Look(chips[i].plate, active ? Glass.Gold : hover ? Glass.Pill : Color.clear, active ? Color.clear : hover ? ChipHover : ChipEdge, 0f);
+                    Ink(chips[i].text, active ? Glass.Ink : Glass.White, active ? Glass.Weight.Semibold : Glass.Weight.Regular);
                 }
             });
             return selector;
         }
 
         /// <summary>
-        /// Cases à cocher en pastilles sur une ligne (plusieurs actives à la fois) : or = activée. Gauche/droite déplacent
-        /// le curseur de pastille (plus claire), A / Entrée ou un clic sur une pastille la bascule.
+        /// Cases à cocher en pastilles sur une ligne (plusieurs actives à la fois) : or plein = activée. Gauche/droite
+        /// déplacent le curseur de pastille (plus claire), A / Entrée ou un clic sur une pastille la bascule.
         /// </summary>
         Selectable AddFlags(RectTransform parent, string fr, string en, (string fr, string en)[] names, Func<int, bool> get, Action<int, bool> set)
         {
             var selector = SelectorRow(parent, fr, en, out var row);
-            var area = Rect(row, "Flags", new Vector2(ControlLeft, 0f), Vector2.one, new Vector2(0f, 7f), new Vector2(-4f, -7f));
-            var h = area.gameObject.AddComponent<HorizontalLayoutGroup>();
-            h.spacing = 8;
-            h.childControlWidth = true; h.childControlHeight = true;
-            h.childForceExpandWidth = true; h.childForceExpandHeight = true;
+            var area = ChipArea(row, "Flags");
             int count = names.Length, cursor = 0;
 
             void Flip(int i)
@@ -788,11 +860,11 @@ namespace ChillRoad
                 Changed();
                 RefreshAll();
             }
-            var chips = new (HudShape shape, Text text, OptionHit hit)[count];
+            var chips = new (GlassRect plate, Text text, OptionHit hit)[count];
             for (int i = 0; i < count; i++)
             {
                 int index = i;
-                chips[i] = Chip(area, "Flag", 21);
+                chips[i] = Chip(area, "Flag", 22);
                 chips[i].hit.Click = () => Flip(index);
             }
             selector.Move = d => cursor = Mathf.Clamp(cursor + d, 0, count - 1);
@@ -803,42 +875,33 @@ namespace ChillRoad
             });
             animators.Add(_ =>
             {
-                bool focused = EventSystem.current && EventSystem.current.currentSelectedGameObject == selector.gameObject;
+                bool focused = Focused(selector.gameObject);
                 for (int i = 0; i < count; i++)
                 {
                     bool on = get(i), lit = chips[i].hit.Hover || (focused && i == cursor);
-                    chips[i].shape.color = on ? (lit ? Color.Lerp(SegOn, Color.white, 0.3f) : SegOn) : lit ? SegHover : SegOff;
-                    chips[i].text.color = on ? Ink : White;
+                    if (on) Look(chips[i].plate, lit ? Color.Lerp(Glass.Gold, Color.white, 0.3f) : Glass.Gold, Color.clear, 0f);
+                    else Look(chips[i].plate, lit ? Glass.Pill : Color.clear, lit ? ChipHover : ChipEdge, 0f);
+                    Ink(chips[i].text, on ? Glass.Ink : Glass.White, on ? Glass.Weight.Semibold : Glass.Weight.Regular);
                 }
             });
             return selector;
         }
 
         /// <summary>
-        /// Carrousel « ‹ valeur › » pour les longues listes : flèches cliquables (estompées en bout de liste), valeur au
-        /// centre et repères de position dessous. Gauche/droite sans boucler, A / Entrée en boucle.
+        /// Carrousel « ‹ valeur › » pour les longues listes : flèches cliquables (estompées en bout de liste, or sur la
+        /// ligne choisie), valeur au centre et repères de position dessous. Gauche/droite sans boucler, A / Entrée en boucle.
         /// </summary>
         Selectable AddCarousel(RectTransform parent, string fr, string en, Func<int> count, Func<int> get, Action<int> set, Func<int, string> name)
         {
             var selector = SelectorRow(parent, fr, en, out var row);
-            var area = Rect(row, "Carousel", new Vector2(ControlLeft, 0f), Vector2.one, new Vector2(0f, 5f), new Vector2(-4f, -5f));
-            const float Arrow = 50f;
-            var prev = Chip(area, "Prev", 30);
-            var prt = prev.shape.rectTransform;
-            prt.anchorMin = Vector2.zero; prt.anchorMax = new Vector2(0f, 1f);
-            prt.offsetMin = Vector2.zero; prt.offsetMax = new Vector2(Arrow, 0f);
-            prev.text.text = "‹";
-            var next = Chip(area, "Next", 30);
-            var nrt = next.shape.rectTransform;
-            nrt.anchorMin = new Vector2(1f, 0f); nrt.anchorMax = Vector2.one;
-            nrt.offsetMin = new Vector2(-Arrow, 0f); nrt.offsetMax = Vector2.zero;
-            next.text.text = "›";
-            var mid = Shape(area, "Value", SegOff).Set(10f, 0f, 0f);
-            Fill(mid.rectTransform, new Vector2(Arrow + 8f, 0f), new Vector2(-Arrow - 8f, 0f));
-            var value = Label(mid.transform, "", 23, TextAnchor.MiddleCenter, Accent, FontStyle.BoldAndItalic);
-            Fill(value.rectTransform, new Vector2(0f, 10f), new Vector2(0f, 1f));
-            var pipRow = Rect(mid.transform, "Pips", new Vector2(0.3f, 0f), new Vector2(0.7f, 0f), new Vector2(0f, 3f), new Vector2(0f, 5f));
-            var pips = new List<HudShape>();
+            var area = Glass.Rect(row, "Carousel", new Vector2(ControlLeft, 0f), Vector2.one, new Vector2(0f, 6f), new Vector2(-Pad, -6f));
+            const float Arrow = 48f;
+            var prev = Arrowhead(area, "Prev", "‹", 0f);
+            var next = Arrowhead(area, "Next", "›", 1f);
+            var value = Glass.Label(area, "", 25, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleCenter);
+            Fill(value.rectTransform, new Vector2(Arrow, 10f), new Vector2(-Arrow, 0f));
+            var pipRow = Glass.Rect(area, "Pips", new Vector2(0.3f, 0f), new Vector2(0.7f, 0f), new Vector2(0f, 3f), new Vector2(0f, 7f));
+            var pips = new List<GlassRect>();
 
             void Pick(int i)
             {
@@ -860,7 +923,7 @@ namespace ChillRoad
                 value.text = name(get());
                 // Repères : un par valeur, au-delà de 24 valeurs une seule barre de position
                 int wanted = n > 24 ? 1 : n;
-                while (pips.Count < wanted) pips.Add(Shape(pipRow, "Pip", Faint).Set(2f, 0f, 0f));
+                while (pips.Count < wanted) pips.Add(Glass.Make(pipRow, "Pip", 2f, Glass.Faint, 0f));
                 for (int i = 0; i < pips.Count; i++) pips[i].gameObject.SetActive(i < wanted && n > 1);
                 for (int i = 0; i < wanted; i++)
                 {
@@ -876,53 +939,75 @@ namespace ChillRoad
             animators.Add(_ =>
             {
                 int n = count(), i = get();
+                bool focused = Focused(selector.gameObject);
                 bool canPrev = i > 0, canNext = i < n - 1;
-                prev.shape.color = canPrev && prev.hit.Hover ? SegHover : SegOff;
-                next.shape.color = canNext && next.hit.Hover ? SegHover : SegOff;
-                prev.text.color = canPrev ? White : Faint;
-                next.text.color = canNext ? White : Faint;
+                Look(prev.plate, canPrev && prev.hit.Hover ? Glass.Pill : Color.clear, Color.clear, 0f);
+                Look(next.plate, canNext && next.hit.Hover ? Glass.Pill : Color.clear, Color.clear, 0f);
+                prev.text.color = canPrev ? (focused ? Glass.Gold : Glass.White) : Glass.Faint;
+                next.text.color = canNext ? (focused ? Glass.Gold : Glass.White) : Glass.Faint;
+                Ink(value, focused ? Glass.Gold : Glass.White, focused ? Glass.Weight.Semibold : Glass.Weight.Regular);
                 int wanted = n > 24 ? 1 : n;
-                for (int p = 0; p < wanted && p < pips.Count; p++) pips[p].color = wanted == 1 || p == i ? Accent : Faint;
+                for (int p = 0; p < wanted && p < pips.Count; p++) pips[p].color = wanted == 1 || p == i ? Glass.Gold : Glass.Faint;
             });
             return selector;
         }
 
-        /// <summary>Curseur (valeurs continues) : rail blanc estompé, remplissage or, languette inclinée, valeur à droite.</summary>
+        /// <summary>Flèche « ‹ » ou « › » cliquable au bord d'un carrousel (x = 0 : à gauche, 1 : à droite).</summary>
+        static (GlassRect plate, Text text, OptionHit hit) Arrowhead(RectTransform area, string name, string glyph, float x)
+        {
+            var plate = Glass.Make(area, name, 24f, Color.clear, 0f);
+            plate.raycastTarget = true;
+            Put(plate.rectTransform, new Vector2(x, 0.5f), Vector2.zero, new Vector2(48f, 48f));
+            var text = Glass.Label(plate.transform, glyph, 36, Glass.Weight.Light, Glass.White, TextAnchor.MiddleCenter);
+            Glass.Stretch(text.rectTransform);
+            text.rectTransform.offsetMin = new Vector2(0f, 3f);
+            return (plate, text, plate.gameObject.AddComponent<OptionHit>());
+        }
+
+        /// <summary>
+        /// Curseur (valeurs continues) : trait fin, remplissage blanc et pastille ronde, valeur à droite ; sur la ligne
+        /// choisie, remplissage et pastille en or (avec halo) et flèches « ‹ › » or de part et d'autre.
+        /// </summary>
         Slider AddSlider(RectTransform parent, string fr, string en, float min, float max, int steps, Func<float> get, Action<float> set, Func<float, string> format)
         {
-            var row = OptionRow(parent, fr, en, out var plate, out var bar);
-            var value = Label(row, "", 25, TextAnchor.MiddleRight, Accent, FontStyle.Bold);
-            Stretch(value.rectTransform, 0.875f, 1f, 0f, 4f);
+            var row = OptionRow(parent, fr, en, out var plate, out var line, out var label);
+            const float ValueW = 96f, ArrowW = 36f, Gap = 6f, AreaH = 34f;
+            var value = Glass.Label(row, "", 25, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleRight);
+            Stretch(value.rectTransform, 1f, 1f, -(Pad + ValueW), Pad);
 
-            // Curseur : rail blanc estompé, remplissage or, languette inclinée
-            var sliderRt = Rect(row, "Slider", new Vector2(ControlLeft, 0.5f), new Vector2(0.86f, 0.5f), new Vector2(0, -7), new Vector2(0, 7));
+            // Rail fin estompé, remplissage, pastille ; une zone transparente plus haute capte la souris
+            float right = Pad + ValueW + Gap + ArrowW;
+            var sliderRt = Glass.Rect(row, "Slider", new Vector2(ControlLeft, 0.5f), new Vector2(1f, 0.5f), new Vector2(ArrowW, -AreaH / 2f), new Vector2(-right, AreaH / 2f));
             var slider = sliderRt.gameObject.AddComponent<Slider>();
-            var track = Shape(sliderRt, "Track", new Color(1f, 1f, 1f, 0.14f)).Set(6f, 0f, 0f);
-            track.raycastTarget = true;
-            Fill(track.rectTransform, Vector2.zero, Vector2.zero);
-            var fillArea = Rect(sliderRt, "FillArea", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            var fill = Shape(fillArea, "Fill", Accent).Set(6f, 0f, 0f);
+            var hit = Glass.Make(sliderRt, "Hit", 0f, Color.clear, 0f);
+            hit.raycastTarget = true;
+            Glass.Stretch(hit.rectTransform);
+            var track = Glass.Make(sliderRt, "Track", 1.5f, Glass.Track, 0f);
+            ThinLine(track.rectTransform);
+            var fillArea = Glass.Rect(sliderRt, "FillArea", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            ThinLine(fillArea);
+            var fill = Glass.Make(fillArea, "Fill", 1.5f, Glass.White, 0f);
             Fill(fill.rectTransform, Vector2.zero, Vector2.zero);
-            var handleArea = Rect(sliderRt, "HandleArea", Vector2.zero, Vector2.one, new Vector2(9, 0), new Vector2(-9, 0));
-            var handle = Shape(handleArea, "Handle", Color.white).Set(8f, 0f, 0f);
+            var handleArea = Glass.Rect(sliderRt, "HandleArea", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            var handle = Glass.Make(handleArea, "Handle", 999f, Glass.White, 0f);
             handle.raycastTarget = true;
+            handle.haloColor = Glass.A(Glass.Gold, 0.25f);
             var handleRt = handle.rectTransform;
             handleRt.anchorMin = Vector2.zero;
             handleRt.anchorMax = new Vector2(0f, 1f);
-            handleRt.offsetMin = new Vector2(-9, -9);
-            handleRt.offsetMax = new Vector2(9, 9);
             slider.fillRect = fill.rectTransform;
             slider.handleRect = handleRt;
             slider.targetGraphic = handle;
-            var colors = slider.colors;
-            colors.normalColor = new Color(0.85f, 0.87f, 0.9f);
-            colors.highlightedColor = Color.white;
-            colors.selectedColor = Accent;
-            colors.pressedColor = new Color(1f, 0.8f, 0.4f);
-            slider.colors = colors;
+            slider.transition = Selectable.Transition.None;
             slider.wholeNumbers = true;
             slider.minValue = 0;
             slider.maxValue = steps;
+
+            // Flèches or de part et d'autre du rail, visibles sur la ligne choisie
+            var lessRt = Glass.Rect(row, "Less", new Vector2(ControlLeft, 0f), new Vector2(ControlLeft, 1f), Vector2.zero, new Vector2(ArrowW, 0f));
+            var moreRt = Glass.Rect(row, "More", new Vector2(1f, 0f), Vector2.one, new Vector2(-right, 0f), new Vector2(-right + ArrowW, 0f));
+            var less = SliderArrow(lessRt, "‹");
+            var more = SliderArrow(moreRt, "›");
 
             bool updating = false;
             Action refresh = () =>
@@ -941,19 +1026,82 @@ namespace ChillRoad
                 RefreshAll();
             });
             refreshers.Add(refresh);
-            rows.Add((slider.gameObject, plate, bar));
+            float knob = 24f;
+            animators.Add(dt =>
+            {
+                bool focused = Focused(slider.gameObject);
+                knob = Mathf.MoveTowards(knob, focused ? 33f : 24f, dt * 90f);
+                handleRt.sizeDelta = new Vector2(knob, knob - AreaH);
+                handleRt.anchoredPosition = Vector2.zero;
+                handle.color = focused ? Glass.Gold : Glass.White;
+                if (Mathf.Abs(handle.halo - (focused ? 9f : 0f)) > 0.01f) { handle.halo = focused ? 9f : 0f; handle.SetVerticesDirty(); }
+                fill.color = focused ? Glass.Gold : Glass.White;
+                Ink(value, focused ? Glass.Gold : Glass.White, focused ? Glass.Weight.Semibold : Glass.Weight.Regular);
+                if (less.activeSelf != focused) { less.SetActive(focused); more.SetActive(focused); }
+            });
+            rows.Add((slider.gameObject, plate, line, label));
             return slider;
         }
 
-        static RectTransform ButtonRow(RectTransform parent, float height)
+        /// <summary>
+        /// Flèche or d'un curseur, simple repère (pas de clic : la ligne n'est pas sélectionnable, un clic ici ôterait
+        /// la sélection du curseur et la flèche disparaîtrait avant d'être relâchée).
+        /// </summary>
+        static GameObject SliderArrow(RectTransform rt, string glyph)
         {
-            var row = Rect(parent, "Buttons", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            Fixed(row, height);
-            var h = row.gameObject.AddComponent<HorizontalLayoutGroup>();
-            h.spacing = 16;
+            var t = Glass.Label(rt, glyph, 33, Glass.Weight.Regular, Glass.Gold, TextAnchor.MiddleCenter);
+            Glass.Stretch(t.rectTransform);
+            t.rectTransform.offsetMin = new Vector2(0f, 3f);
+            rt.gameObject.SetActive(false);
+            return rt.gameObject;
+        }
+
+        /// <summary>Trait de 3 px centré dans la hauteur du parent, sur toute sa largeur.</summary>
+        static void ThinLine(RectTransform rt)
+        {
+            rt.anchorMin = new Vector2(0f, 0.5f);
+            rt.anchorMax = new Vector2(1f, 0.5f);
+            rt.offsetMin = new Vector2(0f, -1.5f);
+            rt.offsetMax = new Vector2(0f, 1.5f);
+        }
+
+        /// <summary>
+        /// Ligne d'action : nom à gauche, pilule cernée à droite (or plein quand la ligne est choisie) ; toute la ligne est
+        /// le bouton.
+        /// </summary>
+        (Button button, Text label) AddAction(RectTransform parent, string fr, string en, string pillFr, string pillEn, UnityEngine.Events.UnityAction onClick)
+        {
+            var row = OptionRow(parent, fr, en, out var plate, out var line, out var label);
+            Stretch(label.rectTransform, 0f, 0.72f, Pad, 12f);
+            var hitPlate = Glass.Make(row, "Hit", 0f, Color.clear, 0f);
+            hitPlate.raycastTarget = true;
+            hitPlate.transform.SetAsFirstSibling();
+            Glass.Stretch(hitPlate.rectTransform);
+            var button = row.gameObject.AddComponent<Button>();
+            button.targetGraphic = hitPlate;
+            button.transition = Selectable.Transition.None;
+            button.onClick.AddListener(onClick);
+            var hover = row.gameObject.AddComponent<OptionHit>();
+
+            var pill = Glass.Make(row, "Pill", 999f, Color.clear, 1.5f);
+            pill.borderColor = ChipEdge;
+            var prt = pill.rectTransform;
+            Put(prt, new Vector2(1f, 0.5f), new Vector2(-Pad, 0f), new Vector2(240f, 45f));
+            var h = pill.gameObject.AddComponent<HorizontalLayoutGroup>();
+            h.padding = new RectOffset(27, 27, 0, 0);
+            h.childAlignment = TextAnchor.MiddleCenter;
             h.childControlWidth = true; h.childControlHeight = true;
-            h.childForceExpandWidth = true; h.childForceExpandHeight = true;
-            return row;
+            h.childForceExpandWidth = true; h.childForceExpandHeight = false;
+            pill.gameObject.AddComponent<ContentSizeFitter>().horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var text = Loc.Bind(Glass.Label(pill.transform, "", 22, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleCenter), pillFr, pillEn);
+            animators.Add(_ =>
+            {
+                bool sel = Focused(row.gameObject);
+                Look(pill, sel ? Glass.Gold : hover.Hover ? Glass.Pill : Color.clear, sel ? Color.clear : hover.Hover ? ChipHover : ChipEdge, 0f);
+                Ink(text, sel ? Glass.Ink : Glass.White, sel ? Glass.Weight.Semibold : Glass.Weight.Regular);
+            });
+            rows.Add((row.gameObject, plate, line, label));
+            return (button, label);
         }
 
         /// <summary>Hauteur fixe : une rangée à mise en page propre ne doit pas absorber la place libre de la plaque.</summary>
@@ -962,12 +1110,6 @@ namespace ChillRoad
             var le = row.gameObject.AddComponent<LayoutElement>();
             le.preferredHeight = height;
             le.flexibleHeight = 0f;
-        }
-
-        static void Spacer(RectTransform parent)
-        {
-            var s = Rect(parent, "Spacer", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            s.gameObject.AddComponent<LayoutElement>().flexibleHeight = 1f;
         }
 
         /// <summary>Chaîne haut/bas d'une plaque, en boucle ; gauche/droite laissés libres (réglage des curseurs).</summary>
@@ -988,15 +1130,6 @@ namespace ChillRoad
 
         // ------------------------------------------------------------------ helpers
 
-        static RectTransform Rect(Transform parent, string name, Vector2 aMin, Vector2 aMax, Vector2 oMin, Vector2 oMax)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var rt = (RectTransform)go.transform;
-            rt.anchorMin = aMin; rt.anchorMax = aMax; rt.offsetMin = oMin; rt.offsetMax = oMax;
-            return rt;
-        }
-
         static void Fill(RectTransform rt, Vector2 offsetMin, Vector2 offsetMax)
         {
             rt.anchorMin = Vector2.zero;
@@ -1013,53 +1146,72 @@ namespace ChillRoad
             rt.offsetMax = new Vector2(-padRight, 0f);
         }
 
-        static HudShape Shape(Transform parent, string name, Color color)
+        /// <summary>Rectangle posé : ancre et pivot au même point, position et taille.</summary>
+        static void Put(RectTransform rt, Vector2 anchor, Vector2 pos, Vector2 size)
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape));
-            go.transform.SetParent(parent, false);
-            var s = go.GetComponent<HudShape>();
-            s.color = color;
-            s.raycastTarget = false;
-            return s;
+            rt.anchorMin = rt.anchorMax = rt.pivot = anchor;
+            rt.anchoredPosition = pos;
+            rt.sizeDelta = size;
         }
 
-        Text Label(Transform parent, string text, int size, TextAnchor align, Color color, FontStyle style)
+        /// <summary>Change le fond, le liseré et le halo d'un rectangle de verre, sans reconstruire le maillage s'il n'a pas changé.</summary>
+        static void Look(GlassRect g, Color fill, Color edge, float halo)
         {
-            var go = new GameObject("Text", typeof(RectTransform), typeof(Text), typeof(Shadow));
-            go.transform.SetParent(parent, false);
-            var t = go.GetComponent<Text>();
-            t.font = font; t.fontSize = size; t.alignment = align; t.color = color; t.text = text;
-            t.fontStyle = style;
-            t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
-            t.raycastTarget = false;
-            var sh = go.GetComponent<Shadow>();
-            sh.effectColor = new Color(0, 0, 0, 0.55f);
-            sh.effectDistance = new Vector2(2, -2);
-            return t;
+            bool dirty = g.borderColor != edge || !Mathf.Approximately(g.halo, halo);
+            g.color = fill;
+            if (!dirty) return;
+            g.borderColor = edge;
+            g.halo = halo;
+            g.SetVerticesDirty();
         }
 
-        /// <summary>Bouton du HUD : plaque inclinée anthracite, or une fois choisi ; libellé posé par l'appelant.</summary>
-        (Button button, Text text) AddButton(Transform parent, UnityEngine.Events.UnityAction onClick, TextAnchor align = TextAnchor.MiddleCenter)
+        /// <summary>Couleur et graisse d'un texte (la police ne change que si besoin : la mise en page suit sa largeur).</summary>
+        static void Ink(Text t, Color color, Glass.Weight weight)
         {
-            var go = new GameObject("Button", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape), typeof(Button), typeof(LayoutElement));
+            t.color = color;
+            var f = Glass.FontOf(weight);
+            if (t.font != f) t.font = f;
+        }
+
+        /// <summary>Bouton pilule de verre ; padding non nul : la largeur suit le libellé (rangées à mise en page).</summary>
+        static (Button button, GlassRect plate, Text text) PillButton(Transform parent, string name, int size, Glass.Weight weight, RectOffset padding,
+            TextAnchor align, UnityEngine.Events.UnityAction onClick)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(GlassRect), typeof(Button), typeof(OptionHit));
             go.transform.SetParent(parent, false);
-            go.GetComponent<LayoutElement>().preferredHeight = 62;
-            var shape = go.GetComponent<HudShape>();
-            shape.Set(18f, 0f, 0f);
-            shape.color = Color.white;
+            var plate = go.GetComponent<GlassRect>();
+            plate.radius = 999f;
+            plate.color = Glass.Pill;
+            plate.border = 1.5f;
+            plate.borderColor = Glass.Edge;
+            plate.raycastTarget = true;
             var b = go.GetComponent<Button>();
-            b.targetGraphic = shape;
-            var colors = b.colors;
-            colors.normalColor = new Color(0.14f, 0.16f, 0.2f, 0.95f);
-            colors.highlightedColor = new Color(0.24f, 0.27f, 0.33f, 1f);
-            colors.selectedColor = new Color(0.95f, 0.62f, 0.12f, 1f);
-            colors.pressedColor = new Color(1f, 0.8f, 0.4f, 1f);
-            b.colors = colors;
+            b.targetGraphic = plate;
+            b.transition = Selectable.Transition.None;
             b.onClick.AddListener(onClick);
-            var t = Label(go.transform, "", 27, align, White, FontStyle.BoldAndItalic);
-            Stretch(t.rectTransform, 0f, 1f, align == TextAnchor.MiddleLeft ? 26f : 0f, 0f);
-            return (b, t);
+            var text = Glass.Label(go.transform, "", size, weight, Glass.White, align);
+            if (padding != null)
+            {
+                var h = go.AddComponent<HorizontalLayoutGroup>();
+                h.padding = padding;
+                h.childAlignment = align;
+                h.childControlWidth = true; h.childControlHeight = true;
+                h.childForceExpandWidth = true; h.childForceExpandHeight = false;
+            }
+            else Glass.Stretch(text.rectTransform);
+            return (b, plate, text);
+        }
+
+        /// <summary>Pilule du bas : or plein et encre une fois choisie, verre plus clair au survol.</summary>
+        void PillLook(Button b, GlassRect plate, Text text)
+        {
+            var hit = b.GetComponent<OptionHit>();
+            animators.Add(_ =>
+            {
+                bool sel = Focused(b.gameObject);
+                Look(plate, sel ? Glass.Gold : hit.Hover ? Glass.A(Color.white, 0.18f) : Glass.Pill, sel ? Color.clear : Glass.Edge, 0f);
+                Ink(text, sel ? Glass.Ink : Glass.White, sel ? Glass.Weight.Semibold : Glass.Weight.Regular);
+            });
         }
     }
 }
