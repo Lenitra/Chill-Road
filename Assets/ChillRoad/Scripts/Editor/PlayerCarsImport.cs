@@ -59,6 +59,7 @@ namespace ChillRoad.EditorTools
                 ("Twingo", new Color(0.97f, 0.77f, 0.10f), Twingo),   // « Jaune Indien » du lancement, boucliers gris
                 ("Ami", new Color(0.60f, 0.80f, 0.87f), Ami),         // « Bleu Ciel », boucliers et bas de caisse gris foncé
                 ("GRYaris", new Color(0.94f, 0.94f, 0.93f), GRYaris), // blanc nacré, toit carbone noir
+                ("AlpineA110", new Color(0.07f, 0.31f, 0.73f), AlpineA110), // bleu Alpine
             };
             // Accents hors palette (matériau « PK_Accent » du modèle) : couleur unie par voiture
             var accents = new Dictionary<string, Color>
@@ -283,6 +284,24 @@ namespace ChillRoad.EditorTools
                 brakeForce = mass * 11.5f,
                 hoodCamera = new Vector3(0f, 1.20f, 1.02f),
                 bumperCamera = new Vector3(0f, 0.45f, 2.19f),
+                engineVoice = EngineVoice.Inline4,
+            };
+        }
+
+        /// <summary>Alpine A110 1600 S Groupe 4 (début des années 1970) : environ 650 kg en rallye + le pilote, moteur arrière
+        /// 4 cylindres préparé (~ 165 ch, 180 N·m), propulsion, boîte 5 rapports courte de rallye, pneus de 13".</summary>
+        static VehicleSpec AlpineA110(GameObject model)
+        {
+            const float mass = 720f;
+            return new VehicleSpec
+            {
+                id = "a110", displayName = "Alpine A110 Rally", prefab = model, modelScale = 1f,
+                drivetrain = Drivetrain.RWD, mass = mass, maxTorque = 180f, redline = 7200f,
+                gearRatios = new[] { 3.61f, 2.33f, 1.61f, 1.21f, 0.96f }, finalDrive = 4.375f,
+                wheelRadius = 0.288f, tireGrip = 1.2f, dragArea = 0.55f, downforceArea = 0.05f, steerLock = 36f,
+                brakeForce = mass * 11.5f,
+                hoodCamera = new Vector3(0f, 0.98f, 0.55f),
+                bumperCamera = new Vector3(0f, 0.40f, 1.92f),
                 engineVoice = EngineVoice.Inline4,
             };
         }

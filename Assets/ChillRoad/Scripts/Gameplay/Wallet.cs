@@ -27,6 +27,7 @@ namespace ChillRoad
             { "miata", 20000 },
             { "dmc12", 40000 },
             { "gryaris", 45000 },
+            { "a110", 50000 },
             { "supra", 55000 },
             { "mustang", 70000 },
             { "vision74", 140000 },

@@ -1,6 +1,5 @@
-"""Alpine A110 1600 S Groupe 4 (berlinette de rallye, début des années 1970) : proposition à valider avant d'entrer au
-garage. Même moteur que les autres voitures (pack_lib) ; la fiche est `hidden` et absente de PLAYABLE tant qu'elle n'est
-pas validée, pour qu'aucun export groupé ne la pose dans le jeu.
+"""Alpine A110 1600 S Groupe 4 (berlinette de rallye, début des années 1970), voiture jouable (validée le 2026-11-19).
+Même moteur que les autres voitures (pack_lib) ; play_cars l'importe et la range dans PLAYABLE.
 
 Repères de la vraie voiture : 3,85 m de long, 1,13 m de haut, 2,10 m d'empattement, nez plongeant, quatre phares ronds,
 pare-chocs chromés en deux lames, deux longue-portée, grande lunette enveloppante, ouïes de custode, moteur en porte-à-
@@ -113,7 +112,6 @@ def a110_details(c):
 
 reg(dict(
     id="a110", file="AlpineA110", name="Alpine A110 Rally", color=(0.006, 0.078, 0.50),
-    hidden=True,                                                       # proposition : pas de trafic ni d'export groupé
     front=1.87, rear=-1.98, height=1.13, axles=(1.05, -1.05),
     wheel=dict(rt=0.288, rr=0.195, w=0.19, y=0.645, style="multi", rim="rim"),
     axle_wheels=[{}, {"w": 0.215, "y": 0.665}],

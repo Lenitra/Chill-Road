@@ -1349,4 +1349,6 @@ reg(dict(
     details=gryaris_details,
 ))
 
-PLAYABLE = ["supra", "miata", "mustang", "p50", "ae86", "dmc12", "jesko", "valkyrie", "twingo", "ami", "gryaris"]
+import play_a110  # noqa: E402,F401  (Alpine A110 Rally, fiche à part)
+
+PLAYABLE = ["supra", "miata", "mustang", "p50", "ae86", "dmc12", "jesko", "valkyrie", "twingo", "ami", "gryaris", "a110"]
