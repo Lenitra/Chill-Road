@@ -6,11 +6,11 @@ using UnityEngine.UI;
 namespace ChillRoad
 {
     /// <summary>
-    /// Minicarte du HUD (bas gauche, pendant du compte-tours), en version claire : disque découpé dans
-    /// Resources/Map/map_minimap.png (style « épuré » : fond crème, routes blanches bordées de beige, autoroute orange,
-    /// dessinée par Tools/Map/map_minimap.py) et tourné avec la voiture (l'avant toujours en haut). La voiture, flèche noire cerclée de
-    /// blanc, est un peu sous le centre pour voir plus loin devant ; le champ s'élargit avec la vitesse. Pas de
-    /// circulation affichée ; autres joueurs en flèches grises (posées sur le bord quand ils sont hors champ), nord sur le
+    /// Minicarte du HUD (bas gauche, pendant du compte-tours), en style verre : disque découpé dans
+    /// Resources/Map/map_minimap.png (style « verre » : sol sombre translucide, routes en blancs selon leur importance,
+    /// dessinée par Tools/Map/map_minimap.py), fin liseré clair, tourné avec la voiture (l'avant toujours en haut). La voiture,
+    /// flèche or cernée d'encre, est un peu sous le centre pour voir plus loin devant ; le champ s'élargit avec la vitesse. Pas de
+    /// circulation affichée ; autres joueurs en flèches blanches (posées sur le bord quand ils sont hors champ), nord sur le
     /// bord du disque. Tremplins (losanges) et radars (pastilles) à pictogramme à leur place, coche verte une fois réussis, sauf en course.
     /// </summary>
     public class MiniMap : MonoBehaviour
@@ -21,8 +21,7 @@ namespace ChillRoad
         const float CarOffset = 0.3f;           // la voiture est sous le centre (fraction du rayon)
         const float NearRange = 230f, FarRange = 430f;   // mètres couverts par un rayon, à l'arrêt et à pleine vitesse
 
-        static readonly Color Black = new Color(0.04f, 0.04f, 0.04f, 0.95f);
-        static readonly Color White = new Color(0.98f, 0.98f, 0.98f, 1f);
+        static readonly Color Ink = new Color(0.04f, 0.05f, 0.07f, 0.95f);
 
         // ------------------------------------------------------------------ autres joueurs
 
@@ -76,36 +75,36 @@ namespace ChillRoad
             // Ombre portée : disque noir aux bords doux, détache la carte de l'image du jeu
             var back = Box(root, "Back", Vector2.zero, new Vector2(Size, Size)).gameObject.AddComponent<Image>();
             back.sprite = HudArt.SoftDisc;
-            back.color = new Color(0f, 0f, 0f, 0.55f);
+            back.color = new Color(0f, 0f, 0f, 0.3f);
             back.raycastTarget = false;
 
             disc = Box(root, "Map", Vector2.zero, new Vector2(Radius * 2f, Radius * 2f)).gameObject.AddComponent<MiniMapDisc>();
-            disc.color = new Color(1f, 1f, 1f, 0.96f);
+            disc.color = Color.white;   // la texture porte déjà sa transparence (sol translucide, routes opaques)
             disc.raycastTarget = false;
             disc.radius = Radius;
 
-            // Liseré : fin cercle sombre, net sur le bord clair de la carte
-            var rim = Box(root, "Rim", Vector2.zero, new Vector2(Radius * 2f + 8f, Radius * 2f + 8f)).gameObject.AddComponent<HudRing>();
-            rim.inner = Radius - 0.5f;
-            rim.outer = Radius + 1.8f;
-            rim.color = new Color(0f, 0f, 0f, 0.55f);
+            // Liseré du style verre : fin cercle clair au bord du disque, comme le bord des panneaux
+            var edge = Box(root, "Edge", Vector2.zero, new Vector2(Radius * 2f + 16f, Radius * 2f + 16f)).gameObject.AddComponent<HudRing>();
+            edge.inner = Radius - 0.5f;
+            edge.outer = Radius + 1f;
+            edge.color = Glass.Edge;
 
-            // Nord : pastille noire et « N » blanc, sur le bord du disque
+            // Nord : pastille de verre sombre et « N » or, sur le bord du disque
             north = Box(root, "North", Vector2.zero, new Vector2(26f, 26f));
             var pip = Box(north, "Disc", Vector2.zero, new Vector2(26f, 26f)).gameObject.AddComponent<Image>();
             pip.sprite = HudArt.Disc;
-            pip.color = Black;
+            pip.color = new Color(0.063f, 0.078f, 0.102f, 0.9f);
             pip.raycastTarget = false;
             var ring = Box(north, "Ring", Vector2.zero, new Vector2(30f, 30f)).gameObject.AddComponent<HudRing>();
             ring.inner = 12.5f;
-            ring.outer = 13.5f;
-            ring.color = new Color(1f, 1f, 1f, 0.32f);
-            Label(north, "N", 16, White).rectTransform.anchoredPosition = new Vector2(0f, 1f);
+            ring.outer = 13.8f;
+            ring.color = Glass.Edge;
+            Label(north, "N", 16, Glass.Gold).rectTransform.anchoredPosition = new Vector2(0f, 1f);
 
-            // Voiture du joueur : flèche noire cerclée de blanc, toujours vers le haut
+            // Voiture du joueur : flèche or cernée d'encre (l'or = soi, comme la sélection), toujours vers le haut
             carMark = Box(root, "Car", new Vector2(0f, -CarOffset * Radius), new Vector2(32f, 32f));
-            Arrow(carMark, 30f, White);
-            Arrow(carMark, 21f, Black).rectTransform.anchoredPosition = new Vector2(0f, 0.5f);
+            Arrow(carMark, 30f, Ink);
+            Arrow(carMark, 22f, Glass.Gold).rectTransform.anchoredPosition = new Vector2(0f, 0.5f);
         }
 
         void LateUpdate()
@@ -174,7 +173,7 @@ namespace ChillRoad
                 }
             }
 
-            // Autres joueurs : flèche grise cerclée de blanc, posée sur le bord quand ils sont hors du disque
+            // Autres joueurs : flèche blanche cernée d'encre, posée sur le bord quand ils sont hors du disque
             int used = 0;
             foreach (var m in markers)
             {
@@ -184,7 +183,7 @@ namespace ChillRoad
                 if (used == others.Count) others.Add(MakeOther());
                 var (rt, fill) = others[used++];
                 rt.gameObject.SetActive(true);
-                float grey = Mathf.Lerp(0.3f, 0.55f, m.color.grayscale);
+                float grey = Mathf.Lerp(0.78f, 0.96f, m.color.grayscale);
                 fill.color = new Color(grey, grey, grey, 1f);
                 Vector2 p = ToUi(o.position);
                 float edge = Radius - 10f;
@@ -202,8 +201,8 @@ namespace ChillRoad
             var rt = Box((RectTransform)transform, "Other", Vector2.zero, new Vector2(24f, 24f));
             // Sous le nord et la voiture du joueur, qui restent au-dessus de tout
             rt.SetSiblingIndex(north.GetSiblingIndex());
-            Arrow(rt, 22f, White);
-            var fill = Arrow(rt, 14f, Black);
+            Arrow(rt, 22f, Ink);
+            var fill = Arrow(rt, 15f, Color.white);
             fill.rectTransform.anchoredPosition = new Vector2(0f, 0.5f);
             return (rt, fill);
         }
@@ -255,10 +254,9 @@ namespace ChillRoad
             var go = new GameObject("Text", typeof(RectTransform), typeof(CanvasRenderer));
             go.transform.SetParent(parent, false);
             var t = go.AddComponent<Text>();
-            t.font = HudArt.Font;
+            t.font = Glass.FontOf(Glass.Weight.Semibold);
             t.text = text;
             t.fontSize = size;
-            t.fontStyle = FontStyle.Bold;
             t.alignment = TextAnchor.MiddleCenter;
             t.color = color;
             t.raycastTarget = false;

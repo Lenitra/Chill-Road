@@ -1397,15 +1397,15 @@ namespace ChillRoad
         readonly List<RectTransform> miniStarts = new List<RectTransform>();
         RectTransform miniNext;
 
-        /// <summary>Minicarte (en gris) : pastille des départs en balade, de la prochaine porte en course (au bord si elle est hors champ).</summary>
+        /// <summary>Minicarte : pastille blanche des départs en balade, or pour la prochaine porte en course (au bord si elle est hors champ).</summary>
         void DrawOnMiniMap(RectTransform root, Func<Vector3, Vector2> toUi, float radius)
         {
             if (tracks == null) return;
             if (!miniNext)
             {
                 miniStarts.Clear();
-                foreach (var t in tracks) miniStarts.Add(MiniMark(root, 15f));
-                miniNext = MiniMark(root, 17f);
+                foreach (var t in tracks) miniStarts.Add(MiniMark(root, 15f, Color.white));
+                miniNext = MiniMark(root, 17f, Glass.Gold);
             }
             float edge = radius - 9f;
             for (int i = 0; i < miniStarts.Count; i++)
@@ -1424,14 +1424,15 @@ namespace ChillRoad
             }
         }
 
-        static RectTransform MiniMark(RectTransform root, float size)
+        static RectTransform MiniMark(RectTransform root, float size, Color ring)
         {
             var mark = Box(root, "RaceMark", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(size, size));
             var map = root.Find("Map");
             if (map) mark.SetSiblingIndex(map.GetSiblingIndex() + 1);
-            Disc(mark, size, new Color(0.08f, 0.08f, 0.08f, 1f));
-            Disc(mark, size - 4.5f, Color.white);
-            Disc(mark, size - 10f, new Color(0.08f, 0.08f, 0.08f, 1f));
+            // Anneau clair cerné d'encre, centre d'encre : se lit sur les routes blanches comme sur le sol sombre
+            Disc(mark, size, new Color(0.04f, 0.05f, 0.07f, 0.95f));
+            Disc(mark, size - 4.5f, ring);
+            Disc(mark, size - 10f, new Color(0.04f, 0.05f, 0.07f, 0.95f));
             return mark;
         }
 
@@ -1811,17 +1812,18 @@ namespace ChillRoad
             var rt = Box(parent, "Text", anchor, pos, box);
             rt.pivot = anchor;
             var t = rt.gameObject.AddComponent<Text>();
-            t.font = HudArt.Font;
+            // Style verre : chiffres et titres en graisse fine, plus de gras italique
+            t.font = Glass.FontOf(size >= 40 ? Glass.Weight.Light : style != FontStyle.Normal ? Glass.Weight.Regular : Glass.Weight.Semilight);
             t.fontSize = size;
-            t.fontStyle = style;
+            t.fontStyle = FontStyle.Normal;
             t.alignment = align;
             t.color = color;
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
             t.verticalOverflow = VerticalWrapMode.Overflow;
             t.raycastTarget = false;
             var sh = rt.gameObject.AddComponent<Shadow>();
-            sh.effectColor = new Color(0f, 0f, 0f, 0.55f);
-            sh.effectDistance = new Vector2(2f, -2f);
+            sh.effectColor = new Color(0f, 0f, 0f, 0.45f);
+            sh.effectDistance = new Vector2(0f, -2f);
             return t;
         }
     }

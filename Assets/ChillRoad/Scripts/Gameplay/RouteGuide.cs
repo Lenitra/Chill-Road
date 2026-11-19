@@ -771,41 +771,41 @@ namespace ChillRoad
 
         // ------------------------------------------------------------------ minicarte
 
-        /// <summary>Itinéraire sur la minicarte : trait presque noir liseré de blanc (la minicarte reste en gris), destination au bord si elle est hors champ.</summary>
+        /// <summary>Itinéraire sur la minicarte : trait cyan cerné d'encre (les routes sont blanches, la voiture or), destination au bord si elle est hors champ.</summary>
         void DrawOnMiniMap(RectTransform root, Func<Vector3, Vector2> toUi, float radius)
         {
             if (!miniLine)
             {
                 miniLine = Rect(root, "GpsRoute", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(radius * 2f, radius * 2f)).gameObject.AddComponent<RouteLine>();
-                miniLine.core = new Color(0.08f, 0.08f, 0.08f, 1f);
-                miniLine.edge = new Color(1f, 1f, 1f, 0.95f);
+                miniLine.core = GpsColor;
+                miniLine.edge = new Color(0.04f, 0.05f, 0.07f, 0.9f);
                 miniLine.width = 5.5f;
                 miniLine.edgeWidth = 1.4f;
                 var map = root.Find("Map");
                 miniLine.transform.SetSiblingIndex(map ? map.GetSiblingIndex() + 1 : 0);
                 miniPin = Rect(root, "GpsPin", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(14f, 14f));
                 var pinEdge = Rect(miniPin, "Edge", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(15f, 15f)).gameObject.AddComponent<Image>();
-                pinEdge.color = Color.white;
+                pinEdge.color = new Color(0.04f, 0.05f, 0.07f, 0.95f);
                 pinEdge.raycastTarget = false;
                 var pinCore = Rect(miniPin, "Core", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(10f, 10f)).gameObject.AddComponent<Image>();
-                pinCore.color = new Color(0.08f, 0.08f, 0.08f, 1f);
+                pinCore.color = GpsColor;
                 pinCore.raycastTarget = false;
                 miniPin.localEulerAngles = new Vector3(0f, 0f, 45f);
                 miniPin.SetSiblingIndex(miniLine.transform.GetSiblingIndex() + 1);
-                // Distance restante : en bas du disque, gris presque noir liseré de blanc (la minicarte reste en gris) ;
-                // juste au-dessus, le pseudo du joueur suivi
-                Text Caption(int size, float y)
+                // Distance restante : en bas du disque, cyan sur une ombre douce (lisible sur le sol sombre) ;
+                // juste au-dessus, le pseudo du joueur suivi, en blanc
+                Text Caption(int size, float y, Color color)
                 {
-                    var text = Label(root, size, new Color(0.08f, 0.08f, 0.08f, 1f), FontStyle.BoldAndItalic, TextAnchor.MiddleCenter, new Vector2(0f, y), new Vector2(160f, 24f));
+                    var text = Label(root, size, color, FontStyle.Normal, TextAnchor.MiddleCenter, new Vector2(0f, y), new Vector2(160f, 24f));
                     text.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-                    Destroy(text.GetComponent<Shadow>());
+                    text.font = Glass.FontOf(Glass.Weight.Semibold);
                     var edge = text.gameObject.AddComponent<Outline>();
-                    edge.effectColor = new Color(1f, 1f, 1f, 0.95f);
-                    edge.effectDistance = new Vector2(1.3f, -1.3f);
+                    edge.effectColor = new Color(0.04f, 0.05f, 0.07f, 0.8f);
+                    edge.effectDistance = new Vector2(1.2f, -1.2f);
                     return text;
                 }
-                miniDistance = Caption(18, -radius + 18f);
-                miniName = Caption(15, -radius + 38f);
+                miniDistance = Caption(18, -radius + 18f, GpsColor);
+                miniName = Caption(15, -radius + 38f, Color.white);
                 miniName.supportRichText = false;
             }
             miniLine.strips.Clear();
@@ -881,7 +881,7 @@ namespace ChillRoad
             var t = rt.gameObject.AddComponent<Text>();
             t.font = HudArt.Font;
             t.fontSize = size;
-            t.fontStyle = style;
+            t.fontStyle = style; Glass.Adopt(t, style);
             t.alignment = align;
             t.color = color;
             t.horizontalOverflow = HorizontalWrapMode.Overflow;

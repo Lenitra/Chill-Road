@@ -1,7 +1,8 @@
 """Minicarte du HUD : la carte vue de dessus, très sobre, sans bâtiment ni texte (le jeu pose par-dessus la flèche du
 joueur, la circulation et l'itinéraire du GPS).
 
-Plusieurs styles (STYLES), celui du jeu est STYLE : « epure » (fond crème presque sans relief, eau bleu pâle, routes
+Plusieurs styles (STYLES), celui du jeu est STYLE : « verre » (sol sombre translucide, routes blanches, depuis la
+refonte de l'UI du 2026-11-19). « epure » : fond crème presque sans relief, eau bleu pâle, routes
 blanches bordées de beige, autoroute orange, routes de montagne jaunes, comme la carte globale en plus doux ; la largeur
 dit l'importance d'une route, tunnels en pointillés). « gris » est la version précédente, en niveaux de gris. Un style
 peut laisser le sol transparent (ground_alpha < 255) : le jeu se voit alors sous les routes.
@@ -51,8 +52,15 @@ STYLES = {
                   shore=(120, 190, 240), outline=(6, 8, 12), tunnel=(200, 204, 210), ground_alpha=70, water_alpha=170,
                   roads={"track": (170, 160, 146), "lane": (210, 214, 220), "mountain": (236, 240, 246), "main": (255, 255, 255),
                          "ramp": (255, 204, 110), "highway": (255, 186, 64)}),
+    # Verre (refonte de l'UI, 2026-11-19) : sol sombre translucide comme les panneaux, routes en blancs plus ou moins
+    # vifs selon leur importance (pas de couleur : l'or reste à la voiture, le cyan au GPS), eau bleu nuit, relief léger
+    "verre": dict(ground=(18, 23, 30), relief=16.0, forest=(16, 27, 26), forest_mix=1.0, snow=(46, 53, 64),
+                  water=(34, 70, 104), shore=(78, 128, 168), outline=(10, 13, 18), tunnel=(150, 156, 166),
+                  ground_alpha=200, water_alpha=215,
+                  roads={"track": (104, 110, 118), "lane": (150, 156, 164), "mountain": (206, 210, 216), "main": (236, 238, 242),
+                         "ramp": (226, 230, 236), "highway": (255, 255, 255)}),
 }
-STYLE = "epure"      # style de map_minimap.png (le jeu), choisi le 2026-11-16 parmi 5 propositions
+STYLE = "verre"      # style de map_minimap.png (le jeu) ; « epure » (clair) avant la refonte de l'UI du 2026-11-19
 
 
 def stroke(dr, pts, width, fill):
