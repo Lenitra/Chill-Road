@@ -621,6 +621,32 @@ namespace ChillRoad
                 if (factor <= 0f || (i * 0.618f) % 1f >= factor) traffic.Despawn(cars[i]);
         }
 
+        /// <summary>Décompte de départ en cours : la voiture est tenue sur la ligne, pas de replacement.</summary>
+        public bool Counting => mode == Mode.Countdown;
+
+        /// <summary>
+        /// Course en cours : point de replacement, sur le parcours (dans la voie) juste après la dernière porte
+        /// franchie, ou au départ si aucune ne l'est encore, et cap du parcours à cet endroit. Le chrono tourne pendant
+        /// le replacement : la distance refaite depuis la porte et le temps perdu sont la pénalité.
+        /// </summary>
+        public bool RespawnPoint(out Vector3 pos, out Vector3 forward)
+        {
+            pos = forward = Vector3.zero;
+            if (mode != Mode.Running || Active == null || Active.path.Count < 2) return false;
+            var g = next > 0 ? GateOf(next - 1) : Active.start;
+            var path = Active.path;
+            // Ligne de la porte ramenée sur le parcours (la porte d'une route de campagne est sur l'axe de la chaussée)
+            int i = Mathf.Clamp(g.index, 1, path.Count - 1);
+            Vector3 a = path[i - 1], ab = path[i] - a;
+            float len2 = ab.x * ab.x + ab.z * ab.z;
+            float k = len2 > 1e-4f ? Mathf.Clamp01(((g.pos.x - a.x) * ab.x + (g.pos.z - a.z) * ab.z) / len2) : 0f;
+            forward = g.forward;
+            pos = a + ab * k + forward * 3f;
+            var ground = game.Road.Nearest(pos, 20f);
+            if (ground.Found) pos.y = ground.point.y;
+            return true;
+        }
+
         void UpdateCountdown(VehicleController car, Vector3 pos, bool menu, float dt)
         {
             // Voiture tenue sur la ligne (un menu refermé pendant le décompte lui rend la main)

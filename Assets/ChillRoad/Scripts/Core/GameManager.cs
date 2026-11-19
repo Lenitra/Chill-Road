@@ -90,6 +90,10 @@ namespace ChillRoad
         public SpeedCameras Radars { get; private set; }
         /// <summary>Courses chronométrées sur la carte (sprints, tours) et records personnels.</summary>
         public Races Races { get; private set; }
+        /// <summary>Replacement de la voiture sur la route (transition, pénalités).</summary>
+        public Respawn Respawn { get; private set; }
+        /// <summary>Replacement en cours : les commandes restent coupées jusqu'à la fin de la transition.</summary>
+        public bool Respawning => Respawn && Respawn.Busy;
 
         readonly PlayerSlot local = new PlayerSlot();
         /// <summary>Position de la voiture locale (terrain fin, décor) et positions de tous les joueurs (trafic).</summary>
@@ -260,6 +264,8 @@ namespace ChillRoad
             Radars.Init(this);
             Races = gameObject.AddComponent<Races>();
             Races.Init(this);
+            Respawn = gameObject.AddComponent<Respawn>();
+            Respawn.Init(this);
             menus = gameObject.AddComponent<MenuScreens>();
             menus.Init(this);
             ApplyListenerVolume();
@@ -431,9 +437,10 @@ namespace ChillRoad
         public void SetInputEnabled(bool enabled)
         {
             if (DedicatedServer) return;
-            Player.InputEnabled = enabled;
+            // Replacement en cours : la main revient à la fin de la transition (Respawn)
+            Player.InputEnabled = enabled && !Respawning;
             // Menu ouvert : la voiture freine (utile en réseau, où le temps ne s'arrête pas)
-            Player.Parked = !enabled;
+            Player.Parked = !Player.InputEnabled;
         }
 
         // ------------------------------------------------------------------ départ
@@ -620,7 +627,7 @@ namespace ChillRoad
             lost |= Mathf.Abs(pos.x) > limit || Mathf.Abs(pos.z) > limit;
             int water = Map.Water(pos.x, pos.z);
             if (water > 0 && water <= Map.Json.waters.Length && pos.y < Map.Json.waters[water - 1].level - 1.6f) lost = true;
-            if (local.UpsideDown > 2.5f || lost) ResetPlayer();
+            if (local.UpsideDown > 2.5f || lost) Respawn.Begin();
         }
 
         /// <summary>Annonce le lieu-dit quand le joueur y entre (ville, col, station, barrage…).</summary>
@@ -658,40 +665,17 @@ namespace ChillRoad
             }
             else
             {
-                if (p.ResetHeld > 0f && !p.ResetConsumed) ResetPlayer();
+                if (p.ResetHeld > 0f && !p.ResetConsumed) Respawn.Begin();
                 p.ResetHeld = 0f;
                 p.ResetConsumed = false;
             }
         }
 
-        /// <summary>Replace la voiture sur la route la plus proche, dans sa voie, dans le sens où elle regardait.</summary>
-        public void ResetPlayer()
-        {
-            Vector3 from = Player.transform.position;
-            // Aéroport (piste, voies, tarmac, parking : hors du réseau routier) : la voiture est redressée sur place
-            if (Airfield.Inside(from))
-            {
-                Vector3 facing = Player.transform.forward;
-                facing.y = 0f;
-                if (facing.sqrMagnitude < 0.01f) facing = Vector3.forward;
-                Player.Teleport(new Vector3(from.x, Map.Height(from.x, from.z) + 0.6f, from.z), Quaternion.LookRotation(facing.normalized, Vector3.up), 0f);
-                local.UpsideDown = 0f;
-                return;
-            }
-            var hit = Road.Nearest(from, 4000f);
-            if (!hit.Found) return;
-            var e = hit.edge;
-            float s = Mathf.Clamp(hit.s, Mathf.Min(e.trimA + 3f, e.Length * 0.5f), Mathf.Max(e.Length - e.trimB - 3f, e.Length * 0.5f));
-            e.Evaluate(s, out var tangent, out _);
-            Vector3 heading = Player.transform.forward;
-            heading.y = 0f;
-            // Bretelle à sens unique : toujours dans le sens de la circulation (de a vers b)
-            int direction = e.oneway || Vector3.Dot(tangent, heading) >= 0f ? 1 : -1;
-            Vector3 pos = e.LanePosition(s, direction, out var forward);
-            Traffic.ClearAround(pos, 14f);
-            Player.Teleport(pos + Vector3.up * 0.5f, Quaternion.LookRotation(forward, Vector3.up), 0f);
-            local.UpsideDown = 0f;
-        }
+        /// <summary>
+        /// Replace la voiture sur la route (transition et pénalités : <see cref="ChillRoad.Respawn"/>), dans le sens du
+        /// parcours, de l'itinéraire du GPS ou de la voiture.
+        /// </summary>
+        public void ResetPlayer() => Respawn.Begin();
 
         /// <summary>Replace le joueur sur la route la plus proche d'un point de la carte (outils, captures).</summary>
         public void TeleportTo(Vector3 point)

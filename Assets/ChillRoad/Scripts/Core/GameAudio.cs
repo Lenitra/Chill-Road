@@ -82,6 +82,10 @@ namespace ChillRoad
         /// <summary>Carillon (achat à la concession).</summary>
         public void Chime() => Play(bonus, 0.55f * Ui, 1.12f);
 
+        /// <summary>Replacement sur la route : souffle grave au fondu au noir, petite note à la reprise des commandes.</summary>
+        public void RespawnOut() => Play(whoosh, 0.7f * Ui, 0.55f);
+        public void RespawnIn() => Play(blip, 0.4f * Ui, 0.8f);
+
         /// <summary>Déclic double du flash d'un radar.</summary>
         public void RadarFlash() => Play(flash, 0.7f * Ui, 1f);
 

@@ -58,6 +58,8 @@ namespace ChillRoad
         float timer;
         int teleports = -1;
         float[][] times;
+        // Calcul pour un replacement : pas de pénalité de demi-tour au départ
+        bool freeStart;
         // Arrivée de l'itinéraire (sur la route) ; pour un joueur suivi, là où il était au dernier report
         Vector3 goal, goalFrom;
         RemoteCar friend;
@@ -139,6 +141,62 @@ namespace ChillRoad
         }
 
         static string FriendName(RemoteCar player) => string.IsNullOrEmpty(player.Name) ? Loc.T("Joueur", "Player") : player.Name;
+
+        /// <summary>
+        /// Replacement de la voiture avec un itinéraire affiché (GPS ou parcours imposé) : point de l'itinéraire le
+        /// plus proche de <paramref name="from"/> (dans la voie, à moins de <paramref name="maxDistance"/> m) et sens
+        /// dans lequel l'itinéraire repart de là, pour reposer la voiture dans la bonne direction.
+        /// </summary>
+        public bool RespawnHint(Vector3 from, float maxDistance, out Vector3 point, out Vector3 heading)
+        {
+            point = heading = Vector3.zero;
+            if (!HasDestination) return false;
+            // La voiture va être reposée dans le sens voulu : l'itinéraire est refait sans tenir compte du sens où elle
+            // regarde (retournée, en travers…), le meilleur des deux sens de la route où elle se trouve
+            if (!OnCourse)
+            {
+                freeStart = true;
+                Compute();
+                freeStart = false;
+            }
+            if (route.Count < 2) return false;
+            float best = maxDistance * maxDistance;
+            int seg = -1;
+            float segK = 0f;
+            for (int i = 0; i < route.Count - 1; i++)
+            {
+                Vector3 a = route[i], ab = route[i + 1] - a;
+                float len2 = ab.x * ab.x + ab.z * ab.z;
+                float k = len2 > 1e-4f ? Mathf.Clamp01(((from.x - a.x) * ab.x + (from.z - a.z) * ab.z) / len2) : 0f;
+                Vector3 p = a + ab * k;
+                float dx = from.x - p.x, dz = from.z - p.z, dy = (from.y - p.y) * 0.5f;
+                float d2 = dx * dx + dz * dz + dy * dy;
+                if (d2 < best) { best = d2; seg = i; segK = k; }
+            }
+            if (seg < 0) return false;
+            point = Vector3.Lerp(route[seg], route[seg + 1], segK);
+            // Sens : vers un point quelques mètres plus loin sur l'itinéraire (pas faussé par un segment très court)
+            Vector3 ahead = route[route.Count - 1];
+            float left = 8f;
+            Vector3 prev = point;
+            for (int i = seg + 1; i < route.Count; i++)
+            {
+                float d = Vector3.Distance(prev, route[i]);
+                if (d >= left) { ahead = prev + (route[i] - prev) * (left / d); break; }
+                left -= d;
+                prev = route[i];
+            }
+            heading = ahead - point;
+            heading.y = 0f;
+            if (heading.sqrMagnitude < 1e-4f)
+            {
+                heading = route[Mathf.Min(seg + 1, route.Count - 1)] - route[seg];
+                heading.y = 0f;
+            }
+            if (heading.sqrMagnitude < 1e-4f) return false;
+            heading.Normalize();
+            return true;
+        }
 
         public void ClearDestination()
         {
@@ -481,7 +539,7 @@ namespace ChillRoad
             {
                 int dir = k == 0 ? ahead : -ahead;
                 if (dir < 0 && e0.oneway) continue;
-                float pen = dir == ahead ? 0f : UTurnPenalty;
+                float pen = dir == ahead || freeStart ? 0f : UTurnPenalty;
                 var arc = new Arc { e = e0, dir = dir };
                 float c = pen + Span(e0, start.s, EndOf(arc));
                 if (c < cost[arc.Index]) { cost[arc.Index] = c; prev[arc.Index] = -1; open.Add(arc.Index); }

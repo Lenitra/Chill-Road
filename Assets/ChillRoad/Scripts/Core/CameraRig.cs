@@ -78,6 +78,9 @@ namespace ChillRoad
         // Transition de départ : trajectoire autour de la voiture, puis coup de focale au « GO »
         float introT = -1f, introLen = 1f, fovKick, fovBase = 60f, rawFov = 60f;
         Vector3 introFrom;
+        // Arrivée après un replacement : écart de départ (repère de la voiture), avancement
+        static readonly Vector3 DropFrom = new Vector3(0f, 9f, -17f);
+        float dropT = -1f, dropLen = 1f;
 
         void Awake() => cam = GetComponent<Camera>();
 
@@ -95,6 +98,20 @@ namespace ChillRoad
         /// <summary>Bruit lisse sur trois axes, entre -1 et 1.</summary>
         static Vector3 Noise3(float t, float seed) => new Vector3(
             Mathf.PerlinNoise(t, seed + 0.1f) * 2f - 1f, Mathf.PerlinNoise(seed + 3.7f, t) * 2f - 1f, Mathf.PerlinNoise(t + 11.3f, seed + 5.9f) * 2f - 1f);
+
+        /// <summary>
+        /// Replacement de la voiture : coupe nette (pas de travelling d'un bout à l'autre de la carte), puis, en vue
+        /// poursuite, la caméra arrive de haut et de loin derrière la voiture et descend se placer en <paramref name="duration"/> s.
+        /// </summary>
+        public void Respawn(float duration)
+        {
+            initialized = false;
+            clearFraction = 1f;
+            trauma = 0f;
+            orbitYaw = orbitPitch = 0f;
+            dropLen = Mathf.Max(0.1f, duration);
+            dropT = 0f;
+        }
 
         /// <summary>Coup de focale (degrés), qui retombe en une fraction de seconde.</summary>
         public void Kick(float degrees) => fovKick = Mathf.Max(fovKick, degrees);
@@ -264,6 +281,16 @@ namespace ChillRoad
                 Quaternion r = smoothedRot * orbit;
                 pos = smoothedPos + r * offset;
                 look = smoothedPos + r * v.lookOffset;
+                if (dropT >= 0f)
+                {
+                    // Replacement : descente en douceur depuis le haut, le regard d'abord sur la voiture
+                    dropT += dt;
+                    float k = Mathf.Clamp01(dropT / dropLen);
+                    float e = 1f - (1f - k) * (1f - k) * (1f - k);
+                    pos += r * Vector3.Lerp(DropFrom - offset, Vector3.zero, e);
+                    look = Vector3.Lerp(smoothedPos + Vector3.up * 0.8f, look, Mathf.SmoothStep(0f, 1f, k));
+                    if (k >= 1f) dropT = -1f;
+                }
                 // Ne descend pas sous la voiture en regardant de côté
                 pos.y = Mathf.Max(pos.y, smoothedPos.y + 0.8f);
                 // Ni dans un talus, ni dans une façade : la caméra se rapproche de la voiture plutôt que de traverser
@@ -271,6 +298,7 @@ namespace ChillRoad
             }
             else
             {
+                dropT = -1f;    // vues embarquées : la coupe suffit
                 pos = smoothedPos + smoothedRot * offset;
                 look = pos + smoothedRot * (orbit * (v.lookOffset - offset));
             }
