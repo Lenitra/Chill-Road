@@ -135,58 +135,165 @@ namespace ChillRoad
         }
 
         /// <summary>
-        /// Traces de drift permanentes dans l'arène : boucles de pneus (paires de traits, voie de 1,5 m) qui tournent autour
-        /// des deux poteaux en spirale irrégulière, et 8 qui se croisent entre eux. Deux tons : traces fraîches et anciennes.
-        /// Sous les marquages peints (hauteurs un peu plus basses), tirage fixe : les mêmes à chaque partie.
+        /// Traces de drift permanentes dans l'arène, irrégulières comme de vraies traces : boucles autour des deux poteaux
+        /// (centres qui dérivent, rayons bruités), 8 entre les poteaux, quelques têtes-à-queue serrés et des frottements
+        /// larges. Chaque paire de pneus a sa voie, sa largeur qui varie et s'effile aux bouts, ses coupures (parfois un
+        /// seul pneu marque) et pâlit vers sa fin. Trois tons (marks[0] frais → marks[2] ancien), sous les marquages
+        /// peints. Tirage fixe : les mêmes à chaque partie.
         /// </summary>
-        void DriftMarks(RoadNetwork.MeshBuilder fresh, RoadNetwork.MeshBuilder old)
+        void DriftMarks(RoadNetwork.MeshBuilder[] marks)
         {
             var rnd = new System.Random(4207);
-            float R(float a, float b) => a + (b - a) * (float)rnd.NextDouble();
+            float R(float lo, float hi) => lo + (hi - lo) * (float)rnd.NextDouble();
             Vector3 axis = pylons[1] - pylons[0];
             axis.y = 0f;
             axis.Normalize();
             Vector3 across = new Vector3(-axis.z, 0f, axis.x);
+            int seed = 0;
 
-            // Boucles autour de chaque poteau
+            // Boucles autour de chaque poteau : le centre glisse pendant la boucle, le rayon respire
             for (int pi = 0; pi < 2; pi++)
                 for (int loop = 0; loop < 9; loop++)
                 {
-                    var m = loop % 3 == 0 ? fresh : old;
-                    Vector3 c = pylons[pi] + axis * R(-2.5f, 2.5f) + across * R(-2.5f, 2.5f);
-                    float r0 = R(7.5f, 15f), r1 = r0 + R(-2.5f, 2.5f), start = R(0f, 360f), span = R(160f, 380f);
-                    float dir = (pi == 0) == (loop % 4 != 3) ? 1f : -1f;
-                    var pts = new List<(Vector3 p, Vector3 o)>();
-                    int n = Mathf.CeilToInt(span / 6f);
+                    Vector3 c0 = pylons[pi] + axis * R(-2.5f, 2.5f) + across * R(-2.5f, 2.5f);
+                    Vector3 drift = axis * R(-2f, 2f) + across * R(-2f, 2f);
+                    float r0 = R(7.5f, 15f), r1 = r0 + R(-3f, 3f), start = R(0f, 360f), span = R(140f, 400f);
+                    float dir = (pi == 0) == (loop % 4 != 3) ? 1f : -1f, ph = R(0f, 50f);
+                    var line = new List<Vector3>();
+                    int n = Mathf.CeilToInt(span / 5f);
                     for (int i = 0; i <= n; i++)
                     {
-                        float t = i / (float)n, a = (start + dir * span * t) * Mathf.Deg2Rad;
-                        float r = Mathf.Lerp(r0, r1, t) + Mathf.Sin(t * 9f + loop) * 0.35f;
-                        Vector3 e = axis * Mathf.Cos(a) + across * Mathf.Sin(a);
-                        pts.Add((c + e * r, e));
+                        float t = i / (float)n, ang = (start + dir * span * t) * Mathf.Deg2Rad;
+                        float r = Mathf.Lerp(r0, r1, t) + (Mathf.PerlinNoise(ph, t * span / 60f) - 0.5f) * 2.2f
+                                  + Mathf.Sin(t * 23f + loop) * 0.15f;
+                        line.Add(c0 + drift * t + (axis * Mathf.Cos(ang) + across * Mathf.Sin(ang)) * r);
                     }
-                    Pair(m, pts, R(0.22f, 0.32f), loop);
+                    Pair(marks, line, R(0.2f, 0.32f), loop % 3, seed++);
                 }
 
             // 8 : un cercle autour de chaque poteau, reliés par les deux tangentes intérieures qui se croisent au milieu
             for (int k = 0; k < 6; k++)
             {
-                var m = k % 2 == 0 ? fresh : old;
                 Vector3 a = pylons[0] + axis * R(-1.5f, 1.5f) + across * R(-1.5f, 1.5f);
                 Vector3 b = pylons[1] + axis * R(-1.5f, 1.5f) + across * R(-1.5f, 1.5f);
                 a.y = b.y = 0f;
                 var line = Eight(a, b, R(10f, 14f));
-                float wob = R(0.3f, 1f), phase = R(0f, 6.28f);
-                var pts = new List<(Vector3 p, Vector3 o)>();
+                float wob = R(0.3f, 1f), phase = R(0f, 6.28f), ph = R(0f, 50f);
                 for (int i = 0; i < line.Count; i++)
                 {
-                    Vector3 d = line[Mathf.Min(i + 1, line.Count - 1)] - line[Mathf.Max(i - 1, 0)];
-                    d.y = 0f;
-                    float t = i / (float)line.Count * Mathf.PI * 2f;
-                    pts.Add((line[i] + across * (Mathf.Sin(t * 3f + phase) * wob), new Vector3(-d.z, 0f, d.x).normalized));
+                    float t = i / (float)line.Count;
+                    float off = Mathf.Sin(t * Mathf.PI * 6f + phase) * wob + (Mathf.PerlinNoise(ph, t * 14f) - 0.5f) * 1.6f;
+                    line[i] += across * off;
                 }
-                Pair(m, pts, R(0.22f, 0.3f), 20 + k);
+                // Parfois un 8 interrompu : la voiture est partie en ligne droite à mi-parcours
+                if (k % 3 == 2) line.RemoveRange(line.Count * 2 / 3, line.Count - line.Count * 2 / 3);
+                Pair(marks, line, R(0.2f, 0.3f), k % 3, seed++);
             }
+
+            // Têtes-à-queue : courtes spirales qui se resserrent, près des poteaux
+            for (int k = 0; k < 4; k++)
+            {
+                Vector3 c = pylons[k % 2] + axis * R(-13f, 13f) + across * R(-9f, 9f);
+                float r0 = R(5f, 7f), r1 = R(1.6f, 2.6f), start = R(0f, 360f), span = R(150f, 260f), dir = k % 2 == 0 ? 1f : -1f;
+                var line = new List<Vector3>();
+                for (int i = 0; i <= 24; i++)
+                {
+                    float t = i / 24f, ang = (start + dir * span * t) * Mathf.Deg2Rad;
+                    line.Add(c + (axis * Mathf.Cos(ang) + across * Mathf.Sin(ang)) * Mathf.Lerp(r0, r1, t * t));
+                }
+                Pair(marks, line, R(0.24f, 0.34f), 1 + k % 2, seed++);
+            }
+
+            // Frottements : larges bandes pâles et courtes, là où les voitures se mettent en travers
+            for (int k = 0; k < 10; k++)
+            {
+                Vector3 c = pylons[k % 2];
+                float ang = R(0f, Mathf.PI * 2f), r = R(8f, 14f), len = R(3f, 7f), w = R(0.7f, 1.4f);
+                Vector3 e = axis * Mathf.Cos(ang) + across * Mathf.Sin(ang), tan = Vector3.Cross(Vector3.up, e);
+                Vector3 p0 = c + e * r - tan * (len * 0.5f), p1 = c + e * (r + R(-1f, 1f)) + tan * (len * 0.5f);
+                const int n = 6;
+                for (int i = 0; i < n; i++)
+                {
+                    float t0 = i / (float)n, t1 = (i + 1) / (float)n;
+                    float w0 = w * Mathf.Sin(t0 * Mathf.PI), w1 = w * Mathf.Sin(t1 * Mathf.PI);
+                    Strip(marks[2], Vector3.Lerp(p0, p1, t0), Vector3.Lerp(p0, p1, t1), w0, w1, 0.026f);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Paire de traces de pneus le long d'une ligne : voie propre à la voiture, largeur bruitée qui s'effile aux deux
+        /// bouts, coupures de longueur variable (un pneu seul parfois), écart latéral bruité, ton qui pâlit en fin de trace.
+        /// </summary>
+        void Pair(RoadNetwork.MeshBuilder[] marks, List<Vector3> line, float w, int tone, int seed)
+        {
+            if (line.Count < 2) return;
+            var rnd = new System.Random(seed * 131 + 7);
+            float R(float lo, float hi) => lo + (hi - lo) * (float)rnd.NextDouble();
+            float half = R(0.66f, 0.85f), lift = 0.028f + 0.0012f * (seed % 8);
+            var len = new float[line.Count];
+            var side = new Vector3[line.Count];
+            for (int i = 0; i < line.Count; i++)
+            {
+                if (i > 0) len[i] = len[i - 1] + Vector3.Distance(line[i - 1], line[i]);
+                Vector3 d = line[Mathf.Min(i + 1, line.Count - 1)] - line[Mathf.Max(i - 1, 0)];
+                d.y = 0f;
+                side[i] = new Vector3(-d.z, 0f, d.x).normalized;
+            }
+            float total = Mathf.Max(len[line.Count - 1], 1f), taper = Mathf.Min(4f, total * 0.2f);
+            // Ton par passages (jamais par petits blocs) : un passage plus pâle au milieu une fois sur deux, et la fin
+            // de la trace qui pâlit
+            int fadeAt = Mathf.RoundToInt(line.Count * R(0.55f, 0.85f));
+            int paleAt = rnd.NextDouble() < 0.5 ? rnd.Next(line.Count) : -1, paleTo = paleAt + rnd.Next(8, 25);
+            for (int wheel = -1; wheel <= 1; wheel += 2)
+            {
+                float ph = R(0f, 100f), jit = R(0f, 100f);
+                int gap = 0;
+                float Width(int i)
+                {
+                    float ends = Mathf.Clamp01(len[i] / taper) * Mathf.Clamp01((total - len[i]) / taper);
+                    return w * Mathf.Lerp(0.55f, 1.25f, Mathf.PerlinNoise(ph, len[i] * 0.18f)) * Mathf.Sqrt(ends);
+                }
+                Vector3 At(int i) => line[i] + side[i] * (wheel * half + (Mathf.PerlinNoise(jit, len[i] * 0.12f) - 0.5f) * 0.35f);
+                Vector3 Normal(int i) => i > 0 && i + 1 < line.Count ? Vector3.Lerp(Edge(i - 1), Edge(i), 0.5f).normalized : Edge(Mathf.Min(i, line.Count - 2));
+                Vector3 Edge(int i)
+                {
+                    Vector3 d = At(i + 1) - At(i);
+                    d.y = 0f;
+                    return new Vector3(-d.z, 0f, d.x).normalized;
+                }
+                for (int i = 0; i + 1 < line.Count; i++)
+                {
+                    if (gap > 0) { gap--; continue; }
+                    double roll = rnd.NextDouble();
+                    if (roll < 0.035) { gap = rnd.Next(1, 5); continue; }          // petite coupure
+                    if (roll < 0.045) { gap = rnd.Next(6, 16); continue; }         // ce pneu a cessé de marquer un moment
+                    int t = Mathf.Min(2, tone + (i >= fadeAt ? 1 : 0) + (i >= paleAt && i < paleTo ? 1 : 0));
+                    // Bords communs aux jointures (normale moyenne) : la bande reste continue, sans marches
+                    Strip(marks[t], At(i), At(i + 1), Normal(i), Normal(i + 1), Width(i), Width(i + 1), lift);
+                }
+            }
+        }
+
+        /// <summary>Bande au sol de a (largeur wa) à b (largeur wb), posée sur le terrain.</summary>
+        void Strip(RoadNetwork.MeshBuilder m, Vector3 a, Vector3 b, float wa, float wb, float lift)
+        {
+            Vector3 d = b - a;
+            d.y = 0f;
+            Vector3 n = new Vector3(-d.z, 0f, d.x).normalized;
+            Strip(m, a, b, n, n, wa, wb, lift);
+        }
+
+        /// <summary>Idem, avec la direction des bords imposée à chaque bout (na, nb : horizontales, unitaires).</summary>
+        void Strip(RoadNetwork.MeshBuilder m, Vector3 a, Vector3 b, Vector3 na, Vector3 nb, float wa, float wb, float lift)
+        {
+            if (wa < 0.02f && wb < 0.02f) return;
+            Vector3 G(Vector3 p)
+            {
+                p.y = game.Map.Height(p.x, p.z) + lift;
+                return p;
+            }
+            Face(m, G(a - na * (wa * 0.5f)), G(a + na * (wa * 0.5f)), G(b - nb * (wb * 0.5f)), G(b + nb * (wb * 0.5f)));
         }
 
         /// <summary>Tracé d'un 8 (plan horizontal) : tangente a→b, tour de b, tangente croisée b→a, tour de a.</summary>
@@ -222,22 +329,6 @@ namespace ChillRoad
             Arc(a, a2, a1, u2);
             o.Add(a1);
             return o;
-        }
-
-        /// <summary>Paire de traces de pneus le long d'une ligne (o : côté), avec des trous pour un rendu usé.</summary>
-        void Pair(RoadNetwork.MeshBuilder m, List<(Vector3 p, Vector3 o)> pts, float w, int seed)
-        {
-            var rnd = new System.Random(seed * 131 + 7);
-            for (int side = -1; side <= 1; side += 2)
-            {
-                float lift = 0.028f + 0.0015f * (seed % 7);
-                for (int i = 0; i + 1 < pts.Count; i++)
-                {
-                    if (rnd.NextDouble() < 0.08) continue;
-                    Vector3 a = pts[i].p + pts[i].o * (side * 0.75f), b = pts[i + 1].p + pts[i + 1].o * (side * 0.75f);
-                    Ribbon(m, a, b, w, lift);
-                }
-            }
         }
 
         void Build()
@@ -303,9 +394,8 @@ namespace ChillRoad
                 outline.Add(mid + axis * halfLen + (axis * Mathf.Cos(a) + across * Mathf.Sin(a)) * (ArenaR - 1.2f));
             }
             for (int i = 0; i < outline.Count; i++) Ribbon(orange, outline[i], outline[(i + 1) % outline.Count], 0.8f);
-            var skid = new RoadNetwork.MeshBuilder();
-            var skidOld = new RoadNetwork.MeshBuilder();
-            DriftMarks(skid, skidOld);
+            var skid = new[] { new RoadNetwork.MeshBuilder(), new RoadNetwork.MeshBuilder(), new RoadNetwork.MeshBuilder() };
+            DriftMarks(skid);
             foreach (var pylon in pylons)
                 for (int i = 0; i < 48; i++)
                 {
@@ -319,8 +409,9 @@ namespace ChillRoad
             Paint("Black", black, new Color(0.06f, 0.06f, 0.07f));
             Paint("Red", red, new Color(0.86f, 0.17f, 0.13f));
             Paint("Orange", orange, new Color(1f, 0.56f, 0.12f));
-            Paint("Skid", skid, new Color(0.2f, 0.19f, 0.19f));
-            Paint("SkidOld", skidOld, new Color(0.44f, 0.42f, 0.39f));
+            Paint("Skid", skid[0], new Color(0.2f, 0.19f, 0.19f));
+            Paint("SkidMid", skid[1], new Color(0.32f, 0.31f, 0.3f));
+            Paint("SkidOld", skid[2], new Color(0.45f, 0.43f, 0.4f));
         }
 
         void Paint(string name, RoadNetwork.MeshBuilder m, Color color)
