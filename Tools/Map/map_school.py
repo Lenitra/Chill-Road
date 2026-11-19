@@ -2,7 +2,7 @@
 l'ancien lit de la rivière, au sud des Granges. On y arrive par une route (carrefour sur la route de la vallée, passage
 sous le portique). Tout est fait de vraies routes du réseau :
 - un circuit de 12 m de large, couru comme une course du jeu (« Circuit d'essai », Races.cs), portique de départ,
-  tribunes, murs de pneus, banderoles ;
+  murs de pneus, banderoles ;
 - sa ligne droite est porte un radar et un tremplin (sites ajoutés à map_radars / map_stunts) ;
 - dans l'infield, une grande arène de drift ovale goudronnée, avec deux poteaux entourés de pneus pour tourner en 8.
 Pas de leçons ni de missions : on y essaie librement. Le jeu ne fait que peindre le sol (ProvingGround.cs).
@@ -133,9 +133,6 @@ def populate(pl, edges):
     put("school_gantry", (START[0], START[1]), S)
     put("school_flag", (START[0] - 10.0, START[1] + 2.0), E)
     put("school_flag", (START[0] + 10.0, START[1] + 2.0), W)
-    # Tribunes : le long de la ligne droite de départ et face à la grande courbe du sud
-    put("school_grandstand", (-120.0, 75.0), E)
-    put("school_grandstand", (20.0, -203.0), N)
     # Poteaux du 8 entourés de pneus
     for p in PYLONS:
         put("school_pylon", p, N)
