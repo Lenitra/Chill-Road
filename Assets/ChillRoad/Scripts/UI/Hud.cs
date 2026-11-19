@@ -16,7 +16,8 @@ namespace ChillRoad
     ///   concession ;
     /// - bas gauche : minicarte (pendant du compte-tours), à sa droite le morceau en cours et l'aide des commandes
     ///   (quelques secondes seulement) ;
-    /// - menu pause avec le panneau des contrôles (manette ou clavier selon le dernier appareil utilisé).
+    /// - menu pause avec le panneau des contrôles : liste, ou manette / clavier dessinés avec les commandes sur l'appareil
+    ///   (<see cref="ControlsDiagram"/>) ; par défaut, le dessin de l'appareil utilisé en dernier.
     /// En réseau, le menu pause n'arrête pas le monde : la partie continue pour les autres joueurs.
     /// </summary>
     public class Hud : MonoBehaviour
@@ -138,7 +139,12 @@ namespace ChillRoad
         bool inPause;
         Text controlsTitle;
         readonly List<(Text action, Text key)> controlRows = new List<(Text, Text)>();
-        int controlsShown = -1;   // appareil + langue affichés (0-3), -1 = à construire
+        int controlsShown = -1;   // vue, appareil, langue, commandes affichés ; -1 = à construire
+        // Vues du panneau des contrôles : liste, manette dessinée, clavier dessiné (onglets en haut à droite, LB / RB)
+        const int ViewList = 0, ViewPad = 1, ViewKeys = 2, ViewPlayers = -10;
+        static int controlsView = -1;   // -1 : selon l'appareil utilisé en dernier
+        RectTransform controlsList, controlsArt;
+        readonly List<(Button button, HudShape plate, Text text, int view)> viewChips = new List<(Button, HudShape, Text, int)>();
         Button firstButton;
         int openedFrame;
         // Partie en réseau : plaque du menu (elle grandit avec ses lignes), ligne d'état, bouton du code d'invitation
@@ -943,22 +949,38 @@ namespace ChillRoad
             var panel = Rect(parent, "Controls", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(40, -370), new Vector2(780, 370));
             Backdrop(panel);
             controlsPanel = panel.gameObject;
-            // En réseau, un clic sur le panneau montre le tableau des joueurs à sa place
-            panel.gameObject.AddComponent<Image>().color = Color.clear;
-            var toPlayers = panel.gameObject.AddComponent<Button>();
-            toPlayers.transition = Selectable.Transition.None;
-            toPlayers.navigation = new Navigation { mode = Navigation.Mode.None };
-            toPlayers.onClick.AddListener(() => { if (game.Online) playersPage = true; });
-            var layout = panel.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(50, 50, 30, 30);
+            controlsTitle = Label(panel, "", 30, TextAnchor.MiddleLeft, Info, new Vector2(0f, 1f), new Vector2(50f, -22f), new Vector2(300, 60), FontStyle.BoldAndItalic);
+            // Onglets : liste, manette, clavier (en réseau, d'abord le tableau des joueurs, qui prend la place du panneau)
+            foreach (var (view, fr, en) in new[] { (ViewPlayers, "JOUEURS", "PLAYERS"), (ViewList, "LISTE", "LIST"), (ViewPad, "MANETTE", "GAMEPAD"), (ViewKeys, "CLAVIER", "KEYBOARD") })
+            {
+                var go = new GameObject("View", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape), typeof(Button));
+                go.transform.SetParent(panel, false);
+                var rt = (RectTransform)go.transform;
+                rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(1f, 1f);
+                var plate = go.GetComponent<HudShape>();
+                plate.Set(12f, 0f, 0f);
+                plate.color = TileNormal;
+                var button = go.GetComponent<Button>();
+                button.targetGraphic = plate;
+                button.transition = Selectable.Transition.None;
+                button.navigation = new Navigation { mode = Navigation.Mode.None };
+                int v = view;
+                button.onClick.AddListener(() => ShowControlsView(v));
+                var text = Label(rt, "", 17, TextAnchor.MiddleCenter, White, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, FontStyle.BoldAndItalic);
+                Fit(text.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+                Loc.Bind(text, fr, en);
+                viewChips.Add((button, plate, text, view));
+            }
+            // Vue dessinée (manette ou clavier), reconstruite quand les commandes, la langue ou la disposition changent
+            controlsArt = Rect(panel, "Diagram", Vector2.zero, Vector2.one, Vector2.zero, new Vector2(0f, -96f));
+            controlsList = Rect(panel, "List", Vector2.zero, Vector2.one, new Vector2(50f, 24f), new Vector2(-50f, -100f));
+            var layout = controlsList.gameObject.AddComponent<VerticalLayoutGroup>();
             layout.spacing = 3;
             layout.childControlHeight = true; layout.childControlWidth = true; layout.childForceExpandHeight = false;
-            controlsTitle = Label(panel, "", 30, TextAnchor.MiddleLeft, Info, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(600, 60), FontStyle.BoldAndItalic);
-            controlsTitle.gameObject.AddComponent<LayoutElement>().preferredHeight = 70;
             foreach (var _ in Controls)
             {
                 // Quatorze lignes dans la hauteur du panneau
-                var row = Rect(panel, "Row", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+                var row = Rect(controlsList, "Row", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
                 row.gameObject.AddComponent<LayoutElement>().preferredHeight = 40;
                 var h = row.gameObject.AddComponent<HorizontalLayoutGroup>();
                 h.childControlWidth = true; h.childControlHeight = true; h.childForceExpandWidth = false;
@@ -976,15 +998,25 @@ namespace ChillRoad
             bool touch = TouchInput.InUse && GameSettings.TouchSteer != 0;
             bool pad = !touch && GameInput.UsingGamepad;
             bool online = game.Online;
-            int shown = (touch ? 2 : pad ? 1 : 0) + (Loc.French ? 3 : 0) + GameSettings.TouchSteer * 6 + (online ? 100 : 0) + GameInput.BindingsVersion * 1000;
+            int view = ControlsView(touch, pad);
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            int layoutHash = kb != null && kb.keyboardLayout != null ? kb.keyboardLayout.GetHashCode() : 0;
+            int shown = unchecked((((((view * 3 + (touch ? 2 : pad ? 1 : 0)) * 2 + (Loc.French ? 1 : 0)) * 8 + GameSettings.TouchSteer) * 2
+                + (online ? 1 : 0)) * 7919 + GameInput.BindingsVersion) * 31 + layoutHash);
             if (shown == controlsShown) return;
             controlsShown = shown;
-            controlsTitle.text = touch ? Loc.T("CONTRÔLES  ·  TACTILE", "CONTROLS  ·  TOUCH")
-                : pad ? Loc.T("CONTRÔLES  ·  MANETTE", "CONTROLS  ·  GAMEPAD") : Loc.T("CONTRÔLES  ·  CLAVIER", "CONTROLS  ·  KEYBOARD");
-            // En réseau : comment revenir au tableau des joueurs
-            if (online)
-                controlsTitle.text += "<size=19>      " + (touch ? Loc.T("touche : joueurs", "tap: players") : pad ? Loc.T("RB : joueurs", "RB: players")
-                    : Loc.T("Tab : joueurs", "Tab: players")) + "</size>";
+            controlsTitle.text = Loc.T("CONTRÔLES", "CONTROLS");
+            LayoutViewChips(view, online);
+            controlsList.gameObject.SetActive(view == ViewList);
+            for (int i = controlsArt.childCount - 1; i >= 0; i--)
+            {
+                var child = controlsArt.GetChild(i).gameObject;
+                child.SetActive(false);
+                if (Application.isPlaying) Destroy(child); else DestroyImmediate(child);
+            }
+            if (view == ViewPad) ControlsDiagram.BuildPad(controlsArt, online);
+            else if (view == ViewKeys) ControlsDiagram.BuildKeyboard(controlsArt, online);
+            if (view != ViewList) return;
             for (int i = 0; i < Controls.Length; i++)
             {
                 var c = Controls[i];
@@ -1006,6 +1038,51 @@ namespace ChillRoad
                     : GameSettings.TouchSteer == 2 ? Loc.T("Boutons ‹ ›", "‹ › buttons") : Loc.T("Glisser à gauche", "Slide on the left");
                 controlRows[i].key.text = key;
             }
+        }
+
+        /// <summary>Vue des contrôles : celle choisie, sinon la liste (tactile) ou le dessin de l'appareil utilisé en dernier.</summary>
+        static int ControlsView(bool touch, bool pad) => controlsView >= 0 ? controlsView : touch ? ViewList : pad ? ViewPad : ViewKeys;
+
+        /// <summary>Onglets des vues, alignés à droite du titre ; l'onglet affiché passe à l'or. « Joueurs » : en réseau seulement.</summary>
+        void LayoutViewChips(int view, bool online)
+        {
+            float x = -50f;
+            for (int i = viewChips.Count - 1; i >= 0; i--)
+            {
+                var (button, plate, text, v) = viewChips[i];
+                bool show = v != ViewPlayers || online;
+                button.gameObject.SetActive(show);
+                if (!show) continue;
+                bool on = v == view;
+                plate.color = on ? TileGold : TileNormal;
+                text.color = on ? Ink : White;
+                float w = Mathf.Ceil(text.preferredWidth) + 30f;
+                var rt = (RectTransform)button.transform;
+                rt.sizeDelta = new Vector2(w, 38f);
+                rt.anchoredPosition = new Vector2(x, -33f);
+                x -= w + 8f;
+            }
+        }
+
+        /// <summary>Onglet choisi (clic) : une vue des contrôles, ou le tableau des joueurs en réseau.</summary>
+        void ShowControlsView(int view)
+        {
+            if (view == ViewPlayers) { if (game.Online) playersPage = true; return; }
+            controlsView = view;
+            if (game.Online) playersPage = false;
+            controlsShown = -1;
+            RefreshControls();
+        }
+
+        /// <summary>LB / RB (Maj+Tab / Tab) : vue précédente ou suivante ; en réseau, le tableau des joueurs en fait partie.</summary>
+        void CycleControlsView(int dir)
+        {
+            bool touch = TouchInput.InUse && GameSettings.TouchSteer != 0;
+            bool online = game.Online;
+            var views = online ? new[] { ViewPlayers, ViewList, ViewPad, ViewKeys } : new[] { ViewList, ViewPad, ViewKeys };
+            int cur = online && playersPage ? ViewPlayers : ControlsView(touch, !touch && GameInput.UsingGamepad);
+            int i = System.Array.IndexOf(views, cur);
+            ShowControlsView(views[(i + dir + views.Length) % views.Length]);
         }
 
         void RefreshPause()
@@ -1166,7 +1243,8 @@ namespace ChillRoad
             if (inPause && pausePanel.activeSelf)
             {
                 AnimateTiles(Time.unscaledDeltaTime);
-                if (game.Online && (GameInput.TabNextPressed || GameInput.TabPrevPressed)) playersPage = !playersPage;
+                int dir = GameInput.TabNextPressed ? 1 : GameInput.TabPrevPressed ? -1 : 0;
+                if (dir != 0) CycleControlsView(dir);
                 bool controls = !PlayersInMenu;
                 if (controlsPanel.activeSelf != controls) controlsPanel.SetActive(controls);
             }

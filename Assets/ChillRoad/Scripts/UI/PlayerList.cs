@@ -9,7 +9,8 @@ namespace ChillRoad
     /// quelle couleur), et où en est chacun (distance, course à plusieurs).
     /// - en conduisant : Tab maintenu (clavier) ;
     /// - dans le menu d'une partie en réseau (Start, Échap, bouton II) : à droite du menu, à la place des contrôles ; Tab,
-    ///   RB ou un clic sur le panneau passe de l'un à l'autre (<see cref="Hud.PlayersInMenu"/>).
+    ///   RB / LB passent aux vues des contrôles (liste, manette, clavier) ; un clic sur ce panneau y revient, l'onglet
+    ///   JOUEURS du panneau des contrôles le rouvre (<see cref="Hud.PlayersInMenu"/>).
     /// Chaque joueur garde la couleur de son étiquette au-dessus de sa voiture et de son point sur la minicarte.
     /// </summary>
     public class PlayerList : MonoBehaviour
