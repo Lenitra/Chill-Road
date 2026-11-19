@@ -14,7 +14,9 @@ namespace ChillRoad
     /// pour les pneus, réglages pour les suspensions).
     /// Chaque option s'achète seule (le niveau 3 ne donne pas les niveaux 1 et 2) ; une option achetée, comme la pièce
     /// de série, se remonte ensuite gratuitement, autant de fois que l'on veut.
-    /// Deux onglets (LB / RB, Tab, ou clic) : PERFORMANCES (les pièces ci-dessus) et COSMÉTIQUE, sans effet sur la
+    /// Style verre : un seul panneau à gauche (la liste, puis les options de la ligne ouverte à la place), la fiche en
+    /// bas à droite. Onglets affichés PIÈCES / PEINTURE / COSMÉTIQUE (LB / RB, Tab, ou clic ; la peinture est le
+    /// nuancier de l'onglet cosmétique). Deux onglets internes : PERFORMANCES (les pièces ci-dessus) et COSMÉTIQUE, sans effet sur la
     /// conduite : la peinture (nuancier de <see cref="CarPaint"/>), puis les accessoires de <see cref="CarCosmetics"/>
     /// (néons, vitres teintées, pop and bang, couleur des flammes), essayés en direct sur la voiture de l'atelier — le pop
     /// and bang et les flammes y pétaradent en démonstration. Même règle d'achat : payé une fois, remonté gratuitement.
@@ -22,21 +24,16 @@ namespace ChillRoad
     /// </summary>
     public class TuningGarage : MonoBehaviour
     {
-        static readonly Color White = new Color(0.96f, 0.97f, 0.98f);
-        static readonly Color Ink = new Color(0.05f, 0.06f, 0.08f);
-        static readonly Color Accent = new Color(1f, 0.76f, 0.2f);
+        // Style verre (Glass) : or = sélection, argent, touches ; vert = gain ou monté ; corail = perte ou manque
+        static readonly Color White = Glass.White;
+        static readonly Color Accent = Glass.Gold;
+        /// <summary>Rose de la marque : seulement la lumière de la baie dans le monde (repère du lieu).</summary>
         static readonly Color Brand = new Color(1f, 0.42f, 0.82f);
-        static readonly Color Info = new Color(0.35f, 0.85f, 1f);
-        static readonly Color Danger = new Color(1f, 0.32f, 0.26f);
-        static readonly Color Dim = new Color(1f, 1f, 1f, 0.6f);
-        static readonly Color Money = new Color(0.5f, 1f, 0.6f);
-        static readonly Color PipOff = new Color(1f, 1f, 1f, 0.16f);
-        // Sur la ligne choisie (plaque blanche) : mêmes teintes, foncées
-        static readonly Color InkDim = new Color(0f, 0f, 0f, 0.5f);
-        static readonly Color InkMoney = new Color(0.04f, 0.46f, 0.18f);
-        static readonly Color InkAccent = new Color(0.66f, 0.4f, 0f);
-        static readonly Color InkDanger = new Color(0.74f, 0.13f, 0.09f);
-        static readonly Color InkBrand = new Color(0.8f, 0.16f, 0.58f);
+        static readonly Color Danger = Glass.Bad;
+        static readonly Color Dim = Glass.Dim;
+        static readonly Color Money = Glass.Good;
+        static readonly Color PipOff = new Color(1f, 1f, 1f, 0.18f);
+        const string GoldTag = "#FFC233";
 
         /// <summary>Baie ouverte de l'atelier dans le repère du bâtiment (sur la façade).</summary>
         static readonly Vector3 DoorLocal = new Vector3(-3.6f, 0f, 8f);
@@ -63,20 +60,26 @@ namespace ChillRoad
             public Text name, status;
             public Image[] pips;
             /// <summary>Pastille de couleur (peinture).</summary>
-            public Image swatch;
+            public GlassRect swatch;
+            /// <summary>Fond de la ligne : transparent, or doux cerné d'or quand elle est choisie.</summary>
+            public GlassRect plate;
+            public LayoutElement layout;
         }
 
         GameManager game;
-        Font font;
         GarageDoorway door;
         GameObject root;
         WorkshopStage stage;
         RectTransform screenRt, menuRt, cardRt;
-        Text carText, cashText, crumbText, countText, nameText, subText, levelText, actionText, hintText, leaveText, tabPrevText, tabNextText;
+        Text carText, cashText, walletText, crumbText, countText, chevronText, kickerText, nameText, subText, levelText, actionText, actionPrice, actionKey, hintText, leaveText, tabKeysText;
+        GlassRect actionPlate, actionChip;
+        LayoutElement leaveLayout;
+        /// <summary>Hauteur prise par l'en-tête du menu (titre, onglets, marges), pour répartir le reste entre les lignes.</summary>
+        float menuChrome;
         readonly List<Row> rows = new List<Row>();
         readonly List<(RectTransform fill, RectTransform gain, RectTransform loss, Text label, Text value, RectTransform bg)> bars = new List<(RectTransform, RectTransform, RectTransform, Text, Text, RectTransform)>();
-        /// <summary>Boutons des onglets : plaque, libellé, trait de l'onglet ouvert.</summary>
-        readonly List<(HudShape plate, Text label, Image mark)> tabs = new List<(HudShape, Text, Image)>();
+        /// <summary>Onglets texte : libellé, trait or sous l'onglet ouvert (pièces, peinture, cosmétique).</summary>
+        readonly List<(Text label, Image mark)> tabs = new List<(Text, Image)>();
         /// <summary>Échelle des barres, par fiche (<see cref="CardMode"/>).</summary>
         readonly float[,] scale = new float[3, Stats];
         /// <summary>Onglet ouvert (<see cref="TabParts"/>, <see cref="TabLooks"/>).</summary>
@@ -96,7 +99,6 @@ namespace ChillRoad
         public void Init(GameManager g)
         {
             game = g;
-            font = HudArt.Font;
             Current = this;
             door = new GarageDoorway(g, "tuning_garage", DoorLocal, Brand);
         }
@@ -137,7 +139,7 @@ namespace ChillRoad
             }
             float dt = Time.unscaledDeltaTime;
             if (Time.frameCount != openedFrame && (GameInput.CancelPressed || GameInput.PausePressed)) { Back(); return; }
-            if (Time.frameCount != openedFrame && (GameInput.TabPrevPressed || GameInput.TabNextPressed)) SwitchTab(1 - tab);
+            if (Time.frameCount != openedFrame && (GameInput.TabPrevPressed || GameInput.TabNextPressed)) GoTab(VisualTab + (GameInput.TabNextPressed ? 1 : -1));
 
             // Toujours une ligne choisie (manette, clavier)
             var es = EventSystem.current;
@@ -242,6 +244,23 @@ namespace ChillRoad
             Select(FirstRow());
         }
 
+        /// <summary>
+        /// Onglet affiché : PIÈCES, PEINTURE (le nuancier de l'onglet cosmétique), COSMÉTIQUE (la liste et les
+        /// accessoires). La peinture reste aussi la première ligne de la liste cosmétique.
+        /// </summary>
+        int VisualTab => tab == TabParts ? 0 : InPaint ? 1 : 2;
+
+        /// <summary>Va à un onglet affiché (en boucle) ; voiture sans peinture : on reste sur la liste cosmétique.</summary>
+        void GoTab(int v)
+        {
+            v = (v % 3 + 3) % 3;
+            if (v == VisualTab) return;
+            if (v == 0) { SwitchTab(TabParts); return; }
+            if (tab != TabLooks) SwitchTab(TabLooks);
+            if (v == 1) { if (!InPaint) EnterPart(0); }
+            else if (part >= 0) Back();
+        }
+
         public void Close()
         {
             if (!IsOpen) return;
@@ -315,6 +334,7 @@ namespace ChillRoad
         void Arrange()
         {
             int count = RowCount;
+            FitRows();
             for (int i = 0; i < rows.Count; i++)
             {
                 rows[i].button.gameObject.SetActive(i < count);
@@ -329,6 +349,15 @@ namespace ChillRoad
                     selectOnDown = rows[(i + 1) % count].button,
                 };
             }
+        }
+
+        /// <summary>Lignes de 75 px (maquette) ; le nuancier, plus long, se resserre pour tenir dans la hauteur du panneau.</summary>
+        void FitRows()
+        {
+            float room = (menuRt.rect.height > 1f ? menuRt.rect.height : 972f) - menuChrome;
+            float rowH = Mathf.Round(Mathf.Clamp(room / Mathf.Max(RowCount, 1) - 4f, 36f, 75f));
+            foreach (var r in rows)
+                if (!Mathf.Approximately(r.layout.preferredHeight, rowH)) r.layout.preferredHeight = rowH;
         }
 
         /// <summary>Validation d'une ligne : ouvrir la pièce, ou monter l'option (gratuit si elle est achetée, sinon s'il y a l'argent).</summary>
@@ -418,26 +447,35 @@ namespace ChillRoad
         {
             var spec = BaseSpec;
             int cash = Wallet.Cash, count = RowCount;
-            // Fenêtre basse ou étroite : le menu et la fiche rétrécissent
-            menuRt.localScale = Vector3.one * Mathf.Min(1f, (screenRt.rect.height - 88f) / Mathf.Max(menuRt.rect.height, 1f));
-            cardRt.localScale = Vector3.one * Mathf.Min(1f, Mathf.Min(screenRt.rect.width / 1500f, screenRt.rect.height / 900f));
+            FitRows();
+            // Fenêtre étroite ou basse : la fiche rétrécit (le menu suit la hauteur de l'écran)
+            float fit = Mathf.Min((screenRt.rect.width - 780f) / CardW, (screenRt.rect.height - 108f) / CardH);
+            cardRt.localScale = Vector3.one * Mathf.Clamp(fit, 0.55f, 1f);
             carText.text = spec.displayName;
-            cashText.text = Loc.T("Portefeuille : ", "Wallet: ") + Wallet.Format(cash);
-            crumbText.text = tab == TabParts
-                ? (part < 0 ? Loc.T("PIÈCES", "PARTS") : CarTuning.Name((CarTuning.Part)part).ToUpperInvariant())
-                : part < 0 ? Loc.T("PEINTURE ET ACCESSOIRES", "PAINT AND ACCESSORIES") : InPaint ? Loc.T("PEINTURE", "PAINT") : CarCosmetics.Name(LookItem).ToUpperInvariant();
-            countText.text = shown >= 0 ? $"{shown + 1} / {count}" : "";
-            leaveText.text = part < 0 ? Loc.T("Sortir", "Leave") : Loc.T("Retour", "Back");
+            walletText.text = Glass.Spaced(Loc.T("PORTEFEUILLE", "WALLET"), 2);
+            cashText.text = Wallet.Format(cash);
+
+            // Fil d'Ariane : la liste de l'onglet, ou « ‹ Pièces › Pneus » et les options possédées sur le total
+            bool deep = part >= 0;
+            string parent = tab == TabParts ? Loc.T("Pièces", "Parts") : Loc.T("Cosmétique", "Cosmetics");
+            string leaf = tab == TabParts ? (deep ? CarTuning.Name((CarTuning.Part)part) : "")
+                        : InPaint ? Loc.T("Peinture", "Paint") : deep ? CarCosmetics.Name(LookItem) : "";
+            crumbText.text = deep ? $"{parent}  ›  <color=#FFFFFF>{leaf}</color>"
+                           : tab == TabParts ? parent : Loc.T("Peinture et accessoires", "Paint and accessories");
+            chevronText.enabled = deep;
+            crumbText.rectTransform.offsetMin = new Vector2(deep ? 54f : 27f, 0f);
+            countText.text = deep ? $"{OwnedOptions(spec)} / {count}" : shown >= 0 ? $"{shown + 1} / {count}" : "";
+            leaveText.text = "‹   " + (part < 0 ? Loc.T("Sortir", "Leave") : Loc.T("Retour", "Back"));
             bool pad = GameInput.UsingGamepad;
+            int vt = VisualTab;
             for (int k = 0; k < tabs.Count; k++)
             {
-                bool open = k == tab;
-                tabs[k].plate.color = open ? new Color(0.12f, 0.13f, 0.17f, 0.96f) : new Color(0.02f, 0.025f, 0.04f, 0.85f);
-                tabs[k].label.color = open ? White : Dim;
+                bool open = k == vt;
+                tabs[k].label.color = open ? Accent : Dim;
+                tabs[k].label.font = Glass.FontOf(open ? Glass.Weight.Semibold : Glass.Weight.Regular);
                 tabs[k].mark.enabled = open;
             }
-            tabPrevText.text = pad ? "LB" : "";
-            tabNextText.text = pad ? "RB" : "Tab";
+            tabKeysText.text = pad ? "LB   RB" : "Tab";
 
             int current = tab == TabParts && part >= 0 ? CarTuning.Level(spec, (CarTuning.Part)part) : 0;
             int colour = CarPaint.Selected(spec);
@@ -449,7 +487,8 @@ namespace ChillRoad
             {
                 var row = rows[i];
                 bool on = i == shown;
-                row.name.color = on ? Ink : White;
+                // Ligne choisie : or doux cerné d'or, texte un peu plus appuyé
+                StyleRow(row, on);
                 if (tab == TabLooks && part < 0 && i > 0)
                 {
                     // Accessoire : l'option montée, sa couleur dans la pastille
@@ -458,25 +497,25 @@ namespace ChillRoad
                     bool can = CarCosmetics.Available(spec, item);
                     row.swatch.color = can ? CarCosmetics.Swatch(item, fitted[item]) : Color.clear;
                     row.status.text = can ? CarCosmetics.OptionName(item, fitted[item]).ToUpperInvariant() : Loc.T("INDISPONIBLE", "N/A");
-                    row.status.color = on ? InkDim : Dim;
+                    row.status.color = Dim;
                 }
                 else if (InLook)
                 {
                     var item = LookItem;
                     row.name.text = CarCosmetics.OptionName(item, i);
                     row.swatch.color = CarCosmetics.Swatch(item, i);
-                    if (i == fitted[item]) { row.status.text = Loc.T("INSTALLÉ", "FITTED"); row.status.color = on ? InkMoney : Money; }
+                    if (i == fitted[item]) { row.status.text = Loc.T("INSTALLÉ", "FITTED"); row.status.color = Money; }
                     else if (CarCosmetics.Owns(spec, item, i))
                     {
                         row.status.text = i == CarCosmetics.Stock(item) ? Loc.T("D'ORIGINE", "STOCK")
                                         : CarCosmetics.OptionPrice(spec, item, i) == 0 ? Loc.T("GRATUIT", "FREE") : Loc.T("ACHETÉ", "OWNED");
-                        row.status.color = on ? InkDim : Dim;
+                        row.status.color = Dim;
                     }
                     else
                     {
                         int price = CarCosmetics.Price(spec, item, i);
                         row.status.text = PriceText(price);
-                        row.status.color = cash >= price ? (on ? InkAccent : Accent) : on ? InkDanger : new Color(1f, 0.45f, 0.4f, 0.85f);
+                        row.status.color = cash >= price ? Accent : Danger;
                     }
                 }
                 else if (tab == TabLooks && part < 0)
@@ -484,20 +523,20 @@ namespace ChillRoad
                     row.name.text = Loc.T("Peinture", "Paint");
                     row.swatch.color = CarPaint.Shade(spec, colour);
                     row.status.text = CarPaint.Paintable(spec) ? CarPaint.Name(colour).ToUpperInvariant() : Loc.T("D'ORIGINE", "FACTORY");
-                    row.status.color = on ? InkDim : Dim;
+                    row.status.color = Dim;
                 }
                 else if (InPaint)
                 {
                     row.name.text = CarPaint.Name(i);
                     row.swatch.color = CarPaint.Shade(spec, i);
                     // Textes courts : la pastille est juste à gauche
-                    if (i == colour) { row.status.text = Loc.T("ACTUELLE", "CURRENT"); row.status.color = on ? InkMoney : Money; }
-                    else if (CarPaint.Owns(spec, i)) { row.status.text = i == 0 ? Loc.T("OFFERTE", "FREE") : Loc.T("ACHETÉE", "OWNED"); row.status.color = on ? InkDim : Dim; }
+                    if (i == colour) { row.status.text = Loc.T("ACTUELLE", "CURRENT"); row.status.color = Money; }
+                    else if (CarPaint.Owns(spec, i)) { row.status.text = i == 0 ? Loc.T("OFFERTE", "FREE") : Loc.T("ACHETÉE", "OWNED"); row.status.color = Dim; }
                     else
                     {
                         int price = CarPaint.Price(spec, i);
                         row.status.text = PriceText(price);
-                        row.status.color = cash >= price ? (on ? InkAccent : Accent) : on ? InkDanger : new Color(1f, 0.45f, 0.4f, 0.85f);
+                        row.status.color = cash >= price ? Accent : Danger;
                     }
                 }
                 else if (part < 0)
@@ -509,37 +548,43 @@ namespace ChillRoad
                     {
                         // Pneus, suspensions : le type monté, comme la couleur de la peinture
                         row.status.text = CarTuning.OptionName(p, level).ToUpperInvariant();
-                        row.status.color = on ? InkDim : Dim;
+                        row.status.color = Dim;
                         continue;
                     }
                     int price = CarTuning.NextPrice(spec, p);
                     for (int k = 0; k < row.pips.Length; k++)
-                        row.pips[k].color = k < level ? (on ? InkBrand : Brand) : on ? new Color(0f, 0f, 0f, 0.18f) : PipOff;
+                        row.pips[k].color = k < level ? Accent : PipOff;
                     bool bought = price >= 0 && CarTuning.Owns(spec, p, level + 1);
                     row.status.text = bought ? Loc.T("ACHETÉ", "OWNED") : PriceText(price);
-                    row.status.color = price < 0 ? (on ? InkMoney : Money) : bought ?(on ? InkDim : Dim) : cash >= price ? (on ? InkAccent : Accent) : on ? InkDanger : new Color(1f, 0.45f, 0.4f, 0.85f);
+                    row.status.color = price < 0 ? Money : bought ? Dim : cash >= price ? Accent : Danger;
                 }
                 else
                 {
                     var cp = (CarTuning.Part)part;
                     row.name.text = CarTuning.OptionName(cp, i);
-                    if (i == current) { row.status.text = Loc.T("INSTALLÉ", "FITTED"); row.status.color = on ? InkMoney : Money; }
-                    else if (CarTuning.Owns(spec, cp, i)) { row.status.text = i == 0 ? Loc.T("D'ORIGINE", "STOCK") : Loc.T("ACHETÉ", "OWNED"); row.status.color = on ? InkDim : Dim; }
+                    if (i == current) { row.status.text = Loc.T("INSTALLÉ", "FITTED"); row.status.color = Money; }
+                    else if (CarTuning.Owns(spec, cp, i)) { row.status.text = i == 0 ? Loc.T("D'ORIGINE", "STOCK") : Loc.T("ACHETÉ", "OWNED"); row.status.color = Dim; }
                     else
                     {
                         int price = CarTuning.Price(spec, cp, i);
                         row.status.text = PriceText(price);
-                        row.status.color = cash >= price ? (on ? InkAccent : Accent) : on ? InkDanger : new Color(1f, 0.45f, 0.4f, 0.85f);
+                        row.status.color = cash >= price ? Accent : Danger;
                     }
                 }
             }
 
             if (shown < 0) return;
             string ok = pad ? "A" : Loc.T("Entrée", "Enter");
-            string turn = pad ? Loc.T("joystick droit : tourner", "right stick: rotate") : Loc.T("clic droit : tourner", "right click: rotate");
             string back = pad ? "B" : Loc.T("Échap", "Esc");
-            if (InPaint || (tab == TabLooks && part < 0 && shown == 0)) { RefreshPaint(spec, cash, ok, back, turn); return; }
-            if (tab == TabLooks) { RefreshLook(spec, cash, ok, back, turn); return; }
+            actionKey.text = ok;
+            // Aide en bas du menu : les touches en or
+            string turn = pad ? Loc.T($"{K("joystick droit")} : tourner", $"{K("right stick")}: rotate")
+                              : Loc.T($"{K("clic droit")} : tourner", $"{K("right click")}: rotate");
+            string keys = K("↑ ↓");
+            ok = K(ok);
+            back = K(back);
+            if (InPaint || (tab == TabLooks && part < 0 && shown == 0)) { RefreshPaint(spec, cash, ok, back, turn, keys); return; }
+            if (tab == TabLooks) { RefreshLook(spec, cash, ok, back, turn, keys); return; }
 
             // Fiche : la pièce regardée (ou ouverte), et ce qu'apporte l'option visée
             var sel = (CarTuning.Part)(part < 0 ? shown : part);
@@ -547,7 +592,8 @@ namespace ChillRoad
             int lv = CarTuning.Level(spec, sel);
             int target = part >= 0 ? shown : typed ? lv : Mathf.Min(lv + 1, CarTuning.MaxLevel);
             string option = CarTuning.OptionName(sel, target);
-            nameText.text = CarTuning.Name(sel);
+            kickerText.text = Glass.Spaced(CarTuning.Name(sel).ToUpperInvariant(), 2);
+            nameText.text = option;
             subText.text = part >= 0 && typed ? CarTuning.OptionEffect(sel, target) : CarTuning.Effect(sel);
             levelText.text = typed ? CarTuning.OptionName(sel, lv) : Loc.F($"Niveau {lv} / {CarTuning.MaxLevel}", $"Level {lv} / {CarTuning.MaxLevel}");
 
@@ -556,81 +602,132 @@ namespace ChillRoad
 
             int cost = CarTuning.Price(spec, sel, target);
             bool has = CarTuning.Owns(spec, sel, target);
-            if (message != null) { actionText.text = message; actionText.color = messageColor; }
-            else if (part < 0 && typed) { actionText.text = Loc.T($"{ok} : voir les {CarTuning.Options(sel)} types", $"{ok}: see the {CarTuning.Options(sel)} types"); actionText.color = White; }
-            else if (part < 0 && lv >= CarTuning.MaxLevel) { actionText.text = Loc.T($"{ok} : voir les niveaux  ·  pièce au maximum", $"{ok}: see the levels  ·  part fully upgraded"); actionText.color = Money; }
-            else if (part < 0) { actionText.text = Loc.T($"{ok} : voir les niveaux  ·  suivant {(has ? "acheté" : PriceText(cost))}", $"{ok}: see the levels  ·  next {(has ? "owned" : PriceText(cost))}"); actionText.color = White; }
-            else if (target == lv) { actionText.text = typed ? Loc.T("Monté sur la voiture", "On the car") : Loc.T("Niveau installé", "Level fitted"); actionText.color = Money; }
-            else if (target == 0) { actionText.text = Loc.T($"{ok} : remettre d'origine  ·  gratuit", $"{ok}: back to stock  ·  free"); actionText.color = White; }
-            else if (has) { actionText.text = Loc.T($"{ok} : remonter {option}  ·  déjà acheté", $"{ok}: refit {option}  ·  already owned"); actionText.color = White; }
-            else if (cash < cost) { actionText.text = Loc.T($"Il te manque {Wallet.Format(cost - cash)}", $"You need {Wallet.Format(cost - cash)} more"); actionText.color = Danger; }
-            else { actionText.text = Loc.T($"{ok} : installer {option}  ·  {PriceText(cost)}", $"{ok}: fit {option}  ·  {PriceText(cost)}"); actionText.color = White; }
+            if (message != null) Action(message, messageColor);
+            else if (part < 0 && typed) Action(Loc.T($"Voir les {CarTuning.Options(sel)} types", $"See the {CarTuning.Options(sel)} types"), White, key: true);
+            else if (part < 0 && lv >= CarTuning.MaxLevel) Action(Loc.T("Voir les niveaux  ·  pièce au maximum", "See the levels  ·  part fully upgraded"), Money, key: true);
+            else if (part < 0) Action(Loc.T("Voir les niveaux  ·  suivant", "See the levels  ·  next"), White, has ? Loc.T("acheté", "owned") : PriceText(cost), has ? Dim : cash >= cost ? Accent : Danger, true);
+            else if (target == lv) Action(typed ? Loc.T("Monté sur la voiture", "On the car") : Loc.T("Niveau installé", "Level fitted"), Money);
+            else if (target == 0) Action(Loc.T("Remettre d'origine", "Back to stock"), White, Loc.T("gratuit", "free"), Money, true);
+            else if (has) Action(Loc.T($"Remonter {option}", $"Refit {option}"), White, Loc.T("déjà acheté", "already owned"), Dim, true);
+            else if (cash < cost) Action(Loc.T($"Il te manque {Wallet.Format(cost - cash)}", $"You need {Wallet.Format(cost - cash)} more"), Danger, PriceText(cost), Danger);
+            else Action(Loc.T($"Installer {option}", $"Fit {option}"), White, PriceText(cost), Accent, true);
 
             hintText.text = part < 0
-                ? Loc.T($"↑ ↓ choisir  ·  {ok} ouvrir  ·  {back} sortir  ·  {turn}", $"↑ ↓ browse  ·  {ok} open  ·  {back} leave  ·  {turn}")
-                : Loc.T($"↑ ↓ choisir  ·  {ok} installer  ·  {back} retour  ·  {turn}", $"↑ ↓ browse  ·  {ok} fit  ·  {back} back  ·  {turn}");
+                ? Loc.T($"{keys} choisir  ·  {ok} ouvrir  ·  {back} sortir  ·  {turn}", $"{keys} browse  ·  {ok} open  ·  {back} leave  ·  {turn}")
+                : Loc.T($"{keys} choisir  ·  {ok} installer  ·  {back} retour  ·  {turn}", $"{keys} browse  ·  {ok} fit  ·  {back} back  ·  {turn}");
+        }
+
+        /// <summary>Touche de l'aide, en or.</summary>
+        static string K(string key) => $"<color={GoldTag}>{key}</color>";
+
+        /// <summary>Options possédées de la ligne ouverte (fil d'Ariane).</summary>
+        int OwnedOptions(VehicleSpec spec)
+        {
+            if (InPaint) return CarPaint.OwnedCount(spec);
+            if (InLook) return CarCosmetics.OwnedCount(spec, LookItem);
+            var p = (CarTuning.Part)part;
+            int n = 0;
+            for (int i = 0; i < CarTuning.Options(p); i++) if (CarTuning.Owns(spec, p, i)) n++;
+            return n;
+        }
+
+        /// <summary>Fond de ligne : rien au repos, or doux cerné d'or et halo quand elle est choisie (redessiné seulement au changement).</summary>
+        static void StyleRow(Row row, bool on)
+        {
+            row.name.color = White;
+            row.name.font = Glass.FontOf(on ? Glass.Weight.Regular : Glass.Weight.Light);
+            row.status.font = Glass.FontOf(on ? Glass.Weight.Semibold : Glass.Weight.Regular);
+            float edge = on ? 2.25f : 0f;
+            if (!Mathf.Approximately(row.plate.border, edge))
+                row.plate.Set(on ? Glass.GoldSoft : Color.clear, Accent, edge, on ? 8f : 0f);
+        }
+
+        /// <summary>
+        /// Ligne d'action de la fiche : pilule cernée d'or quand l'appui fait quelque chose (touche à droite, prix juste
+        /// avant), cernée de corail pour un manque d'argent, neutre pour un simple état.
+        /// </summary>
+        void Action(string text, Color color, string price = null, Color? priceColor = null, bool key = false)
+        {
+            actionText.text = text;
+            actionText.color = color;
+            actionPrice.text = price ?? "";
+            actionPrice.color = priceColor ?? Accent;
+            actionChip.gameObject.SetActive(key);
+            bool bad = color == Danger;
+            Color fill = key ? Glass.GoldSoft : bad ? Glass.A(Danger, 0.12f) : Glass.Pill;
+            Color edge = key ? Glass.A(Accent, 0.6f) : bad ? Glass.A(Danger, 0.6f) : Glass.Edge;
+            if (actionPlate.color != fill || actionPlate.borderColor != edge)
+            {
+                actionPlate.borderColor = edge;
+                actionPlate.color = fill;
+                actionPlate.SetVerticesDirty();
+            }
+            float chipW = key ? Mathf.Max(72f, actionKey.preferredWidth + 42f) : 0f;
+            actionChip.rectTransform.sizeDelta = new Vector2(chipW, 54f);
+            actionPrice.rectTransform.anchoredPosition = new Vector2(key ? -(chipW + 30f) : -30f, 0f);
         }
 
         /// <summary>Fiche de la peinture : sans effet sur la conduite (barres inchangées), la couleur regardée et son prix.</summary>
-        void RefreshPaint(VehicleSpec spec, int cash, string ok, string back, string turn)
+        void RefreshPaint(VehicleSpec spec, int cash, string ok, string back, string turn, string keys)
         {
             bool can = CarPaint.Paintable(spec);
             int colour = CarPaint.Selected(spec);
-            nameText.text = InPaint ? CarPaint.Name(shown) : Loc.T("Peinture", "Paint");
+            kickerText.text = Glass.Spaced(Loc.T("PEINTURE", "PAINT"), 2);
+            nameText.text = !can ? Loc.T("D'origine", "Factory") : CarPaint.Name(InPaint ? shown : colour);
             subText.text = Loc.T("Couleur de carrosserie : sans effet sur la conduite", "Body colour: no effect on handling");
             levelText.text = can ? Loc.F($"{CarPaint.OwnedCount(spec)} / {CarPaint.Count} couleurs", $"{CarPaint.OwnedCount(spec)} / {CarPaint.Count} colours") : "";
             ShowLook(spec, InPaint ? shown : colour, CarCosmetics.Fitted(spec));
 
             int price = InPaint ? CarPaint.Price(spec, shown) : 0;
-            if (message != null) { actionText.text = message; actionText.color = messageColor; }
-            else if (!can) { actionText.text = Loc.T("Cette voiture garde sa livrée d'origine", "This car keeps its factory livery"); actionText.color = Dim; }
-            else if (!InPaint) { actionText.text = Loc.T($"{ok} : voir les couleurs  ·  {CarPaint.Count - 1} au choix", $"{ok}: see the colours  ·  {CarPaint.Count - 1} to choose from"); actionText.color = White; }
-            else if (shown == colour) { actionText.text = Loc.T("Couleur actuelle de la voiture", "The car's current colour"); actionText.color = Money; }
-            else if (CarPaint.Owns(spec, shown)) { actionText.text = Loc.T($"{ok} : repeindre  ·  déjà achetée", $"{ok}: repaint  ·  already owned"); actionText.color = White; }
-            else if (cash < price) { actionText.text = Loc.T($"Il te manque {Wallet.Format(price - cash)}", $"You need {Wallet.Format(price - cash)} more"); actionText.color = Danger; }
-            else { actionText.text = Loc.T($"{ok} : acheter et peindre  ·  {PriceText(price)}", $"{ok}: buy and paint  ·  {PriceText(price)}"); actionText.color = White; }
+            if (message != null) Action(message, messageColor);
+            else if (!can) Action(Loc.T("Cette voiture garde sa livrée d'origine", "This car keeps its factory livery"), Dim);
+            else if (!InPaint) Action(Loc.T($"Voir les couleurs  ·  {CarPaint.Count - 1} au choix", $"See the colours  ·  {CarPaint.Count - 1} to choose from"), White, key: true);
+            else if (shown == colour) Action(Loc.T("Couleur actuelle de la voiture", "The car's current colour"), Money);
+            else if (CarPaint.Owns(spec, shown)) Action(Loc.T("Repeindre", "Repaint"), White, Loc.T("déjà achetée", "already owned"), Dim, true);
+            else if (cash < price) Action(Loc.T($"Il te manque {Wallet.Format(price - cash)}", $"You need {Wallet.Format(price - cash)} more"), Danger, PriceText(price), Danger);
+            else Action(Loc.T("Acheter et peindre", "Buy and paint"), White, PriceText(price), Accent, true);
 
             hintText.text = InPaint
-                ? Loc.T($"↑ ↓ essayer  ·  {ok} peindre  ·  {back} retour  ·  {turn}", $"↑ ↓ try on  ·  {ok} paint  ·  {back} back  ·  {turn}")
-                : Loc.T($"↑ ↓ choisir  ·  {ok} ouvrir  ·  {back} sortir  ·  {turn}", $"↑ ↓ browse  ·  {ok} open  ·  {back} leave  ·  {turn}");
+                ? Loc.T($"{keys} essayer  ·  {ok} peindre  ·  {back} retour  ·  {turn}", $"{keys} try on  ·  {ok} paint  ·  {back} back  ·  {turn}")
+                : Loc.T($"{keys} choisir  ·  {ok} ouvrir  ·  {back} sortir  ·  {turn}", $"{keys} browse  ·  {ok} open  ·  {back} leave  ·  {turn}");
         }
 
         /// <summary>Fiche d'un accessoire cosmétique : ce qu'il fait, l'option visée et son prix, l'habillage complet de la voiture.</summary>
-        void RefreshLook(VehicleSpec spec, int cash, string ok, string back, string turn)
+        void RefreshLook(VehicleSpec spec, int cash, string ok, string back, string turn, string keys)
         {
             var item = part < 0 ? (CarCosmetics.Item)(shown - 1) : LookItem;
             bool can = CarCosmetics.Available(spec, item);
             int fitted = CarCosmetics.Fitted(spec, item);
             int target = part < 0 ? fitted : shown;
             string option = CarCosmetics.OptionName(item, target);
-            nameText.text = CarCosmetics.Name(item);
+            kickerText.text = Glass.Spaced(CarCosmetics.Name(item).ToUpperInvariant(), 2);
+            nameText.text = can ? option : CarCosmetics.Name(item);
             subText.text = part < 0 ? CarCosmetics.Effect(item) : CarCosmetics.OptionEffect(item, target);
             levelText.text = can ? Loc.F($"{CarCosmetics.OwnedCount(spec, item)} / {CarCosmetics.Options(item)}") : "";
             ShowLook(spec, CarPaint.Selected(spec), ShownLook());
 
             int cost = CarCosmetics.Price(spec, item, target);
-            if (message != null) { actionText.text = message; actionText.color = messageColor; }
-            else if (!can) { actionText.text = CarCosmetics.Unavailable(item); actionText.color = Dim; }
-            else if (part < 0) { actionText.text = Loc.T($"{ok} : voir les {CarCosmetics.Options(item)} options", $"{ok}: see the {CarCosmetics.Options(item)} options"); actionText.color = White; }
-            else if (target == fitted) { actionText.text = Loc.T("Monté sur la voiture", "On the car"); actionText.color = Money; }
-            else if (target == CarCosmetics.Stock(item)) { actionText.text = Loc.T($"{ok} : remettre d'origine  ·  gratuit", $"{ok}: back to stock  ·  free"); actionText.color = White; }
+            if (message != null) Action(message, messageColor);
+            else if (!can) Action(CarCosmetics.Unavailable(item), Dim);
+            else if (part < 0) Action(Loc.T($"Voir les {CarCosmetics.Options(item)} options", $"See the {CarCosmetics.Options(item)} options"), White, key: true);
+            else if (target == fitted) Action(Loc.T("Monté sur la voiture", "On the car"), Money);
+            else if (target == CarCosmetics.Stock(item)) Action(Loc.T("Remettre d'origine", "Back to stock"), White, Loc.T("gratuit", "free"), Money, true);
             else if (CarCosmetics.Owns(spec, item, target))
             {
                 bool free = CarCosmetics.OptionPrice(spec, item, target) == 0;
-                actionText.text = Loc.T($"{ok} : monter {option}  ·  {(free ? "gratuit" : "déjà acheté")}", $"{ok}: fit {option}  ·  {(free ? "free" : "already owned")}");
-                actionText.color = White;
+                Action(Loc.T($"Monter {option}", $"Fit {option}"), White, free ? Loc.T("gratuit", "free") : Loc.T("déjà acheté", "already owned"), free ? Money : Dim, true);
             }
-            else if (cash < cost) { actionText.text = Loc.T($"Il te manque {Wallet.Format(cost - cash)}", $"You need {Wallet.Format(cost - cash)} more"); actionText.color = Danger; }
-            else { actionText.text = Loc.T($"{ok} : installer {option}  ·  {PriceText(cost)}", $"{ok}: fit {option}  ·  {PriceText(cost)}"); actionText.color = White; }
+            else if (cash < cost) Action(Loc.T($"Il te manque {Wallet.Format(cost - cash)}", $"You need {Wallet.Format(cost - cash)} more"), Danger, PriceText(cost), Danger);
+            else Action(Loc.T($"Installer {option}", $"Fit {option}"), White, PriceText(cost), Accent, true);
 
             hintText.text = part < 0
-                ? Loc.T($"↑ ↓ choisir  ·  {ok} ouvrir  ·  {back} sortir  ·  {turn}", $"↑ ↓ browse  ·  {ok} open  ·  {back} leave  ·  {turn}")
-                : Loc.T($"↑ ↓ essayer  ·  {ok} installer  ·  {back} retour  ·  {turn}", $"↑ ↓ try on  ·  {ok} fit  ·  {back} back  ·  {turn}");
+                ? Loc.T($"{keys} choisir  ·  {ok} ouvrir  ·  {back} sortir  ·  {turn}", $"{keys} browse  ·  {ok} open  ·  {back} leave  ·  {turn}")
+                : Loc.T($"{keys} essayer  ·  {ok} installer  ·  {back} retour  ·  {turn}", $"{keys} try on  ·  {ok} fit  ·  {back} back  ·  {turn}");
         }
 
         /// <summary>
         /// Fiche de l'onglet cosmétique : à la place des barres, l'habillage de la voiture ligne par ligne (peinture et
-        /// accessoires), le changement essayé en surbrillance (« actuel → essayé »).
+        /// accessoires), le changement essayé en or (« actuel → essayé »).
         /// </summary>
         void ShowLook(VehicleSpec spec, int paint, CarCosmetics.Look look)
         {
@@ -658,9 +755,9 @@ namespace ChillRoad
                 }
                 else { bar.label.text = ""; bar.value.text = ""; continue; }
                 bool changed = now != then;
-                bar.label.color = changed ? Brand : White;
+                bar.label.color = White;
                 bar.value.text = changed ? now + "  →  " + then : now;
-                bar.value.color = changed ? Brand : Accent;
+                bar.value.color = changed ? Accent : Dim;
             }
         }
 
@@ -693,14 +790,14 @@ namespace ChillRoad
                 float barA = Mathf.Clamp01(Bar(mode, i, a) / scale[mode, i]), barB = Mathf.Clamp01(Bar(mode, i, b) / scale[mode, i]);
                 bars[i].bg.gameObject.SetActive(true);
                 bars[i].label.text = Loc.T(StatLabels[mode, i, 0], StatLabels[mode, i, 1]);
-                // Le plein s'arrête à la valeur qui reste ; au-delà, le gain (rose) ou ce qui serait perdu (rouge)
+                // Le plein (blanc) s'arrête à la valeur qui reste ; au-delà, le gain (vert) ou ce qui serait perdu (corail)
                 bars[i].fill.localScale = new Vector3(Mathf.Min(barA, barB), 1f, 1f);
                 bars[i].gain.localScale = new Vector3(lost ? 0f : barB, 1f, 1f);
                 bars[i].loss.localScale = new Vector3(lost ? barA : 0f, 1f, 1f);
-                Color tint = lost ? Danger : Brand;
-                bars[i].label.color = changed ? tint : White;
+                Color tint = lost ? Danger : Money;
+                bars[i].label.color = White;
                 bars[i].value.text = changed ? Format(mode, i, a) + "  →  " + Format(mode, i, b) : Format(mode, i, a);
-                bars[i].value.color = changed ? tint : Accent;
+                bars[i].value.color = changed ? tint : White;
             }
         }
 
@@ -761,6 +858,9 @@ namespace ChillRoad
 
         // ------------------------------------------------------------------ construction
 
+        /// <summary>Fiche (en bas à droite), aux mesures de la maquette (×1,5 pour 1920×1080).</summary>
+        const float CardW = 780f, CardH = 564f;
+
         void Build()
         {
             // Échelle des barres : la meilleure voiture du jeu, entièrement améliorée ; pneus et suspensions : le meilleur
@@ -791,50 +891,65 @@ namespace ChillRoad
             canvas.sortingOrder = 29;
             var scaler = root.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            // Résolution de référence plus grande : le menu occupe moins d'écran (environ 80 % de l'ancienne taille)
-            scaler.referenceResolution = new Vector2(2400, 1350);
+            scaler.referenceResolution = new Vector2(1920, 1080);
             scaler.matchWidthOrHeight = 0.5f;
             var screen = (RectTransform)root.transform;
             screenRt = screen;
 
-            // Menu (en haut à gauche) : bandeau, fil d'Ariane, lignes, portefeuille ; sa hauteur suit le nombre de lignes
-            var menu = Rect(screen, "Menu", new Vector2(0f, 1f), new Vector2(0f, 1f), Vector2.zero, Vector2.zero);
-            menu.pivot = new Vector2(0f, 1f);
-            menu.sizeDelta = new Vector2(580f, 0f);
-            menu.anchoredPosition = new Vector2(56f, -44f);
+            // Menu (à gauche, sur toute la hauteur, l'atelier reste visible derrière) : titre et portefeuille, onglets,
+            // fil d'Ariane, lignes ; l'aide des touches en bas
+            var menu = Glass.Rect(screen, "Menu", new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(60f, 54f), new Vector2(660f, -54f));
             menuRt = menu;
+            Glass.Backdrop(menu, 48f);
             var layout = menu.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 3;
-            layout.childControlHeight = true; layout.childControlWidth = true; layout.childForceExpandHeight = false;
-            menu.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            layout.padding = new RectOffset(24, 24, 36, 27);
+            layout.spacing = 4f;
+            layout.childControlHeight = true; layout.childControlWidth = true;
+            layout.childForceExpandHeight = false; layout.childForceExpandWidth = true;
 
-            var banner = Bar(menu, 100f, new Color(0.02f, 0.025f, 0.04f, 0.92f), 0f);
-            var accent = Rect(banner, "Accent", new Vector2(0f, 0f), new Vector2(0f, 1f), Vector2.zero, new Vector2(5f, 0f));
-            accent.gameObject.AddComponent<Image>().color = Brand;
-            var underline = Rect(banner, "Underline", new Vector2(0f, 0f), new Vector2(1f, 0f), Vector2.zero, new Vector2(0f, 3f));
-            underline.gameObject.AddComponent<Image>().color = new Color(Brand.r, Brand.g, Brand.b, 0.5f);
-            var title = Place(Label(banner, "", 40, TextAnchor.MiddleLeft, White, FontStyle.BoldAndItalic), new Vector2(26f, -10f), new Vector2(530f, 50f));
-            Loc.Bind(title, "GARAGE DE TUNING", "TUNING GARAGE");
-            carText = Place(Label(banner, "", 24, TextAnchor.MiddleLeft, Dim, FontStyle.BoldAndItalic), new Vector2(28f, -62f), new Vector2(530f, 30f));
+            var head = Block(menu, 78f);
+            Glass.Label(head, Glass.Spaced("TUNING", 1), 48, Glass.Weight.Light, White, TextAnchor.UpperLeft, new Vector2(0f, 1f), new Vector2(27f, 6f), new Vector2(330f, 60f));
+            carText = Glass.Label(head, "", 20, Glass.Weight.Light, Dim, TextAnchor.LowerLeft, new Vector2(0f, 1f), new Vector2(29f, -50f), new Vector2(330f, 26f));
+            walletText = Glass.Kicker(head, "", 16);
+            Pin(walletText, TextAnchor.UpperRight, new Vector2(1f, 1f), new Vector2(-27f, -14f), new Vector2(260f, 22f));
+            cashText = Glass.Label(head, "", 27, Glass.Weight.Regular, Accent, TextAnchor.UpperRight, new Vector2(1f, 1f), new Vector2(-27f, -38f), new Vector2(260f, 36f));
 
-            // Onglets : performances, cosmétique (LB / RB, Tab, ou clic)
-            var tabBar = Bar(menu, 54f, new Color(0.01f, 0.012f, 0.02f, 0.94f), 0f);
-            tabBar.GetComponent<LayoutElement>().flexibleHeight = 0f;
-            var th = tabBar.gameObject.AddComponent<HorizontalLayoutGroup>();
-            th.padding = new RectOffset(6, 6, 6, 6);
-            th.spacing = 6;
+            // Onglets texte, trait or sous l'onglet ouvert (LB / RB, Tab, ou clic)
+            Gap(menu, 6f);
+            var tabRow = Block(menu, 54f);
+            var rule = Glass.Bar(tabRow, "Rule", Glass.A(White, 0.22f)).rectTransform;
+            rule.anchorMin = Vector2.zero; rule.anchorMax = new Vector2(1f, 0f);
+            rule.offsetMin = new Vector2(27f, 0f); rule.offsetMax = new Vector2(-27f, 1.5f);
+            var strip = Glass.Rect(tabRow, "Tabs", Vector2.zero, Vector2.one, new Vector2(27f, 0f), new Vector2(-27f, 0f));
+            var th = strip.gameObject.AddComponent<HorizontalLayoutGroup>();
+            th.spacing = 33;
             th.childControlWidth = true; th.childControlHeight = true;
             th.childForceExpandWidth = false; th.childForceExpandHeight = true;
-            tabPrevText = TabGlyph(tabBar);
-            var tabNames = new[] { ("PERFORMANCES", "PERFORMANCE"), ("COSMÉTIQUE", "COSMETICS") };
-            for (int i = 0; i < tabNames.Length; i++) tabs.Add(MakeTab(tabBar, tabNames[i].Item1, tabNames[i].Item2, i));
-            tabNextText = TabGlyph(tabBar);
+            var tabNames = new[] { ("PIÈCES", "PARTS"), ("PEINTURE", "PAINT"), ("COSMÉTIQUE", "COSMETICS") };
+            for (int i = 0; i < tabNames.Length; i++) tabs.Add(MakeTab(strip, tabNames[i].Item1, tabNames[i].Item2, i));
+            Gap(strip, 0f).flexibleWidth = 1f;
+            tabKeysText = Glass.Label(strip, "", 18, Glass.Weight.Semibold, Accent, TextAnchor.MiddleRight);
+            Gap(menu, 12f);
 
-            var crumb = Bar(menu, 44f, new Color(0.01f, 0.012f, 0.02f, 0.94f), 0f);
-            crumbText = Label(crumb, "", 22, TextAnchor.MiddleLeft, White, FontStyle.Bold);
-            Stretch(crumbText.rectTransform, 26f, 120f);
-            countText = Label(crumb, "", 22, TextAnchor.MiddleRight, Dim, FontStyle.Bold);
-            Stretch(countText.rectTransform, 300f, 24f);
+            // Fil d'Ariane : « ‹ Pièces › Pneus » et le compte ; clic : retour à la liste
+            var crumbGo = new GameObject("Crumb", typeof(RectTransform), typeof(CanvasRenderer), typeof(GlassRect), typeof(Button), typeof(LayoutElement));
+            crumbGo.transform.SetParent(menu, false);
+            var crumbPlate = crumbGo.GetComponent<GlassRect>();
+            crumbPlate.Set(Color.clear, Glass.Edge, 0f);
+            crumbPlate.radius = 27f;
+            var crumbButton = crumbGo.GetComponent<Button>();
+            crumbButton.targetGraphic = crumbPlate;
+            crumbButton.transition = Selectable.Transition.None;
+            crumbButton.navigation = new Navigation { mode = Navigation.Mode.None };
+            crumbButton.onClick.AddListener(() => { if (part >= 0) Back(); });
+            crumbGo.GetComponent<LayoutElement>().preferredHeight = 56f;
+            chevronText = Glass.Label(crumbGo.transform, "‹", 38, Glass.Weight.Light, Glass.Cyan, TextAnchor.MiddleLeft);
+            Stretch(chevronText.rectTransform, 25f, 0f);
+            chevronText.rectTransform.offsetMin += new Vector2(0f, 4f);
+            crumbText = Glass.Label(crumbGo.transform, "", 22, Glass.Weight.Regular, Glass.Cyan, TextAnchor.MiddleLeft);
+            Stretch(crumbText.rectTransform, 54f, 120f);
+            countText = Glass.Label(crumbGo.transform, "", 20, Glass.Weight.Regular, Dim, TextAnchor.MiddleRight);
+            Stretch(countText.rectTransform, 300f, 27f);
 
             int count = Mathf.Max(Mathf.Max(CarTuning.PartCount, CarTuning.MaxOptions), Mathf.Max(LookRows, Mathf.Max(CarPaint.Count, CarCosmetics.MaxOptions)));
             for (int i = 0; i < count; i++)
@@ -843,162 +958,171 @@ namespace ChillRoad
                 rows.Add(MakeRow(menu, () => Choose(index), true));
             }
 
-            var purse = Bar(menu, 46f, new Color(0.01f, 0.012f, 0.02f, 0.94f), 0f);
-            cashText = Label(purse, "", 24, TextAnchor.MiddleLeft, Money, FontStyle.BoldAndItalic);
-            Stretch(cashText.rectTransform, 26f, 20f);
-            // Sortir ou revenir (souris, doigt) : hors de la navigation de la liste
+            // L'aide reste en bas du panneau
+            Gap(menu, 0f).flexibleHeight = 1f;
+            // Sortir ou revenir (souris, doigt) : hors de la navigation de la liste, discret
             var leave = MakeRow(menu, Back, false);
             Destroy(leave.button.GetComponent<HoverSelect>());
             leave.button.navigation = new Navigation { mode = Navigation.Mode.None };
+            leave.plate.Set(Color.white, Glass.Edge, 0f);
+            leave.button.transition = Selectable.Transition.ColorTint;
             var leaveColors = leave.button.colors;
-            leaveColors.selectedColor = leaveColors.normalColor;
+            leaveColors.normalColor = Color.clear;
+            leaveColors.highlightedColor = Glass.Pill;
+            leaveColors.selectedColor = Color.clear;
+            leaveColors.pressedColor = Glass.GoldSoft;
+            leaveColors.colorMultiplier = 1f;
+            leaveColors.fadeDuration = 0.06f;
             leave.button.colors = leaveColors;
-            leave.button.GetComponent<LayoutElement>().preferredHeight = 46;
+            leaveLayout = leave.layout;
+            leaveLayout.preferredHeight = 44f;
             leaveText = leave.name;
-            hintText = Label(menu, "", 19, TextAnchor.MiddleLeft, Dim, FontStyle.Bold);
-            hintText.gameObject.AddComponent<LayoutElement>().preferredHeight = 34;
+            leaveText.fontSize = 20;
+            leaveText.color = Dim;
+            var hintBox = Block(menu, 50f);
+            hintText = Glass.Label(hintBox, "", 18, Glass.Weight.Light, White, TextAnchor.MiddleLeft);
+            hintText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            hintText.lineSpacing = 0.95f;
+            Stretch(hintText.rectTransform, 27f, 18f);
+            // En-tête, onglets, fil d'Ariane, sortie, aide et marges : le reste de la hauteur va aux lignes
+            menuChrome = 36f + 27f + 78f + 6f + 54f + 12f + 56f + 44f + 50f + 9f * 4f;
 
-            // Fiche de la pièce (en bas à droite)
-            const float cardH = 520f;
-            var card = Rect(screen, "Card", new Vector2(1f, 0f), new Vector2(1f, 0f), Vector2.zero, Vector2.zero);
-            card.pivot = new Vector2(1f, 0f);
-            card.sizeDelta = new Vector2(710f, cardH);
-            card.anchoredPosition = new Vector2(-50f, 44f);
+            // Fiche de la pièce (en bas à droite) : catégorie en cyan, option en texte fin, effet, barres, ligne d'action
+            var card = Glass.Place(screen, "Card", new Vector2(1f, 0f), new Vector2(-60f, 54f), new Vector2(CardW, CardH));
             cardRt = card;
-            Backdrop(card, cardH);
-            // Liseré le long du bord gauche, à la même pente que la plaque
-            Shape(card, "Stripe", Vector2.zero, Vector2.zero, new Vector2(4f, cardH), new Color(Brand.r, Brand.g, Brand.b, 0.7f)).Set(cardH * Slope, 0f, 0f);
-            nameText = Place(Label(card, "", 40, TextAnchor.UpperLeft, White, FontStyle.BoldAndItalic), new Vector2(34f, -20f), new Vector2(460f, 50f));
-            levelText = Place(Label(card, "", 24, TextAnchor.UpperRight, Brand, FontStyle.BoldAndItalic), new Vector2(480f, -28f), new Vector2(200f, 40f));
-            subText = Place(Label(card, "", 22, TextAnchor.UpperLeft, Dim, FontStyle.Bold), new Vector2(34f, -70f), new Vector2(640f, 30f));
+            Glass.Backdrop(card, 45f);
+            kickerText = Glass.Kicker(card, "", 16);
+            Pin(kickerText, TextAnchor.LowerLeft, new Vector2(0f, 1f), new Vector2(39f, -24f), new Vector2(480f, 24f));
+            nameText = Glass.Label(card, "", 45, Glass.Weight.Light, White, TextAnchor.MiddleLeft, new Vector2(0f, 1f), new Vector2(37f, -48f), new Vector2(440f, 56f));
+            levelText = Glass.Label(card, "", 21, Glass.Weight.Light, White, TextAnchor.MiddleRight, new Vector2(1f, 1f), new Vector2(-39f, -62f), new Vector2(300f, 36f));
+            subText = Glass.Label(card, "", 22, Glass.Weight.Light, White, TextAnchor.MiddleLeft, new Vector2(0f, 1f), new Vector2(39f, -108f), new Vector2(702f, 32f));
+            var divider = Glass.Bar(card, "Rule", Glass.A(White, 0.22f)).rectTransform;
+            divider.anchorMin = divider.anchorMax = divider.pivot = new Vector2(0f, 1f);
+            divider.anchoredPosition = new Vector2(39f, -152f);
+            divider.sizeDelta = new Vector2(702f, 1.5f);
             for (int i = 0; i < Stats; i++)
             {
-                float y = -118f - i * 52f;
-                var label = Place(Label(card, "", 21, TextAnchor.MiddleLeft, White, FontStyle.Normal), new Vector2(34f, y), new Vector2(250f, 30f));
+                float y = -186f - i * 46f;                    // milieu de la ligne
+                var label = Glass.Label(card, "", 21, Glass.Weight.Light, White, TextAnchor.MiddleLeft, new Vector2(0f, 1f), new Vector2(39f, y + 15f), new Vector2(246f, 30f));
                 label.text = Loc.T(StatLabels[0, i, 0], StatLabels[0, i, 1]);
-                var bg = Rect(card, "Bar", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(290f, y - 19f), new Vector2(470f, y - 11f));
-                bg.gameObject.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.12f);
+                // Barre fine : piste 6 px, plein blanc, gain vert, perte corail
+                var bg = Rect(card, "Bar", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(305f, y - 3f), new Vector2(470f, y + 3f));   // court : place pour « 452 ch/t → 488 ch/t »
+                bg.gameObject.AddComponent<Image>().color = Glass.A(White, 0.18f);
                 var gain = Rect(bg, "Gain", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
                 gain.pivot = new Vector2(0f, 0.5f);
-                gain.gameObject.AddComponent<Image>().color = Brand;
+                gain.gameObject.AddComponent<Image>().color = Money;
                 var loss = Rect(bg, "Loss", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
                 loss.pivot = new Vector2(0f, 0.5f);
                 loss.gameObject.AddComponent<Image>().color = Danger;
                 var fill = Rect(bg, "Fill", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
                 fill.pivot = new Vector2(0f, 0.5f);
-                fill.gameObject.AddComponent<Image>().color = Info;
-                var value = Place(Label(card, "", 21, TextAnchor.MiddleRight, Accent, FontStyle.Bold), new Vector2(480f, y), new Vector2(200f, 30f));
+                fill.gameObject.AddComponent<Image>().color = White;
+                var value = Glass.Label(card, "", 21, Glass.Weight.Regular, White, TextAnchor.MiddleRight, new Vector2(0f, 1f), new Vector2(480f, y + 15f), new Vector2(261f, 30f));
                 bars.Add((fill, gain, loss, label, value, bg));
             }
-            actionText = Place(Label(card, "", 27, TextAnchor.MiddleLeft, White, FontStyle.BoldAndItalic), new Vector2(34f, -440f), new Vector2(650f, 40f));
-            // Textes et barres de la fiche : leur marge suit le bord penché de la plaque
-            foreach (RectTransform child in card)
-            {
-                if (child.name == "Plate" || child.name == "Stripe") continue;
-                float yc = cardH + child.anchoredPosition.y;          // milieu de la ligne, depuis le bas de la fiche
-                child.anchoredPosition += new Vector2(Slope * (yc - cardH * 0.5f), 0f);
-            }
+            // Ligne d'action : pilule cernée d'or, texte, prix en or, touche dans une pastille or
+            actionPlate = Glass.Make(card, "Action", 37.5f, Glass.GoldSoft, 1.5f);
+            actionPlate.borderColor = Glass.A(Accent, 0.6f);
+            var ap = actionPlate.rectTransform;
+            ap.anchorMin = ap.anchorMax = ap.pivot = new Vector2(0f, 1f);
+            ap.anchoredPosition = new Vector2(39f, -458f);
+            ap.sizeDelta = new Vector2(702f, 75f);
+            actionText = Glass.Label(ap, "", 24, Glass.Weight.Regular, White, TextAnchor.MiddleLeft);
+            Stretch(actionText.rectTransform, 27f, 200f);
+            actionPrice = Glass.Label(ap, "", 27, Glass.Weight.Semibold, Accent, TextAnchor.MiddleRight, new Vector2(1f, 0.5f), new Vector2(-30f, 0f), new Vector2(300f, 40f));
+            actionChip = Glass.Make(ap, "Key", 27f, Accent, 0f);
+            var kc = actionChip.rectTransform;
+            kc.anchorMin = kc.anchorMax = kc.pivot = new Vector2(1f, 0.5f);
+            kc.anchoredPosition = new Vector2(-10.5f, 0f);
+            kc.sizeDelta = new Vector2(72f, 54f);
+            actionKey = Glass.Label(kc, "", 21, Glass.Weight.Semibold, Glass.Ink, TextAnchor.MiddleCenter);
+            Stretch(actionKey.rectTransform, 0f, 0f);
             root.SetActive(false);
         }
 
-        /// <summary>Bandeau du menu : plaque pleine largeur, d'une hauteur donnée dans la mise en page.</summary>
-        static RectTransform Bar(Transform parent, float height, Color color, float skew)
+        /// <summary>Bloc du menu d'une hauteur donnée dans la mise en page.</summary>
+        static RectTransform Block(Transform parent, float height)
         {
-            var go = new GameObject("Bar", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape), typeof(LayoutElement));
+            var go = new GameObject("Block", typeof(RectTransform), typeof(LayoutElement));
             go.transform.SetParent(parent, false);
             go.GetComponent<LayoutElement>().preferredHeight = height;
-            var shape = go.GetComponent<HudShape>();
-            shape.Set(skew, 0f, 0f);
-            shape.color = color;
-            shape.raycastTarget = false;
             return (RectTransform)go.transform;
         }
 
-        /// <summary>Ligne du menu : sombre, blanche à texte foncé quand elle est choisie.</summary>
+        /// <summary>Espace dans une mise en page (fixe, ou extensible par le LayoutElement rendu).</summary>
+        static LayoutElement Gap(Transform parent, float size)
+        {
+            var go = new GameObject("Gap", typeof(RectTransform), typeof(LayoutElement));
+            go.transform.SetParent(parent, false);
+            var le = go.GetComponent<LayoutElement>();
+            le.preferredHeight = size;
+            le.preferredWidth = 0f;
+            return le;
+        }
+
+        /// <summary>Ligne du menu : texte fin sur fond transparent ; choisie, or doux cerné d'or (<see cref="StyleRow"/>).</summary>
         Row MakeRow(Transform parent, UnityEngine.Events.UnityAction onClick, bool withPips)
         {
-            var go = new GameObject("Row", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape), typeof(Button), typeof(LayoutElement), typeof(HoverSelect));
+            var go = new GameObject("Row", typeof(RectTransform), typeof(CanvasRenderer), typeof(GlassRect), typeof(Button), typeof(LayoutElement), typeof(HoverSelect));
             go.transform.SetParent(parent, false);
-            go.GetComponent<LayoutElement>().preferredHeight = 48;
-            var shape = go.GetComponent<HudShape>();
-            shape.Set(0f, 0f, 0f);
-            shape.color = Color.white;
+            var le = go.GetComponent<LayoutElement>();
+            le.preferredHeight = 75f;
+            var plate = go.GetComponent<GlassRect>();
+            plate.radius = 27f;
+            plate.border = 0f;
+            plate.borderColor = Accent;
+            plate.color = Color.clear;
             var b = go.GetComponent<Button>();
-            b.targetGraphic = shape;
-            var colors = b.colors;
-            colors.normalColor = new Color(0.04f, 0.05f, 0.07f, 0.8f);
-            colors.highlightedColor = new Color(0.16f, 0.18f, 0.23f, 0.92f);
-            colors.selectedColor = new Color(0.95f, 0.96f, 0.97f, 1f);
-            colors.pressedColor = Brand;
-            colors.fadeDuration = 0.06f;
-            b.colors = colors;
+            b.targetGraphic = plate;
+            // Couleurs pilotées par StyleRow (la ligne choisie suit le survol, HoverSelect)
+            b.transition = Selectable.Transition.None;
             b.onClick.AddListener(onClick);
-            var name = Label(go.transform, "", 24, TextAnchor.MiddleLeft, White, FontStyle.BoldAndItalic);
-            Stretch(name.rectTransform, 26f, 260f);
-            name.GetComponent<Shadow>().enabled = false;
-            var status = Label(go.transform, "", 22, TextAnchor.MiddleRight, Accent, FontStyle.Bold);
-            Stretch(status.rectTransform, 340f, 24f);
-            status.GetComponent<Shadow>().enabled = false;
+            var name = Glass.Label(go.transform, "", 25, Glass.Weight.Light, White, TextAnchor.MiddleLeft);
+            Stretch(name.rectTransform, 27f, 260f);
+            var status = Glass.Label(go.transform, "", 20, Glass.Weight.Regular, Accent, TextAnchor.MiddleRight);
+            Stretch(status.rectTransform, 300f, 27f);
             var pips = new Image[withPips ? CarTuning.MaxLevel : 0];
             for (int k = 0; k < pips.Length; k++)
             {
-                // Niveaux : trois pastilles inclinées entre le nom et le prix
+                // Niveaux : trois traits fins entre le nom et le prix
                 var pip = Rect(go.transform, "Pip", new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), Vector2.zero, Vector2.zero);
-                pip.sizeDelta = new Vector2(22f, 14f);
-                pip.anchoredPosition = new Vector2(-232f + k * 28f, 0f);
-                pip.localRotation = Quaternion.Euler(0f, 0f, -12f);
+                pip.sizeDelta = new Vector2(21f, 6f);
+                pip.anchoredPosition = new Vector2(-228f + k * 27f, 0f);
                 var img = pip.gameObject.AddComponent<Image>();
                 img.raycastTarget = false;
                 img.color = PipOff;
                 pips[k] = img;
             }
-            Image swatch = null;
+            GlassRect swatch = null;
             if (withPips)
             {
-                // Peinture : pastille de couleur à la place des niveaux, cernée pour rester lisible sur la ligne blanche
-                var sw = Rect(go.transform, "Swatch", new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), Vector2.zero, Vector2.zero);
-                sw.sizeDelta = new Vector2(78f, 20f);
-                sw.anchoredPosition = new Vector2(-204f, 0f);
-                swatch = sw.gameObject.AddComponent<Image>();
-                swatch.raycastTarget = false;
-                var ring = sw.gameObject.AddComponent<Outline>();
-                ring.effectColor = new Color(0f, 0f, 0f, 0.6f);
-                ring.effectDistance = new Vector2(2f, -2f);
-                sw.gameObject.SetActive(false);
+                // Peinture : pastille de couleur à la place des niveaux, cernée d'un liseré clair
+                swatch = Glass.Make(go.transform, "Swatch", 10.5f, Color.white, 1.5f);
+                var sw = swatch.rectTransform;
+                sw.anchorMin = sw.anchorMax = new Vector2(1f, 0.5f);
+                sw.sizeDelta = new Vector2(60f, 21f);
+                sw.anchoredPosition = new Vector2(-216f, 0f);
+                swatch.gameObject.SetActive(false);
             }
-            return new Row { button = b, name = name, status = status, pips = pips, swatch = swatch };
+            return new Row { button = b, name = name, status = status, pips = pips, swatch = swatch, plate = plate, layout = le };
         }
 
-        /// <summary>Onglet : plaque cliquable hors de la navigation de la liste, trait rose sous l'onglet ouvert.</summary>
-        (HudShape plate, Text label, Image mark) MakeTab(Transform parent, string fr, string en, int index)
+        /// <summary>Onglet texte cliquable hors de la navigation de la liste, trait or sous l'onglet ouvert.</summary>
+        (Text label, Image mark) MakeTab(Transform parent, string fr, string en, int index)
         {
-            var go = new GameObject("Tab", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape), typeof(Button), typeof(LayoutElement));
-            go.transform.SetParent(parent, false);
-            go.GetComponent<LayoutElement>().flexibleWidth = 1f;
-            var shape = go.GetComponent<HudShape>();
-            shape.Set(10f, 0f, 0f);
-            shape.color = new Color(0.02f, 0.025f, 0.04f, 0.85f);
-            var b = go.GetComponent<Button>();
-            b.targetGraphic = shape;
+            var label = Glass.Label(parent, "", 21, Glass.Weight.Regular, Dim, TextAnchor.MiddleCenter);
+            label.raycastTarget = true;
+            Loc.Bind(label, fr, en);
+            var b = label.gameObject.AddComponent<Button>();
+            b.targetGraphic = label;
             b.transition = Selectable.Transition.None;
             b.navigation = new Navigation { mode = Navigation.Mode.None };
-            b.onClick.AddListener(() => SwitchTab(index));
-            var label = Label(go.transform, "", 22, TextAnchor.MiddleCenter, White, FontStyle.BoldAndItalic);
-            Stretch(label.rectTransform, 8f, 8f);
-            Loc.Bind(label, fr, en);
-            var mark = Rect(go.transform, "Active", new Vector2(0.1f, 0f), new Vector2(0.9f, 0f), new Vector2(0f, 0f), new Vector2(0f, 4f));
+            b.onClick.AddListener(() => GoTab(index));
+            var mark = Rect(label.transform, "Active", new Vector2(0f, 0f), new Vector2(1f, 0f), Vector2.zero, new Vector2(0f, 4.5f));
             var img = mark.gameObject.AddComponent<Image>();
-            img.color = Brand;
+            img.color = Accent;
             img.raycastTarget = false;
-            return (shape, label, img);
-        }
-
-        /// <summary>Repère de touche (LB / RB, Tab) au bord de la rangée d'onglets.</summary>
-        Text TabGlyph(Transform parent)
-        {
-            var t = Label(parent, "", 19, TextAnchor.MiddleCenter, Dim, FontStyle.Bold);
-            t.gameObject.AddComponent<LayoutElement>().preferredWidth = 46;
-            return t;
+            return (label, img);
         }
 
         // ------------------------------------------------------------------ helpers
@@ -1020,63 +1144,14 @@ namespace ChillRoad
             rt.offsetMax = new Vector2(-right, 0f);
         }
 
-        /// <summary>Texte posé en haut à gauche d'un panneau, à une position donnée.</summary>
-        static Text Place(Text t, Vector2 pos, Vector2 size)
+        /// <summary>Texte posé (ancre = pivot) à la position et dans la boîte données.</summary>
+        static void Pin(Text t, TextAnchor align, Vector2 anchor, Vector2 pos, Vector2 box)
         {
+            t.alignment = align;
             var rt = t.rectTransform;
-            rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
-            rt.pivot = new Vector2(0f, 0.5f);
-            rt.sizeDelta = size;
-            rt.anchoredPosition = pos + new Vector2(0f, -size.y * 0.5f);
-            return t;
-        }
-
-        static HudShape Shape(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size, Color color)
-        {
-            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape));
-            go.transform.SetParent(parent, false);
-            var rt = (RectTransform)go.transform;
             rt.anchorMin = rt.anchorMax = rt.pivot = anchor;
             rt.anchoredPosition = pos;
-            rt.sizeDelta = size;
-            var s = go.GetComponent<HudShape>();
-            s.color = color;
-            s.raycastTarget = false;
-            return s;
-        }
-
-        /// <summary>
-        /// Pente des plaques inclinées (décalage horizontal par pixel de hauteur, environ 8°, comme à la concession) :
-        /// le même angle quelle que soit la hauteur de la plaque.
-        /// </summary>
-        const float Slope = 0.14f;
-
-        /// <summary>Fond d'un panneau : plaque inclinée sur toute la surface, à la pente commune.</summary>
-        static void Backdrop(RectTransform panel, float height)
-        {
-            var s = Shape(panel, "Plate", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(0.025f, 0.03f, 0.045f, 0.78f));
-            s.Set(height * Slope, 0f, 0f);
-            var rt = s.rectTransform;
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
-            rt.offsetMin = rt.offsetMax = Vector2.zero;
-            rt.SetAsFirstSibling();
-        }
-
-        Text Label(Transform parent, string text, int size, TextAnchor align, Color color, FontStyle style)
-        {
-            var go = new GameObject("Text", typeof(RectTransform), typeof(Text), typeof(Shadow));
-            go.transform.SetParent(parent, false);
-            var t = go.GetComponent<Text>();
-            t.font = font; t.fontSize = size; t.alignment = align; t.color = color; t.text = text;
-            t.fontStyle = style;
-            t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
-            t.raycastTarget = false;
-            var sh = go.GetComponent<Shadow>();
-            sh.effectColor = new Color(0, 0, 0, 0.55f);
-            sh.effectDistance = new Vector2(2, -2);
-            return t;
+            rt.sizeDelta = box;
         }
     }
 }
