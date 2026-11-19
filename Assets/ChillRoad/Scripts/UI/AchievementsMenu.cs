@@ -1,58 +1,44 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace ChillRoad
 {
     /// <summary>
-    /// Écran des succès, ouvert depuis le menu pause (tuile « Succès ») : en tête, le trophée, le nombre de succès
-    /// obtenus et une jauge ; dessous, un onglet par catégorie (pictogramme, nom, obtenus / total) et la grille de ses
-    /// succès (six au plus). Chaque carte montre une médaille (dorée si obtenu, sombre sinon), le nom, l'objectif, puis la date
-    /// d'obtention ou la progression (jauge et valeur).
+    /// Écran des succès, ouvert depuis le menu pause (tuile « Succès »), style verre sur l'image floutée du jeu : en tête,
+    /// « SUCCÈS », une fine jauge dorée et le nombre obtenu ; dessous, un onglet texte par catégorie (souligné d'or quand
+    /// il est choisi, obtenus / total) et la grille de ses succès (six au plus). Une carte obtenue est teintée d'or (pastille
+    /// cochée, « DÉBLOQUÉ » et sa date) ; une carte à obtenir est en verre simple (anneau vide, jauge et valeur).
     /// ← → (croix, joystick), LB / RB, Tab ou clic pour changer d'onglet ; Échap / B pour revenir au menu pause.
     /// </summary>
     public class AchievementsMenu : MonoBehaviour
     {
-        static readonly Color White = new Color(0.96f, 0.97f, 0.98f);
-        static readonly Color Accent = new Color(1f, 0.76f, 0.2f);
-        static readonly Color Gold = new Color(0.95f, 0.62f, 0.12f);
-        static readonly Color Info = new Color(0.35f, 0.85f, 1f);
-        static readonly Color Dim = new Color(1f, 1f, 1f, 0.6f);
-        static readonly Color Muted = new Color(0.5f, 0.52f, 0.56f);
-        static readonly Color Ink = new Color(0.06f, 0.07f, 0.09f);
-        static readonly Color InkDim = new Color(0.06f, 0.07f, 0.09f, 0.7f);
-        static readonly Color PanelPlate = new Color(0.025f, 0.03f, 0.045f, 0.9f);
-        static readonly Color TabPlate = new Color(0.12f, 0.14f, 0.18f, 0.96f);
-        static readonly Color CardLocked = new Color(0.075f, 0.085f, 0.11f, 0.95f);
-        static readonly Color CardDone = new Color(0.14f, 0.12f, 0.08f, 0.96f);
-        static readonly Color MedalLocked = new Color(0.16f, 0.18f, 0.22f);
-        static readonly Color Money = new Color(0.5f, 1f, 0.6f);
-
-        const float Slope = 0.14f;
-        const float AreaW = 1760f, AreaH = 860f;
-        const float TabW = 280f, TabH = 66f, TabGap = 14f;
-        const float CardW = 560f, CardH = 250f, CardGap = 24f;
+        const float AreaW = 1920f, AreaH = 1080f, Margin = 180f;
+        const float HeadY = -81f, TabsY = -156f, TabH = 51f, TabGap = 42f;
+        const float GridY = -249f, CardW = 504f, CardH = 315f, CardGap = 24f, CardPad = 36f;
 
         public static bool IsOpen { get; private set; }
         /// <summary>Image où l'écran s'est ouvert ou fermé (la touche de fermeture ne doit pas rouvrir la pause).</summary>
         public static int ChangedFrame { get; private set; } = -1;
         static int lastTab;
 
-        class Tab { public Button button; public HudShape plate; public HudIcon icon; public Text name, count; public float on; }
+        class Tab { public Button button; public RectTransform rt; public Text name; public Image line; public float on; }
         class Card
         {
             public RectTransform rt;
-            public HudShape plate, edge, barBack, barFill;
-            public Image medal;
-            public HudIcon icon;
+            public GlassRect plate, disc, ring;
+            public HudIcon check;
+            public Image barBack;
+            public RectTransform barFill;
             public Text title, desc, state, value, reward;
         }
 
-        Font font;
         GameObject root;
-        RectTransform area, screenRt;
-        Text countText, hintText;
+        RectTransform area, screenRt, barRt, backRt;
+        Text titleText, countText, subText, hintText, backText;
+        GlassRect backPlate;
         RectTransform totalFill;
         readonly List<Tab> tabs = new List<Tab>();
         readonly List<Card> cards = new List<Card>();
@@ -62,7 +48,6 @@ namespace ChillRoad
 
         public void Init()
         {
-            font = HudArt.Font;
             Build();
         }
 
@@ -144,35 +129,34 @@ namespace ChillRoad
             }
         }
 
-        /// <summary>Carte d'un succès : obtenu (médaille dorée, date) ou à obtenir (médaille sombre, progression).</summary>
+        /// <summary>Carte d'un succès : obtenue (verre doré, pastille cochée, date) ou à obtenir (verre, anneau vide, progression).</summary>
         void Fill(Card c, Achievements.Def d)
         {
             bool done = Achievements.IsUnlocked(d);
-            c.plate.color = done ? CardDone : CardLocked;
-            c.edge.color = done ? Accent : new Color(1f, 1f, 1f, 0.08f);
-            c.medal.color = done ? Gold : MedalLocked;
-            c.icon.Shape = done ? Achievements.CategoryIcon(d.category) : HudIcon.Kind.Lock;
-            c.icon.SetColors(done ? Ink : Muted, done ? Gold : MedalLocked);
+            c.plate.Set(done ? Glass.A(Glass.Gold, 0.035f) : Glass.Panel, done ? Glass.A(Glass.Gold, 0.7f) : Glass.Edge, 1.5f);
+            c.disc.gameObject.SetActive(done);
+            c.ring.gameObject.SetActive(!done);
             c.title.text = d.Name;
-            c.title.color = done ? White : new Color(0.85f, 0.87f, 0.9f);
+            c.title.color = done ? Glass.White : Glass.A(Glass.White, 0.88f);
             c.desc.text = d.Description;
             // Récompense : verte une fois versée, dorée et discrète à obtenir
             c.reward.text = d.Reward > 0 ? "+" + Wallet.Format(d.Reward) : "";
-            c.reward.color = done ? Money : new Color(Accent.r, Accent.g, Accent.b, 0.75f);
+            c.reward.color = done ? Glass.Good : Glass.A(Glass.Gold, 0.75f);
             if (done)
             {
                 var when = Achievements.UnlockDate(d);
-                c.state.text = when.HasValue
-                    ? Loc.T("OBTENU LE ", "UNLOCKED ") + when.Value.ToString(Loc.French ? "dd/MM/yyyy" : "MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture)
-                    : Loc.T("OBTENU", "UNLOCKED");
-                c.state.color = Accent;
+                string state = when.HasValue
+                    ? Loc.T("DÉBLOQUÉ LE ", "UNLOCKED ") + when.Value.ToString(Loc.French ? "dd/MM/yyyy" : "MMM d, yyyy", System.Globalization.CultureInfo.InvariantCulture).ToUpperInvariant()
+                    : Loc.T("DÉBLOQUÉ", "UNLOCKED");
+                c.state.text = Glass.Spaced(state, 1);
+                c.state.color = Glass.Gold;
                 c.value.text = "";
                 c.barBack.gameObject.SetActive(false);
             }
             else if (d.Single)
             {
-                c.state.text = Loc.T("À OBTENIR", "LOCKED");
-                c.state.color = Muted;
+                c.state.text = Glass.Spaced(Loc.T("À OBTENIR", "LOCKED"), 1);
+                c.state.color = Glass.Faint;
                 c.value.text = "";
                 c.barBack.gameObject.SetActive(false);
             }
@@ -181,7 +165,10 @@ namespace ChillRoad
                 c.state.text = "";
                 c.value.text = Achievements.ProgressText(d);
                 c.barBack.gameObject.SetActive(true);
-                c.barFill.rectTransform.localScale = new Vector3(Mathf.Max(0.004f, Achievements.Progress01(d)), 1f, 1f);
+                // La jauge prend la place laissée par la valeur
+                float vw = Mathf.Min(220f, c.value.preferredWidth);
+                c.barBack.rectTransform.sizeDelta = new Vector2(Mathf.Max(60f, CardW - CardPad * 2f - vw - 21f), 3f);
+                c.barFill.localScale = new Vector3(Mathf.Max(0.004f, Achievements.Progress01(d)), 1f, 1f);
             }
         }
 
@@ -190,29 +177,38 @@ namespace ChillRoad
             float fit = screenRt.rect.width < 1f ? 1f : Mathf.Min(1f, Mathf.Min(screenRt.rect.width / AreaW, screenRt.rect.height / AreaH));
             area.localScale = Vector3.one * fit;
 
+            // En-tête : titre, jauge entre le titre et le compte, compte (obtenus en or)
             int got = Achievements.UnlockedCount, total = Achievements.All.Length;
-            string earned = Wallet.Format(Achievements.RewardsEarned);
-            countText.text = Loc.F($"{got} / {total} succès obtenus  ·  {Mathf.RoundToInt(100f * got / total)} %  ·  {earned} gagnés",
-                $"{got} / {total} achievements unlocked  ·  {Mathf.RoundToInt(100f * got / total)}%  ·  {earned} earned");
+            countText.text = $"<color=#FFC233>{got}</color> / {total}";
+            float left = Margin + titleText.preferredWidth + 36f, right = AreaW - Margin - countText.preferredWidth - 36f;
+            barRt.anchoredPosition = new Vector2(left, HeadY);
+            barRt.sizeDelta = new Vector2(Mathf.Max(40f, right - left), 3f);
             totalFill.localScale = new Vector3(Mathf.Max(0.004f, got / (float)total), 1f, 1f);
+            string earned = Wallet.Format(Achievements.RewardsEarned);
+            subText.text = Loc.F($"{Mathf.RoundToInt(100f * got / total)} %  ·  {earned} gagnés", $"{Mathf.RoundToInt(100f * got / total)}%  ·  {earned} earned");
+            subText.rectTransform.anchoredPosition = new Vector2(left, HeadY - 14f);
 
-            // Onglets : le choisi passe à l'or (textes à l'encre)
+            // Onglets : texte espacé, le choisi passe à l'or et se souligne ; posés à la suite selon leur largeur
+            float x = Margin;
             for (int i = 0; i < tabs.Count; i++)
             {
                 var t = tabs[i];
                 var cat = (Achievements.Category)i;
                 t.on = dt > 0f ? Mathf.MoveTowards(t.on, i == tab ? 1f : 0f, dt * 9f) : (i == tab ? 1f : 0f);
                 float e = t.on * t.on * (3f - 2f * t.on);
-                var plate = Color.Lerp(TabPlate, Gold, e);
-                t.plate.color = plate;
-                plate.a = 1f;
-                t.icon.SetColors(Color.Lerp(Accent, Ink, e), plate);
-                t.name.text = Achievements.CategoryName(cat);
-                t.name.color = Color.Lerp(White, Ink, e);
+                bool sel = i == tab;
                 int n = Achievements.CountIn(cat, true), all = Achievements.CountIn(cat, false);
-                t.count.text = $"{n} / {all}";
-                t.count.color = n == all ? Color.Lerp(Accent, Ink, e) : Color.Lerp(Dim, InkDim, e);
-                t.button.transform.localScale = Vector3.one * (1f + 0.03f * e);
+                string name = Glass.Spaced(Achievements.CategoryName(cat).ToUpperInvariant(), 1);
+                string count = $"{n}/{all}";
+                // Catégorie complète : compte en or ; sinon plus discret que le nom
+                t.name.text = sel ? $"{name}  {count}" : n == all ? $"{name}  <color=#FFC233>{count}</color>" : $"{name}  <color=#FFFFFF73>{count}</color>";
+                t.name.font = Glass.FontOf(sel ? Glass.Weight.Semibold : Glass.Weight.Regular);
+                t.name.color = Color.Lerp(Glass.Dim, Glass.Gold, e);
+                t.line.color = Glass.A(Glass.Gold, e);
+                float w = t.name.preferredWidth + 4f;
+                t.rt.anchoredPosition = new Vector2(x, TabsY);
+                t.rt.sizeDelta = new Vector2(w, TabH);
+                x += w + TabGap;
             }
 
             // Cartes : arrivée en cascade à chaque onglet
@@ -226,17 +222,23 @@ namespace ChillRoad
                 c.rt.GetComponent<CanvasGroup>().alpha = e;
             }
 
-            bool pad = GameInput.UsingGamepad;
-            hintText.text = pad
-                ? Loc.T("LB RB / ← → catégorie  ·  B retour", "LB RB / ← → category  ·  B back")
-                : Loc.T("Tab / ← → catégorie  ·  Échap retour", "Tab / ← → category  ·  Esc back");
+            // Retour : doré au survol de la souris
+            var mouse = Mouse.current;
+            bool hover = mouse != null && !GameInput.UsingGamepad && RectTransformUtility.RectangleContainsScreenPoint(backRt, mouse.position.ReadValue(), null);
+            var fillColor = hover ? Glass.Gold : Glass.Pill;
+            if (backPlate.color != fillColor) backPlate.Set(fillColor, hover ? Color.clear : Glass.Edge, 1.5f);
+            backText.color = hover ? Glass.Ink : Glass.White;
+
+            const string G = "<color=#FFC233>", E = "</color>";
+            hintText.text = GameInput.UsingGamepad
+                ? Loc.T($"{G}LB RB{E} / {G}← →{E}  catégorie     ·     {G}B{E}  retour", $"{G}LB RB{E} / {G}← →{E}  category     ·     {G}B{E}  back")
+                : Loc.T($"{G}Tab{E} / {G}← →{E}  catégorie     ·     {G}Échap{E}  retour", $"{G}Tab{E} / {G}← →{E}  category     ·     {G}Esc{E}  back");
         }
 
         Vector2 CardPos(int k)
         {
             int col = k % 3, row = k / 3;
-            float x0 = -(CardW * 3f + CardGap * 2f) * 0.5f + CardW * 0.5f;
-            return new Vector2(x0 + col * (CardW + CardGap), -296f - row * (CardH + CardGap) - CardH * 0.5f);
+            return new Vector2(Margin + CardW * 0.5f + col * (CardW + CardGap), GridY - CardH * 0.5f - row * (CardH + CardGap));
         }
 
         // ------------------------------------------------------------------ construction
@@ -253,42 +255,42 @@ namespace ChillRoad
             scaler.matchWidthOrHeight = 0.5f;
             screenRt = (RectTransform)root.transform;
 
-            var veil = Rect(screenRt, "Veil", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            var vi = veil.gameObject.AddComponent<Image>();
-            vi.color = new Color(0.01f, 0.012f, 0.02f, 0.86f);
+            // Image du jeu floutée sous un voile (elle arrête aussi les clics vers le menu pause)
+            MenuBackdrop.Attach(screenRt, 0.5f);
 
-            // Zone de mise en page (1760 × 860), centrée et réduite sur les petits écrans
-            area = Rect(screenRt, "Area", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            // Zone de mise en page (1920 × 1080), centrée et réduite sur les écrans plus étroits
+            area = Glass.Rect(screenRt, "Area", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
             area.sizeDelta = new Vector2(AreaW, AreaH);
 
-            // Enseigne : trophée, titre, nombre obtenu et jauge
-            const float headH = 140f;
-            var head = Panel(area, "Head", new Vector2(0f, 1f), new Vector2(0f, 0f), new Vector2(780f, headH));
-            Shape(head, "Stripe", Vector2.zero, Vector2.zero, new Vector2(4f, headH), new Color(Info.r, Info.g, Info.b, 0.7f)).Set(headH * Slope, 0f, 0f);
-            var icon = Icon(head, HudIcon.Kind.Trophy, new Vector2(0f, 1f), new Vector2(40f + Lean(headH - 50f, headH), -50f), 70f);
-            icon.SetColors(Accent, PanelPlate);
-            var title = Place(Label(head, 50, TextAnchor.MiddleLeft, White, FontStyle.BoldAndItalic), new Vector2(124f, -12f), new Vector2(600f, 64f), headH);
-            Loc.Bind(title, "SUCCÈS", "ACHIEVEMENTS");
-            countText = Place(Label(head, 22, TextAnchor.MiddleLeft, Dim, FontStyle.Bold), new Vector2(126f, -78f), new Vector2(600f, 30f), headH);
-            float lean = Lean(22f, headH);
-            var bar = Rect(head, "Total", Vector2.zero, Vector2.zero, new Vector2(128f + lean, 18f), new Vector2(700f + lean, 26f));
-            bar.gameObject.AddComponent<Image>().color = new Color(1f, 1f, 1f, 0.12f);
-            totalFill = Rect(bar, "Fill", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            // En-tête : SUCCÈS, jauge fine, compte
+            titleText = Glass.Label(area, "", 57, Glass.Weight.Light, Glass.White, TextAnchor.MiddleLeft,
+                new Vector2(0f, 1f), new Vector2(Margin, HeadY + 36f), new Vector2(900f, 72f));
+            Loc.Bind(titleText, Glass.Spaced("SUCCÈS", 3), Glass.Spaced("ACHIEVEMENTS", 3));
+            // Le texte posé a son pivot en haut : on le recentre sur la ligne de l'en-tête
+            titleText.rectTransform.pivot = new Vector2(0f, 0.5f);
+            titleText.rectTransform.anchoredPosition = new Vector2(Margin, HeadY);
+            countText = Glass.Label(area, "", 51, Glass.Weight.Light, Glass.White, TextAnchor.MiddleRight,
+                new Vector2(0f, 1f), new Vector2(AreaW - Margin, HeadY), new Vector2(400f, 72f));
+            countText.rectTransform.pivot = new Vector2(1f, 0.5f);
+            countText.rectTransform.anchoredPosition = new Vector2(AreaW - Margin, HeadY);
+            var bar = Glass.Bar(area, "Total", Glass.Track);
+            barRt = bar.rectTransform;
+            barRt.anchorMin = barRt.anchorMax = new Vector2(0f, 1f);
+            barRt.pivot = new Vector2(0f, 0.5f);
+            totalFill = Glass.Bar(bar.transform, "Fill", Glass.Gold).rectTransform;
+            Glass.Stretch(totalFill);
             totalFill.pivot = new Vector2(0f, 0.5f);
-            totalFill.gameObject.AddComponent<Image>().color = Accent;
+            subText = Glass.Label(area, "", 19, Glass.Weight.Semilight, Glass.Faint, TextAnchor.UpperLeft);
+            var sr = subText.rectTransform;
+            sr.anchorMin = sr.anchorMax = sr.pivot = new Vector2(0f, 1f);
+            sr.sizeDelta = new Vector2(800f, 26f);
 
-            // Retour (souris, doigt) et aide des touches, en haut à droite
-            var back = BackButton(area);
-            hintText = Label(area, 19, TextAnchor.MiddleRight, Dim, FontStyle.Bold);
-            var hr = hintText.rectTransform;
-            hr.anchorMin = hr.anchorMax = hr.pivot = new Vector2(1f, 1f);
-            hr.sizeDelta = new Vector2(800f, 30f);
-            hr.anchoredPosition = new Vector2(-4f, -82f);
-
-            // Onglets des catégories
-            float tabsW = TabW * Achievements.CategoryCount + TabGap * (Achievements.CategoryCount - 1);
-            for (int i = 0; i < Achievements.CategoryCount; i++)
-                tabs.Add(BuildTab(i, new Vector2(-tabsW * 0.5f + TabW * 0.5f + i * (TabW + TabGap), -206f)));
+            // Onglets des catégories, sur une ligne fine
+            var baseLine = Glass.Bar(area, "TabsLine", Glass.A(Color.white, 0.22f)).rectTransform;
+            baseLine.anchorMin = baseLine.anchorMax = baseLine.pivot = new Vector2(0f, 1f);
+            baseLine.anchoredPosition = new Vector2(Margin, TabsY - TabH);
+            baseLine.sizeDelta = new Vector2(AreaW - Margin * 2f, 1.5f);
+            for (int i = 0; i < Achievements.CategoryCount; i++) tabs.Add(BuildTab(i));
             for (int i = 0; i < tabs.Count; i++)
                 tabs[i].button.navigation = new Navigation
                 {
@@ -299,37 +301,40 @@ namespace ChillRoad
 
             // Grille des succès (trois colonnes, deux rangées)
             for (int k = 0; k < 6; k++) cards.Add(BuildCard(k));
+
+            // Retour (pilule, souris et doigt) en bas à gauche, aide des touches en bas à droite
+            BuildBack();
+            hintText = Glass.Label(area, "", 22, Glass.Weight.Light, Glass.White, TextAnchor.MiddleRight,
+                new Vector2(1f, 0f), new Vector2(-Margin, 51f), new Vector2(1000f, 75f));
             root.SetActive(false);
         }
 
-        Tab BuildTab(int i, Vector2 pos)
+        Tab BuildTab(int i)
         {
             var t = new Tab();
-            var go = new GameObject("Tab", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape), typeof(Button));
+            var go = new GameObject("Tab", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
             go.transform.SetParent(area, false);
-            var rt = (RectTransform)go.transform;
-            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
-            rt.sizeDelta = new Vector2(TabW, TabH);
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.anchoredPosition = pos;
-            t.plate = go.GetComponent<HudShape>();
-            t.plate.Set(TabH * Slope, 0f, 0f);
-            t.plate.color = TabPlate;
+            t.rt = (RectTransform)go.transform;
+            t.rt.anchorMin = t.rt.anchorMax = t.rt.pivot = new Vector2(0f, 1f);
+            t.rt.sizeDelta = new Vector2(200f, TabH);
+            var hit = go.GetComponent<Image>();
+            hit.color = Color.clear;   // zone de clic seulement
             t.button = go.GetComponent<Button>();
-            t.button.targetGraphic = t.plate;
+            t.button.targetGraphic = hit;
             t.button.transition = Selectable.Transition.None;
             int index = i;
             t.button.onClick.AddListener(() => Select(index));
-            t.icon = Icon(go.transform, Achievements.CategoryIcon((Achievements.Category)i), new Vector2(0f, 0.5f), new Vector2(42f, 0f), 38f);
-            t.name = Label(go.transform, 24, TextAnchor.MiddleLeft, White, FontStyle.BoldAndItalic);
-            Fit(t.name.rectTransform, Vector2.zero, Vector2.one, new Vector2(76f, 0f), new Vector2(-74f, 0f));
-            t.name.horizontalOverflow = HorizontalWrapMode.Wrap;
-            t.name.resizeTextForBestFit = true;
-            t.name.resizeTextMinSize = 16;
-            t.name.resizeTextMaxSize = 24;
-            t.count = Label(go.transform, 20, TextAnchor.MiddleRight, Dim, FontStyle.Bold);
-            Fit(t.count.rectTransform, Vector2.zero, Vector2.one, new Vector2(0f, 0f), new Vector2(-24f, 0f));
-            t.name.GetComponent<Shadow>().enabled = t.count.GetComponent<Shadow>().enabled = false;
+            t.name = Glass.Label(go.transform, "", 22, Glass.Weight.Regular, Glass.Dim, TextAnchor.MiddleLeft);
+            var nr = t.name.rectTransform;
+            nr.anchorMin = new Vector2(0f, 1f); nr.anchorMax = Vector2.one;
+            nr.pivot = new Vector2(0f, 1f);
+            nr.offsetMin = new Vector2(2f, -36f); nr.offsetMax = Vector2.zero;
+            // Soulignement doré, posé sur la ligne des onglets
+            t.line = Glass.Bar(go.transform, "Underline", Glass.A(Glass.Gold, 0f));
+            var lr = t.line.rectTransform;
+            lr.anchorMin = Vector2.zero; lr.anchorMax = new Vector2(1f, 0f);
+            lr.pivot = new Vector2(0.5f, 0f);
+            lr.offsetMin = new Vector2(0f, -1.5f); lr.offsetMax = new Vector2(0f, 3f);
             return t;
         }
 
@@ -339,199 +344,93 @@ namespace ChillRoad
             var go = new GameObject("Card", typeof(RectTransform), typeof(CanvasGroup));
             go.transform.SetParent(area, false);
             c.rt = (RectTransform)go.transform;
-            c.rt.anchorMin = c.rt.anchorMax = new Vector2(0.5f, 1f);
+            c.rt.anchorMin = c.rt.anchorMax = new Vector2(0f, 1f);
             c.rt.pivot = new Vector2(0.5f, 0.5f);
             c.rt.sizeDelta = new Vector2(CardW, CardH);
             c.rt.anchoredPosition = CardPos(k);
             go.GetComponent<CanvasGroup>().blocksRaycasts = false;
 
-            c.plate = Shape(c.rt, "Plate", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(CardW, CardH), CardLocked);
-            c.plate.Set(CardH * Slope, 0f, 0f);
-            c.edge = Shape(c.rt, "Edge", new Vector2(0f, 0.5f), Vector2.zero, new Vector2(5f, CardH), Accent);
-            c.edge.Set(CardH * Slope, 0f, 0f);
+            c.plate = Glass.Backdrop(c.rt, 39f);
 
-            // Médaille en haut à gauche
-            float my = -78f, mx = 46f + Lean(CardH + my, CardH) + 44f;
-            var medalGo = new GameObject("Medal", typeof(RectTransform), typeof(Image));
-            medalGo.transform.SetParent(c.rt, false);
-            var mr = (RectTransform)medalGo.transform;
-            mr.anchorMin = mr.anchorMax = new Vector2(0f, 1f);
-            mr.sizeDelta = new Vector2(96f, 96f);
-            mr.anchoredPosition = new Vector2(mx, my);
-            c.medal = medalGo.GetComponent<Image>();
-            c.medal.sprite = HudArt.Disc;
-            c.medal.raycastTarget = false;
-            c.icon = Icon(mr, HudIcon.Kind.Lock, new Vector2(0.5f, 0.5f), Vector2.zero, 56f);
-            // Récompense sous la médaille
-            c.reward = Label(c.rt, 19, TextAnchor.MiddleCenter, Money, FontStyle.BoldAndItalic);
-            var rr = c.reward.rectTransform;
-            rr.anchorMin = rr.anchorMax = new Vector2(0f, 1f);
-            rr.pivot = new Vector2(0.5f, 0.5f);
-            rr.sizeDelta = new Vector2(130f, 26f);
-            rr.anchoredPosition = new Vector2(mx - 3f, my - 68f);
-            c.reward.horizontalOverflow = HorizontalWrapMode.Wrap;
-            c.reward.resizeTextForBestFit = true;
-            c.reward.resizeTextMinSize = 13;
-            c.reward.resizeTextMaxSize = 19;
+            // Pastille dorée cochée (obtenu) ou anneau vide (à obtenir), en haut à gauche
+            var top = new Vector2(0f, 1f);
+            c.disc = Glass.Make(c.rt, "Done", 32f, Glass.Gold, 0f);
+            Pose(c.disc.rectTransform, top, new Vector2(CardPad, -33f), new Vector2(63f, 63f));
+            var ig = new GameObject("Check", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudIcon));
+            ig.transform.SetParent(c.disc.transform, false);
+            Pose((RectTransform)ig.transform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(34f, 34f));
+            c.check = ig.GetComponent<HudIcon>();
+            c.check.Shape = HudIcon.Kind.Check;
+            c.check.raycastTarget = false;
+            c.check.SetColors(Glass.Ink, Glass.Gold);
+            c.ring = Glass.Make(c.rt, "Todo", 32f, Color.clear, 2.25f);
+            c.ring.borderColor = Glass.A(Color.white, 0.6f);
+            Pose(c.ring.rectTransform, top, new Vector2(CardPad, -33f), new Vector2(63f, 63f));
 
-            c.title = Place(Label(c.rt, 29, TextAnchor.MiddleLeft, White, FontStyle.BoldAndItalic), new Vector2(166f, -34f), new Vector2(CardW - 204f, 44f), CardH);
+            // Récompense en haut à droite
+            c.reward = Glass.Label(c.rt, "", 21, Glass.Weight.Regular, Glass.Good, TextAnchor.MiddleRight,
+                new Vector2(1f, 1f), new Vector2(-CardPad, -48f), new Vector2(220f, 32f));
+
+            c.title = Glass.Label(c.rt, "", 31, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleLeft,
+                top, new Vector2(CardPad, -114f), new Vector2(CardW - CardPad * 2f, 42f));
             c.title.horizontalOverflow = HorizontalWrapMode.Wrap;
             c.title.resizeTextForBestFit = true;
-            c.title.resizeTextMinSize = 18;
-            c.title.resizeTextMaxSize = 29;
-            c.desc = Place(Label(c.rt, 20, TextAnchor.UpperLeft, Dim, FontStyle.Bold), new Vector2(166f, -84f), new Vector2(CardW - 212f, 84f), CardH);
+            c.title.resizeTextMinSize = 20;
+            c.title.resizeTextMaxSize = 31;
+            c.desc = Glass.Label(c.rt, "", 22, Glass.Weight.Light, Glass.Dim, TextAnchor.UpperLeft,
+                top, new Vector2(CardPad, -162f), new Vector2(CardW - CardPad * 2f, 70f));
             c.desc.horizontalOverflow = HorizontalWrapMode.Wrap;
             c.desc.verticalOverflow = VerticalWrapMode.Truncate;
 
-            // Bas de carte : état (obtenu le…, à obtenir) ou jauge et progression
-            c.state = Low(Label(c.rt, 21, TextAnchor.MiddleLeft, Accent, FontStyle.BoldAndItalic), 40f, 44f, CardW - 100f, 30f, CardH);
-            float bl = Lean(44f, CardH);
-            var back = Shape(c.rt, "Bar", Vector2.zero, new Vector2(40f + bl, 38f), new Vector2(CardW - 280f, 12f), new Color(1f, 1f, 1f, 0.12f));
-            back.rectTransform.pivot = new Vector2(0f, 0f);
-            back.Set(12f * Slope, 0f, 0f);
-            c.barBack = back;
-            c.barFill = Shape(back.rectTransform, "Fill", new Vector2(0f, 0.5f), Vector2.zero, new Vector2(CardW - 280f, 12f), Info);
-            c.barFill.Set(12f * Slope, 0f, 0f);
-            c.value = Low(Label(c.rt, 21, TextAnchor.MiddleRight, Accent, FontStyle.Bold), CardW - 236f, 44f, 196f, 30f, CardH);
+            // Bas de carte : état (débloqué le…, à obtenir) ou jauge fine et progression
+            var low = new Vector2(0f, 0f);
+            c.state = Glass.Label(c.rt, "", 17, Glass.Weight.Semibold, Glass.Gold, TextAnchor.MiddleLeft,
+                low, new Vector2(CardPad, 30f), new Vector2(CardW - CardPad * 2f, 30f));
+            c.barBack = Glass.Bar(c.rt, "Bar", Glass.Track);
+            var br = c.barBack.rectTransform;
+            br.anchorMin = br.anchorMax = Vector2.zero;
+            br.pivot = new Vector2(0f, 0.5f);
+            br.anchoredPosition = new Vector2(CardPad, 45f);
+            br.sizeDelta = new Vector2(240f, 3f);
+            c.barFill = Glass.Bar(c.barBack.transform, "Fill", Glass.White).rectTransform;
+            Glass.Stretch(c.barFill);
+            c.barFill.pivot = new Vector2(0f, 0.5f);
+            c.value = Glass.Label(c.rt, "", 21, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleRight,
+                new Vector2(1f, 0f), new Vector2(-CardPad, 30f), new Vector2(220f, 30f));
+            c.value.horizontalOverflow = HorizontalWrapMode.Wrap;
             c.value.resizeTextForBestFit = true;
             c.value.resizeTextMinSize = 14;
             c.value.resizeTextMaxSize = 21;
-            c.value.horizontalOverflow = HorizontalWrapMode.Wrap;
             return c;
         }
 
-        RectTransform BackButton(Transform parent)
+        void BuildBack()
         {
-            var go = new GameObject("Back", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape), typeof(Button));
-            go.transform.SetParent(parent, false);
-            var rt = (RectTransform)go.transform;
-            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(1f, 1f);
-            rt.sizeDelta = new Vector2(230f, 60f);
-            rt.anchoredPosition = new Vector2(0f, -6f);
-            var shape = go.GetComponent<HudShape>();
-            shape.Set(60f * Slope, 0f, 0f);
-            shape.color = Color.white;
+            var go = new GameObject("Back", typeof(RectTransform), typeof(CanvasRenderer), typeof(GlassRect), typeof(Button));
+            go.transform.SetParent(area, false);
+            backRt = (RectTransform)go.transform;
+            Pose(backRt, Vector2.zero, new Vector2(Margin, 51f), new Vector2(170f, 75f));
+            backPlate = go.GetComponent<GlassRect>();
+            backPlate.radius = 37.5f;
+            backPlate.color = Glass.Pill;
             var b = go.GetComponent<Button>();
-            b.targetGraphic = shape;
-            var colors = b.colors;
-            colors.normalColor = new Color(0.14f, 0.16f, 0.2f, 0.92f);
-            colors.highlightedColor = new Color(0.2f, 0.42f, 0.55f, 1f);
-            colors.selectedColor = new Color(0.14f, 0.16f, 0.2f, 0.92f);
-            colors.pressedColor = Info;
-            b.colors = colors;
+            b.targetGraphic = backPlate;
+            b.transition = Selectable.Transition.None;
             b.navigation = new Navigation { mode = Navigation.Mode.None };
             b.onClick.AddListener(Close);
-            var icon = Icon(rt, HudIcon.Kind.Back, new Vector2(0f, 0.5f), new Vector2(46f, 0f), 30f);
-            icon.SetColors(White, Color.clear);
-            var label = Label(rt, 26, TextAnchor.MiddleLeft, White, FontStyle.BoldAndItalic);
-            Fit(label.rectTransform, Vector2.zero, Vector2.one, new Vector2(78f, 0f), new Vector2(-16f, 0f));
-            Loc.Bind(label, "Retour", "Back");
-            return rt;
+            backText = Glass.Label(go.transform, "", 24, Glass.Weight.Regular, Glass.White, TextAnchor.MiddleCenter);
+            Glass.Stretch(backText.rectTransform);
+            Loc.Bind(backText, "Retour", "Back");
         }
 
         // ------------------------------------------------------------------ helpers
 
-        static RectTransform Panel(Transform parent, string name, Vector2 corner, Vector2 pos, Vector2 size)
+        /// <summary>Ancre et pivot au même point, position et taille.</summary>
+        static void Pose(RectTransform rt, Vector2 anchor, Vector2 pos, Vector2 size)
         {
-            var rt = Rect(parent, name, corner, corner, Vector2.zero, Vector2.zero);
-            rt.pivot = corner;
-            rt.sizeDelta = size;
-            rt.anchoredPosition = pos;
-            var s = Shape(rt, "Plate", new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, PanelPlate);
-            s.Set(size.y * Slope, 0f, 0f);
-            var pr = s.rectTransform;
-            pr.anchorMin = Vector2.zero;
-            pr.anchorMax = Vector2.one;
-            pr.offsetMin = pr.offsetMax = Vector2.zero;
-            pr.SetAsFirstSibling();
-            return rt;
-        }
-
-        /// <summary>Décalage horizontal du bord penché d'un panneau à la hauteur y (depuis le bas) : 0 au milieu.</summary>
-        static float Lean(float y, float panelHeight) => Slope * (y - panelHeight * 0.5f);
-
-        static HudIcon Icon(Transform parent, HudIcon.Kind kind, Vector2 anchor, Vector2 pos, float size)
-        {
-            var go = new GameObject("Icon", typeof(RectTransform), typeof(CanvasRenderer), typeof(HudIcon));
-            go.transform.SetParent(parent, false);
-            var rt = (RectTransform)go.transform;
-            rt.anchorMin = rt.anchorMax = anchor;
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(size, size);
-            rt.anchoredPosition = pos;
-            var icon = go.GetComponent<HudIcon>();
-            icon.Shape = kind;
-            icon.raycastTarget = false;
-            return icon;
-        }
-
-        static RectTransform Rect(Transform parent, string name, Vector2 aMin, Vector2 aMax, Vector2 oMin, Vector2 oMax)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            go.transform.SetParent(parent, false);
-            var rt = (RectTransform)go.transform;
-            rt.anchorMin = aMin; rt.anchorMax = aMax; rt.offsetMin = oMin; rt.offsetMax = oMax;
-            return rt;
-        }
-
-        static void Fit(RectTransform rt, Vector2 aMin, Vector2 aMax, Vector2 oMin, Vector2 oMax)
-        {
-            rt.anchorMin = aMin; rt.anchorMax = aMax;
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.offsetMin = oMin; rt.offsetMax = oMax;
-        }
-
-        /// <summary>Texte posé depuis le haut à gauche d'un panneau de hauteur panelHeight : sa marge suit le bord penché.</summary>
-        static Text Place(Text t, Vector2 pos, Vector2 size, float panelHeight)
-        {
-            var rt = t.rectTransform;
-            rt.anchorMin = rt.anchorMax = new Vector2(0f, 1f);
-            rt.pivot = new Vector2(0f, 0.5f);
-            rt.sizeDelta = size;
-            float lean = Lean(panelHeight + pos.y - size.y * 0.5f, panelHeight);
-            rt.anchoredPosition = pos + new Vector2(lean, -size.y * 0.5f);
-            return t;
-        }
-
-        /// <summary>Texte posé depuis le bas à gauche d'un panneau (y : milieu de la ligne) ; sa marge suit le bord penché.</summary>
-        static Text Low(Text t, float x, float y, float width, float height, float panelHeight)
-        {
-            var rt = t.rectTransform;
-            rt.anchorMin = rt.anchorMax = Vector2.zero;
-            rt.pivot = new Vector2(0f, 0.5f);
-            rt.sizeDelta = new Vector2(width, height);
-            rt.anchoredPosition = new Vector2(x + Lean(y, panelHeight), y);
-            return t;
-        }
-
-        static HudShape Shape(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size, Color color)
-        {
-            var go = new GameObject(name, typeof(RectTransform), typeof(CanvasRenderer), typeof(HudShape));
-            go.transform.SetParent(parent, false);
-            var rt = (RectTransform)go.transform;
             rt.anchorMin = rt.anchorMax = rt.pivot = anchor;
             rt.anchoredPosition = pos;
             rt.sizeDelta = size;
-            var s = go.GetComponent<HudShape>();
-            s.color = color;
-            s.raycastTarget = false;
-            return s;
-        }
-
-        Text Label(Transform parent, int size, TextAnchor align, Color color, FontStyle style)
-        {
-            var go = new GameObject("Text", typeof(RectTransform), typeof(Text), typeof(Shadow));
-            go.transform.SetParent(parent, false);
-            var t = go.GetComponent<Text>();
-            t.font = font; t.fontSize = size; t.alignment = align; t.color = color;
-            t.fontStyle = style;
-            t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
-            t.raycastTarget = false;
-            var sh = go.GetComponent<Shadow>();
-            sh.effectColor = new Color(0, 0, 0, 0.55f);
-            sh.effectDistance = new Vector2(2, -2);
-            return t;
         }
     }
 }
