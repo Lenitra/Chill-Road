@@ -10,14 +10,15 @@ namespace ChillRoad
     /// <summary>
     /// Menu Options (construit en code), ouvert depuis l'accueil ou la pause, dans le langage visuel du HUD et de la
     /// pause : voile sombre, plaque inclinée anthracite (<see cref="HudShape"/>), police du HUD, titre or, rubriques
-    /// cyan, curseurs or.
+    /// cyan. Chaque réglage a le contrôle qui lui va : curseur or pour les volumes et pourcentages, interrupteur pour
+    /// activé / désactivé, choix segmentés (langue, qualité, mode d'affichage…), carrousel pour la résolution.
     /// Rangé par onglets : Jeu (langue, trafic, pluie, secousses, commandes tactiles si l'écran est tactile, retour au
     /// départ), Graphismes (écran : mode d'affichage, résolution et VSync sur ordinateur, limite d'images ; rendu :
     /// qualité, distance des détails, flou de mouvement), Audio (volume général puis une voie par famille de sons, titre
     /// des morceaux, son en arrière-plan), Touches (deux touches et deux boutons de manette par commande,
-    /// <see cref="GameInput.Bind"/>). Tout s'applique tout de suite (mode d'affichage et résolution : une fois le curseur lâché).
+    /// <see cref="GameInput.Bind"/>). Tout s'applique tout de suite (mode d'affichage et résolution : un instant après le dernier changement).
     /// Manette : LB/RB (clavier : Tab, Maj+Tab) pour changer d'onglet, haut/bas pour choisir (la ligne choisie
-    /// s'éclaire), gauche/droite pour régler.
+    /// s'éclaire), gauche/droite pour régler, A / Entrée pour passer au choix suivant.
     /// </summary>
     public class OptionsMenu : MonoBehaviour
     {
@@ -38,6 +39,8 @@ namespace ChillRoad
         string roadAtOpen;
         int openedFrame;
         readonly List<Action> refreshers = new List<Action>();
+        // Animations des contrôles (pastille des interrupteurs, survol et choix en or), chaque image tant que c'est ouvert
+        readonly List<Action<float>> animators = new List<Action<float>>();
         readonly List<(GameObject target, Graphic plate, Graphic bar)> rows = new List<(GameObject, Graphic, Graphic)>();
 
         // Onglets : pages (une seule visible), lignes réglables de chaque page, boutons d'onglet
@@ -49,7 +52,7 @@ namespace ChillRoad
         Button defaultsButton, backButton;
 
         // Mode d'affichage et définition : appliqués à cet instant (0 = rien en attente), pour ne pas changer de mode
-        // d'écran à chaque cran quand on fait glisser le curseur
+        // d'écran à chaque cran quand on fait défiler les choix
         const float DisplayDelay = 0.6f;
         float displayAt;
 
@@ -106,19 +109,19 @@ namespace ChillRoad
             // Jeu : langue, monde (trafic, pluie), caméra, commandes tactiles, puis le retour au départ
             var play = pages[GameTab];
             Section(play, "GÉNÉRAL", "GENERAL", "", "");
-            var language = AddSlider(play, "Langue", "Language", 0f, 1f, 1, () => Loc.French ? 1f : 0f,
-                v => Loc.Set(v > 0.5f ? Language.French : Language.English), v => v > 0.5f ? "Français" : "English");
+            var language = AddChoice(play, "Langue", "Language", 2, () => Loc.French ? 0 : 1,
+                i => Loc.Set(i == 0 ? Language.French : Language.English), i => i == 0 ? "Français" : "English");
             var traffic = AddSlider(play, "Densité du trafic", "Traffic density", 0.2f, 2f, 18, () => GameSettings.TrafficDensity, v => GameSettings.TrafficDensity = v, Percent);
             var rain = AddSlider(play, "Probabilité de pluie", "Rain probability", 0f, 1f, 20, () => GameSettings.RainChance, v => GameSettings.RainChance = v, v => v < 0.01f ? Loc.T("Jamais", "Never") : v > 0.99f ? Loc.T("Toujours", "Always") : Percent(v));
             var shake = AddToggle(play, "Secousses de caméra", "Camera shake", () => GameSettings.CameraShake, v => GameSettings.CameraShake = v);
             // Commandes tactiles (téléphone, tablette) : façon de diriger, ou désactivées. Absentes sur un PC sans
             // écran tactile, où elles ne s'affichent jamais.
-            Slider touch = null;
+            Selectable touch = null;
             if (TouchScreen)
             {
                 Section(play, "COMMANDES TACTILES", "TOUCH CONTROLS", "", "");
-                touch = AddSlider(play, "Commandes tactiles", "Touch controls", 0f, 3f, 3, () => GameSettings.TouchSteer, v => GameSettings.TouchSteer = Mathf.RoundToInt(v),
-                    v => v < 0.5f ? Loc.T("Désactivées", "Off") : v < 1.5f ? Loc.T("Glisser", "Slide") : v < 2.5f ? Loc.T("Boutons ‹ ›", "‹ › buttons") : Loc.T("Inclinaison", "Tilt"));
+                touch = AddChoice(play, "Commandes tactiles", "Touch controls", 4, () => GameSettings.TouchSteer, i => GameSettings.TouchSteer = i,
+                    i => i == 0 ? Loc.T("Désactivées", "Off") : i == 1 ? Loc.T("Glisser", "Slide") : i == 2 ? Loc.T("Boutons ‹ ›", "‹ › buttons") : Loc.T("Inclinaison", "Tilt"));
             }
             Section(play, "CARTE", "MAP", "", "");
             var gap = Rect(play, "Gap", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
@@ -129,50 +132,46 @@ namespace ChillRoad
             Loc.Bind(applyText, "Revenir au départ (route de la vallée)", "Back to the start (valley road)");
 
             // Graphismes : l'écran (mode d'affichage, définition et synchro verticale sur ordinateur seulement ; mode et
-            // définition appliqués une fois le curseur lâché, voir Update), puis le rendu
+            // définition appliqués un instant après le dernier changement, voir Update), puis le rendu
             var gfx = pages[GraphicsTab];
             Section(gfx, "ÉCRAN", "DISPLAY", "", "");
-            Slider window = null, resolution = null, vsync = null;
+            Selectable window = null, resolution = null, vsync = null;
             if (GraphicsQuality.HasDisplayOptions)
             {
-                window = AddSlider(gfx, "Mode d'affichage", "Display mode", 0f, GraphicsQuality.WindowModes.Length - 1, GraphicsQuality.WindowModes.Length - 1,
-                    () => GameSettings.WindowMode, v =>
+                window = AddChoice(gfx, "Mode d'affichage", "Display mode", GraphicsQuality.WindowModes.Length,
+                    () => GameSettings.WindowMode, m =>
                     {
-                        int m = Mathf.RoundToInt(v);
                         if (m == GameSettings.WindowMode) return;
                         GameSettings.WindowMode = m;
                         displayAt = Time.unscaledTime + DisplayDelay;
                     },
-                    v => GraphicsQuality.WindowModeName(Mathf.RoundToInt(v)));
-                int resSteps = Mathf.Max(1, GraphicsQuality.Resolutions.Length - 1);
-                resolution = AddSlider(gfx, "Résolution", "Resolution", 0f, resSteps, resSteps,
-                    () => GraphicsQuality.ResolutionIndex, v =>
+                    GraphicsQuality.WindowModeName);
+                resolution = AddCarousel(gfx, "Résolution", "Resolution", () => GraphicsQuality.Resolutions.Length,
+                    () => GraphicsQuality.ResolutionIndex, i =>
                     {
-                        int i = Mathf.RoundToInt(v);
                         if (i == GraphicsQuality.ResolutionIndex) return;
                         GraphicsQuality.SetResolutionIndex(i);
                         displayAt = Time.unscaledTime + DisplayDelay;
                     },
-                    v => GraphicsQuality.ResolutionName(Mathf.RoundToInt(v)));
+                    GraphicsQuality.ResolutionName);
                 vsync = AddToggle(gfx, "Synchro verticale (VSync)", "Vertical sync (VSync)", () => GameSettings.VSync, v => GameSettings.VSync = v);
             }
-            var fps = AddSlider(gfx, "Limite d'images", "Frame rate limit", 0f, GraphicsQuality.FpsCaps.Length - 1, GraphicsQuality.FpsCaps.Length - 1,
-                () => GameSettings.FpsCap, v => GameSettings.FpsCap = Mathf.RoundToInt(v),
-                v => GameSettings.VSync && GraphicsQuality.HasDisplayOptions ? Loc.T("Suit l'écran (VSync)", "Follows display (VSync)") : GraphicsQuality.FpsName(Mathf.RoundToInt(v)));
+            // (VSync activée : la limite suit l'écran, les choix laissent place à la mention)
+            var fps = AddChoice(gfx, "Limite d'images", "Frame rate limit", GraphicsQuality.FpsCaps.Length,
+                () => GameSettings.FpsCap, i => GameSettings.FpsCap = i, GraphicsQuality.FpsName,
+                () => GameSettings.VSync && GraphicsQuality.HasDisplayOptions ? Loc.T("Suit l'écran (VSync)", "Follows display (VSync)") : null);
 
             // Rendu : changer la qualité remet la distance des détails au niveau conseillé
             Section(gfx, "RENDU", "RENDERING", "", "");
-            var quality = AddSlider(gfx, "Qualité graphique", "Graphics quality", 0f, 3f, 3, () => GameSettings.Quality, v =>
+            var quality = AddChoice(gfx, "Qualité graphique", "Graphics quality", 4, () => GameSettings.Quality, q =>
                 {
-                    // (l'éditeur rappelle les curseurs sans changement de valeur : ne pas écraser la distance choisie)
-                    int q = Mathf.RoundToInt(v);
                     if (q == GameSettings.Quality) return;
                     GameSettings.Quality = q;
                     GameSettings.DetailDistance = GraphicsQuality.DefaultDetail(q);
                 },
-                v => GraphicsQuality.Name(Mathf.RoundToInt(v)));
-            var detail = AddSlider(gfx, "Distance des détails", "Detail distance", 0f, GraphicsQuality.DetailLevels - 1, GraphicsQuality.DetailLevels - 1,
-                () => GameSettings.DetailDistance, v => GameSettings.DetailDistance = Mathf.RoundToInt(v), v => GraphicsQuality.DetailName(Mathf.RoundToInt(v)));
+                GraphicsQuality.Name);
+            var detail = AddChoice(gfx, "Distance des détails", "Detail distance", GraphicsQuality.DetailLevels,
+                () => GameSettings.DetailDistance, i => GameSettings.DetailDistance = i, GraphicsQuality.DetailName);
             var blur = AddToggle(gfx, "Flou de mouvement", "Motion blur", () => GameSettings.MotionBlur, v => GameSettings.MotionBlur = v);
 
             // Audio : volume général puis une voie par famille de sons ; la musique ; le son quand la fenêtre est
@@ -186,9 +185,9 @@ namespace ChillRoad
             var ambience = AddSlider(audio, "Ambiance", "Ambience", 0f, 1f, 20, () => GameSettings.AmbienceVolume, v => GameSettings.AmbienceVolume = v, Percent);
             var ui = AddSlider(audio, "Sons du score", "Score sounds", 0f, 1f, 20, () => GameSettings.UiVolume, v => GameSettings.UiVolume = v, Percent);
             Section(audio, "LECTURE", "PLAYBACK", "", "");
-            var trackNames = AddSlider(audio, "Titre des morceaux", "Track titles", 0f, 1f, 1, () => GameSettings.TrackNames ? 1f : 0f, v => GameSettings.TrackNames = v > 0.5f,
-                v => v > 0.5f ? Loc.T("Affiché", "Shown") : Loc.T("Masqué", "Hidden"));
-            Slider background = null;
+            var trackNames = AddToggle(audio, "Titre des morceaux", "Track titles", () => GameSettings.TrackNames, v => GameSettings.TrackNames = v,
+                ("Affiché", "Shown"), ("Masqué", "Hidden"));
+            Selectable background = null;
             if (GraphicsQuality.HasDisplayOptions)
                 background = AddToggle(audio, "Son en arrière-plan", "Sound in background", () => GameSettings.BackgroundAudio, v => GameSettings.BackgroundAudio = v);
 
@@ -298,7 +297,9 @@ namespace ChillRoad
         void Update()
         {
             if (displayAt > 0f && Time.unscaledTime >= displayAt) FlushDisplay();
-            if (!IsOpen || Time.frameCount == openedFrame) return;
+            if (!IsOpen) return;
+            foreach (var a in animators) a(Time.unscaledDeltaTime);
+            if (Time.frameCount == openedFrame) return;
             if (capturing) { UpdateCapture(); return; }
             if (Time.frameCount <= captureEndFrame + 1) { HighlightRows(); return; }
             RestoreNavigation();
@@ -583,32 +584,258 @@ namespace ChillRoad
             lrt.offsetMax = new Vector2(0f, 2f);
         }
 
-        /// <summary>Interrupteur : curseur à deux crans, Activé / Désactivé.</summary>
-        Slider AddToggle(RectTransform parent, string fr, string en, Func<bool> get, Action<bool> set) =>
-            AddSlider(parent, fr, en, 0f, 1f, 1, () => get() ? 1f : 0f, v => set(v > 0.5f), v => v > 0.5f ? Loc.T("Activé", "On") : Loc.T("Désactivé", "Off"));
+        // Contrôles de réglage : curseur pour les valeurs continues (volumes, pourcentages), interrupteur pour
+        // activé / désactivé, choix segmentés quand toutes les valeurs tiennent sur la ligne, carrousel « ‹ valeur › »
+        // pour les longues listes (résolution). Tous occupent la partie droite de la ligne, à partir de ControlLeft.
+        const float ControlLeft = 0.49f;
+        static readonly Color SegOff = new Color(0.14f, 0.16f, 0.2f, 0.95f);
+        static readonly Color SegHover = new Color(0.24f, 0.27f, 0.33f, 1f);
+        static readonly Color SegOn = new Color(0.95f, 0.62f, 0.12f, 1f);
+        static readonly Color Ink = new Color(0.05f, 0.06f, 0.08f, 1f);
+        static readonly Color Faint = new Color(1f, 1f, 1f, 0.16f);
 
-        Slider AddSlider(RectTransform parent, string fr, string en, float min, float max, int steps, Func<float> get, Action<float> set, Func<float, string> format)
+        /// <summary>Ligne de réglage : nom à gauche, plaque et trait or allumés quand elle est choisie (HighlightRows).</summary>
+        RectTransform OptionRow(RectTransform parent, string fr, string en, out Graphic plate, out Graphic bar)
         {
             var row = Rect(parent, en, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             row.gameObject.AddComponent<LayoutElement>().preferredHeight = 46;
-            // Ligne choisie : plaque inclinée plus claire et trait or à gauche (allumés par HighlightRows)
-            var plate = Shape(row, "Selected", RowOn).Set(18f, 0f, 0f);
+            plate = Shape(row, "Selected", RowOn).Set(18f, 0f, 0f);
             Fill(plate.rectTransform, new Vector2(-18, 1), new Vector2(14, -1));
-            var bar = Shape(row, "Mark", Accent).Set(8f, 0f, 0f);
+            bar = Shape(row, "Mark", Accent).Set(8f, 0f, 0f);
             var barRt = bar.rectTransform;
             barRt.anchorMin = Vector2.zero;
             barRt.anchorMax = new Vector2(0f, 1f);
             barRt.offsetMin = new Vector2(-18, 8);
             barRt.offsetMax = new Vector2(-12, -8);
             plate.enabled = bar.enabled = false;
-
             var name = Loc.Bind(Label(row, "", 25, TextAnchor.MiddleLeft, White, FontStyle.Normal), fr, en);
-            Stretch(name.rectTransform, 0f, 0.47f, 6f, 0f);
+            Stretch(name.rectTransform, 0f, ControlLeft - 0.02f, 6f, 0f);
+            return row;
+        }
+
+        /// <summary>Ligne à choix (<see cref="OptionSelector"/>) : toute la ligne capte la souris et devient la ligne choisie.</summary>
+        OptionSelector SelectorRow(RectTransform parent, string fr, string en, out RectTransform row)
+        {
+            row = OptionRow(parent, fr, en, out var plate, out var bar);
+            var hit = Shape(row, "Hit", Color.clear);
+            hit.raycastTarget = true;
+            hit.transform.SetAsFirstSibling();
+            Fill(hit.rectTransform, new Vector2(-18, 1), new Vector2(14, -1));
+            var selector = row.gameObject.AddComponent<OptionSelector>();
+            selector.transition = Selectable.Transition.None;
+            rows.Add((row.gameObject, plate, bar));
+            return selector;
+        }
+
+        /// <summary>Petite plaque inclinée cliquable (choix, flèche) ; libellé sans ombre, encre sur or.</summary>
+        (HudShape shape, Text text, OptionHit hit) Chip(Transform parent, string name, int size)
+        {
+            var shape = Shape(parent, name, SegOff).Set(10f, 0f, 0f);
+            shape.raycastTarget = true;
+            var text = Label(shape.transform, "", size, TextAnchor.MiddleCenter, White, FontStyle.Bold);
+            text.GetComponent<Shadow>().enabled = false;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 14;
+            text.resizeTextMaxSize = size;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            Fill(text.rectTransform, new Vector2(8, 0), new Vector2(-6, 0));
+            return (shape, text, shape.gameObject.AddComponent<OptionHit>());
+        }
+
+        /// <summary>
+        /// Interrupteur : pastille qui glisse dans un rail (or quand c'est activé), état écrit à sa gauche.
+        /// Gauche = désactivé, droite = activé, A / Entrée ou un clic sur la ligne bascule.
+        /// </summary>
+        Selectable AddToggle(RectTransform parent, string fr, string en, Func<bool> get, Action<bool> set,
+            (string fr, string en)? onName = null, (string fr, string en)? offName = null)
+        {
+            var on = onName ?? ("Activé", "On");
+            var off = offName ?? ("Désactivé", "Off");
+            var selector = SelectorRow(parent, fr, en, out var row);
+            const float W = 84f, H = 30f, Knob = 36f, Pad = 4f;
+            var track = Shape(row, "Switch", Faint).Set(10f, 0f, 0f);
+            var trt = track.rectTransform;
+            trt.anchorMin = trt.anchorMax = new Vector2(1f, 0.5f);
+            trt.offsetMin = new Vector2(-W - 4f, -H / 2f);
+            trt.offsetMax = new Vector2(-4f, H / 2f);
+            var knob = Shape(track.transform, "Knob", White).Set(8f, 0f, 0f);
+            var krt = knob.rectTransform;
+            krt.anchorMin = new Vector2(0f, 0f);
+            krt.anchorMax = new Vector2(0f, 1f);
+            var state = Label(row, "", 23, TextAnchor.MiddleRight, Accent, FontStyle.Bold);
+            Stretch(state.rectTransform, ControlLeft, 1f, 0f, W + 22f);
+
+            float t = get() ? 1f : 0f;
+            void Place()
+            {
+                float x = Pad + t * (W - Knob - 2f * Pad);
+                krt.offsetMin = new Vector2(x, Pad);
+                krt.offsetMax = new Vector2(x + Knob, -Pad);
+                track.color = Color.Lerp(Faint, SegOn, t);
+                knob.color = Color.Lerp(new Color(0.72f, 0.74f, 0.78f), Color.white, t);
+            }
+            void Set(bool v)
+            {
+                if (v == get()) return;
+                set(v);
+                Changed();
+                RefreshAll();
+            }
+            selector.Move = d => Set(d > 0);
+            selector.Submit = selector.Click = () => Set(!get());
+            refreshers.Add(() =>
+            {
+                bool v = get();
+                state.text = v ? Loc.T(on.fr, on.en) : Loc.T(off.fr, off.en);
+                state.color = v ? Accent : Dim;
+                if (!IsOpen) { t = v ? 1f : 0f; Place(); }
+            });
+            animators.Add(dt =>
+            {
+                t = Mathf.MoveTowards(t, get() ? 1f : 0f, dt * 7f);
+                Place();
+            });
+            Place();
+            return selector;
+        }
+
+        /// <summary>
+        /// Choix segmentés : une plaque par valeur, la valeur prise en or. Gauche/droite passe à la voisine (sans
+        /// boucler), A / Entrée à la suivante (en boucle), un clic choisit. <paramref name="locked"/> rend un texte quand
+        /// le réglage ne s'applique pas (les plaques laissent place à ce texte).
+        /// </summary>
+        Selectable AddChoice(RectTransform parent, string fr, string en, int count, Func<int> get, Action<int> set,
+            Func<int, string> name, Func<string> locked = null)
+        {
+            var selector = SelectorRow(parent, fr, en, out var row);
+            var area = Rect(row, "Choices", new Vector2(ControlLeft, 0f), Vector2.one, new Vector2(0f, 7f), new Vector2(-4f, -7f));
+            var h = area.gameObject.AddComponent<HorizontalLayoutGroup>();
+            h.spacing = 8;
+            h.childControlWidth = true; h.childControlHeight = true;
+            h.childForceExpandWidth = true; h.childForceExpandHeight = true;
+            var note = Label(row, "", 23, TextAnchor.MiddleCenter, Dim, FontStyle.Italic);
+            Stretch(note.rectTransform, ControlLeft, 1f, 0f, 4f);
+
+            void Pick(int i)
+            {
+                if (locked?.Invoke() != null) return;
+                i = Mathf.Clamp(i, 0, count - 1);
+                if (i == get()) return;
+                set(i);
+                Changed();
+                RefreshAll();
+            }
+            var chips = new (HudShape shape, Text text, OptionHit hit)[count];
+            for (int i = 0; i < count; i++)
+            {
+                int index = i;
+                chips[i] = Chip(area, "Choice", 21);
+                chips[i].hit.Click = () => Pick(index);
+            }
+            selector.Move = d => Pick(get() + d);
+            selector.Submit = () => Pick((get() + 1) % count);
+            refreshers.Add(() =>
+            {
+                for (int i = 0; i < count; i++) chips[i].text.text = name(i);
+                string lockText = locked?.Invoke();
+                area.gameObject.SetActive(lockText == null);
+                note.text = lockText ?? "";
+            });
+            animators.Add(_ =>
+            {
+                int current = get();
+                for (int i = 0; i < count; i++)
+                {
+                    bool active = i == current;
+                    chips[i].shape.color = active ? SegOn : chips[i].hit.Hover ? SegHover : SegOff;
+                    chips[i].text.color = active ? Ink : White;
+                }
+            });
+            return selector;
+        }
+
+        /// <summary>
+        /// Carrousel « ‹ valeur › » pour les longues listes : flèches cliquables (estompées en bout de liste), valeur au
+        /// centre et repères de position dessous. Gauche/droite sans boucler, A / Entrée en boucle.
+        /// </summary>
+        Selectable AddCarousel(RectTransform parent, string fr, string en, Func<int> count, Func<int> get, Action<int> set, Func<int, string> name)
+        {
+            var selector = SelectorRow(parent, fr, en, out var row);
+            var area = Rect(row, "Carousel", new Vector2(ControlLeft, 0f), Vector2.one, new Vector2(0f, 5f), new Vector2(-4f, -5f));
+            const float Arrow = 50f;
+            var prev = Chip(area, "Prev", 30);
+            var prt = prev.shape.rectTransform;
+            prt.anchorMin = Vector2.zero; prt.anchorMax = new Vector2(0f, 1f);
+            prt.offsetMin = Vector2.zero; prt.offsetMax = new Vector2(Arrow, 0f);
+            prev.text.text = "‹";
+            var next = Chip(area, "Next", 30);
+            var nrt = next.shape.rectTransform;
+            nrt.anchorMin = new Vector2(1f, 0f); nrt.anchorMax = Vector2.one;
+            nrt.offsetMin = new Vector2(-Arrow, 0f); nrt.offsetMax = Vector2.zero;
+            next.text.text = "›";
+            var mid = Shape(area, "Value", SegOff).Set(10f, 0f, 0f);
+            Fill(mid.rectTransform, new Vector2(Arrow + 8f, 0f), new Vector2(-Arrow - 8f, 0f));
+            var value = Label(mid.transform, "", 23, TextAnchor.MiddleCenter, Accent, FontStyle.BoldAndItalic);
+            Fill(value.rectTransform, new Vector2(0f, 10f), new Vector2(0f, 1f));
+            var pipRow = Rect(mid.transform, "Pips", new Vector2(0.3f, 0f), new Vector2(0.7f, 0f), new Vector2(0f, 3f), new Vector2(0f, 5f));
+            var pips = new List<HudShape>();
+
+            void Pick(int i)
+            {
+                int n = count();
+                if (n <= 0) return;
+                i = Mathf.Clamp(i, 0, n - 1);
+                if (i == get()) return;
+                set(i);
+                Changed();
+                RefreshAll();
+            }
+            prev.hit.Click = () => Pick(get() - 1);
+            next.hit.Click = () => Pick(get() + 1);
+            selector.Move = d => Pick(get() + d);
+            selector.Submit = () => { int n = count(); if (n > 0) Pick((get() + 1) % n); };
+            refreshers.Add(() =>
+            {
+                int n = count();
+                value.text = name(get());
+                // Repères : un par valeur, au-delà de 24 valeurs une seule barre de position
+                int wanted = n > 24 ? 1 : n;
+                while (pips.Count < wanted) pips.Add(Shape(pipRow, "Pip", Faint).Set(2f, 0f, 0f));
+                for (int i = 0; i < pips.Count; i++) pips[i].gameObject.SetActive(i < wanted && n > 1);
+                for (int i = 0; i < wanted; i++)
+                {
+                    var rt = pips[i].rectTransform;
+                    float a = wanted == 1 ? Mathf.Max(0f, get() / (float)n) : i / (float)n;
+                    float b = wanted == 1 ? Mathf.Min(1f, (get() + 1f) / n) : (i + 1f) / n;
+                    rt.anchorMin = new Vector2(a, 0f);
+                    rt.anchorMax = new Vector2(b, 1f);
+                    rt.offsetMin = Vector2.zero;
+                    rt.offsetMax = new Vector2(wanted == 1 ? 0f : -3f, 0f);
+                }
+            });
+            animators.Add(_ =>
+            {
+                int n = count(), i = get();
+                bool canPrev = i > 0, canNext = i < n - 1;
+                prev.shape.color = canPrev && prev.hit.Hover ? SegHover : SegOff;
+                next.shape.color = canNext && next.hit.Hover ? SegHover : SegOff;
+                prev.text.color = canPrev ? White : Faint;
+                next.text.color = canNext ? White : Faint;
+                int wanted = n > 24 ? 1 : n;
+                for (int p = 0; p < wanted && p < pips.Count; p++) pips[p].color = wanted == 1 || p == i ? Accent : Faint;
+            });
+            return selector;
+        }
+
+        /// <summary>Curseur (valeurs continues) : rail blanc estompé, remplissage or, languette inclinée, valeur à droite.</summary>
+        Slider AddSlider(RectTransform parent, string fr, string en, float min, float max, int steps, Func<float> get, Action<float> set, Func<float, string> format)
+        {
+            var row = OptionRow(parent, fr, en, out var plate, out var bar);
             var value = Label(row, "", 25, TextAnchor.MiddleRight, Accent, FontStyle.Bold);
-            Stretch(value.rectTransform, 0.8f, 1f, 0f, 4f);
+            Stretch(value.rectTransform, 0.875f, 1f, 0f, 4f);
 
             // Curseur : rail blanc estompé, remplissage or, languette inclinée
-            var sliderRt = Rect(row, "Slider", new Vector2(0.49f, 0.5f), new Vector2(0.78f, 0.5f), new Vector2(0, -7), new Vector2(0, 7));
+            var sliderRt = Rect(row, "Slider", new Vector2(ControlLeft, 0.5f), new Vector2(0.86f, 0.5f), new Vector2(0, -7), new Vector2(0, 7));
             var slider = sliderRt.gameObject.AddComponent<Slider>();
             var track = Shape(sliderRt, "Track", new Color(1f, 1f, 1f, 0.14f)).Set(6f, 0f, 0f);
             track.raycastTarget = true;
