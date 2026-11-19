@@ -21,7 +21,7 @@ def lin(hexstr):
 
 
 def font(name):
-    path = FONTS + name + ".ttf"
+    path = name if ":" in name else FONTS + name + ".ttf"
     for f in bpy.data.fonts:
         if os.path.normcase(bpy.path.abspath(f.filepath)) == os.path.normcase(path):
             return f
@@ -41,7 +41,7 @@ def mat_new(name):
 
 def mat_glass(dark=0.34, rough=0.22):
     """Verre dépoli teinté sombre = Glass.Panel de l'UI (rgba(20,24,30,.42) sur fond flou)."""
-    m = mat_new("LG_Glass")
+    m = mat_new("LG_Glass_%02d" % round(dark * 100))
     nt = m.node_tree
     nt.nodes.clear()
     clear = nt.nodes.new("ShaderNodeBsdfPrincipled")
