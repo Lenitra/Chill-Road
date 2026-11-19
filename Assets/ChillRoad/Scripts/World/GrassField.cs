@@ -8,9 +8,12 @@ namespace ChillRoad
     /// Herbe des prés : un champ continu de brins fins autour du joueur (shader ChillRoad/Grass).
     /// - le sol est découpé en carrés de 2 m qui partagent un seul maillage de brins (rangés du plus important au
     ///   moins important : chaque début de liste reste bien réparti) ; un carré ne stocke que son centre, sa pente,
-    ///   la hauteur de son herbe, la part de brins gardés et les masques du sol (herbe sèche, sous-bois) ;
-    /// - les carrés sont générés par cases de 16 m dans un budget de temps, d'après les masques de la carte (pas
-    ///   d'herbe sur la route, la roche, la neige, le pavé, l'eau ni les pentes raides) ;
+    ///   la hauteur de son herbe et la part de brins gardés à ses quatre coins, sa part fauchée et les masques du sol ;
+    /// - les carrés sont générés par cases de 16 m dans un budget de temps, d'après la carte d'herbe cuite par
+    ///   Tools/Map/map_grass.py (Resources/Map/map_grass : couverture du milieu, hauteur, prés de fauche, distance au
+    ///   bâti) et le bord de route de map_info, lus au plus fin : herbe jusqu'à l'accotement, bord net au pied des murs ;
+    /// - les prés de fauche sont découpés en parcelles (Voronoï de 46 m) : fauchée, en repousse ou en foin haut, avec
+    ///   une bande non fauchée en lisière de parcelle ;
     /// - au tri (caméra déplacée ou tournée), chaque carré visible va dans un lot selon le nombre de brins utiles à sa
     ///   distance : un seul tampon GPU, un dessin indirect par lot (seulement les premiers brins du maillage) ;
     /// - les voitures proches couchent l'herbe (capsules envoyées au shader).
@@ -35,9 +38,10 @@ namespace ChillRoad
         // Paliers de densité des lots (part des brins dessinés)
         static readonly float[] Levels = { 1f, 0.7f, 0.5f, 0.35f, 0.25f, 0.17f, 0.12f, 0.085f, 0.06f, 0.042f, 0.03f };
 
-        // a = centre + graine, b = pente + hauteur, c = herbe sèche + sous-bois, d = densité aux quatre coins
-        struct Patch { public Vector4 a, b, c, d; }
-        const int PatchStride = 64;
+        // a = centre + graine, b = pente + hauteur au centre + part fauchée, c = herbe sèche + sous-bois + foin + nuance,
+        // d = densité aux quatre coins, e = hauteur aux quatre coins (x0z0, x1z0, x0z1, x1z1)
+        struct Patch { public Vector4 a, b, c, d, e; }
+        const int PatchStride = 80;
         // Hauteur des rangées de sommets le long d'un brin (la pointe est à 1), un peu serrées vers le haut pour une
         // pointe de feuille effilée mais douce
         static readonly float[] RowT = { 0f, 0.3f, 0.6f, 0.85f };
@@ -56,6 +60,8 @@ namespace ChillRoad
         }
 
         MapData map;
+        byte[] grassMap;          // map_grass.bytes : 4 octets par nœud (couverture, hauteur en cm + bit 7 entretenue,
+                                  // prés de fauche, (bâti + 2) × 8)
         Material material;
         Mesh mesh;
         readonly Dictionary<Vector2Int, Chunk> chunks = new Dictionary<Vector2Int, Chunk>();
@@ -92,6 +98,10 @@ namespace ChillRoad
         {
             map = m;
             byDistance = (a, b) => ChunkDistance(a, focus).CompareTo(ChunkDistance(b, focus));
+            var baked = Resources.Load<TextAsset>("Map/map_grass");
+            if (baked && m != null && baked.bytes.Length == m.N * m.N * 4) grassMap = baked.bytes;
+            else Debug.LogWarning("GrassField : Resources/Map/map_grass absent ou périmé (lancer Tools/Map/map_grass.py)");
+            if (baked) Resources.UnloadAsset(baked);
             var template = Resources.Load<Material>("GrassField");
             if (template) material = new Material(template) { name = "GrassField (runtime)" };
             else
@@ -291,62 +301,148 @@ namespace ChillRoad
 
         static float Smooth01(float a, float b, float x) => Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(a, b, x));
 
-        /// <summary>
-        /// Densité de l'herbe en un point (0-1), continue : bords de route, eau, pavé, neige, roche, terre, pentes et
-        /// sous-bois la font décroître progressivement ; un bruit fin rend ces bords irréguliers ; de grandes nappes
-        /// de bruit font varier le pré lui-même (plus dru ici, plus clair là, quelques trouées).
-        /// </summary>
-        float Density(float x, float z)
+        /// <summary>Herbe en un point : part de brins gardés, hauteur de base, part fauchée (gazon, accotement,
+        /// parcelle fauchée), foin haut, herbe sèche, sous-bois.</summary>
+        struct Sample { public float k, height, mown, hay, tone, dry, forest; }
+
+        /// <summary>Octet d'un canal de la carte d'herbe, lissé entre les nœuds (0-255).</summary>
+        float SmoothGrass(int ch)
         {
-            Locate(x, z);
-            float jitter = Perlin(x, z, 0.55f, 31.7f) - 0.5f;          // bords irréguliers
-            float edge = Smooth(map.Info, 0) * 0.25f - 1f;
-            float k = Smooth01(2.1f, 3.9f, edge + jitter * 1.2f);
-            if (k <= 0f) return 0f;
-            k *= 1f - Smooth01(0.2f, 0.55f, SmoothFlag(7 | 16) + jitter * 0.25f);   // eau, entrées de tunnel
-            k *= 1f - Smooth01(0.12f, 0.3f, Smooth(map.Info, 2) / 255f + jitter * 0.1f); // pavé
-            k *= 1f - Smooth01(0.16f, 0.3f, Smooth(map.Info, 3) / 255f + jitter * 0.1f); // neige
-            if (k <= 0f) return 0f;
-            float forest = Smooth(map.Masks, 0) / 255f, rock = Smooth(map.Masks, 2) / 255f, dirt = Smooth(map.Masks, 3) / 255f;
-            k *= 1f - Smooth01(0.28f, 0.5f, rock + jitter * 0.15f);
-            k *= 1f - Smooth01(0.3f, 0.6f, dirt + jitter * 0.2f);
-            k *= Mathf.Lerp(1f, 0.25f, Smooth01(0.2f, 0.75f, forest + jitter * 0.2f));
-            if (k <= 0f) return 0f;
-            // Pentes : là où le terrain se peint en roche
-            const float e = 1.5f;
-            float gx = (map.Height(x + e, z) - map.Height(x - e, z)) / (2f * e);
-            float gz = (map.Height(x, z + e) - map.Height(x, z - e)) / (2f * e);
-            float steep = 1f - 1f / Mathf.Sqrt(1f + gx * gx + gz * gz) + rock * 0.35f;
-            k *= 1f - Smooth01(0.15f, 0.26f, steep + jitter * 0.05f);
-            // Le pré lui-même : grandes nappes plus drues ou plus claires (bruit déformé), petites trouées
-            float wx = x + (Perlin(x, z, 0.012f, 3.3f) - 0.5f) * 60f, wz = z + (Perlin(x, z, 0.012f, 8.1f) - 0.5f) * 60f;
-            k *= Mathf.Lerp(0.72f, 1f, Smooth01(0.3f, 0.62f, Perlin(wx, wz, 0.03f, 17.3f)));
-            k *= Mathf.Lerp(0.35f, 1f, Smooth01(0.12f, 0.24f, Perlin(wx, wz, 0.14f, 44.4f)));
-            return Mathf.Clamp01(k);
+            int n = map.N;
+            var g = grassMap;
+            return Lerp4(g[i00 * 4 + ch], g[(i00 + 1) * 4 + ch], g[(i00 + n) * 4 + ch], g[(i00 + n + 1) * 4 + ch]);
+        }
+
+        /// <summary>Hauteur du milieu (m) lissée entre les nœuds, et part d'herbe entretenue (bit 7 du canal 1).</summary>
+        float SmoothHeight(out float managed)
+        {
+            int n = map.N;
+            var g = grassMap;
+            byte a = g[i00 * 4 + 1], b = g[(i00 + 1) * 4 + 1], c = g[(i00 + n) * 4 + 1], d = g[(i00 + n + 1) * 4 + 1];
+            managed = Lerp4(a >> 7, b >> 7, c >> 7, d >> 7);
+            return Lerp4(a & 127, b & 127, c & 127, d & 127) * 0.01f;
+        }
+
+        static float Hash(int x, int z, int salt)
+        {
+            unchecked
+            {
+                uint h = (uint)(x * 374761393 + z * 668265263 + salt * 1442695041);
+                h = (h ^ (h >> 13)) * 1274126177u;
+                h ^= h >> 16;
+                return (h & 0xffffff) / 16777216f;
+            }
+        }
+
+        const float ParcelSize = 46f;
+
+        /// <summary>
+        /// Parcelle d'un pré de fauche (Voronoï sur une grille de 46 m tirée au hasard) : graine de la parcelle et
+        /// distance (m) à son bord le plus proche (bissectrice avec la parcelle voisine), bords droits comme un cadastre.
+        /// </summary>
+        static float Parcel(float x, float z, out float border)
+        {
+            int cx = Mathf.FloorToInt(x / ParcelSize), cz = Mathf.FloorToInt(z / ParcelSize);
+            float bx = 0f, bz = 0f, best = float.MaxValue;
+            int bi = 0, bk = 0;
+            for (int dz = -1; dz <= 1; dz++)
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                int i = cx + dx, k = cz + dz;
+                float sx = (i + 0.15f + 0.7f * Hash(i, k, 11)) * ParcelSize, sz = (k + 0.15f + 0.7f * Hash(i, k, 12)) * ParcelSize;
+                float d = (sx - x) * (sx - x) + (sz - z) * (sz - z);
+                if (d < best) { best = d; bx = sx; bz = sz; bi = i; bk = k; }
+            }
+            border = float.MaxValue;
+            for (int dz = -2; dz <= 2; dz++)
+            for (int dx = -2; dx <= 2; dx++)
+            {
+                int i = bi + dx, k = bk + dz;
+                if (dx == 0 && dz == 0) continue;
+                float sx = (i + 0.15f + 0.7f * Hash(i, k, 11)) * ParcelSize, sz = (k + 0.15f + 0.7f * Hash(i, k, 12)) * ParcelSize;
+                float ux = sx - bx, uz = sz - bz;
+                float len = Mathf.Sqrt(ux * ux + uz * uz);
+                if (len < 1e-3f) continue;
+                float d = ((x - (bx + sx) * 0.5f) * ux + (z - (bz + sz) * 0.5f) * uz) / -len;
+                border = Mathf.Min(border, d);
+            }
+            return Hash(bi, bk, 13);
         }
 
         /// <summary>
-        /// Hauteur de base de l'herbe en un point (m) : nappes de hautes herbes aux contours déformés, herbe rase au
-        /// bord des routes, dans les cours (gazon), sur l'alpage et sous bois. Les brins font ensuite ×0,75-1,15 au
-        /// hasard et ×0,7-1,25 selon leur touffe (shader).
+        /// Herbe en un point, continue : la carte d'herbe donne le milieu (pré, pâture, friche, sous-bois, alpage,
+        /// gazon, accotement fauché) ; le bord de route et le pied des murs la coupent net, un bruit fin rend ces bords
+        /// irréguliers ; les prés de fauche prennent la hauteur de leur parcelle.
         /// </summary>
-        float BaseHeight(float x, float z, out float dry, out float forest)
+        Sample At(float x, float z)
         {
+            var s = new Sample();
             Locate(x, z);
-            forest = Smooth(map.Masks, 0) / 255f;
-            dry = Smooth(map.Masks, 1) / 255f;
+            float jitter = Perlin(x, z, 0.55f, 31.7f) - 0.5f;
             float edge = Smooth(map.Info, 0) * 0.25f - 1f;
-            float yard = SmoothFlag(8);
-            float alt = Lerp4(map.H[i00], map.H[i00 + 1], map.H[i00 + map.N], map.H[i00 + map.N + 1]);
-            float wx = x + (Perlin(x, z, 0.015f, 6.6f) - 0.5f) * 50f, wz = z + (Perlin(x, z, 0.015f, 2.2f) - 0.5f) * 50f;
-            float tall = Smooth01(0.42f, 0.72f, Perlin(wx, wz, 0.028f, 5.9f));
-            float height = meadowHeight * Mathf.Lerp(0.75f, 1.55f, tall);
-            height *= Mathf.Lerp(0.6f, 1f, Mathf.InverseLerp(2.5f, 6f, edge));
-            height *= Mathf.Lerp(1f, 0.55f, dry);
-            height *= Mathf.Lerp(1f, 0.65f, forest);
-            height *= Mathf.Lerp(1f, 0.7f, Mathf.InverseLerp(280f, 420f, alt));
-            height *= 0.88f + 0.24f * Perlin(x, z, 0.33f, 71.1f);
-            return Mathf.Lerp(height, Mathf.Min(height, 0.12f), Smooth01(0.15f, 0.6f, yard));
+            // herbe jusqu'au pied de l'accotement (il plonge sous le terrain à 1,6 m du bord)
+            float k = Smooth01(0.5f, 1.4f, edge + jitter * 0.7f);
+            if (k <= 0f) return s;
+            k *= 1f - Smooth01(0.2f, 0.55f, SmoothFlag(7 | 16) + jitter * 0.25f);   // eau, entrées de tunnel
+            if (k <= 0f) return s;
+            s.forest = Smooth(map.Masks, 0) / 255f;
+            s.dry = Smooth(map.Masks, 1) / 255f;
+            float field = 0f;
+            if (grassMap != null)
+            {
+                float clear = SmoothGrass(3) / 8f - 2f;
+                k *= Smooth01(0.05f, 0.45f, clear + jitter * 0.2f);              // pied des murs, aires de l'aéroport
+                k *= SmoothGrass(0) / 255f;
+                s.height = SmoothHeight(out s.mown);
+                field = SmoothGrass(2) / 255f;
+            }
+            else
+            {
+                k *= 1f - Smooth01(0.12f, 0.3f, Smooth(map.Info, 2) / 255f);
+                k *= 1f - Smooth01(0.16f, 0.3f, Smooth(map.Info, 3) / 255f);
+                s.height = meadowHeight;
+            }
+            if (k <= 0f) return s;
+
+            // Accotement fauché le long de toutes les routes, au plus fin (la carte d'herbe n'a qu'un nœud tous les 4 m)
+            float verge = 1f - Smooth01(3f, 4.4f, edge + jitter * 0.8f);
+            field *= 1f - verge;
+
+            // Prés de fauche : chaque parcelle a son état ; bande non fauchée le long de ses bords
+            if (field > 0.01f)
+            {
+                float seed = Parcel(x + jitter * 0.4f, z - jitter * 0.4f, out float border);
+                float ph, pm, hay = 0f;
+                int sk = (int)(seed * 9e5f);
+                if (seed < 0.34f) { ph = 0.2f; pm = 1f; }                                   // fauchée
+                else if (seed < 0.56f) { ph = 0.32f + 0.08f * Hash(sk, 1, 5); pm = 0.6f; }  // repousse
+                else { ph = 0.92f + 0.24f * Hash(sk, 2, 5); pm = 0f; hay = 1f; }           // foin haut
+                // chaque parcelle a sa nuance (le patchwork des fonds de vallée), les fauchées plus claires
+                s.tone = ((seed < 0.34f ? 0.5f : 0f) + (Hash(sk, 3, 5) - 0.5f) * 1.2f) * field;
+                if (pm > 0f)
+                {
+                    // bande non fauchée en lisière de parcelle
+                    float keep = Smooth01(0.8f, 2.2f, border);
+                    ph = Mathf.Lerp(0.66f, ph, keep);
+                    pm *= keep;
+                }
+                s.height = Mathf.Lerp(s.height, ph, field);
+                s.mown = Mathf.Lerp(s.mown, pm, field);
+                s.hay = hay * field;
+            }
+            s.height = Mathf.Lerp(s.height, 0.18f, verge);
+            s.mown = Mathf.Max(s.mown, verge);
+            // Le pré sauvage varie un peu ; gazon et parcelles fauchées restent réguliers
+            s.height *= Mathf.Lerp(0.88f + 0.24f * Perlin(x, z, 0.33f, 71.1f), 1f, s.mown);
+            // Petites trouées dans les pâtures et les friches, pas dans les prés entretenus
+            float wild = (1f - Mathf.Max(field, s.mown));
+            if (wild > 0f)
+            {
+                float wx = x + (Perlin(x, z, 0.012f, 3.3f) - 0.5f) * 60f, wz = z + (Perlin(x, z, 0.012f, 8.1f) - 0.5f) * 60f;
+                k *= Mathf.Lerp(1f, Mathf.Lerp(0.4f, 1f, Smooth01(0.12f, 0.24f, Perlin(wx, wz, 0.14f, 44.4f))), wild);
+            }
+            s.k = Mathf.Clamp01(k);
+            return s;
         }
 
         /// <summary>
@@ -356,12 +452,29 @@ namespace ChillRoad
         public float HeightAt(float x, float z)
         {
             if (map == null) return 0f;
-            float k = Density(x, z);
-            if (k < 0.03f) return 0f;
-            return BaseHeight(x, z, out _, out _) * Mathf.Lerp(0.55f, 1f, k);
+            var s = At(x, z);
+            if (s.k < 0.03f) return 0f;
+            return s.height * Mathf.Lerp(0.55f, 1f, s.k);
         }
 
-        readonly float[] corners = new float[(PatchesPerSide + 1) * (PatchesPerSide + 1)];
+        /// <summary>Part fauchée de l'herbe en un point (0-1) : gazon, accotement, parcelle fauchée ; 0 sans herbe.</summary>
+        public float MownAt(float x, float z)
+        {
+            if (map == null) return 0f;
+            var s = At(x, z);
+            return s.k < 0.03f ? 0f : s.mown;
+        }
+
+        /// <summary>Distance (m) au bâti le plus proche (murs, aires de l'aéroport), 30 au-delà : GroundFlora n'y
+        /// pose pas de plantes.</summary>
+        public float ClearAt(float x, float z)
+        {
+            if (map == null || grassMap == null) return 30f;
+            Locate(x, z);
+            return SmoothGrass(3) / 8f - 2f;
+        }
+
+        readonly Sample[] corners = new Sample[(PatchesPerSide + 1) * (PatchesPerSide + 1)];
 
         /// <summary>Carrés d'herbe d'une case de 16 m, ou null s'il n'y en a aucun.</summary>
         Chunk Build(Vector2Int c)
@@ -373,9 +486,9 @@ namespace ChillRoad
             for (int iz = 0; iz < C; iz++)
             for (int ix = 0; ix < C; ix++)
             {
-                float k = Density(x0 + ix * PatchSize, z0 + iz * PatchSize);
-                corners[iz * C + ix] = k;
-                any |= k > 0.03f;
+                var s = At(x0 + ix * PatchSize, z0 + iz * PatchSize);
+                corners[iz * C + ix] = s;
+                any |= s.k > 0.03f;
             }
             if (!any) return null;
 
@@ -383,11 +496,12 @@ namespace ChillRoad
             for (int iz = 0; iz < PatchesPerSide; iz++)
             for (int ix = 0; ix < PatchesPerSide; ix++)
             {
-                var d = new Vector4(corners[iz * C + ix], corners[iz * C + ix + 1], corners[(iz + 1) * C + ix], corners[(iz + 1) * C + ix + 1]);
+                Sample s00 = corners[iz * C + ix], s10 = corners[iz * C + ix + 1], s01 = corners[(iz + 1) * C + ix], s11 = corners[(iz + 1) * C + ix + 1];
+                var d = new Vector4(s00.k, s10.k, s01.k, s11.k);
                 if (Mathf.Max(Mathf.Max(d.x, d.y), Mathf.Max(d.z, d.w)) < 0.03f) continue;
                 float x = x0 + (ix + 0.5f) * PatchSize, z = z0 + (iz + 0.5f) * PatchSize;
+                var mid = At(x, z);
 
-                float height = BaseHeight(x, z, out float dry, out float forest);
                 const float e = 1.5f;
                 float gx = (map.Height(x + e, z) - map.Height(x - e, z)) / (2f * e);
                 float gz = (map.Height(x, z + e) - map.Height(x, z - e)) / (2f * e);
@@ -397,9 +511,10 @@ namespace ChillRoad
                 build.Add(new Patch
                 {
                     a = new Vector4(x, y, z, seed),
-                    b = new Vector4(gx, gz, height, 0f),
-                    c = new Vector4(dry, forest, 0f, 0f),
+                    b = new Vector4(gx, gz, mid.height, mid.mown),
+                    c = new Vector4(mid.dry, mid.forest, mid.hay, mid.tone),
                     d = d,
+                    e = new Vector4(s00.height, s10.height, s01.height, s11.height),
                 });
                 hMin = Mathf.Min(hMin, y);
                 hMax = Mathf.Max(hMax, y);

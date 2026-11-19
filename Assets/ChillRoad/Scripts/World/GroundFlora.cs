@@ -316,7 +316,15 @@ namespace ChillRoad
                 if (edge < 2.0f || (map.Info[gi * 4 + 1] & 15) != 0 || map.Info[gi * 4 + 2] > 60 || map.Info[gi * 4 + 3] > 120) continue;
                 // Terre battue (rives, plages, chemins) : rien n'y pousse, le champ d'herbe non plus
                 if (map.Masks[gi * 4 + 3] > 90) continue;
-                var kind = layer.dense ? ChooseDense(x, z, gi, edge, roll) : Choose(x, z, gi, edge, roll);
+                // Pied des murs et aires de l'aéroport : rien ; gazon, accotements et parcelles fauchés : seulement
+                // ce qui pousse dans l'herbe rase (trèfle, pâquerettes)
+                mownHere = false;
+                if (FieldOn)
+                {
+                    if (grass.ClearAt(x, z) < 1f) continue;
+                    mownHere = grass.MownAt(x, z) > 0.5f;
+                }
+                var kind =layer.dense ? ChooseDense(x, z, gi, edge, roll) : Choose(x, z, gi, edge, roll);
                 if (kind == null) continue;
                 float y = map.Height(x, z);
                 // Pente du terrain (même pas que le champ d'herbe) : la matrice penche la plante sur la normale du
@@ -379,11 +387,14 @@ namespace ChillRoad
         /// <summary>Part du trèfle gardée : il vit dans l'herbe courte, les hautes herbes le cachent.</summary>
         float ShortGrass(float x, float z) => FieldOn && grass.HeightAt(x, z) > 0.42f ? 0.15f : 1f;
 
+        bool mownHere;
+
         void Option(Kind k, float w, bool withField = false)
         {
             if (k == null || w <= 0f) return;
             // Le champ d'herbe remplace les touffes d'herbe (sauf sur la roche, où il ne pousse pas)
             if (!withField && FieldOn && (k == grassShort || k == grassTall || k == grassDry)) return;
+            if (mownHere && k != clover && k != daisy && k != grassShort && k != grassDry) return;
             pick[picks] = k;
             weight[picks] = w * density;
             picks++;

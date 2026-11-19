@@ -61,10 +61,11 @@ Shader "ChillRoad/Grass"
             half4 _Grass, _GrassLush, _GrassDry, _Forest, _RootColor, _TipColor, _TransColor, _ShadeColor;
         CBUFFER_END
 
-        // Carré d'herbe (GrassField.Patch) : a = centre (x, y, z) + graine ; b = pente (dh/dx, dh/dz), hauteur (m),
-        // inutilisé ; c = herbe sèche, sous-bois, inutilisés ; d = densité aux quatre coins (x0z0, x1z0, x0z1, x1z1),
-        // interpolée brin par brin : les bords du pré sont progressifs, pas en carrés
-        struct GrassPatch { float4 a; float4 b; float4 c; float4 d; };
+        // Carré d'herbe (GrassField.Patch) : a = centre (x, y, z) + graine ; b = pente (dh/dx, dh/dz), hauteur au
+        // centre (m), part fauchée ; c = herbe sèche, sous-bois, foin haut, nuance de la parcelle ; d = densité et e = hauteur aux
+        // quatre coins (x0z0, x1z0, x0z1, x1z1), interpolées brin par brin : bords du pré et limites de parcelles
+        // progressifs, pas en carrés
+        struct GrassPatch { float4 a; float4 b; float4 c; float4 d; float4 e; };
         StructuredBuffer<GrassPatch> _GrassPatches;
         // Fourni par GrassField : taille d'un carré (m) ; chaque lot a son propre tampon de carrés
         float _GrassPatchSize;
@@ -122,6 +123,9 @@ Shader "ChillRoad/Grass"
             half far;           // 0 près, 1 au bout du champ (couleur du sol)
             half shade;         // variation du brin (-1, 1)
             half side;          // côté du brin (-1, 1)
+            half mown;          // herbe fauchée (gazon, accotement, parcelle fauchée) : plus claire et régulière
+            half hay;           // foin haut : pointes dorées
+            half tone;          // nuance de la parcelle (-1 sombre, 1 claire)
         };
 
         // positionOS = (racine x, t, racine z) dans le carré ; uv = (côté -1..1, rang 0..1)
@@ -147,6 +151,8 @@ Shader "ChillRoad/Grass"
             // Densité du milieu aux coins du carré, interpolée à la racine
             float2 u = saturate(c / S + 0.5);
             float k = lerp(lerp(p.d.x, p.d.y, u.x), lerp(p.d.z, p.d.w, u.x), u.y);
+            float baseH = lerp(lerp(p.e.x, p.e.y, u.x), lerp(p.e.z, p.e.w, u.x), u.y);
+            float mown = saturate(p.b.w);
 
             // Touffes : les brins poussent autour de centres répartis au hasard et s'ouvrent vers l'extérieur ;
             // là où le milieu est clairsemé, ce sont des touffes entières qui manquent (pas un semis uniforme)
@@ -156,7 +162,8 @@ Shader "ChillRoad/Grass"
             float dc = length(out2);
             float2 outDir = dc > 1e-4 ? out2 / dc : float2(1, 0);
             float clumpRand = Hash12(cell * 1.31 + 9.7);
-            float clumpH = lerp(0.7, 1.25, Hash12(cell * 0.77 + 3.1));
+            // l'herbe fauchée repousse à la même hauteur partout : touffes presque égales
+            float clumpH = lerp(lerp(0.7, 1.25, Hash12(cell * 0.77 + 3.1)), 1.0, mown * 0.75);
             float thr = clumpRand * 0.78 + h1.y * 0.22;
             float biome = saturate((saturate(k * 1.5 - 0.2) - thr) / 0.12);
 
@@ -172,7 +179,8 @@ Shader "ChillRoad/Grass"
             o.far = (half)smoothstep(_GrassRange.y * 0.55, _GrassRange.z, dist);
 
             float rel = saturate(dc / (_ClumpSize * 0.6));
-            float height = p.b.z * clumpH * lerp(1.05, 0.62, rel) * lerp(0.75, 1.15, h1.x) * lerp(0.55, 1.0, saturate(k)) * alive * biome;
+            float height = baseH * clumpH * lerp(lerp(1.05, 0.62, rel), 0.95, mown * 0.7) * lerp(lerp(0.75, 1.15, h1.x), 1.0, mown * 0.6)
+                         * lerp(0.55, 1.0, saturate(k)) * alive * biome;
             // Au loin, moins de brins mais plus larges (le pré reste couvert)
             float widen = min(rsqrt(max(keepDist * _GrassDensity, 1e-3)), _MaxWiden);
             float width = _BladeWidth * lerp(0.75, 1.25, h2.y) * widen * saturate(alive * 3.0) * saturate(biome * 3.0);
@@ -186,8 +194,8 @@ Shader "ChillRoad/Grass"
             float2 dir = _ChillRoadWind.xy;
             dir = dot(dir, dir) > 1e-4 ? normalize(dir) : float2(0.8, 0.6);
             // Inclinaison : tout le pré est « peigné » dans le sens du vent, un peu de hasard et d'ouverture des touffes
-            float2 lean = dir * (_Comb * (0.75 + 0.5 * h2.y)) + outDir * (_ClumpSpread * (0.35 + 0.65 * rel))
-                        + (h1 - 0.5) * 2.0 * _Lean;
+            float2 lean = (dir * (_Comb * (0.75 + 0.5 * h2.y)) + outDir * (_ClumpSpread * (0.35 + 0.65 * rel))
+                        + (h1 - 0.5) * 2.0 * _Lean) * (1.0 - 0.55 * mown);
             float force = _ChillRoadWind.z > 0.0 ? _ChillRoadWind.z : 1.0;
             float2 nuv = (root - _ChillRoadTexOrigin.xz) / _WindScale - _ChillRoadWindScroll.xy;
             float gust = smoothstep(0.3, 0.85, SAMPLE_TEXTURE2D_LOD(_Noise, sampler_Noise, nuv, 0).r);
@@ -235,6 +243,9 @@ Shader "ChillRoad/Grass"
             o.t = (half)t;
             o.side = (half)uv.x;
             o.shade = (half)(Hash12(root * 9.13) * 2.0 - 1.0);
+            o.mown = (half)mown;
+            o.hay = (half)saturate(p.c.z);
+            o.tone = (half)clamp(p.c.w, -1.0, 1.0);
             return o;
         }
         ENDHLSL
@@ -289,7 +300,13 @@ Shader "ChillRoad/Grass"
                 half3 tip = lerp(ground, _TipColor.rgb * (lum / 0.45), _TipAmount) * _TipBright;
                 half3 col = lerp(ground * _RootColor.rgb, ground, smoothstep(0.0, 0.5, t));
                 col = lerp(col, tip, smoothstep(0.45, 1.0, t));
-                col *= 1.0 + b.shade * _BladeVariation;
+                col *= 1.0 + b.shade * _BladeVariation * (1.0 - 0.5 * b.mown);
+                // Parcelle fauchée, gazon : vert plus clair et un peu jaune (tiges coupées) ; foin haut : pointes dorées
+                col = lerp(col, col * half3(1.1, 1.08, 0.86) + 0.015, b.mown * 0.55);
+                col = lerp(col, col * half3(1.12, 1.04, 0.72) + half3(0.03, 0.02, 0.0), b.hay * 0.6 * smoothstep(0.3, 1.0, t));
+                // nuance propre à chaque parcelle : plus claire et jaune, ou plus sombre et bleutée
+                col *= 1.0 + b.tone * 0.09;
+                col = lerp(col, col * (b.tone > 0.0 ? half3(1.05, 1.03, 0.86) : half3(0.94, 1.0, 1.04)), abs(b.tone) * 0.5);
                 // Rafale : les pointes couchées accrochent un peu la lumière
                 col = lerp(col, col * 1.15 + 0.02, b.gust * _GustBright * smoothstep(0.2, 1.0, t));
                 // Teinte plus sobre que le sol, puis au loin la couleur du sol (raccord avec le terrain)

@@ -123,6 +123,8 @@ def bake(step=D.STEP, export=True, preview=True, roads_only=False):
         OV.render(g, Hc, rgba, paved, snow, water, edges, info["rivers"], foot, os.path.join(E.OUT, "map_overview.png"))
     if preview:
         import map_place as PLC
+        import map_grass as GR                 # carte d'herbe (GrassField), d'après la carte qui vient d'être exportée
+        GR.bake()
         buildings = []
         for p_ in placer.places:
             it = placer.items[p_["item"]]
