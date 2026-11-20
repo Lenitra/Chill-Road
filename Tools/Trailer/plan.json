@@ -1,0 +1,877 @@
+{
+ "shots": [
+  {
+   "car": "twingo",
+   "paint": 9,
+   "x": 300,
+   "z": -1810,
+   "hour": 7.8,
+   "speed": 35,
+   "drive": 4,
+   "len": 5.4,
+   "traffic": 0.6,
+   "world": true,
+   "track": true,
+   "move": true,
+   "cam": {
+    "x": -80,
+    "y": 60,
+    "z": -90
+   },
+   "cam2": {
+    "x": -66,
+    "y": 44,
+    "z": -76
+   },
+   "look": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "look2": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "fov": 45,
+   "name": "a1_village_haut"
+  },
+  {
+   "car": "miata",
+   "kind": "Mountain",
+   "x": 50,
+   "z": 420,
+   "hour": 8.4,
+   "speed": 50,
+   "drive": 5,
+   "len": 5.4,
+   "traffic": 0.5,
+   "world": true,
+   "track": true,
+   "move": true,
+   "cam": {
+    "x": 70,
+    "y": 25,
+    "z": -50
+   },
+   "cam2": {
+    "x": 58,
+    "y": 15,
+    "z": -40
+   },
+   "look": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "look2": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "fov": 42,
+   "name": "a2_col_lac"
+  },
+  {
+   "car": "twingo",
+   "paint": 9,
+   "x": 300,
+   "z": -1810,
+   "hour": 10.5,
+   "speed": 34,
+   "drive": 4,
+   "len": 3.2,
+   "traffic": 0.4,
+   "cam": {
+    "x": -3.2,
+    "y": 1.2,
+    "z": 7.5
+   },
+   "look": {
+    "x": 0,
+    "y": 0.7,
+    "z": 0
+   },
+   "move": true,
+   "cam2": {
+    "x": -3.6,
+    "y": 1.3,
+    "z": 6.2
+   },
+   "look2": {
+    "x": 0,
+    "y": 0.7,
+    "z": 0
+   },
+   "fov": 40,
+   "name": "b1_village"
+  },
+  {
+   "car": "supra",
+   "kind": "Mountain",
+   "x": 1450,
+   "z": -1900,
+   "hour": 16.6,
+   "speed": 75,
+   "drive": 5,
+   "len": 3.4,
+   "traffic": 0.5,
+   "world": true,
+   "track": true,
+   "move": true,
+   "cam": {
+    "x": -22,
+    "y": 6,
+    "z": 34
+   },
+   "cam2": {
+    "x": -16,
+    "y": 4,
+    "z": 27
+   },
+   "look": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "look2": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "fov": 28,
+   "name": "b2_rives"
+  },
+  {
+   "car": "ae86",
+   "kind": "Mountain",
+   "x": 60,
+   "z": 200,
+   "hour": 16.4,
+   "speed": 62,
+   "drive": 5,
+   "len": 3.4,
+   "traffic": 0.5,
+   "lat": 8.5,
+   "world": true,
+   "track": true,
+   "move": true,
+   "cam": {
+    "x": -22,
+    "y": 16,
+    "z": -30
+   },
+   "cam2": {
+    "x": -15,
+    "y": 10,
+    "z": -22
+   },
+   "look": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "look2": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "fov": 38,
+   "name": "b3_lacets"
+  },
+  {
+   "car": "valkyrie",
+   "kind": "Highway",
+   "span": "tunnel",
+   "x": 0,
+   "z": 0,
+   "spanOffset": -110,
+   "lane": 1,
+   "hour": 15.5,
+   "speed": 190,
+   "drive": 6,
+   "len": 3.6,
+   "traffic": 1.0,
+   "cam": {
+    "x": 1.6,
+    "y": 1.25,
+    "z": -7.5
+   },
+   "look": {
+    "x": 0,
+    "y": 1.1,
+    "z": 30
+   },
+   "fov": 58,
+   "fov2": 64,
+   "blur": true,
+   "name": "b4_tunnel"
+  },
+  {
+   "car": "jesko",
+   "kind": "Highway",
+   "x": 1500,
+   "z": -1500,
+   "lane": 1,
+   "hour": 16.6,
+   "speed": 208,
+   "speed0": 120,
+   "drive": 14,
+   "len": 6.5,
+   "traffic": 2.3,
+   "pack": 16,
+   "first": 125,
+   "gap": 38,
+   "weave": true,
+   "hud": true,
+   "blur": true,
+   "seed": 3,
+   "name": "c1_trafic_a"
+  },
+  {
+   "car": "jesko",
+   "kind": "Highway",
+   "x": 1500,
+   "z": -1500,
+   "lane": 1,
+   "hour": 16.6,
+   "speed": 208,
+   "speed0": 120,
+   "drive": 14,
+   "len": 6.5,
+   "traffic": 2.3,
+   "pack": 16,
+   "first": 125,
+   "gap": 38,
+   "weave": true,
+   "hud": true,
+   "blur": true,
+   "seed": 8,
+   "name": "c1_trafic_b"
+  },
+  {
+   "car": "jesko",
+   "kind": "Highway",
+   "x": 1500,
+   "z": -1500,
+   "lane": 1,
+   "hour": 16.6,
+   "speed": 208,
+   "speed0": 120,
+   "drive": 14,
+   "len": 6.5,
+   "traffic": 2.3,
+   "pack": 16,
+   "first": 125,
+   "gap": 38,
+   "weave": true,
+   "hud": true,
+   "blur": true,
+   "seed": 21,
+   "name": "c1_trafic_c"
+  },
+  {
+   "cam": {
+    "x": -4.5,
+    "y": 1.0,
+    "z": 8
+   },
+   "look": {
+    "x": 0,
+    "y": 0.6,
+    "z": 0
+   },
+   "fov": 42,
+   "velFrame": true,
+   "follow": 0.25,
+   "car": "mustang",
+   "mode": "drift",
+   "cx": 1772,
+   "cz": -893,
+   "radius": 20,
+   "turn": 1,
+   "speed": 45,
+   "slip": 28,
+   "assist": 0.6,
+   "tires": 4,
+   "engine": 3,
+   "hour": 17.4,
+   "drive": 9,
+   "len": 5.0,
+   "traffic": 0.3,
+   "name": "c2_drift_a"
+  },
+  {
+   "useEye": true,
+   "eye": {
+    "x": 1774.5,
+    "y": 6.9,
+    "z": -893
+   },
+   "look": {
+    "x": 0,
+    "y": 0.5,
+    "z": 0
+   },
+   "fov": 36,
+   "shake": 0.2,
+   "car": "mustang",
+   "mode": "drift",
+   "cx": 1772,
+   "cz": -893,
+   "radius": 20,
+   "turn": 1,
+   "speed": 45,
+   "slip": 28,
+   "assist": 0.6,
+   "tires": 4,
+   "engine": 3,
+   "hour": 17.4,
+   "drive": 9,
+   "len": 5.0,
+   "traffic": 0.3,
+   "name": "c2_drift_b"
+  },
+  {
+   "car": "gryaris",
+   "stunt": "port",
+   "runup": 110,
+   "speed": 150,
+   "hour": 17.0,
+   "drive": 2.4,
+   "len": 3.6,
+   "traffic": 0.3,
+   "world": true,
+   "local": true,
+   "track": true,
+   "cam": {
+    "x": 9,
+    "y": 1.3,
+    "z": 38
+   },
+   "look": {
+    "x": 0,
+    "y": 0.6,
+    "z": 0
+   },
+   "fov": 40,
+   "name": "c3_saut"
+  },
+  {
+   "car": "supra",
+   "kind": "Highway",
+   "x": -1000,
+   "z": 1500,
+   "lane": 1,
+   "hour": 17,
+   "storm": true,
+   "speed": 170,
+   "speed0": 115,
+   "drive": 14,
+   "len": 3.8,
+   "traffic": 2.3,
+   "pack": 12,
+   "first": 110,
+   "gap": 34,
+   "weave": true,
+   "hug": 0.3,
+   "cam": {
+    "x": -2.2,
+    "y": 0.9,
+    "z": -7.5
+   },
+   "look": {
+    "x": 0,
+    "y": 1.0,
+    "z": 20
+   },
+   "fov": 62,
+   "blur": true,
+   "seed": 5,
+   "name": "c4_orage"
+  },
+  {
+   "car": "gryaris",
+   "race": "station_tours",
+   "along": 90,
+   "hour": 14.5,
+   "speed": 70,
+   "lat": 6,
+   "tires": 3,
+   "drive": 5,
+   "len": 3.6,
+   "traffic": 0.4,
+   "cam": {
+    "x": -3.6,
+    "y": 1.2,
+    "z": 8
+   },
+   "look": {
+    "x": 0,
+    "y": 0.7,
+    "z": 0
+   },
+   "move": true,
+   "cam2": {
+    "x": -4.4,
+    "y": 1.4,
+    "z": 6.5
+   },
+   "look2": {
+    "x": 0,
+    "y": 0.7,
+    "z": 0
+   },
+   "fov": 42,
+   "follow": 0.5,
+   "name": "c5_neige"
+  },
+  {
+   "car": "a110",
+   "race": "col",
+   "raceStart": true,
+   "hour": 16.2,
+   "speed": 140,
+   "lat": 9,
+   "drive": 0.3,
+   "len": 5.5,
+   "traffic": 0.4,
+   "hud": true,
+   "blur": true,
+   "name": "c6_course"
+  },
+  {
+   "car": "vision",
+   "x": 250,
+   "z": -1780,
+   "hour": 20.6,
+   "speed": 45,
+   "drive": 4,
+   "len": 3.6,
+   "neon": 2,
+   "flame": 1,
+   "traffic": 0.8,
+   "cam": {
+    "x": -3.4,
+    "y": 0.9,
+    "z": -6.5
+   },
+   "look": {
+    "x": 0,
+    "y": 0.8,
+    "z": 6
+   },
+   "move": true,
+   "cam2": {
+    "x": -3.9,
+    "y": 1.1,
+    "z": -5.4
+   },
+   "look2": {
+    "x": 0,
+    "y": 0.8,
+    "z": 6
+   },
+   "fov": 48,
+   "name": "c7_nuit"
+  },
+  {
+   "car": "miata",
+   "kind": "Main",
+   "x": 1790,
+   "z": 120,
+   "hour": 13.0,
+   "speed": 70,
+   "drive": 3,
+   "len": 0.9,
+   "traffic": 0.3,
+   "cam": {
+    "x": -4.2,
+    "y": 1.25,
+    "z": 8.2
+   },
+   "look": {
+    "x": 0,
+    "y": 0.7,
+    "z": 0
+   },
+   "fov": 38,
+   "name": "d1_voiture_0_miata"
+  },
+  {
+   "car": "ae86",
+   "kind": "Main",
+   "x": 1790,
+   "z": 120,
+   "hour": 13.0,
+   "speed": 70,
+   "drive": 3,
+   "len": 0.9,
+   "traffic": 0.3,
+   "cam": {
+    "x": -4.2,
+    "y": 1.25,
+    "z": 8.2
+   },
+   "look": {
+    "x": 0,
+    "y": 0.7,
+    "z": 0
+   },
+   "fov": 38,
+   "name": "d1_voiture_1_ae86"
+  },
+  {
+   "car": "dmc12",
+   "kind": "Main",
+   "x": 1790,
+   "z": 120,
+   "hour": 13.0,
+   "speed": 70,
+   "drive": 3,
+   "len": 0.9,
+   "traffic": 0.3,
+   "cam": {
+    "x": -4.2,
+    "y": 1.25,
+    "z": 8.2
+   },
+   "look": {
+    "x": 0,
+    "y": 0.7,
+    "z": 0
+   },
+   "fov": 38,
+   "name": "d1_voiture_2_dmc12"
+  },
+  {
+   "car": "mustang",
+   "kind": "Main",
+   "x": 1790,
+   "z": 120,
+   "hour": 13.0,
+   "speed": 70,
+   "drive": 3,
+   "len": 0.9,
+   "traffic": 0.3,
+   "cam": {
+    "x": -4.2,
+    "y": 1.25,
+    "z": 8.2
+   },
+   "look": {
+    "x": 0,
+    "y": 0.7,
+    "z": 0
+   },
+   "fov": 38,
+   "name": "d1_voiture_3_mustang"
+  },
+  {
+   "car": "a110",
+   "kind": "Main",
+   "x": 1790,
+   "z": 120,
+   "hour": 13.0,
+   "speed": 70,
+   "drive": 3,
+   "len": 0.9,
+   "traffic": 0.3,
+   "cam": {
+    "x": -4.2,
+    "y": 1.25,
+    "z": 8.2
+   },
+   "look": {
+    "x": 0,
+    "y": 0.7,
+    "z": 0
+   },
+   "fov": 38,
+   "name": "d1_voiture_4_a110"
+  },
+  {
+   "car": "focusst",
+   "kind": "Main",
+   "x": 1790,
+   "z": 120,
+   "hour": 13.0,
+   "speed": 70,
+   "drive": 3,
+   "len": 0.9,
+   "traffic": 0.3,
+   "cam": {
+    "x": -4.2,
+    "y": 1.25,
+    "z": 8.2
+   },
+   "look": {
+    "x": 0,
+    "y": 0.7,
+    "z": 0
+   },
+   "fov": 38,
+   "name": "d1_voiture_5_focusst"
+  },
+  {
+   "car": "valkyrie",
+   "kind": "Main",
+   "x": 1790,
+   "z": 120,
+   "hour": 13.0,
+   "speed": 70,
+   "drive": 3,
+   "len": 0.9,
+   "traffic": 0.3,
+   "cam": {
+    "x": -4.2,
+    "y": 1.25,
+    "z": 8.2
+   },
+   "look": {
+    "x": 0,
+    "y": 0.7,
+    "z": 0
+   },
+   "fov": 38,
+   "name": "d1_voiture_6_valkyrie"
+  },
+  {
+   "car": "vision",
+   "kind": "Main",
+   "x": 1790,
+   "z": 120,
+   "hour": 13.0,
+   "speed": 70,
+   "drive": 3,
+   "len": 0.9,
+   "traffic": 0.3,
+   "cam": {
+    "x": -4.2,
+    "y": 1.25,
+    "z": 8.2
+   },
+   "look": {
+    "x": 0,
+    "y": 0.7,
+    "z": 0
+   },
+   "fov": 38,
+   "name": "d1_voiture_7_vision"
+  },
+  {
+   "car": "supra",
+   "x": 250,
+   "z": -1780,
+   "hour": 15,
+   "speed": 30,
+   "drive": 3,
+   "len": 4.2,
+   "menu": "garage",
+   "step": 0.5,
+   "name": "d2_garage"
+  },
+  {
+   "car": "supra",
+   "x": 250,
+   "z": -1780,
+   "hour": 15,
+   "speed": 30,
+   "drive": 3,
+   "len": 3.0,
+   "menu": "tuning",
+   "name": "d3_tuning"
+  },
+  {
+   "car": "supra",
+   "x": 250,
+   "z": -1780,
+   "hour": 15,
+   "speed": 30,
+   "drive": 3,
+   "len": 3.0,
+   "menu": "carte",
+   "name": "d4_carte"
+  },
+  {
+   "car": "twingo",
+   "paint": 9,
+   "x": 300,
+   "z": -1810,
+   "hour": 16.4,
+   "hour2": 20.7,
+   "speed": 35,
+   "drive": 4,
+   "len": 4.2,
+   "traffic": 1.6,
+   "world": true,
+   "cam": {
+    "x": 70,
+    "y": 45,
+    "z": 80
+   },
+   "look": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+   },
+   "fov": 45,
+   "name": "d5_jour_nuit"
+  },
+  {
+   "car": "jesko",
+   "line": true,
+   "x": 500,
+   "z": 1955,
+   "tox": 1330,
+   "toz": 1881,
+   "along": 330,
+   "hour": 17.4,
+   "speed": 250,
+   "drive": 4.5,
+   "len": 3.2,
+   "traffic": 0.3,
+   "world": true,
+   "track": true,
+   "cam": {
+    "x": 140,
+    "y": 1.7,
+    "z": 10
+   },
+   "look": {
+    "x": 0,
+    "y": 0.5,
+    "z": 0
+   },
+   "fov": 34,
+   "shake": 0.2,
+   "blur": true,
+   "name": "d6_aeroport"
+  },
+  {
+   "car": "a110",
+   "kind": "Track",
+   "x": -1740,
+   "z": 120,
+   "hour": 14,
+   "speed": 75,
+   "lat": 7,
+   "tires": 1,
+   "drive": 5,
+   "len": 3.4,
+   "traffic": 0.3,
+   "cam": {
+    "x": 3.4,
+    "y": 1.0,
+    "z": 8.5
+   },
+   "look": {
+    "x": 0,
+    "y": 0.6,
+    "z": 0
+   },
+   "fov": 40,
+   "follow": 0.4,
+   "name": "d7_terre"
+  },
+  {
+   "car": "p50",
+   "kind": "Main",
+   "x": 700,
+   "z": -1700,
+   "hour": 15,
+   "speed": 45,
+   "drive": 4,
+   "len": 3.0,
+   "traffic": 1.8,
+   "cam": {
+    "x": -2.4,
+    "y": 1.0,
+    "z": 4.5
+   },
+   "look": {
+    "x": 0,
+    "y": 0.5,
+    "z": 0
+   },
+   "fov": 40,
+   "name": "d8_peel"
+  },
+  {
+   "car": "mustang",
+   "kind": "Mountain",
+   "x": 1500,
+   "z": -1900,
+   "dir": -1,
+   "hour": 18.3,
+   "speed": 70,
+   "drive": 5,
+   "len": 5.5,
+   "traffic": 0.5,
+   "lights": 1,
+   "cam": {
+    "x": -2.8,
+    "y": 1.5,
+    "z": -7.5
+   },
+   "look": {
+    "x": 0,
+    "y": 1.0,
+    "z": 8
+   },
+   "move": true,
+   "cam2": {
+    "x": -1.0,
+    "y": 2.8,
+    "z": -11
+   },
+   "look2": {
+    "x": 0,
+    "y": 1.3,
+    "z": 12
+   },
+   "fov": 45,
+   "fov2": 40,
+   "follow": 0.5,
+   "name": "e1_couchant"
+  },
+  {
+   "car": "mustang",
+   "kind": "Mountain",
+   "x": 1500,
+   "z": -1900,
+   "dir": -1,
+   "hour": 18.3,
+   "speed": 70,
+   "drive": 9,
+   "len": 9.0,
+   "traffic": 0.5,
+   "lights": 1,
+   "cam": {
+    "x": -1.0,
+    "y": 2.8,
+    "z": -11
+   },
+   "look": {
+    "x": 0,
+    "y": 1.3,
+    "z": 12
+   },
+   "move": true,
+   "cam2": {
+    "x": 0,
+    "y": 9,
+    "z": -22
+   },
+   "look2": {
+    "x": 0,
+    "y": 3,
+    "z": 20
+   },
+   "fov": 40,
+   "follow": 0.8,
+   "linear": true,
+   "name": "e2_fond_logo"
+  }
+ ]
+}
