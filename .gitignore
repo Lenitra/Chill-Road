@@ -56,6 +56,12 @@ _autosave*.blend
 # Ancienne version de la page itch
 /Marketing/itch/_ancienne_version/
 
+# Bande-annonce : vidéos (lourdes, refaites par Tools/Trailer), musique rendue, build du rendu de musique
+/Marketing/trailer/*.mp4
+/Tools/Trailer/music/trailer_music.wav
+/Tools/Trailer/music/bin/
+/Tools/Trailer/music/obj/
+
 # Python
 __pycache__/
 *.pyc
